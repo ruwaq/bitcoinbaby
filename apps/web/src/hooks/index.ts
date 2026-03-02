@@ -83,6 +83,16 @@ export {
   type MintResult,
   type UseMintNFTReturn,
 } from "./useMintNFT";
+export {
+  useNFTSync,
+  useInvalidateNFTs,
+  type UseNFTSyncReturn,
+} from "./useNFTSync";
+export {
+  useClaimNFT,
+  type ClaimResult,
+  type UseClaimNFTReturn,
+} from "./useClaimNFT";
 
 // Platform hooks
 export { useCapacitor, type UseCapacitorReturn } from "./useCapacitor";

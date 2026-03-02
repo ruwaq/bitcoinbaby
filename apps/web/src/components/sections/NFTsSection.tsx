@@ -4,10 +4,11 @@
  * NFTsSection - Genesis Babies Collection & Mint
  *
  * NFT management with:
- * - Sub-tabs: Collection | Mint New
+ * - Sub-tabs: Collection | Mint New | Claim
  * - Collection grid with stats
  * - Random mint (no preview - surprise!)
  * - Info panel showing what you could get
+ * - Claim legacy NFTs by txid
  */
 
 import { useState, useCallback } from "react";
@@ -30,14 +31,16 @@ import {
 } from "@bitcoinbaby/core";
 import { useMintNFT } from "@/hooks/useMintNFT";
 import { useNFTSync, useInvalidateNFTs } from "@/hooks/useNFTSync";
+import { useClaimNFT } from "@/hooks/useClaimNFT";
 
-type SubTab = "collection" | "mint";
+type SubTab = "collection" | "mint" | "claim";
 type MintState = "info" | "confirming" | "minting" | "revealing" | "success";
 
 export function NFTsSection() {
   const [activeTab, setActiveTab] = useState<SubTab>("collection");
   const [mintState, setMintState] = useState<MintState>("info");
   const [evolvingIds, setEvolvingIds] = useState<Set<number>>(new Set());
+  const [claimTxid, setClaimTxid] = useState("");
 
   // NFT Sync with TanStack Query
   const {
@@ -70,6 +73,15 @@ export function NFTsSection() {
     canMint,
     isWalletConnected,
   } = useMintNFT();
+
+  // Claim NFT hook
+  const {
+    isLoading: isClaiming,
+    error: claimError,
+    lastClaimed,
+    claim,
+    reset: resetClaim,
+  } = useClaimNFT();
 
   // NFT Sale hook for pricing
   const { formattedPrice, price } = useNFTSale({
@@ -148,8 +160,23 @@ export function NFTsSection() {
   const handleViewCollection = useCallback(() => {
     setMintState("info");
     resetMint();
+    resetClaim();
     setActiveTab("collection");
-  }, [resetMint]);
+  }, [resetMint, resetClaim]);
+
+  // Handle claim NFT
+  const handleClaimNFT = useCallback(async () => {
+    if (!claimTxid.trim()) return;
+
+    const result = await claim(claimTxid);
+    if (result.success) {
+      setClaimTxid("");
+      // Invalidate cache to refetch from server with proper type conversion
+      invalidateNFTs();
+      // Also trigger a refresh to show the new NFT
+      refreshNFTs();
+    }
+  }, [claimTxid, claim, invalidateNFTs, refreshNFTs]);
 
   const nfts = ownedNFTs;
 
@@ -241,6 +268,19 @@ export function NFTsSection() {
             }`}
           >
             Mint New
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("claim");
+              resetClaim();
+            }}
+            className={`font-pixel text-[9px] uppercase px-4 py-2 border-4 transition-all ${
+              activeTab === "claim"
+                ? "bg-pixel-secondary text-pixel-text-dark border-black shadow-[4px_4px_0_0_#000]"
+                : "bg-pixel-bg-medium text-pixel-text border-pixel-border hover:border-pixel-secondary"
+            }`}
+          >
+            Claim NFT
           </button>
         </div>
 
@@ -527,6 +567,168 @@ export function NFTsSection() {
                     className="flex-1 font-pixel text-[8px] uppercase px-4 py-3 bg-pixel-success text-pixel-text-dark border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-transform"
                   >
                     Mint Another
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Claim View */}
+        {activeTab === "claim" && (
+          <div className="max-w-2xl mx-auto">
+            {/* Connection Required */}
+            {!isWalletConnected && (
+              <div className="mb-6 p-4 bg-pixel-bg-medium border-4 border-pixel-warning text-center">
+                <p className="font-pixel text-[9px] text-pixel-warning uppercase mb-2">
+                  Wallet Required
+                </p>
+                <p className="font-pixel-body text-sm text-pixel-text-muted mb-3">
+                  Connect your wallet to claim NFTs
+                </p>
+                <p className="font-pixel text-[8px] text-pixel-primary">
+                  Go to Wallet tab to connect
+                </p>
+              </div>
+            )}
+
+            {/* Claim Instructions */}
+            <div className="bg-pixel-bg-medium border-4 border-pixel-secondary p-4 mb-6 shadow-[4px_4px_0_0_#000]">
+              <h3 className="font-pixel text-[10px] text-pixel-secondary uppercase mb-3">
+                Claim Existing NFT
+              </h3>
+              <p className="font-pixel-body text-sm text-pixel-text-muted mb-3">
+                If you minted an NFT before our indexing system was live, you
+                can claim it here by entering the transaction ID.
+              </p>
+              <ul className="font-pixel text-[7px] text-pixel-text-muted space-y-1">
+                <li>• The transaction must be confirmed on the blockchain</li>
+                <li>• Transaction must contain a valid CHARM/NFT mint</li>
+                <li>• Your wallet address must have received an output</li>
+              </ul>
+            </div>
+
+            {/* Error Display */}
+            {claimError && (
+              <div className="mb-4 p-3 bg-pixel-error/20 border-4 border-pixel-error">
+                <p className="font-pixel text-[8px] text-pixel-error uppercase">
+                  {claimError}
+                </p>
+              </div>
+            )}
+
+            {/* Claim Form */}
+            {!lastClaimed ? (
+              <div className="bg-pixel-bg-medium border-4 border-pixel-border p-6">
+                <label className="block font-pixel text-[8px] text-pixel-text-muted uppercase mb-2">
+                  Transaction ID (txid)
+                </label>
+                <input
+                  type="text"
+                  value={claimTxid}
+                  onChange={(e) => setClaimTxid(e.target.value)}
+                  placeholder="Enter txid or mempool.space URL..."
+                  className="w-full font-pixel-body text-sm bg-pixel-bg-dark text-pixel-text border-4 border-pixel-border p-3 mb-4 focus:border-pixel-secondary outline-none"
+                  disabled={isClaiming}
+                />
+
+                <p className="font-pixel text-[6px] text-pixel-text-muted mb-4">
+                  Example:
+                  37b13fdc8dcd85b2892500c213cf2d7c7e4af8fed75903a7f2606b062b78d4b4
+                  <br />
+                  Or paste: https://mempool.space/testnet4/tx/37b13f...
+                </p>
+
+                <button
+                  onClick={handleClaimNFT}
+                  disabled={
+                    !isWalletConnected || isClaiming || !claimTxid.trim()
+                  }
+                  className="w-full font-pixel text-[10px] uppercase px-6 py-4 bg-pixel-secondary text-pixel-text-dark border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isClaiming ? "Claiming..." : "Claim NFT"}
+                </button>
+              </div>
+            ) : (
+              /* Claim Success */
+              <div className="bg-pixel-bg-medium border-4 border-pixel-success p-6 shadow-[8px_8px_0_0_#000]">
+                <div className="text-center mb-4">
+                  <p className="font-pixel text-sm text-pixel-success uppercase mb-2">
+                    NFT Claimed Successfully!
+                  </p>
+                  <p className="font-pixel text-[8px] text-pixel-text-muted">
+                    Genesis Baby #{lastClaimed.tokenId} is now in your
+                    collection
+                  </p>
+                </div>
+
+                {/* Traits Display */}
+                <div className="grid grid-cols-2 gap-2 mb-4 p-3 bg-pixel-bg-dark border-2 border-pixel-border">
+                  <div>
+                    <span className="font-pixel text-[6px] text-pixel-text-muted uppercase">
+                      Token ID
+                    </span>
+                    <p className="font-pixel text-[10px] text-pixel-primary">
+                      #{lastClaimed.tokenId}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-pixel text-[6px] text-pixel-text-muted uppercase">
+                      Rarity
+                    </span>
+                    <p className="font-pixel text-[10px] text-pixel-secondary capitalize">
+                      {lastClaimed.rarityTier}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-pixel text-[6px] text-pixel-text-muted uppercase">
+                      Bloodline
+                    </span>
+                    <p className="font-pixel text-[10px] text-pixel-secondary capitalize">
+                      {lastClaimed.bloodline}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-pixel text-[6px] text-pixel-text-muted uppercase">
+                      Type
+                    </span>
+                    <p className="font-pixel text-[10px] text-pixel-secondary capitalize">
+                      {lastClaimed.baseType}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Transaction Link */}
+                <div className="mb-4 p-2 bg-pixel-bg-dark border-2 border-pixel-border">
+                  <p className="font-pixel text-[6px] text-pixel-text-muted uppercase mb-1">
+                    Transaction
+                  </p>
+                  <a
+                    href={`https://mempool.space/testnet4/tx/${lastClaimed.txid}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-pixel-body text-[10px] text-pixel-primary hover:text-pixel-secondary break-all underline"
+                  >
+                    {lastClaimed.txid}
+                  </a>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleViewCollection}
+                    className="flex-1 font-pixel text-[8px] uppercase px-4 py-3 bg-pixel-success text-pixel-text-dark border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-transform"
+                  >
+                    View Collection
+                  </button>
+                  <button
+                    onClick={() => {
+                      resetClaim();
+                      setClaimTxid("");
+                    }}
+                    className="flex-1 font-pixel text-[8px] uppercase px-4 py-3 bg-pixel-bg-dark text-pixel-text border-2 border-pixel-border hover:border-pixel-secondary transition-colors"
+                  >
+                    Claim Another
                   </button>
                 </div>
               </div>

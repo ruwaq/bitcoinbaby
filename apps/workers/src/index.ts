@@ -1177,7 +1177,7 @@ app.get("/api/nft/owned/:address", async (c) => {
           workCount: parseInt(nftData.workCount as string, 10) || 0,
           lastWorkBlock: parseInt(nftData.lastWorkBlock as string, 10) || 0,
           evolutionCount: parseInt(nftData.evolutionCount as string, 10) || 0,
-          tokensEarned: BigInt((nftData.tokensEarned as string) || "0"),
+          tokensEarned: (nftData.tokensEarned as string) || "0",
           // Extra metadata
           txid: nftData.txid as string,
           mintedAt: parseInt(nftData.mintedAt as string, 10),
@@ -1201,6 +1201,221 @@ app.get("/api/nft/owned/:address", async (c) => {
       {
         success: false,
         error: "Failed to get owned NFTs",
+        timestamp: Date.now(),
+      },
+      500,
+    );
+  }
+});
+
+/**
+ * POST /api/nft/claim - Claim an NFT by providing txid
+ * Verifies the transaction on blockchain and registers the NFT
+ * This allows users to claim NFTs minted before the indexing system
+ */
+app.post("/api/nft/claim", async (c) => {
+  try {
+    const body = await c.req.json<{
+      txid: string;
+      address: string;
+    }>();
+
+    const { txid, address } = body;
+
+    if (!txid || !address) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "txid and address are required",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    // Validate txid format (64 hex chars)
+    if (!/^[a-fA-F0-9]{64}$/.test(txid)) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Invalid txid format",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    // Validate address format (basic check for testnet4)
+    if (
+      !address.startsWith("tb1") &&
+      !address.startsWith("m") &&
+      !address.startsWith("n")
+    ) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Invalid testnet address",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    const redis = getRedis(c.env);
+
+    // Check if this txid was already claimed
+    const existingClaim = await redis.get(`nft:claimed:${txid}`);
+    if (existingClaim) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "This transaction was already claimed",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    // Verify transaction on blockchain (mempool.space testnet4)
+    const mempoolUrl = "https://mempool.space/testnet4/api";
+    const txResponse = await fetch(`${mempoolUrl}/tx/${txid}`);
+
+    if (!txResponse.ok) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Transaction not found on blockchain",
+          timestamp: Date.now(),
+        },
+        404,
+      );
+    }
+
+    const txData = (await txResponse.json()) as {
+      txid: string;
+      status: { confirmed: boolean };
+      vout: Array<{
+        scriptpubkey: string;
+        scriptpubkey_address?: string;
+        scriptpubkey_type: string;
+        value: number;
+      }>;
+    };
+
+    // Transaction must be confirmed
+    if (!txData.status?.confirmed) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Transaction not yet confirmed",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    // Check if transaction has an OP_RETURN with CHARM data
+    const hasCharmOpReturn = txData.vout.some(
+      (out) =>
+        out.scriptpubkey_type === "op_return" &&
+        out.scriptpubkey.includes("434841524d"), // "CHARM" in hex
+    );
+
+    if (!hasCharmOpReturn) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Transaction does not contain a valid Charm/NFT mint",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    // Check if the address received an output in this transaction
+    const userOutput = txData.vout.find(
+      (out) => out.scriptpubkey_address === address,
+    );
+
+    if (!userOutput) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Your address did not receive an output in this transaction",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    // All checks passed - register the NFT
+    // Get next available tokenId for this claim
+    const claimCount = await redis.incr("nft:claim:count");
+    const tokenId = claimCount; // Use claim count as tokenId for legacy mints
+
+    const mintedAt = Date.now();
+
+    // Generate random NFT traits for legacy mint
+    const randomDna = Array.from({ length: 64 }, () =>
+      Math.floor(Math.random() * 16).toString(16),
+    ).join("");
+
+    const bloodlines = ["royal", "warrior", "rogue", "mystic"];
+    const baseTypes = ["human", "animal", "robot", "mystic", "alien"];
+
+    // Weight rarities (mostly common for legacy)
+    const rarityRoll = Math.random() * 100;
+    let rarityTier: string;
+    if (rarityRoll < 50) rarityTier = "common";
+    else if (rarityRoll < 75) rarityTier = "uncommon";
+    else if (rarityRoll < 90) rarityTier = "rare";
+    else if (rarityRoll < 97) rarityTier = "epic";
+    else if (rarityRoll < 99.5) rarityTier = "legendary";
+    else rarityTier = "mythic";
+
+    const nftRecord = {
+      tokenId,
+      txid,
+      address,
+      mintedAt,
+      dna: randomDna,
+      bloodline: bloodlines[Math.floor(Math.random() * bloodlines.length)],
+      baseType: baseTypes[Math.floor(Math.random() * baseTypes.length)],
+      rarityTier,
+      level: 1,
+      xp: 0,
+      totalXp: 0,
+      workCount: 0,
+      evolutionCount: 0,
+      genesisBlock: 0,
+      lastWorkBlock: 0,
+      tokensEarned: "0",
+    };
+
+    // Store NFT data
+    await redis.hset(`nft:minted:${tokenId}`, nftRecord);
+
+    // Index by address
+    await redis.sadd(`nft:owned:${address}`, tokenId.toString());
+
+    // Mark txid as claimed
+    await redis.set(`nft:claimed:${txid}`, tokenId.toString());
+
+    console.log(
+      `[NFT] Claimed NFT #${tokenId} for ${address} (txid: ${txid.slice(0, 8)}...)`,
+    );
+
+    return c.json<ApiResponse<typeof nftRecord>>({
+      success: true,
+      data: nftRecord,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error("[NFT] Claim error:", error);
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: "Failed to claim NFT",
         timestamp: Date.now(),
       },
       500,
@@ -1447,6 +1662,119 @@ app.post("/api/admin/nft/sync", async (c) => {
       {
         success: false,
         error: "Sync failed",
+        timestamp: Date.now(),
+      },
+      500,
+    );
+  }
+});
+
+/**
+ * POST /api/admin/nft/register - Register an existing NFT manually
+ * Used to backfill NFTs minted before the indexing system was implemented
+ */
+app.post("/api/admin/nft/register", async (c) => {
+  const adminKey = c.req.header("X-Admin-Key");
+  const expectedKey = c.env.ADMIN_KEY;
+
+  if (expectedKey && adminKey !== expectedKey) {
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: "Unauthorized",
+        timestamp: Date.now(),
+      },
+      401,
+    );
+  }
+
+  try {
+    const body = await c.req.json<{
+      tokenId: number;
+      address: string;
+      txid: string;
+      dna?: string;
+      bloodline?: string;
+      baseType?: string;
+      rarityTier?: string;
+    }>();
+
+    const { tokenId, address, txid } = body;
+
+    if (!tokenId || !address || !txid) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "tokenId, address, and txid are required",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    const redis = getRedis(c.env);
+    const mintedAt = Date.now();
+
+    // Generate random NFT data if not provided (for legacy mints)
+    const randomDna =
+      body.dna ||
+      Array.from({ length: 64 }, () =>
+        Math.floor(Math.random() * 16).toString(16),
+      ).join("");
+
+    const bloodlines = ["royal", "warrior", "rogue", "mystic"];
+    const baseTypes = ["human", "animal", "robot", "mystic", "alien"];
+    const rarities = [
+      "common",
+      "uncommon",
+      "rare",
+      "epic",
+      "legendary",
+      "mythic",
+    ];
+
+    const nftRecord = {
+      tokenId,
+      txid,
+      address,
+      mintedAt,
+      dna: randomDna,
+      bloodline:
+        body.bloodline ||
+        bloodlines[Math.floor(Math.random() * bloodlines.length)],
+      baseType:
+        body.baseType ||
+        baseTypes[Math.floor(Math.random() * baseTypes.length)],
+      rarityTier: body.rarityTier || rarities[0], // Default to common for legacy
+      level: 1,
+      xp: 0,
+      totalXp: 0,
+      workCount: 0,
+      evolutionCount: 0,
+      genesisBlock: 0,
+      lastWorkBlock: 0,
+      tokensEarned: "0",
+    };
+
+    // Store by tokenId
+    await redis.hset(`nft:minted:${tokenId}`, nftRecord);
+
+    // Index by address
+    await redis.sadd(`nft:owned:${address}`, tokenId.toString());
+
+    console.log(`[Admin] Registered NFT #${tokenId} for ${address}`);
+
+    return c.json<ApiResponse<typeof nftRecord>>({
+      success: true,
+      data: nftRecord,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error("[Admin] NFT register error:", error);
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: "Registration failed",
         timestamp: Date.now(),
       },
       500,

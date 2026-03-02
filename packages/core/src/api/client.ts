@@ -501,10 +501,32 @@ export class BitcoinBabyClient {
     const response = await fetchWithRetry(`${this.baseUrl}/api/nft/${tokenId}`);
     return response.json() as Promise<ApiResponse<NFTRecord | null>>;
   }
+
+  /**
+   * Claim an NFT by providing the mint transaction ID
+   * Verifies the transaction on blockchain and registers the NFT
+   * Used to claim NFTs minted before the indexing system
+   */
+  async claimNFT(
+    txid: string,
+    address: string,
+  ): Promise<ApiResponse<NFTRecord>> {
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/nft/claim`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ txid, address }),
+      },
+      0, // No retries - could result in duplicate claims
+    );
+    return response.json() as Promise<ApiResponse<NFTRecord>>;
+  }
 }
 
 /**
  * NFT record from server index
+ * Note: tokensEarned is string because BigInt cannot be serialized to JSON
  */
 export interface NFTRecord {
   tokenId: number;
@@ -519,7 +541,7 @@ export interface NFTRecord {
   workCount: number;
   lastWorkBlock: number;
   evolutionCount: number;
-  tokensEarned: bigint;
+  tokensEarned: string;
   txid: string;
   mintedAt: number;
 }
