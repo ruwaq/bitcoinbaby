@@ -4,7 +4,12 @@
  * Exports for the Cloudflare Workers API client.
  */
 
-export { BitcoinBabyClient, getApiClient, resetApiClient } from "./client";
+export {
+  BitcoinBabyClient,
+  getApiClient,
+  resetApiClient,
+  type NFTRecord,
+} from "./client";
 export type {
   ApiResponse,
   BalanceResponse,

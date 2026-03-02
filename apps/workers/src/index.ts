@@ -1044,10 +1044,25 @@ app.post("/api/nft/reserve", async (c) => {
 /**
  * POST /api/nft/confirm/:tokenId - Confirm NFT was minted successfully
  * Called after transaction is broadcast
+ * Now accepts full NFT data for storage
  */
 app.post("/api/nft/confirm/:tokenId", async (c) => {
   const tokenId = parseInt(c.req.param("tokenId"), 10);
-  const body = await c.req.json<{ txid: string; address: string }>();
+  const body = await c.req.json<{
+    txid: string;
+    address: string;
+    nft?: {
+      dna: string;
+      bloodline: string;
+      baseType: string;
+      rarityTier: string;
+      level: number;
+      xp: number;
+      totalXp: number;
+      workCount: number;
+      evolutionCount: number;
+    };
+  }>();
 
   if (!tokenId || isNaN(tokenId)) {
     return c.json<ApiResponse>(
@@ -1062,19 +1077,40 @@ app.post("/api/nft/confirm/:tokenId", async (c) => {
 
   try {
     const redis = getRedis(c.env);
+    const mintedAt = Date.now();
 
-    // Store mint record
-    await redis.hset(`nft:minted:${tokenId}`, {
+    // Full NFT record for storage
+    const nftRecord = {
       tokenId,
       txid: body.txid,
       address: body.address,
-      mintedAt: Date.now(),
-    });
+      mintedAt,
+      // Include NFT traits if provided
+      dna: body.nft?.dna || "",
+      bloodline: body.nft?.bloodline || "rogue",
+      baseType: body.nft?.baseType || "human",
+      rarityTier: body.nft?.rarityTier || "common",
+      level: body.nft?.level || 1,
+      xp: body.nft?.xp || 0,
+      totalXp: body.nft?.totalXp || 0,
+      workCount: body.nft?.workCount || 0,
+      evolutionCount: body.nft?.evolutionCount || 0,
+      genesisBlock: 0,
+      lastWorkBlock: 0,
+      tokensEarned: "0",
+    };
 
-    console.log(`[NFT] Confirmed token ID: ${tokenId}, txid: ${body.txid}`);
+    // Store by tokenId for lookup
+    await redis.hset(`nft:minted:${tokenId}`, nftRecord);
 
-    return c.json<ApiResponse>({
+    // Also index by address for ownership queries
+    await redis.sadd(`nft:owned:${body.address}`, tokenId.toString());
+
+    console.log(`[NFT] Confirmed token ID: ${tokenId}, owner: ${body.address}`);
+
+    return c.json<ApiResponse<{ confirmed: boolean }>>({
       success: true,
+      data: { confirmed: true },
       timestamp: Date.now(),
     });
   } catch (error) {
@@ -1083,6 +1119,157 @@ app.post("/api/nft/confirm/:tokenId", async (c) => {
       {
         success: false,
         error: "Failed to confirm mint",
+        timestamp: Date.now(),
+      },
+      500,
+    );
+  }
+});
+
+/**
+ * GET /api/nft/owned/:address - Get all NFTs owned by an address
+ */
+app.get("/api/nft/owned/:address", async (c) => {
+  const address = c.req.param("address");
+
+  if (!address) {
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: "Address required",
+        timestamp: Date.now(),
+      },
+      400,
+    );
+  }
+
+  try {
+    const redis = getRedis(c.env);
+
+    // Get all token IDs owned by this address
+    const tokenIds = await redis.smembers(`nft:owned:${address}`);
+
+    if (!tokenIds || tokenIds.length === 0) {
+      return c.json<ApiResponse<{ nfts: unknown[]; count: number }>>({
+        success: true,
+        data: { nfts: [], count: 0 },
+        timestamp: Date.now(),
+      });
+    }
+
+    // Fetch full NFT data for each token
+    const nfts = await Promise.all(
+      tokenIds.map(async (id) => {
+        const nftData = await redis.hgetall(`nft:minted:${id}`);
+        if (!nftData) return null;
+
+        // Convert to BabyNFTState format
+        return {
+          tokenId: parseInt(nftData.tokenId as string, 10),
+          dna: nftData.dna as string,
+          bloodline: nftData.bloodline as string,
+          baseType: nftData.baseType as string,
+          genesisBlock: parseInt(nftData.genesisBlock as string, 10) || 0,
+          rarityTier: nftData.rarityTier as string,
+          level: parseInt(nftData.level as string, 10) || 1,
+          xp: parseInt(nftData.xp as string, 10) || 0,
+          totalXp: parseInt(nftData.totalXp as string, 10) || 0,
+          workCount: parseInt(nftData.workCount as string, 10) || 0,
+          lastWorkBlock: parseInt(nftData.lastWorkBlock as string, 10) || 0,
+          evolutionCount: parseInt(nftData.evolutionCount as string, 10) || 0,
+          tokensEarned: BigInt((nftData.tokensEarned as string) || "0"),
+          // Extra metadata
+          txid: nftData.txid as string,
+          mintedAt: parseInt(nftData.mintedAt as string, 10),
+        };
+      }),
+    );
+
+    // Filter out nulls and sort by tokenId
+    const validNFTs = nfts
+      .filter((n): n is NonNullable<typeof n> => n !== null)
+      .sort((a, b) => a.tokenId - b.tokenId);
+
+    return c.json<ApiResponse<{ nfts: typeof validNFTs; count: number }>>({
+      success: true,
+      data: { nfts: validNFTs, count: validNFTs.length },
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error("[NFT] Get owned error:", error);
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: "Failed to get owned NFTs",
+        timestamp: Date.now(),
+      },
+      500,
+    );
+  }
+});
+
+/**
+ * GET /api/nft/:tokenId - Get a single NFT by token ID
+ */
+app.get("/api/nft/:tokenId", async (c) => {
+  const tokenId = parseInt(c.req.param("tokenId"), 10);
+
+  if (!tokenId || isNaN(tokenId)) {
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: "Invalid token ID",
+        timestamp: Date.now(),
+      },
+      400,
+    );
+  }
+
+  try {
+    const redis = getRedis(c.env);
+    const nftData = await redis.hgetall(`nft:minted:${tokenId}`);
+
+    if (!nftData || Object.keys(nftData).length === 0) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "NFT not found",
+          timestamp: Date.now(),
+        },
+        404,
+      );
+    }
+
+    const nft = {
+      tokenId: parseInt(nftData.tokenId as string, 10),
+      dna: nftData.dna as string,
+      bloodline: nftData.bloodline as string,
+      baseType: nftData.baseType as string,
+      genesisBlock: parseInt(nftData.genesisBlock as string, 10) || 0,
+      rarityTier: nftData.rarityTier as string,
+      level: parseInt(nftData.level as string, 10) || 1,
+      xp: parseInt(nftData.xp as string, 10) || 0,
+      totalXp: parseInt(nftData.totalXp as string, 10) || 0,
+      workCount: parseInt(nftData.workCount as string, 10) || 0,
+      lastWorkBlock: parseInt(nftData.lastWorkBlock as string, 10) || 0,
+      evolutionCount: parseInt(nftData.evolutionCount as string, 10) || 0,
+      tokensEarned: (nftData.tokensEarned as string) || "0",
+      txid: nftData.txid as string,
+      address: nftData.address as string,
+      mintedAt: parseInt(nftData.mintedAt as string, 10),
+    };
+
+    return c.json<ApiResponse<typeof nft>>({
+      success: true,
+      data: nft,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error("[NFT] Get single error:", error);
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: "Failed to get NFT",
         timestamp: Date.now(),
       },
       500,

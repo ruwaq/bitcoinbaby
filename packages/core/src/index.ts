@@ -10,7 +10,12 @@ export * from "./tokenomics";
 export * from "./offline";
 
 // API exports (with prefixed names to avoid conflicts)
-export { BitcoinBabyClient, getApiClient, resetApiClient } from "./api";
+export {
+  BitcoinBabyClient,
+  getApiClient,
+  resetApiClient,
+  type NFTRecord,
+} from "./api";
 export type {
   ApiResponse,
   BalanceResponse,

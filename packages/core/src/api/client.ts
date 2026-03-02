@@ -449,24 +449,79 @@ export class BitcoinBabyClient {
 
   /**
    * Confirm NFT mint after successful broadcast
-   * Records the txid and address for tracking
+   * Records the txid, address and full NFT data for indexing
    */
   async confirmNFTMint(
     tokenId: number,
     txid: string,
     address: string,
+    nftData?: {
+      dna: string;
+      bloodline: string;
+      baseType: string;
+      rarityTier: string;
+      level: number;
+      xp: number;
+      totalXp: number;
+      workCount: number;
+      evolutionCount: number;
+    },
   ): Promise<ApiResponse<{ confirmed: boolean }>> {
     const response = await fetchWithRetry(
       `${this.baseUrl}/api/nft/confirm/${tokenId}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ txid, address }),
+        body: JSON.stringify({ txid, address, nft: nftData }),
       },
       1, // Single retry - idempotent
     );
     return response.json() as Promise<ApiResponse<{ confirmed: boolean }>>;
   }
+
+  /**
+   * Get all NFTs owned by an address
+   * Returns full NFT state for display
+   */
+  async getOwnedNFTs(
+    address: string,
+  ): Promise<ApiResponse<{ nfts: NFTRecord[]; count: number }>> {
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/nft/owned/${address}`,
+    );
+    return response.json() as Promise<
+      ApiResponse<{ nfts: NFTRecord[]; count: number }>
+    >;
+  }
+
+  /**
+   * Get a single NFT by token ID
+   */
+  async getNFT(tokenId: number): Promise<ApiResponse<NFTRecord | null>> {
+    const response = await fetchWithRetry(`${this.baseUrl}/api/nft/${tokenId}`);
+    return response.json() as Promise<ApiResponse<NFTRecord | null>>;
+  }
+}
+
+/**
+ * NFT record from server index
+ */
+export interface NFTRecord {
+  tokenId: number;
+  dna: string;
+  bloodline: string;
+  baseType: string;
+  genesisBlock: number;
+  rarityTier: string;
+  level: number;
+  xp: number;
+  totalXp: number;
+  workCount: number;
+  lastWorkBlock: number;
+  evolutionCount: number;
+  tokensEarned: bigint;
+  txid: string;
+  mintedAt: number;
 }
 
 // =============================================================================

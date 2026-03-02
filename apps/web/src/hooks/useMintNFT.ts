@@ -158,8 +158,23 @@ export function useMintNFT(): UseMintNFTReturn {
       );
 
       // Confirm the mint with server (non-blocking)
+      // Send full NFT data for server-side indexing
+      const nftData = mintResult.nft
+        ? {
+            dna: mintResult.nft.dna,
+            bloodline: mintResult.nft.bloodline,
+            baseType: mintResult.nft.baseType,
+            rarityTier: mintResult.nft.rarityTier,
+            level: mintResult.nft.level,
+            xp: mintResult.nft.xp,
+            totalXp: mintResult.nft.totalXp,
+            workCount: mintResult.nft.workCount,
+            evolutionCount: mintResult.nft.evolutionCount,
+          }
+        : undefined;
+
       apiClient
-        .confirmNFTMint(reservedTokenId, broadcastTxid, wallet.address)
+        .confirmNFTMint(reservedTokenId, broadcastTxid, wallet.address, nftData)
         .catch((err) => console.warn("[MintNFT] Failed to confirm mint:", err));
 
       setLastMinted(mintResult.nft!);

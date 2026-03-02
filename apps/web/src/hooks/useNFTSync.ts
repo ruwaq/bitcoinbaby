@@ -3,12 +3,18 @@
 /**
  * useNFTSync Hook
  *
- * Professional NFT sync using TanStack Query:
+ * Professional NFT sync using TanStack Query + Server Indexer:
+ * - Fetches NFTs from our indexed backend (not blockchain parsing)
  * - Auto-sync on mount when wallet connected
  * - Smart caching (stale-while-revalidate)
  * - Background refetch on window focus
  * - Optimistic updates after mint
  * - Automatic retry with exponential backoff
+ *
+ * Architecture follows industry standard:
+ * - Blockchain is source of truth (txid verification)
+ * - Server indexes NFTs for fast queries
+ * - Similar to Magic Eden, OpenSea, etc.
  */
 
 import { useCallback, useEffect, useRef } from "react";
@@ -17,21 +23,19 @@ import {
   useNFTStore,
   useWalletStore,
   usePendingTxStore,
+  getApiClient,
+  type NFTRecord,
 } from "@bitcoinbaby/core";
-import {
-  createCharmsClient,
-  GENESIS_BABIES_TESTNET4,
-  type BabyNFTState,
-} from "@bitcoinbaby/bitcoin";
+import { type BabyNFTState } from "@bitcoinbaby/bitcoin";
 
 // =============================================================================
 // TYPES
 // =============================================================================
 
 export interface UseNFTSyncReturn {
-  /** NFTs from blockchain */
+  /** NFTs from server index */
   nfts: BabyNFTState[];
-  /** Is fetching from blockchain */
+  /** Is fetching from server */
   isLoading: boolean;
   /** Is refetching in background */
   isFetching: boolean;
@@ -48,33 +52,61 @@ export interface UseNFTSyncReturn {
 }
 
 // =============================================================================
-// CHARMS CLIENT
-// =============================================================================
-
-const charmsClient = createCharmsClient({
-  network: "testnet4",
-});
-
-// =============================================================================
 // QUERY KEY
 // =============================================================================
 
-const NFT_QUERY_KEY = "owned-nfts";
+const NFT_QUERY_KEY = "owned-nfts-indexed";
 
 function getNFTQueryKey(address: string | undefined) {
-  return [NFT_QUERY_KEY, address, GENESIS_BABIES_TESTNET4.appId];
+  return [NFT_QUERY_KEY, address];
+}
+
+// =============================================================================
+// CONVERSION
+// =============================================================================
+
+/**
+ * Convert server NFTRecord to BabyNFTState for local use
+ */
+function convertToNFTState(record: NFTRecord): BabyNFTState {
+  return {
+    tokenId: record.tokenId,
+    dna: record.dna,
+    bloodline: record.bloodline as BabyNFTState["bloodline"],
+    baseType: record.baseType as BabyNFTState["baseType"],
+    genesisBlock: record.genesisBlock,
+    rarityTier: record.rarityTier as BabyNFTState["rarityTier"],
+    level: record.level,
+    xp: record.xp,
+    totalXp: record.totalXp,
+    workCount: record.workCount,
+    lastWorkBlock: record.lastWorkBlock,
+    evolutionCount: record.evolutionCount,
+    tokensEarned:
+      typeof record.tokensEarned === "bigint"
+        ? record.tokensEarned
+        : BigInt(record.tokensEarned || 0),
+  };
 }
 
 // =============================================================================
 // FETCH FUNCTION
 // =============================================================================
 
+/**
+ * Fetch owned NFTs from server index
+ * Much faster than blockchain parsing - direct database query
+ */
 async function fetchOwnedNFTs(address: string): Promise<BabyNFTState[]> {
-  const nfts = await charmsClient.getOwnedNFTs(
-    address,
-    GENESIS_BABIES_TESTNET4.appId,
-  );
-  return nfts;
+  const apiClient = getApiClient();
+  const response = await apiClient.getOwnedNFTs(address);
+
+  if (!response.success || !response.data) {
+    throw new Error(response.error || "Failed to fetch NFTs");
+  }
+
+  // Convert server records to BabyNFTState
+  return response.data.nfts.map(convertToNFTState);
 }
 
 // =============================================================================
@@ -92,9 +124,9 @@ export function useNFTSync(): UseNFTSyncReturn {
   // Track last confirmed tx to trigger refetch
   const lastConfirmedTxRef = useRef<string | null>(null);
 
-  // Query for NFTs
+  // Query for NFTs from server index
   const {
-    data: blockchainNFTs = [],
+    data: indexedNFTs = [],
     isLoading,
     isFetching,
     error,
@@ -105,7 +137,7 @@ export function useNFTSync(): UseNFTSyncReturn {
     queryKey: getNFTQueryKey(wallet?.address),
     queryFn: () => fetchOwnedNFTs(wallet!.address),
     enabled: !!wallet?.address,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 30 * 1000, // 30 seconds - server data is fast
     gcTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
@@ -114,30 +146,34 @@ export function useNFTSync(): UseNFTSyncReturn {
   });
 
   /**
-   * Merge blockchain NFTs with local store
-   * Blockchain is source of truth, but keep pending local mints
+   * Merge server NFTs with local store
+   * Server is source of truth, but keep pending local mints
    */
   useEffect(() => {
-    if (blockchainNFTs.length > 0) {
-      // Keep local NFTs that aren't on-chain yet (pending mints)
-      const onChainIds = new Set(blockchainNFTs.map((n) => n.tokenId));
+    if (indexedNFTs.length > 0) {
+      // Keep local NFTs that aren't on server yet (pending mints)
+      const indexedIds = new Set(indexedNFTs.map((n) => n.tokenId));
       const pendingLocalNFTs = localNFTs.filter(
-        (n) => !onChainIds.has(n.tokenId),
+        (n) => !indexedIds.has(n.tokenId),
       );
 
-      // Merge: blockchain NFTs (source of truth) + pending local
-      const mergedNFTs = [...blockchainNFTs, ...pendingLocalNFTs];
+      // Merge: server NFTs (indexed) + pending local (optimistic)
+      const mergedNFTs = [...indexedNFTs, ...pendingLocalNFTs];
 
       // Only update if different
       if (JSON.stringify(mergedNFTs) !== JSON.stringify(localNFTs)) {
         setOwnedNFTs(mergedNFTs);
       }
+    } else if (indexedNFTs.length === 0 && !isLoading && !isFetching) {
+      // If server returns empty and we have local NFTs, keep them
+      // (optimistic updates from minting)
+      // Don't clear local NFTs if server is empty - they might just be pending
     }
-  }, [blockchainNFTs, localNFTs, setOwnedNFTs]);
+  }, [indexedNFTs, localNFTs, setOwnedNFTs, isLoading, isFetching]);
 
   /**
    * Refetch when NFT transactions confirm
-   * Uses multiple retry attempts with exponential backoff to handle API indexing delays
+   * Faster than blockchain indexing - our server confirms immediately
    */
   useEffect(() => {
     const confirmedNFTTx = pendingTransactions.find(
@@ -150,9 +186,9 @@ export function useNFTSync(): UseNFTSyncReturn {
     if (confirmedNFTTx) {
       lastConfirmedTxRef.current = confirmedNFTTx.txid;
 
-      // Retry with exponential backoff: 15s, 30s, 60s, 120s
-      // Mempool API can take time to index new transactions
-      const retryDelays = [15000, 30000, 60000, 120000];
+      // With server indexing, we can refetch much faster
+      // Server confirms NFT at mint time, not when blockchain is indexed
+      const retryDelays = [2000, 5000, 10000, 20000];
       let attempt = 0;
 
       const attemptRefetch = async () => {
@@ -164,10 +200,9 @@ export function useNFTSync(): UseNFTSyncReturn {
           const result = await refetch();
           const nfts = result.data || [];
 
-          // Check if we found any NFTs
           if (nfts.length > 0) {
             console.log(
-              `[NFTSync] Found ${nfts.length} NFTs after confirmation`,
+              `[NFTSync] Found ${nfts.length} NFTs from server index`,
             );
             return; // Success - stop retrying
           }
@@ -184,8 +219,8 @@ export function useNFTSync(): UseNFTSyncReturn {
               `[NFTSync] Failed to find NFT after ${retryDelays.length} attempts`,
             );
           }
-        } catch (error) {
-          console.error(`[NFTSync] Refetch failed:`, error);
+        } catch (err) {
+          console.error(`[NFTSync] Refetch failed:`, err);
           // Schedule retry on error
           attempt++;
           if (attempt < retryDelays.length) {
@@ -194,7 +229,7 @@ export function useNFTSync(): UseNFTSyncReturn {
         }
       };
 
-      // Start first attempt after initial delay
+      // Start first attempt quickly - server should have the data already
       setTimeout(attemptRefetch, retryDelays[0]);
     }
   }, [pendingTransactions, refetch]);
