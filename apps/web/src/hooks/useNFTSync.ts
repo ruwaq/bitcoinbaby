@@ -160,8 +160,19 @@ export function useNFTSync(): UseNFTSyncReturn {
       // Merge: server NFTs (indexed) + pending local (optimistic)
       const mergedNFTs = [...indexedNFTs, ...pendingLocalNFTs];
 
-      // Only update if different
-      if (JSON.stringify(mergedNFTs) !== JSON.stringify(localNFTs)) {
+      // Only update if different (use safe comparison for BigInt values)
+      const areEqual =
+        mergedNFTs.length === localNFTs.length &&
+        mergedNFTs.every((merged, i) => {
+          const local = localNFTs[i];
+          return (
+            merged.tokenId === local?.tokenId &&
+            merged.level === local?.level &&
+            merged.xp === local?.xp
+          );
+        });
+
+      if (!areEqual) {
         setOwnedNFTs(mergedNFTs);
       }
     } else if (indexedNFTs.length === 0 && !isLoading && !isFetching) {

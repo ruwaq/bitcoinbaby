@@ -74,6 +74,31 @@ function deserializeWithBigIntMarker(obj: unknown): unknown {
 // =============================================================================
 
 /**
+ * Convert BigInt to number if safe, otherwise to string
+ * This is needed because Zustand's JSON storage can't handle BigInt directly
+ */
+function convertBigIntToSafe(obj: unknown): unknown {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === "bigint") {
+    // If it fits in a safe integer, convert to number
+    if (obj <= Number.MAX_SAFE_INTEGER && obj >= Number.MIN_SAFE_INTEGER) {
+      return Number(obj);
+    }
+    // Otherwise keep as string (will be parsed back as string)
+    return obj.toString();
+  }
+  if (Array.isArray(obj)) return obj.map(convertBigIntToSafe);
+  if (typeof obj === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = convertBigIntToSafe(value);
+    }
+    return result;
+  }
+  return obj;
+}
+
+/**
  * Custom storage that handles BigInt serialization
  * Required because BabyNFTState.tokensEarned is bigint
  */
@@ -83,10 +108,12 @@ const bigIntStorage: StateStorage = {
     if (!value) return null;
 
     try {
-      // Parse and deserialize BigInt markers
+      // Parse stored value and deserialize BigInt markers
       const parsed = JSON.parse(value);
       const deserialized = deserializeWithBigIntMarker(parsed);
-      return JSON.stringify(deserialized);
+      // Convert BigInt to safe types for Zustand's internal JSON handling
+      const safe = convertBigIntToSafe(deserialized);
+      return JSON.stringify(safe);
     } catch {
       return value;
     }

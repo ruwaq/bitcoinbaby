@@ -466,14 +466,30 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     // =========================================================================
     // SECURITY: Validate proof fields exist
     // =========================================================================
-    if (
-      !proof ||
-      !proof.hash ||
-      typeof proof.nonce !== "number" ||
-      !proof.blockData
-    ) {
-      return this.errorResponse("Invalid proof: missing required fields", 400);
+    if (!proof || !proof.hash || !proof.blockData) {
+      return this.errorResponse(
+        `Invalid proof: missing required fields (hash=${!!proof?.hash}, blockData=${!!proof?.blockData})`,
+        400,
+      );
     }
+
+    // Coerce nonce to number (IndexedDB may serialize as string)
+    const nonce =
+      typeof proof.nonce === "string"
+        ? parseInt(proof.nonce, 10)
+        : typeof proof.nonce === "number"
+          ? proof.nonce
+          : NaN;
+
+    if (isNaN(nonce)) {
+      return this.errorResponse(
+        `Invalid proof: nonce must be a number (got ${typeof proof.nonce})`,
+        400,
+      );
+    }
+
+    // Use coerced nonce for validation
+    const proofWithNonce = { ...proof, nonce };
 
     const now = Date.now();
 
@@ -482,11 +498,11 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     // Verifies: hash matches SHA256(blockData + nonce) AND meets difficulty
     // =========================================================================
     const proofValidation = await validateMiningProof({
-      hash: proof.hash,
-      nonce: proof.nonce,
-      difficulty: proof.difficulty,
-      blockData: proof.blockData,
-      timestamp: proof.timestamp,
+      hash: proofWithNonce.hash,
+      nonce: proofWithNonce.nonce,
+      difficulty: proofWithNonce.difficulty,
+      blockData: proofWithNonce.blockData,
+      timestamp: proofWithNonce.timestamp,
     });
 
     if (!proofValidation.valid) {
@@ -501,7 +517,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     // =========================================================================
     const kv = this.env.CACHE || null;
     const isUsed = await isProofUsedGlobally(
-      proof.hash,
+      proofWithNonce.hash,
       kv,
       this.env.ENVIRONMENT,
     );
@@ -535,19 +551,19 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     // Validate that submitted difficulty meets the assigned difficulty
     // SECURITY: Reject shares below assigned difficulty to prevent reward farming
     const assignedDiff = this.difficultyState.currentDiff;
-    if (proof.difficulty < assignedDiff) {
+    if (proofWithNonce.difficulty < assignedDiff) {
       // Grace period: allow 1 level below for network latency (stricter than before)
       // But apply a penalty to reward to discourage abuse
       const minAcceptable = Math.max(assignedDiff - 1, MIN_DIFFICULTY);
-      if (proof.difficulty < minAcceptable) {
+      if (proofWithNonce.difficulty < minAcceptable) {
         return this.errorResponse(
-          `Share difficulty D${proof.difficulty} below minimum D${minAcceptable} (assigned: D${assignedDiff})`,
+          `Share difficulty D${proofWithNonce.difficulty} below minimum D${minAcceptable} (assigned: D${assignedDiff})`,
           400,
         );
       }
       // Log below-assigned shares for monitoring (potential abuse indicator)
       console.warn(
-        `[VarDiff] Share at D${proof.difficulty} below assigned D${assignedDiff}, accepting with penalty`,
+        `[VarDiff] Share at D${proofWithNonce.difficulty} below assigned D${assignedDiff}, accepting with penalty`,
       );
     }
 
@@ -572,7 +588,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     // SECURITY: Calculate reward SERVER-SIDE (never trust client)
     // =========================================================================
     const boostedReward = calculateRewardWithStreak(
-      proof.difficulty,
+      proofWithNonce.difficulty,
       consecutiveShares,
     );
     const baseReward = proofValidation.calculatedReward!;
@@ -582,7 +598,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     // If global marking fails after local insert, another address could use same proof
     // =========================================================================
     try {
-      await markProofUsedGlobally(proof.hash, this.address, kv);
+      await markProofUsedGlobally(proofWithNonce.hash, this.address, kv);
     } catch (e) {
       console.error("[VirtualBalance] Failed to mark proof globally:", e);
       return this.errorResponse("Failed to register proof. Try again.", 500);
@@ -599,10 +615,10 @@ export class VirtualBalanceDO extends DurableObject<Env> {
          (id, hash, nonce, difficulty, block_data, reward, credited, created_at)
          VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
         proofId,
-        proof.hash,
-        proof.nonce,
-        proof.difficulty,
-        proof.blockData,
+        proofWithNonce.hash,
+        proofWithNonce.nonce,
+        proofWithNonce.difficulty,
+        proofWithNonce.blockData,
         boostedReward.toString(),
         now,
       );
