@@ -18,6 +18,7 @@ import {
   useGlobalMining,
   useGameLoop,
   useAchievements,
+  MIN_DIFFICULTY,
 } from "@bitcoinbaby/core";
 import { useBabyState } from "@/hooks/useBabyState";
 import {
@@ -251,7 +252,7 @@ export function BabySection({ setActiveTab }: BabySectionProps) {
   // Mining hook - uses global singleton (persistent across navigation)
   // CRITICAL: Keep this for XP tracking even though we don't show full mining UI
   const mining = useGlobalMining({
-    difficulty: 16,
+    difficulty: MIN_DIFFICULTY,
     minerAddress: "baby-miner-001",
   });
 

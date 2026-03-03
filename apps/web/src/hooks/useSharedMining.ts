@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { MIN_DIFFICULTY } from "@bitcoinbaby/core";
 
 // =============================================================================
 // TYPES
@@ -168,7 +169,7 @@ export function useSharedMining(
     hashrate: 0,
     totalHashes: 0,
     shares: 0,
-    difficulty: config.difficulty || 16,
+    difficulty: config.difficulty || MIN_DIFFICULTY,
     throttle: config.throttle || 100,
     uptime: 0,
     isConnected: false,
@@ -218,7 +219,8 @@ export function useSharedMining(
   const start = useCallback(
     (startConfig?: { difficulty?: number }) => {
       sendMessage("start", {
-        difficulty: startConfig?.difficulty || config.difficulty || 16,
+        difficulty:
+          startConfig?.difficulty || config.difficulty || MIN_DIFFICULTY,
       });
     },
     [config.difficulty],

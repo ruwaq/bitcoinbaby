@@ -10,7 +10,11 @@
  */
 
 import { clsx } from "clsx";
-import { useGlobalMining, formatHashrate } from "@bitcoinbaby/core";
+import {
+  useGlobalMining,
+  formatHashrate,
+  MIN_DIFFICULTY,
+} from "@bitcoinbaby/core";
 
 interface MiningStatusBarProps {
   onClick?: () => void;
@@ -19,7 +23,7 @@ interface MiningStatusBarProps {
 
 export function MiningStatusBar({ onClick, className }: MiningStatusBarProps) {
   const { isRunning, isPaused, hashrate, shares } = useGlobalMining({
-    difficulty: 16,
+    difficulty: MIN_DIFFICULTY,
     minerAddress: "status-bar",
   });
 

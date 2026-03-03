@@ -14,6 +14,7 @@ import {
   useGlobalMining,
   type UseGlobalMiningOptions,
 } from "./useGlobalMining";
+import { DEFAULT_NFT_APP_ID } from "../constants/app-ids";
 
 export interface UseMiningWithNFTsOptions extends Omit<
   UseGlobalMiningOptions,
@@ -37,7 +38,7 @@ export interface UseMiningWithNFTsReturn extends ReturnType<
 export function useMiningWithNFTs(
   options: UseMiningWithNFTsOptions = {},
 ): UseMiningWithNFTsReturn {
-  const { nftAppId = "genesis-babies", ...miningOptions } = options;
+  const { nftAppId = DEFAULT_NFT_APP_ID, ...miningOptions } = options;
 
   // Get wallet address
   const address = useWalletStore((s) => s.wallet?.address ?? null);

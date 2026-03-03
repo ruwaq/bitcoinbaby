@@ -25,6 +25,7 @@ import {
   forceSaveMiningState,
   formatHashrate,
   formatTotal,
+  MIN_DIFFICULTY,
   type MiningManagerState,
 } from "@bitcoinbaby/core";
 import { supportsSharedWorker } from "@/hooks/useSharedMining";
@@ -58,7 +59,7 @@ export function MiningProvider({ children }: MiningProviderProps) {
     hashrate: 0,
     totalHashes: 0,
     shares: 0,
-    difficulty: 16,
+    difficulty: MIN_DIFFICULTY,
     minerType: null,
     capabilities: null,
     lastShare: null,

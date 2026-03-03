@@ -22,7 +22,12 @@ import {
   type SubmissionResult,
   type MiningProof,
 } from "@bitcoinbaby/bitcoin";
-import { useNetworkStore, type NetworkConfig } from "@bitcoinbaby/core";
+import {
+  useNetworkStore,
+  MIN_DIFFICULTY,
+  calculateShareReward,
+  type NetworkConfig,
+} from "@bitcoinbaby/core";
 import { useWalletConnection } from "./useWalletConnection";
 
 /**
@@ -400,20 +405,12 @@ export function useMiningSubmitter(
 
   /**
    * Calculate reward for difficulty
+   * Uses the shared logarithmic formula from tokenomics constants
    */
   const calculateReward = useCallback((difficulty: number): bigint => {
     if (!submitterRef.current) {
-      // Default calculation
-      const baseDifficulty = 16;
-      const baseReward = BigInt(1000);
-      const multiplier = BigInt(2);
-
-      if (difficulty <= baseDifficulty) {
-        return baseReward;
-      }
-
-      const extraDifficulty = BigInt(difficulty - baseDifficulty);
-      return baseReward * multiplier ** extraDifficulty;
+      // Use shared reward calculation (logarithmic formula)
+      return calculateShareReward(difficulty);
     }
 
     return submitterRef.current.calculateReward(difficulty);

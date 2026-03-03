@@ -13,6 +13,7 @@
  */
 
 import Dexie, { type Table } from "dexie";
+import { RETRY_DELAYS } from "../constants/retry-config";
 
 // =============================================================================
 // TYPES
@@ -366,9 +367,12 @@ export async function markFailed(
   currentAttempts: number,
 ): Promise<void> {
   const database = getDB();
-  const backoffDelays = [1000, 5000, 15000, 60000, 300000, 900000, 3600000];
-  const delayIndex = Math.min(currentAttempts, backoffDelays.length - 1);
-  const delay = backoffDelays[delayIndex];
+  // Use centralized retry delays (rate limit backoff for aggressive retries)
+  const delayIndex = Math.min(
+    currentAttempts,
+    RETRY_DELAYS.rateLimit.length - 1,
+  );
+  const delay = RETRY_DELAYS.rateLimit[delayIndex];
 
   await database.shares.update(id, {
     status: "pending", // Back to pending for retry

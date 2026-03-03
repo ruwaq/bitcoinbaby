@@ -28,6 +28,7 @@ import {
   type QueueStats,
 } from "./share-queue";
 import { getApiClient } from "../api/client";
+import { CIRCUIT_BREAKER_DELAYS } from "../constants/retry-config";
 import { MIN_DIFFICULTY } from "../tokenomics/constants";
 import { getMiningManager } from "../mining/mining-singleton";
 
@@ -538,13 +539,13 @@ class SyncManager {
         ) {
           this.consecutiveFailures++;
           // Exponential backoff with jitter (best practice to prevent thundering herd)
-          const breakerDelays = [30000, 60000, 120000, 300000, 600000]; // 30s, 1m, 2m, 5m, 10m (reduced from before)
+          // Use centralized circuit breaker delays
           const delayIndex = Math.min(
             this.consecutiveFailures - 1,
-            breakerDelays.length - 1,
+            CIRCUIT_BREAKER_DELAYS.length - 1,
           );
           // Add ±20% jitter to prevent synchronized retries
-          const baseDelay = breakerDelays[delayIndex];
+          const baseDelay = CIRCUIT_BREAKER_DELAYS[delayIndex];
           const jitter = baseDelay * 0.2 * (Math.random() * 2 - 1); // ±20%
           const delay = Math.round(baseDelay + jitter);
           this.circuitBreakerUntil = Date.now() + delay;
@@ -585,13 +586,13 @@ class SyncManager {
       ) {
         this.consecutiveFailures++;
         // Exponential backoff with jitter (best practice to prevent thundering herd)
-        const breakerDelays = [30000, 60000, 120000, 300000, 600000]; // 30s, 1m, 2m, 5m, 10m
+        // Use centralized circuit breaker delays
         const delayIndex = Math.min(
           this.consecutiveFailures - 1,
-          breakerDelays.length - 1,
+          CIRCUIT_BREAKER_DELAYS.length - 1,
         );
         // Add ±20% jitter
-        const baseDelay = breakerDelays[delayIndex];
+        const baseDelay = CIRCUIT_BREAKER_DELAYS[delayIndex];
         const jitter = baseDelay * 0.2 * (Math.random() * 2 - 1);
         const delay = Math.round(baseDelay + jitter);
         this.circuitBreakerUntil = Date.now() + delay;
