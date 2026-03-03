@@ -16,6 +16,8 @@ import Link from "next/link";
 import {
   useSettingsStore,
   useNetworkStore,
+  useWalletStore,
+  getApiClient,
   SecureStorage,
   MIN_PASSWORD_LENGTH,
   type MiningDifficulty,
@@ -443,6 +445,9 @@ export default function SettingsPage() {
   const { network, switchNetwork, mainnetAllowed, setMainnetAllowed } =
     useNetworkStore();
 
+  // Wallet store (for backend reset)
+  const walletAddress = useWalletStore((s) => s.wallet?.address);
+
   // Modal state
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -455,9 +460,21 @@ export default function SettingsPage() {
     setShowResetConfirm(false);
   }, [resetAllSettings]);
 
-  // Handle reset ALL data (full localStorage + IndexedDB clear)
+  // Handle reset ALL data (full localStorage + IndexedDB + backend)
   const handleResetAllData = useCallback(async () => {
-    // Clear all BitcoinBaby localStorage keys
+    // 1. Reset backend balance if wallet is connected
+    if (walletAddress) {
+      try {
+        const apiClient = getApiClient();
+        await apiClient.resetBalance(walletAddress);
+        console.log("[Settings] Backend balance reset successful");
+      } catch (err) {
+        console.warn("[Settings] Backend reset failed (continuing):", err);
+        // Continue with local reset even if backend fails
+      }
+    }
+
+    // 2. Clear all BitcoinBaby localStorage keys
     const keysToRemove = [
       "bitcoinbaby-nft-store",
       "bitcoinbaby-mining-store",
@@ -472,8 +489,12 @@ export default function SettingsPage() {
     ];
     keysToRemove.forEach((key) => localStorage.removeItem(key));
 
-    // Clear IndexedDB databases
-    const dbsToDelete = ["bitcoinbaby", "bitcoinbaby-secure"];
+    // 3. Clear IndexedDB databases (including share queue)
+    const dbsToDelete = [
+      "bitcoinbaby",
+      "bitcoinbaby-secure",
+      "BitcoinBabyShareQueue", // Mining share queue
+    ];
     for (const dbName of dbsToDelete) {
       try {
         await new Promise<void>((resolve, reject) => {
@@ -493,7 +514,7 @@ export default function SettingsPage() {
     setShowResetDataConfirm(false);
     // Reload to apply changes
     window.location.reload();
-  }, []);
+  }, [walletAddress]);
 
   return (
     <main className="min-h-screen p-4 md:p-8 bg-pixel-bg-dark">
