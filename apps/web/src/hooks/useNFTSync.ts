@@ -24,6 +24,7 @@ import {
   useWalletStore,
   usePendingTxStore,
   getApiClient,
+  RETRY_DELAYS,
   type NFTRecord,
 } from "@bitcoinbaby/core";
 import { type BabyNFTState } from "@bitcoinbaby/bitcoin";
@@ -199,7 +200,8 @@ export function useNFTSync(): UseNFTSyncReturn {
 
       // With server indexing, we can refetch much faster
       // Server confirms NFT at mint time, not when blockchain is indexed
-      const retryDelays = [2000, 5000, 10000, 20000];
+      // Use centralized retry delays from @bitcoinbaby/core/constants
+      const retryDelays = RETRY_DELAYS.standard;
       let attempt = 0;
 
       const attemptRefetch = async () => {

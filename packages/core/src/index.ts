@@ -10,9 +10,11 @@ export * from "./tokenomics";
 export * from "./offline";
 
 // Centralized constants
+// See packages/core/src/constants/index.ts for full guide
 export * from "./constants/retry-config";
 export * from "./constants/polling";
 export * from "./constants/app-ids";
+export * from "./constants/mining";
 
 // API exports (with prefixed names to avoid conflicts)
 export {
