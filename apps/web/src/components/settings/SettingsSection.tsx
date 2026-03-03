@@ -22,6 +22,10 @@ import {
   type MinerTypePreference,
   type AutoLockTimeout,
   AUTO_LOCK_LABELS,
+  getMiningManager,
+  getSyncManager,
+  useNFTStore,
+  clearQueue as clearShareQueue,
 } from "@bitcoinbaby/core";
 import { NetworkSwitcher } from "@bitcoinbaby/ui";
 
@@ -373,6 +377,61 @@ export function SettingsSection() {
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
+  // Debug state
+  const [isClearing, setIsClearing] = useState(false);
+  const [clearMessage, setClearMessage] = useState<string | null>(null);
+
+  // NFT store reset
+  const resetNFTStore = useNFTStore((s) => s.reset);
+
+  // Clear all testnet data
+  const handleClearTestnetData = async () => {
+    if (
+      !confirm(
+        "This will clear ALL testnet data:\n\n• Mining stats & progress\n• Pending share queue\n• NFT cache\n\nYour wallet and NFTs on the blockchain are safe.\n\nContinue?",
+      )
+    ) {
+      return;
+    }
+
+    setIsClearing(true);
+    setClearMessage(null);
+
+    try {
+      // 1. Clear mining manager data
+      const manager = getMiningManager();
+      await manager.resetAllMiningData();
+
+      // 2. Clear share queue
+      await clearShareQueue();
+
+      // 3. Reset NFT store
+      resetNFTStore();
+
+      // 4. Clear localStorage items (testnet-specific)
+      const keysToRemove = [
+        "bitcoinbaby-nft-store",
+        "bitcoinbaby-pending-tx-store",
+        "bitcoinbaby-mining-state",
+      ];
+      keysToRemove.forEach((key) => {
+        try {
+          localStorage.removeItem(key);
+        } catch {
+          // Ignore errors
+        }
+      });
+
+      setClearMessage("All testnet data cleared! Refresh the page.");
+    } catch (err) {
+      setClearMessage(
+        `Error: ${err instanceof Error ? err.message : "Unknown error"}`,
+      );
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Mining Settings */}
@@ -511,6 +570,41 @@ export function SettingsSection() {
           </button>
         </div>
       </div>
+
+      {/* Developer / Debug (only on testnet - includes testnet4) */}
+      {network.includes("testnet") && (
+        <div className="space-y-3">
+          <h3 className="font-pixel text-[10px] text-pixel-warning border-b border-pixel-warning pb-1">
+            DEVELOPER
+          </h3>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="font-pixel text-[10px] text-pixel-text">
+                CLEAR TESTNET DATA
+              </span>
+              <p className="font-pixel-body text-[8px] text-pixel-text-muted mt-0.5">
+                Reset mining stats, queue & cache
+              </p>
+            </div>
+            <button
+              onClick={handleClearTestnetData}
+              disabled={isClearing}
+              className="px-3 py-1 font-pixel text-[8px] bg-pixel-error/20 text-pixel-error border-2 border-pixel-error hover:bg-pixel-error hover:text-white disabled:opacity-50"
+            >
+              {isClearing ? "CLEARING..." : "CLEAR"}
+            </button>
+          </div>
+
+          {clearMessage && (
+            <p
+              className={`font-pixel text-[8px] ${clearMessage.startsWith("Error") ? "text-pixel-error" : "text-pixel-success"}`}
+            >
+              {clearMessage}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* About */}
       <div className="space-y-2 pt-4 border-t border-pixel-border">
