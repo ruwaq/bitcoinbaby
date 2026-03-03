@@ -64,11 +64,25 @@ export {
 } from "./pending-tx-store";
 export {
   useOverlayStore,
+  // Sheet overlays
   useWithdrawOverlay,
   useSendOverlay,
   useReceiveOverlay,
   useSettingsOverlay,
   useHistoryOverlay,
+  // Modal overlays
+  useUnlockModal,
+  useConfirmModal,
+  useResetModal,
+  useRecoveryPhraseModal,
+  useChangePasswordModal,
+  useDeleteWalletModal,
+  // Utilities
+  getOverlayMode,
+  // Types
   type OverlayType,
+  type SheetType,
+  type ModalType,
+  type OverlayMode,
   type OverlayData,
 } from "./overlay-store";

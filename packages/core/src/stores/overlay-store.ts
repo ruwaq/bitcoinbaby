@@ -15,17 +15,53 @@ import { devtools } from "zustand/middleware";
 // =============================================================================
 
 /**
- * Available overlay types in the application
+ * Sheet overlays (slide in from side)
  */
-export type OverlayType =
+export type SheetType =
   | "withdraw"
   | "send"
   | "receive"
   | "settings"
   | "history"
   | "nft-detail"
-  | "mint-confirm"
-  | null;
+  | "mint-confirm";
+
+/**
+ * Modal overlays (centered dialogs)
+ */
+export type ModalType =
+  | "unlock-wallet"
+  | "confirm-reset"
+  | "recovery-phrase"
+  | "change-password"
+  | "confirm-action"
+  | "delete-wallet";
+
+/**
+ * Available overlay types in the application
+ */
+export type OverlayType = SheetType | ModalType | null;
+
+/**
+ * Overlay display mode
+ */
+export type OverlayMode = "sheet" | "modal";
+
+/**
+ * Get the display mode for an overlay type
+ */
+export function getOverlayMode(type: OverlayType): OverlayMode {
+  if (type === null) return "sheet";
+  const modalTypes: ModalType[] = [
+    "unlock-wallet",
+    "confirm-reset",
+    "recovery-phrase",
+    "change-password",
+    "confirm-action",
+    "delete-wallet",
+  ];
+  return modalTypes.includes(type as ModalType) ? "modal" : "sheet";
+}
 
 /**
  * Additional data that can be passed to overlays
@@ -37,6 +73,28 @@ export interface OverlayData {
   recipientAddress?: string;
   /** For pre-filled amount */
   amount?: string;
+
+  // Modal-specific data
+
+  /** Title for confirmation modals */
+  title?: string;
+  /** Message/description for confirmation modals */
+  message?: string;
+  /** Confirm button text */
+  confirmText?: string;
+  /** Cancel button text */
+  cancelText?: string;
+  /** Callback when confirmed */
+  onConfirm?: () => void | Promise<void>;
+  /** Callback when cancelled */
+  onCancel?: () => void;
+  /** If action is destructive (shows in red) */
+  destructive?: boolean;
+  /** Password submission callback */
+  onPasswordSubmit?: (password: string) => void | Promise<void>;
+  /** Recovery phrase to display */
+  recoveryPhrase?: string;
+
   /** Generic metadata */
   [key: string]: unknown;
 }
@@ -196,5 +254,113 @@ export function useHistoryOverlay() {
     open: () => openOverlay("history"),
     close: closeOverlay,
     isOpen: isOpen("history"),
+  };
+}
+
+// =============================================================================
+// MODAL HOOKS
+// =============================================================================
+
+/**
+ * Hook to open the unlock wallet modal
+ */
+export function useUnlockModal() {
+  const { openOverlay, closeOverlay, isOpen } = useOverlayStore();
+
+  return {
+    open: (onPasswordSubmit: (password: string) => void | Promise<void>) =>
+      openOverlay("unlock-wallet", { onPasswordSubmit }),
+    close: closeOverlay,
+    isOpen: isOpen("unlock-wallet"),
+  };
+}
+
+/**
+ * Hook to open a generic confirmation modal
+ */
+export function useConfirmModal() {
+  const { openOverlay, closeOverlay, isOpen } = useOverlayStore();
+
+  return {
+    open: (options: {
+      title: string;
+      message: string;
+      confirmText?: string;
+      cancelText?: string;
+      destructive?: boolean;
+      onConfirm: () => void | Promise<void>;
+      onCancel?: () => void;
+    }) => openOverlay("confirm-action", options),
+    close: closeOverlay,
+    isOpen: isOpen("confirm-action"),
+  };
+}
+
+/**
+ * Hook to open the confirm reset modal
+ */
+export function useResetModal() {
+  const { openOverlay, closeOverlay, isOpen } = useOverlayStore();
+
+  return {
+    open: (onConfirm: () => void | Promise<void>) =>
+      openOverlay("confirm-reset", {
+        title: "Reset Baby?",
+        message:
+          "This will delete your current baby and all progress. This action cannot be undone.",
+        confirmText: "DELETE",
+        destructive: true,
+        onConfirm,
+      }),
+    close: closeOverlay,
+    isOpen: isOpen("confirm-reset"),
+  };
+}
+
+/**
+ * Hook to open the recovery phrase modal
+ */
+export function useRecoveryPhraseModal() {
+  const { openOverlay, closeOverlay, isOpen } = useOverlayStore();
+
+  return {
+    open: (recoveryPhrase: string) =>
+      openOverlay("recovery-phrase", { recoveryPhrase }),
+    close: closeOverlay,
+    isOpen: isOpen("recovery-phrase"),
+  };
+}
+
+/**
+ * Hook to open the change password modal
+ */
+export function useChangePasswordModal() {
+  const { openOverlay, closeOverlay, isOpen } = useOverlayStore();
+
+  return {
+    open: () => openOverlay("change-password"),
+    close: closeOverlay,
+    isOpen: isOpen("change-password"),
+  };
+}
+
+/**
+ * Hook to open the delete wallet modal
+ */
+export function useDeleteWalletModal() {
+  const { openOverlay, closeOverlay, isOpen } = useOverlayStore();
+
+  return {
+    open: (onConfirm: () => void | Promise<void>) =>
+      openOverlay("delete-wallet", {
+        title: "Delete Wallet?",
+        message:
+          "This will permanently delete your wallet. Make sure you have backed up your recovery phrase!",
+        confirmText: "DELETE WALLET",
+        destructive: true,
+        onConfirm,
+      }),
+    close: closeOverlay,
+    isOpen: isOpen("delete-wallet"),
   };
 }

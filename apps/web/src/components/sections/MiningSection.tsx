@@ -22,6 +22,8 @@ import {
   AnimatedTokenCounter,
   HelpTooltip,
   EngagementBonusPanel,
+  SectionHeader,
+  InfoBanner,
 } from "@bitcoinbaby/ui";
 import {
   useWalletStore,
@@ -180,90 +182,67 @@ export function MiningSection() {
     <div className="p-responsive safe-x bg-pixel-bg-dark min-h-screen-safe">
       <div className="max-w-4xl mx-auto">
         {/* Section Header */}
-        <div className="mb-6">
-          <h2 className="font-pixel text-pixel-lg text-pixel-primary">
-            MINING
-          </h2>
-          <p className="font-pixel-body text-body-sm text-pixel-text-muted mt-1">
-            Earn $BABY tokens with Proof of Useful Work
-          </p>
-        </div>
+        <SectionHeader
+          title="Mining"
+          description="Earn $BABY tokens with Proof of Useful Work"
+          icon="&#9935;"
+          size="lg"
+        />
 
         {/* PoUW Info Banner */}
-        <div className="mb-6 p-4 bg-gradient-to-r from-pixel-primary/10 to-pixel-secondary/10 border-4 border-pixel-primary/50">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl sm:text-3xl">🧠</span>
-            <div className="min-w-0 flex-1">
-              <h3 className="font-pixel text-pixel-xs text-pixel-primary uppercase mb-1">
-                Proof of Useful Work
-              </h3>
-              <p className="font-pixel-body text-body-sm text-pixel-text leading-relaxed">
-                Your computing power is not wasted on meaningless algorithms. We
-                are building a system where mining energy{" "}
-                <span className="text-pixel-secondary font-semibold">
-                  trains artificial intelligence
-                </span>
-                . Every hash contributes to a collective AI model.
-              </p>
-              <p className="font-pixel text-pixel-2xs text-pixel-text-muted mt-2">
-                Current phase: Traditional mining | Next phase: AI Training
-              </p>
-            </div>
-          </div>
-        </div>
+        <InfoBanner variant="highlight" icon="&#129504;" className="mb-6">
+          <h3 className="font-pixel text-pixel-xs text-pixel-primary uppercase mb-1">
+            Proof of Useful Work
+          </h3>
+          <p className="font-pixel-body text-sm text-pixel-text leading-relaxed">
+            Your computing power is not wasted on meaningless algorithms. We are
+            building a system where mining energy{" "}
+            <span className="text-pixel-secondary font-semibold">
+              trains artificial intelligence
+            </span>
+            . Every hash contributes to a collective AI model.
+          </p>
+          <p className="font-pixel text-pixel-2xs text-pixel-text-muted mt-2">
+            Current phase: Traditional mining | Next phase: AI Training
+          </p>
+        </InfoBanner>
 
         {/* Connection Warning */}
         {!wallet && (
-          <div className="mb-6 p-4 bg-pixel-bg-medium border-4 border-pixel-warning text-center">
-            <p className="font-pixel text-pixel-xs text-pixel-warning uppercase mb-2">
+          <InfoBanner variant="warning" icon="&#128274;" className="mb-6">
+            <p className="font-pixel text-pixel-xs uppercase mb-1">
               Wallet Not Connected
             </p>
-            <p className="font-pixel-body text-body-sm text-pixel-text-muted mb-4">
-              Connect your wallet to start earning $BABY tokens
+            <p className="font-pixel-body text-sm text-pixel-text-muted">
+              Connect your wallet to start earning $BABY tokens.{" "}
+              <span className="text-pixel-primary">
+                Go to Wallet tab to connect.
+              </span>
             </p>
-            <p className="font-pixel text-pixel-2xs text-pixel-primary">
-              Go to Wallet tab to connect
-            </p>
-          </div>
+          </InfoBanner>
         )}
 
         {/* Virtual Balance Error Alert */}
         {virtualBalanceError && (
-          <div className="mb-4 p-3 bg-pixel-error/20 border-4 border-pixel-error">
-            <div className="flex items-center gap-2">
-              <span className="font-pixel text-pixel-sm text-pixel-error">
-                ⚠
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="font-pixel text-pixel-xs text-pixel-error uppercase">
-                  Balance Sync Error
-                </p>
-                <p className="font-pixel-body text-body-xs text-pixel-text-muted mt-1">
-                  {virtualBalanceError}. Mining rewards are still being tracked
-                  locally.
-                </p>
-              </div>
-            </div>
-          </div>
+          <InfoBanner variant="error" icon="&#9888;" className="mb-4">
+            <p className="font-pixel text-pixel-xs uppercase">
+              Balance Sync Error
+            </p>
+            <p className="font-pixel-body text-xs text-pixel-text-muted mt-1">
+              {virtualBalanceError}. Mining rewards are still being tracked
+              locally.
+            </p>
+          </InfoBanner>
         )}
 
         {/* Workers API Warning */}
         {wallet && !workersApiAvailable && !virtualBalanceLoading && (
-          <div className="mb-4 p-3 bg-pixel-warning/20 border-4 border-pixel-warning">
-            <div className="flex items-center gap-2">
-              <span className="font-pixel text-pixel-sm text-pixel-warning">
-                ⚠
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="font-pixel text-pixel-xs text-pixel-warning uppercase">
-                  Offline Mode
-                </p>
-                <p className="font-pixel-body text-body-xs text-pixel-text-muted mt-1">
-                  Cannot connect to balance server. Mining locally only.
-                </p>
-              </div>
-            </div>
-          </div>
+          <InfoBanner variant="warning" icon="&#9888;" className="mb-4">
+            <p className="font-pixel text-pixel-xs uppercase">Offline Mode</p>
+            <p className="font-pixel-body text-xs text-pixel-text-muted mt-1">
+              Cannot connect to balance server. Mining locally only.
+            </p>
+          </InfoBanner>
         )}
 
         {/* Balance Panel */}

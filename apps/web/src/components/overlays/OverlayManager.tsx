@@ -9,21 +9,34 @@
  * - No page navigation = no state loss
  * - Consistent UX across the app
  * - Deep linking support via URL params (optional)
+ * - Unified modal/sheet system
  */
 
 "use client";
 
 import { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { Sheet, SheetContent } from "@bitcoinbaby/ui";
-import { useOverlayStore, type OverlayType } from "@bitcoinbaby/core";
+import { Sheet, SheetContent, ModalDialog } from "@bitcoinbaby/ui";
+import {
+  useOverlayStore,
+  getOverlayMode,
+  type OverlayType,
+} from "@bitcoinbaby/core";
 
-// Lazy imports for code splitting
+// Sheet imports
 import { WithdrawSheet } from "./WithdrawSheet";
 import { SendSheet } from "./SendSheet";
 import { ReceiveSheet } from "./ReceiveSheet";
 import { SettingsSheet } from "./SettingsSheet";
 import { HistorySheet } from "./HistorySheet";
+
+// Modal imports
+import {
+  UnlockWalletModal,
+  ConfirmActionModal,
+  RecoveryPhraseModal,
+  ChangePasswordModal,
+} from "./modals";
 
 /**
  * OverlayManager Component
@@ -158,6 +171,47 @@ export function OverlayManager() {
           <HistorySheet />
         </SheetContent>
       </Sheet>
+
+      {/* ============================================ */}
+      {/* MODAL DIALOGS (centered) */}
+      {/* ============================================ */}
+
+      {/* Unlock Wallet Modal */}
+      <ModalDialog
+        open={activeOverlay === "unlock-wallet"}
+        onOpenChange={(open) => !open && closeOverlay()}
+      >
+        <UnlockWalletModal />
+      </ModalDialog>
+
+      {/* Confirm Action Modal (generic + reset + delete) */}
+      <ModalDialog
+        open={
+          activeOverlay === "confirm-action" ||
+          activeOverlay === "confirm-reset" ||
+          activeOverlay === "delete-wallet"
+        }
+        onOpenChange={(open) => !open && closeOverlay()}
+      >
+        <ConfirmActionModal />
+      </ModalDialog>
+
+      {/* Recovery Phrase Modal */}
+      <ModalDialog
+        open={activeOverlay === "recovery-phrase"}
+        onOpenChange={(open) => !open && closeOverlay()}
+        preventClose
+      >
+        <RecoveryPhraseModal />
+      </ModalDialog>
+
+      {/* Change Password Modal */}
+      <ModalDialog
+        open={activeOverlay === "change-password"}
+        onOpenChange={(open) => !open && closeOverlay()}
+      >
+        <ChangePasswordModal />
+      </ModalDialog>
     </>
   );
 }

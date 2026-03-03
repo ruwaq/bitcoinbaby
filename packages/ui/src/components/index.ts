@@ -83,6 +83,11 @@ export {
 // Help & Tooltips
 export { HelpTooltip, InfoLabel, StatWithHelp } from "./common/HelpTooltip";
 
+// Layout Primitives
+export { SectionHeader } from "./common/SectionHeader";
+export { InfoBanner } from "./common/InfoBanner";
+export { StatCard } from "./common/StatCard";
+
 // Sheet/Overlay Components
 export {
   Sheet,
@@ -96,6 +101,9 @@ export {
   SheetTitle,
   SheetDescription,
 } from "./common/sheet";
+
+// Modal Dialog
+export { ModalDialog } from "./common/ModalDialog";
 
 // Error Components
 export {
