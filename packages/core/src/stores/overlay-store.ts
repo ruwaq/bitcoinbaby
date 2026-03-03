@@ -324,8 +324,8 @@ export function useRecoveryPhraseModal() {
   const { openOverlay, closeOverlay, isOpen } = useOverlayStore();
 
   return {
-    open: (recoveryPhrase: string) =>
-      openOverlay("recovery-phrase", { recoveryPhrase }),
+    open: (recoveryPhrase?: string) =>
+      openOverlay("recovery-phrase", recoveryPhrase ? { recoveryPhrase } : {}),
     close: closeOverlay,
     isOpen: isOpen("recovery-phrase"),
   };

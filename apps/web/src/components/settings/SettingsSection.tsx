@@ -9,7 +9,7 @@
  * - Security settings (auto-lock)
  * - Quick actions (recovery phrase, change password)
  *
- * Used by both SettingsSheet (overlay) and settings page.
+ * Uses centralized overlay store for modals.
  */
 
 import { useState } from "react";
@@ -17,17 +17,16 @@ import {
   useSettingsStore,
   useNetworkStore,
   useWalletStore,
-  SecureStorage,
-  MIN_PASSWORD_LENGTH,
   type MiningDifficulty,
   type MinerTypePreference,
   type AutoLockTimeout,
   AUTO_LOCK_LABELS,
   getMiningManager,
-  getSyncManager,
   useNFTStore,
   clearQueue as clearShareQueue,
   getApiClient,
+  useRecoveryPhraseModal,
+  useChangePasswordModal,
 } from "@bitcoinbaby/core";
 import { NetworkSwitcher } from "@bitcoinbaby/ui";
 
@@ -115,248 +114,6 @@ function Select<T extends string>({
   );
 }
 
-// Recovery phrase modal
-function RecoveryPhraseModal({ onClose }: { onClose: () => void }) {
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [phrase, setPhrase] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  const handleReveal = async () => {
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const mnemonic = await SecureStorage.getMnemonic(password);
-      setPhrase(mnemonic);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Invalid password or no wallet found",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCopy = async () => {
-    if (phrase) {
-      await navigator.clipboard.writeText(phrase);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80">
-      <div className="bg-pixel-bg-dark border-4 border-black p-4 shadow-[8px_8px_0_0_#000] max-w-sm mx-4">
-        <h3 className="font-pixel text-pixel-primary text-xs mb-3">
-          RECOVERY PHRASE
-        </h3>
-
-        {!phrase ? (
-          <>
-            <p className="font-pixel-body text-xs text-pixel-text mb-3">
-              Enter your password to reveal your 12-word recovery phrase.
-            </p>
-
-            <div className="bg-pixel-error/20 border-2 border-pixel-error p-2 mb-3">
-              <p className="font-pixel text-[7px] text-pixel-error">
-                Never share your recovery phrase!
-              </p>
-            </div>
-
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              className="w-full px-2 py-1 mb-3 font-pixel text-[10px] bg-pixel-bg-light border-2 border-black text-pixel-text"
-            />
-
-            {error && (
-              <p className="font-pixel text-[8px] text-pixel-error mb-3">
-                {error}
-              </p>
-            )}
-
-            <div className="flex gap-2">
-              <button
-                onClick={onClose}
-                className="flex-1 px-3 py-2 font-pixel text-[8px] bg-pixel-bg-light text-pixel-text border-2 border-black"
-              >
-                CANCEL
-              </button>
-              <button
-                onClick={handleReveal}
-                disabled={isLoading || password.length < MIN_PASSWORD_LENGTH}
-                className="flex-1 px-3 py-2 font-pixel text-[8px] bg-pixel-primary text-black border-2 border-black disabled:opacity-50"
-              >
-                {isLoading ? "..." : "REVEAL"}
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="bg-pixel-error/20 border-2 border-pixel-error p-2 mb-3">
-              <p className="font-pixel text-[7px] text-pixel-error">
-                NEVER share this phrase! Anyone with these words can steal your
-                funds.
-              </p>
-            </div>
-
-            <div className="bg-pixel-bg-light border-2 border-black p-3 mb-3">
-              <div className="grid grid-cols-3 gap-1">
-                {phrase.split(" ").map((word, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-1 bg-pixel-bg-dark px-1 py-0.5 border border-pixel-border"
-                  >
-                    <span className="font-pixel text-[6px] text-pixel-text-muted">
-                      {i + 1}.
-                    </span>
-                    <span className="font-pixel-mono text-[8px] text-pixel-text">
-                      {word}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleCopy}
-                className="flex-1 px-3 py-2 font-pixel text-[8px] bg-pixel-bg-light text-pixel-text border-2 border-black"
-              >
-                {copied ? "COPIED!" : "COPY"}
-              </button>
-              <button
-                onClick={onClose}
-                className="flex-1 px-3 py-2 font-pixel text-[8px] bg-pixel-primary text-black border-2 border-black"
-              >
-                CLOSE
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Change password modal
-function ChangePasswordModal({ onClose }: { onClose: () => void }) {
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-
-  const handleChange = async () => {
-    if (currentPassword.length < MIN_PASSWORD_LENGTH) {
-      setError(
-        `Current password must be at least ${MIN_PASSWORD_LENGTH} chars`,
-      );
-      return;
-    }
-    if (newPassword.length < MIN_PASSWORD_LENGTH) {
-      setError(`New password must be at least ${MIN_PASSWORD_LENGTH} chars`);
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setError("New passwords do not match");
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      await SecureStorage.changePassword(currentPassword, newPassword);
-      setSuccess(true);
-      setTimeout(() => onClose(), 2000);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to change password",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80">
-      <div className="bg-pixel-bg-dark border-4 border-black p-4 shadow-[8px_8px_0_0_#000] max-w-sm mx-4">
-        <h3 className="font-pixel text-pixel-primary text-xs mb-3">
-          CHANGE PASSWORD
-        </h3>
-
-        <div className="space-y-2 mb-3">
-          <input
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            placeholder="Current password"
-            className="w-full px-2 py-1 font-pixel text-[10px] bg-pixel-bg-light border-2 border-black text-pixel-text"
-          />
-          <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="New password (min 8 chars)"
-            className="w-full px-2 py-1 font-pixel text-[10px] bg-pixel-bg-light border-2 border-black text-pixel-text"
-          />
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Confirm new password"
-            className="w-full px-2 py-1 font-pixel text-[10px] bg-pixel-bg-light border-2 border-black text-pixel-text"
-          />
-        </div>
-
-        {error && (
-          <p className="font-pixel text-[8px] text-pixel-error mb-3">{error}</p>
-        )}
-
-        {success && (
-          <div className="bg-pixel-success/20 border-2 border-pixel-success p-2 mb-3">
-            <p className="font-pixel text-[8px] text-pixel-success">
-              Password changed successfully!
-            </p>
-          </div>
-        )}
-
-        {!success && (
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="flex-1 px-3 py-2 font-pixel text-[8px] bg-pixel-bg-light text-pixel-text border-2 border-black"
-            >
-              CANCEL
-            </button>
-            <button
-              onClick={handleChange}
-              disabled={isLoading}
-              className="flex-1 px-3 py-2 font-pixel text-[8px] bg-pixel-success text-black border-2 border-black disabled:opacity-50"
-            >
-              {isLoading ? "..." : "CHANGE"}
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export function SettingsSection() {
   // Settings store
   const {
@@ -375,9 +132,9 @@ export function SettingsSection() {
   const { network, switchNetwork, mainnetAllowed, setMainnetAllowed } =
     useNetworkStore();
 
-  // Modal state
-  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  // Overlay modal hooks
+  const { open: openRecoveryModal } = useRecoveryPhraseModal();
+  const { open: openPasswordModal } = useChangePasswordModal();
 
   // Debug state
   const [isClearing, setIsClearing] = useState(false);
@@ -577,7 +334,7 @@ export function SettingsSection() {
             </p>
           </div>
           <button
-            onClick={() => setShowRecoveryModal(true)}
+            onClick={() => openRecoveryModal()}
             className="px-3 py-1 font-pixel text-[8px] bg-pixel-bg-light text-pixel-text border-2 border-black hover:bg-pixel-bg-dark"
           >
             SHOW
@@ -594,7 +351,7 @@ export function SettingsSection() {
             </p>
           </div>
           <button
-            onClick={() => setShowPasswordModal(true)}
+            onClick={openPasswordModal}
             className="px-3 py-1 font-pixel text-[8px] bg-pixel-bg-light text-pixel-text border-2 border-black hover:bg-pixel-bg-dark"
           >
             CHANGE
@@ -651,14 +408,6 @@ export function SettingsSection() {
           Built on Bitcoin with Charms Protocol
         </p>
       </div>
-
-      {/* Modals */}
-      {showRecoveryModal && (
-        <RecoveryPhraseModal onClose={() => setShowRecoveryModal(false)} />
-      )}
-      {showPasswordModal && (
-        <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />
-      )}
     </div>
   );
 }
