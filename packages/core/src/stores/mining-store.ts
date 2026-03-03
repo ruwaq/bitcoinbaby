@@ -24,8 +24,12 @@ interface MiningStore {
   persistedStats: PersistedMiningStats;
 
   // NFT Boost
-  nftBoost: number; // Percentage boost from NFTs (0-200)
-  effectiveHashrate: number; // hashrate * boosts
+  /**
+   * @deprecated Use useNFTStore().bestBoost instead.
+   * This field is kept for backwards compatibility but is no longer maintained.
+   */
+  nftBoost: number;
+  effectiveHashrate: number; // hashrate * boosts (no longer includes NFT boost)
 
   // Cosmic Energy Integration
   cosmicMultiplier: number; // From cosmic energy (0.5 - 2.0)
@@ -38,6 +42,10 @@ interface MiningStore {
   updateStats: (stats: Partial<MiningSession>) => void;
   addHashes: (count: number) => void;
   addTokens: (amount: number) => void;
+  /**
+   * @deprecated NFT boost is now read from NFTStore.bestBoost.
+   * This action is a no-op and will be removed in a future version.
+   */
   setNFTBoost: (boost: number) => void;
   setCosmicEnergy: (
     multiplier: number,
@@ -66,15 +74,17 @@ const initialPersistedStats: PersistedMiningStats = {
 };
 
 /**
- * Calculate effective hashrate with all boosts
+ * Calculate effective hashrate with cosmic multiplier only.
+ *
+ * Note: NFT boost is applied separately in useGlobalMining hook
+ * by reading from NFTStore.bestBoost (single source of truth).
  */
 function calculateEffectiveHashrate(
   baseHashrate: number,
-  nftBoost: number,
   cosmicMultiplier: number,
 ): number {
-  // NFT boost is percentage (0-200), cosmic is multiplier (0.5-2.0)
-  return baseHashrate * (1 + nftBoost / 100) * cosmicMultiplier;
+  // Cosmic is multiplier (0.5-2.0)
+  return baseHashrate * cosmicMultiplier;
 }
 
 export const useMiningStore = create<MiningStore>()(
@@ -119,7 +129,6 @@ export const useMiningStore = create<MiningStore>()(
           const updatedStats = { ...s.stats, ...newStats };
           const effectiveHashrate = calculateEffectiveHashrate(
             updatedStats.hashrate,
-            s.nftBoost,
             s.cosmicMultiplier,
           );
 
@@ -139,15 +148,12 @@ export const useMiningStore = create<MiningStore>()(
           stats: { ...s.stats, tokensEarned: s.stats.tokensEarned + amount },
         })),
 
-      setNFTBoost: (boost) =>
-        set((s) => ({
-          nftBoost: boost,
-          effectiveHashrate: calculateEffectiveHashrate(
-            s.stats.hashrate,
-            boost,
-            s.cosmicMultiplier,
-          ),
-        })),
+      setNFTBoost: (_boost) => {
+        // No-op: NFT boost is now read from NFTStore.bestBoost
+        console.warn(
+          "[MiningStore] setNFTBoost() is deprecated. NFT boost is read from NFTStore.bestBoost automatically.",
+        );
+      },
 
       setCosmicEnergy: (multiplier, status, effects) =>
         set((s) => ({
@@ -156,7 +162,6 @@ export const useMiningStore = create<MiningStore>()(
           activeCosmicEffects: effects,
           effectiveHashrate: calculateEffectiveHashrate(
             s.stats.hashrate,
-            s.nftBoost,
             multiplier,
           ),
         })),

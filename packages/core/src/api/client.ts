@@ -200,6 +200,30 @@ export class BitcoinBabyClient {
     return response.json() as Promise<ApiResponse<SetHashrateResponse>>;
   }
 
+  /**
+   * Reset user's balance and mining data (TESTNET ONLY)
+   *
+   * Clears:
+   * - Virtual balance
+   * - Total mined
+   * - Mining proofs
+   * - Difficulty state
+   *
+   * WARNING: This permanently deletes all mining progress.
+   */
+  async resetBalance(
+    address: string,
+  ): Promise<ApiResponse<{ reset: boolean }>> {
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/balance/${address}/reset`,
+      {
+        method: "DELETE",
+      },
+      0, // No retries for destructive operation
+    );
+    return response.json() as Promise<ApiResponse<{ reset: boolean }>>;
+  }
+
   // ===========================================================================
   // WITHDRAW POOL API
   // ===========================================================================

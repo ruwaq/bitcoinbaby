@@ -29,6 +29,7 @@ import {
   type MiningManagerConfig,
 } from "../mining/mining-singleton";
 import { useMiningStore } from "../stores/mining-store";
+import { useNFTStore } from "../stores/nft-store";
 
 // =============================================================================
 // TYPES
@@ -41,7 +42,10 @@ export interface UseGlobalMiningOptions {
   minerAddress?: string;
   /** Auto-start mining when hook mounts */
   autoStart?: boolean;
-  /** NFT boost percentage (0-200) */
+  /**
+   * @deprecated NFT boost is now read from NFTStore.bestBoost automatically.
+   * This option is ignored.
+   */
   nftBoost?: number;
   /** Cosmic energy multiplier (0.5-2.0) */
   cosmicMultiplier?: number;
@@ -87,7 +91,7 @@ export function useGlobalMining(
     difficulty = 22, // D22 for very sustainable emission
     minerAddress,
     autoStart = false,
-    nftBoost: initialNftBoost = 0,
+    // nftBoost is deprecated - read from NFTStore instead
     cosmicMultiplier: initialCosmicMultiplier = 1.0,
     onWorkFound,
     onError,
@@ -101,13 +105,11 @@ export function useGlobalMining(
     manager.getState(),
   );
 
-  // Get Zustand store for boosts
-  const {
-    nftBoost,
-    cosmicMultiplier,
-    setNFTBoost: setStoreNFTBoost,
-    updateStats,
-  } = useMiningStore();
+  // Get Zustand stores
+  const { cosmicMultiplier, updateStats } = useMiningStore();
+
+  // Read NFT boost directly from NFTStore (single source of truth)
+  const nftBoost = useNFTStore((s) => s.bestBoost);
 
   // Uptime counter
   const [uptime, setUptime] = useState(0);
@@ -149,12 +151,8 @@ export function useGlobalMining(
     }
   }, [autoStart, manager, managerState.isRunning]);
 
-  // Initialize NFT boost from options
-  useEffect(() => {
-    if (initialNftBoost > 0) {
-      setStoreNFTBoost(initialNftBoost);
-    }
-  }, [initialNftBoost, setStoreNFTBoost]);
+  // Note: NFT boost is now read directly from NFTStore (populated by useNFTSync)
+  // The initialNftBoost option is deprecated - boost comes from owned NFTs
 
   // Uptime timer
   useEffect(() => {
@@ -171,14 +169,14 @@ export function useGlobalMining(
   }, [managerState.isRunning, manager]);
 
   // Calculate effective hashrate with boosts
+  // NFT boost comes from NFTStore (single source of truth)
   const effectiveHashrate = useMemo(() => {
-    const boostMultiplier = 1 + (nftBoost || initialNftBoost) / 100;
+    const boostMultiplier = 1 + nftBoost / 100;
     const cosmic = cosmicMultiplier || initialCosmicMultiplier;
     return Math.floor(managerState.hashrate * boostMultiplier * cosmic);
   }, [
     managerState.hashrate,
     nftBoost,
-    initialNftBoost,
     cosmicMultiplier,
     initialCosmicMultiplier,
   ]);
@@ -217,18 +215,20 @@ export function useGlobalMining(
     [manager],
   );
 
-  const setNFTBoost = useCallback(
-    (boost: number) => {
-      const clamped = Math.max(0, Math.min(200, boost));
-      setStoreNFTBoost(clamped);
-    },
-    [setStoreNFTBoost],
-  );
+  /**
+   * @deprecated NFT boost is now read directly from NFTStore.
+   * This function is a no-op. Use useNFTSync to populate NFT data.
+   */
+  const setNFTBoost = useCallback((_boost: number) => {
+    console.warn(
+      "[useGlobalMining] setNFTBoost() is deprecated. NFT boost is read from NFTStore automatically.",
+    );
+  }, []);
 
   return {
     ...managerState,
     effectiveHashrate,
-    nftBoost: nftBoost || initialNftBoost,
+    nftBoost,
     cosmicMultiplier: cosmicMultiplier || initialCosmicMultiplier,
     uptime,
     start,

@@ -9,7 +9,6 @@ import { persist } from "zustand/middleware";
 import type {
   BabyNFTState,
   BabyNFTInfo,
-  RarityTier,
   EvolutionStatus,
 } from "@bitcoinbaby/bitcoin";
 import {
@@ -18,92 +17,8 @@ import {
   LEVEL_BOOSTS,
   XP_REQUIREMENTS,
   EVOLUTION_COSTS,
-  GENESIS_BABIES_CONFIG,
 } from "@bitcoinbaby/bitcoin";
-
-// =============================================================================
-// BIGINT SERIALIZATION HELPERS
-// =============================================================================
-
-// Marker prefix for BigInt values to distinguish from regular strings
-const BIGINT_MARKER = "__bigint__:";
-
-/**
- * Serialize BigInt values with a marker prefix
- * This ensures ALL BigInt values are properly restored, regardless of size
- */
-function serializeWithBigIntMarker(obj: unknown): unknown {
-  if (obj === null || obj === undefined) return obj;
-  if (typeof obj === "bigint") return `${BIGINT_MARKER}${obj.toString()}`;
-  if (Array.isArray(obj)) return obj.map(serializeWithBigIntMarker);
-  if (typeof obj === "object") {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      result[key] = serializeWithBigIntMarker(value);
-    }
-    return result;
-  }
-  return obj;
-}
-
-/**
- * Deserialize values with BigInt marker back to BigInt
- */
-function deserializeWithBigIntMarker(obj: unknown): unknown {
-  if (obj === null || obj === undefined) return obj;
-  if (typeof obj === "string" && obj.startsWith(BIGINT_MARKER)) {
-    return BigInt(obj.slice(BIGINT_MARKER.length));
-  }
-  if (Array.isArray(obj)) return obj.map(deserializeWithBigIntMarker);
-  if (typeof obj === "object") {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
-      result[key] = deserializeWithBigIntMarker(value);
-    }
-    return result;
-  }
-  return obj;
-}
-
-// =============================================================================
-// CUSTOM STORAGE (BigInt-safe)
-// =============================================================================
-
-/**
- * Custom storage adapter that handles BigInt serialization properly.
- *
- * IMPORTANT: This storage does NOT use Zustand's createJSONStorage because
- * createJSONStorage calls JSON.stringify BEFORE passing to setItem, which fails
- * with BigInt values. Instead, we implement the full StorageValue interface
- * and handle serialization ourselves.
- */
-const bigIntSafeStorage = {
-  getItem: (name: string) => {
-    const value = localStorage.getItem(name);
-    if (!value) return null;
-
-    try {
-      // Parse and convert BigInt markers back to BigInt
-      const parsed = JSON.parse(value);
-      const deserialized = deserializeWithBigIntMarker(parsed);
-      return deserialized;
-    } catch {
-      return null;
-    }
-  },
-  setItem: (name: string, value: unknown): void => {
-    try {
-      // Serialize with BigInt markers before storing
-      const serialized = serializeWithBigIntMarker(value);
-      localStorage.setItem(name, JSON.stringify(serialized));
-    } catch (e) {
-      console.error("[NFTStore] Failed to save:", e);
-    }
-  },
-  removeItem: (name: string): void => {
-    localStorage.removeItem(name);
-  },
-};
+import { createBigIntStorage } from "./utils/bigint-storage";
 
 // =============================================================================
 // TYPES
@@ -316,9 +231,8 @@ export const useNFTStore = create<NFTStore>()(
     }),
     {
       name: "bitcoinbaby-nft-store",
-      // Use custom storage that handles BigInt serialization internally
-      // NOT using createJSONStorage because it calls JSON.stringify before setItem
-      storage: bigIntSafeStorage as never,
+      // Use BigInt-safe storage (handles serialization internally)
+      storage: createBigIntStorage() as never,
       partialize: (state) => ({
         ownedNFTs: state.ownedNFTs,
         selectedNFT: state.selectedNFT,

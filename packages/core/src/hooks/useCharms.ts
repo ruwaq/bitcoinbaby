@@ -9,7 +9,6 @@ import {
   createCharmsClient,
   formatTokenAmount,
   BABTC_CONFIG,
-  type BabyNFTState,
   type CharmsClientOptions,
 } from "@bitcoinbaby/bitcoin";
 import { useNFTStore } from "../stores/nft-store";
@@ -88,53 +87,25 @@ export function useTokenBalance(
 }
 
 /**
- * Hook for owned NFTs
+ * Hook for owned NFTs (READ-ONLY)
+ *
+ * @deprecated This hook only reads from NFTStore. Use useNFTSync from
+ * apps/web/src/hooks/useNFTSync.ts for fetching NFT data from the server.
+ *
+ * DATA FLOW (Single Source of Truth):
+ * 1. useNFTSync (web app) fetches from Workers API (fast, indexed)
+ * 2. useNFTSync calls setOwnedNFTs() to update NFTStore
+ * 3. This hook (and useMiningBoost) reads from NFTStore
+ *
+ * DO NOT fetch from blockchain here - it's slow and creates race conditions.
  */
 export function useOwnedNFTs(
-  address: string | null,
-  appId: string,
-  options?: UseCharmsOptions,
+  _address: string | null,
+  _appId: string,
+  _options?: UseCharmsOptions,
 ) {
-  const {
-    ownedNFTs,
-    setOwnedNFTs,
-    isLoading,
-    setLoading,
-    error,
-    setError,
-    bestBoost,
-    totalNFTs,
-  } = useNFTStore();
-
-  const client = useMemo(() => getClient(options), [options]);
-
-  const refresh = useCallback(async () => {
-    if (!address) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const nfts = await client.getOwnedNFTs(address, appId);
-      setOwnedNFTs(nfts);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [address, appId, client, setOwnedNFTs, setLoading, setError]);
-
-  useEffect(() => {
-    refresh();
-
-    if (options?.autoRefresh !== false) {
-      const interval = setInterval(
-        refresh,
-        options?.refreshInterval || 120_000,
-      );
-      return () => clearInterval(interval);
-    }
-  }, [refresh, options?.autoRefresh, options?.refreshInterval]);
+  // Read-only from NFTStore (populated by useNFTSync in web app)
+  const { ownedNFTs, isLoading, error, bestBoost, totalNFTs } = useNFTStore();
 
   return {
     nfts: ownedNFTs,
@@ -142,7 +113,11 @@ export function useOwnedNFTs(
     error,
     bestBoost,
     totalNFTs,
-    refresh,
+    refresh: () => {
+      console.warn(
+        "[useOwnedNFTs] refresh() is a no-op. Use useNFTSync for fetching.",
+      );
+    },
   };
 }
 
@@ -314,23 +289,38 @@ export function useBlockHeight(options?: UseCharmsOptions) {
 
 /**
  * Combined dashboard hook
+ *
+ * @deprecated NFT data should be fetched via useNFTSync in the web app.
+ * This hook reads NFT data from NFTStore (read-only).
+ *
+ * For full dashboard functionality in web app, use individual hooks:
+ * - useVirtualBalance (for token balance)
+ * - useNFTSync (for NFT fetching)
+ * - useFeeEstimates (for network fees)
  */
 export function useDashboard(
   address: string | null,
   tokenAppId: string,
-  nftAppId: string,
+  _nftAppId: string,
   options?: UseCharmsOptions,
 ) {
   const btc = useBTCBalance(address, options);
   const token = useTokenBalance(address, tokenAppId, options);
-  const nfts = useOwnedNFTs(address, nftAppId, options);
   const fees = useFeeEstimates(options);
   const block = useBlockHeight(options);
+
+  // Read NFT data from store (populated by useNFTSync)
+  const {
+    ownedNFTs,
+    totalNFTs,
+    bestBoost,
+    isLoading: nftsLoading,
+  } = useNFTStore();
 
   const loading =
     btc.loading ||
     token.loading ||
-    nfts.loading ||
+    nftsLoading ||
     fees.loading ||
     block.loading;
 
@@ -338,11 +328,11 @@ export function useDashboard(
     await Promise.all([
       btc.refresh(),
       token.refresh(),
-      nfts.refresh(),
       fees.refresh(),
       block.refresh(),
     ]);
-  }, [btc, token, nfts, fees, block]);
+    // Note: NFT refresh is handled by useNFTSync, not here
+  }, [btc, token, fees, block]);
 
   return {
     // BTC
@@ -353,10 +343,10 @@ export function useDashboard(
     tokenBalance: token.balance,
     tokenFormatted: token.formatted,
 
-    // NFTs
-    ownedNFTs: nfts.nfts,
-    nftCount: nfts.totalNFTs,
-    miningBoost: nfts.bestBoost,
+    // NFTs (read-only from store)
+    ownedNFTs,
+    nftCount: totalNFTs,
+    miningBoost: bestBoost,
 
     // Network
     feeRate: fees.fees?.halfHourFee || 0,

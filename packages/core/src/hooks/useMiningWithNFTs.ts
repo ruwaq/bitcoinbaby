@@ -8,7 +8,6 @@
 
 "use client";
 
-import { useEffect } from "react";
 import { useMiningBoost } from "./useCharms";
 import { useWalletStore } from "../stores/wallet-store";
 import {
@@ -51,15 +50,8 @@ export function useMiningWithNFTs(
   } = useMiningBoost(address, nftAppId);
 
   // Use global mining (persists across navigation!)
-  const mining = useGlobalMining({
-    ...miningOptions,
-    nftBoost: boost,
-  });
-
-  // Sync boost when it changes
-  useEffect(() => {
-    mining.setNFTBoost(boost);
-  }, [boost, mining.setNFTBoost]);
+  // Note: NFT boost is read directly from NFTStore by useGlobalMining
+  const mining = useGlobalMining(miningOptions);
 
   return {
     // Mining state

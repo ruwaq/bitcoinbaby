@@ -16,6 +16,7 @@ import { useState } from "react";
 import {
   useSettingsStore,
   useNetworkStore,
+  useWalletStore,
   SecureStorage,
   MIN_PASSWORD_LENGTH,
   type MiningDifficulty,
@@ -26,6 +27,7 @@ import {
   getSyncManager,
   useNFTStore,
   clearQueue as clearShareQueue,
+  getApiClient,
 } from "@bitcoinbaby/core";
 import { NetworkSwitcher } from "@bitcoinbaby/ui";
 
@@ -384,11 +386,14 @@ export function SettingsSection() {
   // NFT store reset
   const resetNFTStore = useNFTStore((s) => s.reset);
 
-  // Clear all testnet data
+  // Get wallet address for backend reset
+  const walletAddress = useWalletStore((s) => s.wallet?.address);
+
+  // Clear all testnet data (local + backend)
   const handleClearTestnetData = async () => {
     if (
       !confirm(
-        "This will clear ALL testnet data:\n\n• Mining stats & progress\n• Pending share queue\n• NFT cache\n\nYour wallet and NFTs on the blockchain are safe.\n\nContinue?",
+        "This will PERMANENTLY DELETE all your testnet data:\n\n• Backend: Virtual balance & mining history\n• Local: Mining stats, share queue, NFT cache\n\nYour wallet seed phrase is safe.\nNFTs on blockchain are safe.\n\nTHIS CANNOT BE UNDONE. Continue?",
       )
     ) {
       return;
@@ -398,21 +403,39 @@ export function SettingsSection() {
     setClearMessage(null);
 
     try {
-      // 1. Clear mining manager data
+      const errors: string[] = [];
+
+      // 1. Reset backend balance (most important)
+      if (walletAddress) {
+        try {
+          const client = getApiClient();
+          const result = await client.resetBalance(walletAddress);
+          if (!result.success) {
+            errors.push(`Backend: ${result.error || "Failed to reset"}`);
+          }
+        } catch (err) {
+          errors.push(
+            `Backend: ${err instanceof Error ? err.message : "Connection failed"}`,
+          );
+        }
+      }
+
+      // 2. Clear mining manager data
       const manager = getMiningManager();
       await manager.resetAllMiningData();
 
-      // 2. Clear share queue
+      // 3. Clear share queue
       await clearShareQueue();
 
-      // 3. Reset NFT store
+      // 4. Reset NFT store
       resetNFTStore();
 
-      // 4. Clear localStorage items (testnet-specific)
+      // 5. Clear localStorage items
       const keysToRemove = [
         "bitcoinbaby-nft-store",
         "bitcoinbaby-pending-tx-store",
         "bitcoinbaby-mining-state",
+        "bitcoinbaby-mining-store",
       ];
       keysToRemove.forEach((key) => {
         try {
@@ -422,7 +445,15 @@ export function SettingsSection() {
         }
       });
 
-      setClearMessage("All testnet data cleared! Refresh the page.");
+      if (errors.length > 0) {
+        setClearMessage(
+          `Partial reset. Errors:\n${errors.join("\n")}\n\nRefresh the page.`,
+        );
+      } else {
+        setClearMessage(
+          "All data reset to zero! Refresh the page to start fresh.",
+        );
+      }
     } catch (err) {
       setClearMessage(
         `Error: ${err instanceof Error ? err.message : "Unknown error"}`,

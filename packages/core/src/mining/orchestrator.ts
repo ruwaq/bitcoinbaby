@@ -52,6 +52,14 @@ export class MiningOrchestrator {
   constructor(config: Partial<OrchestratorConfig> = {}) {
     this.config = { ...defaultConfig, ...config };
 
+    // Enforce MIN_DIFFICULTY on initial config
+    if (this.config.initialDifficulty < MIN_DIFFICULTY) {
+      console.warn(
+        `[Orchestrator] Initial difficulty D${this.config.initialDifficulty} below MIN_DIFFICULTY, using D${MIN_DIFFICULTY}`,
+      );
+      this.config.initialDifficulty = MIN_DIFFICULTY;
+    }
+
     // Initialize AI integration if enabled
     if (this.config.enableAIPoUW) {
       this.aiIntegration = new AIWorkIntegration({
@@ -271,10 +279,19 @@ export class MiningOrchestrator {
 
   /**
    * Set difficulty
+   *
+   * Enforces MIN_DIFFICULTY to prevent unsustainable emission rates.
+   * Difficulty below MIN_DIFFICULTY will be clamped.
    */
   setDifficulty(difficulty: number): void {
-    this.config.initialDifficulty = difficulty;
-    this.activeMiner?.setDifficulty(difficulty);
+    const safeDifficulty = Math.max(difficulty, MIN_DIFFICULTY);
+    if (difficulty < MIN_DIFFICULTY) {
+      console.warn(
+        `[Orchestrator] Difficulty D${difficulty} below MIN_DIFFICULTY, using D${safeDifficulty}`,
+      );
+    }
+    this.config.initialDifficulty = safeDifficulty;
+    this.activeMiner?.setDifficulty(safeDifficulty);
   }
 
   /**
