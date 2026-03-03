@@ -15,6 +15,9 @@ export {
   getApiClient,
   resetApiClient,
   type NFTRecord,
+  type NFTListing,
+  type NFTListingWithNFT,
+  type NFTSale,
 } from "./api";
 export type {
   ApiResponse,

@@ -17,9 +17,11 @@ import {
   NFTStats,
   NFTCard,
   NFTInfoPanel,
+  NFTEvolutionPanel,
   HelpTooltip,
   TransactionConfirmModal,
   PendingTransactions,
+  getEvolutionStatus,
   type BabyNFTState,
   type TransactionDetails,
 } from "@bitcoinbaby/ui";
@@ -32,8 +34,10 @@ import {
 import { useMintNFT } from "@/hooks/useMintNFT";
 import { useNFTSync, useInvalidateNFTs } from "@/hooks/useNFTSync";
 import { useClaimNFT } from "@/hooks/useClaimNFT";
+import { useVirtualBalance } from "@/hooks/useVirtualBalance";
+import { useMarketplace } from "@/hooks/useMarketplace";
 
-type SubTab = "collection" | "mint" | "claim";
+type SubTab = "collection" | "mint" | "claim" | "marketplace";
 type MintState = "info" | "confirming" | "minting" | "revealing" | "success";
 
 export function NFTsSection() {
@@ -41,6 +45,7 @@ export function NFTsSection() {
   const [mintState, setMintState] = useState<MintState>("info");
   const [evolvingIds, setEvolvingIds] = useState<Set<number>>(new Set());
   const [claimTxid, setClaimTxid] = useState("");
+  const [selectedNFT, setSelectedNFT] = useState<BabyNFTState | null>(null);
 
   // NFT Sync with TanStack Query
   const {
@@ -82,6 +87,18 @@ export function NFTsSection() {
     claim,
     reset: resetClaim,
   } = useClaimNFT();
+
+  // Virtual balance for $BABY tokens
+  const { virtualBalance } = useVirtualBalance({ address: wallet?.address });
+
+  // Marketplace hook
+  const {
+    listings,
+    isLoading: isLoadingListings,
+    buyNFT,
+    isProcessing: isProcessingMarketplace,
+    processingError: marketplaceError,
+  } = useMarketplace();
 
   // NFT Sale hook for pricing
   const { formattedPrice, price } = useNFTSale({
@@ -180,15 +197,45 @@ export function NFTsSection() {
 
   const nfts = ownedNFTs;
 
-  const handleEvolve = async (nft: BabyNFTState) => {
-    setEvolvingIds((prev) => new Set(prev).add(nft.tokenId));
-    await new Promise((r) => setTimeout(r, 2000));
-    setEvolvingIds((prev) => {
-      const next = new Set(prev);
-      next.delete(nft.tokenId);
-      return next;
-    });
-  };
+  // Handle selecting an NFT to view details/evolution
+  const handleSelectNFT = useCallback(
+    (nft: BabyNFTState) => {
+      setSelectedNFT(selectedNFT?.tokenId === nft.tokenId ? null : nft);
+    },
+    [selectedNFT],
+  );
+
+  // Handle NFT evolution (level up)
+  const handleEvolve = useCallback(
+    async (nft: BabyNFTState) => {
+      setEvolvingIds((prev) => new Set(prev).add(nft.tokenId));
+
+      // Simulate evolution delay (in production, this would be a blockchain tx)
+      await new Promise((r) => setTimeout(r, 2000));
+
+      // Update local state optimistically
+      const evolutionStatus = getEvolutionStatus(nft);
+      if (evolutionStatus.canEvolve) {
+        // Update the NFT with new level and reset XP
+        const updatedNFTs = ownedNFTs.map((n) =>
+          n.tokenId === nft.tokenId ? { ...n, level: n.level + 1, xp: 0 } : n,
+        );
+        setOwnedNFTs(updatedNFTs);
+
+        // Update selected NFT if it's the one being evolved
+        if (selectedNFT?.tokenId === nft.tokenId) {
+          setSelectedNFT({ ...nft, level: nft.level + 1, xp: 0 });
+        }
+      }
+
+      setEvolvingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(nft.tokenId);
+        return next;
+      });
+    },
+    [ownedNFTs, setOwnedNFTs, selectedNFT],
+  );
 
   return (
     <div className="p-4 md:p-8 bg-pixel-bg-dark min-h-screen">
@@ -282,6 +329,16 @@ export function NFTsSection() {
           >
             Claim NFT
           </button>
+          <button
+            onClick={() => setActiveTab("marketplace")}
+            className={`font-pixel text-[9px] uppercase px-4 py-2 border-4 transition-all ${
+              activeTab === "marketplace"
+                ? "bg-pixel-warning text-pixel-text-dark border-black shadow-[4px_4px_0_0_#000]"
+                : "bg-pixel-bg-medium text-pixel-text border-pixel-border hover:border-pixel-warning"
+            }`}
+          >
+            Marketplace ({listings.length})
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -290,11 +347,35 @@ export function NFTsSection() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Stats Panel (Sidebar) */}
             <div className="lg:col-span-1 order-2 lg:order-1">
+              {/* Selected NFT Evolution Panel */}
+              {selectedNFT && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-pixel text-[9px] text-pixel-primary uppercase">
+                      Selected: #{selectedNFT.tokenId}
+                    </h3>
+                    <button
+                      onClick={() => setSelectedNFT(null)}
+                      className="font-pixel text-[7px] text-pixel-text-muted hover:text-pixel-error transition-colors"
+                    >
+                      x Close
+                    </button>
+                  </div>
+                  <NFTEvolutionPanel
+                    nft={selectedNFT}
+                    evolutionStatus={getEvolutionStatus(selectedNFT)}
+                    tokenBalance={virtualBalance}
+                    onEvolve={handleEvolve}
+                    isEvolving={evolvingIds.has(selectedNFT.tokenId)}
+                  />
+                </div>
+              )}
+
               <NFTStats
                 nfts={nfts}
                 isLoading={isLoading}
                 showRarityBreakdown={true}
-                className="sticky top-4"
+                className={selectedNFT ? "" : "sticky top-4"}
               />
 
               {/* Pending Transactions */}
@@ -353,6 +434,8 @@ export function NFTsSection() {
                   nfts={nfts}
                   columns={3}
                   onEvolve={handleEvolve}
+                  onSelect={handleSelectNFT}
+                  selectedTokenId={selectedNFT?.tokenId}
                   evolvingIds={evolvingIds}
                   isLoading={isLoading}
                   skeletonCount={6}
@@ -733,6 +816,141 @@ export function NFTsSection() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Marketplace View */}
+        {activeTab === "marketplace" && (
+          <div className="max-w-4xl mx-auto">
+            {/* Marketplace Header */}
+            <div className="bg-pixel-bg-medium border-4 border-pixel-warning p-4 mb-6 shadow-[4px_4px_0_0_#000]">
+              <h3 className="font-pixel text-[10px] text-pixel-warning uppercase mb-2">
+                NFT Marketplace
+              </h3>
+              <p className="font-pixel-body text-sm text-pixel-text-muted">
+                Buy and sell Genesis Babies with other players. All transactions
+                are recorded on-chain.
+              </p>
+            </div>
+
+            {/* Error Display */}
+            {marketplaceError && (
+              <div className="mb-4 p-3 bg-pixel-error/20 border-4 border-pixel-error">
+                <p className="font-pixel text-[8px] text-pixel-error uppercase">
+                  {marketplaceError}
+                </p>
+              </div>
+            )}
+
+            {/* Listings */}
+            {isLoadingListings ? (
+              <div className="text-center py-12">
+                <div className="text-4xl animate-bounce mb-4">🛒</div>
+                <p className="font-pixel text-[9px] text-pixel-text-muted animate-pulse">
+                  Loading marketplace...
+                </p>
+              </div>
+            ) : listings.length === 0 ? (
+              <div className="bg-pixel-bg-medium border-4 border-pixel-border p-8 text-center">
+                <div className="text-6xl mb-4">🏪</div>
+                <h3 className="font-pixel text-sm text-pixel-text mb-2">
+                  No Listings Yet
+                </h3>
+                <p className="font-pixel-body text-sm text-pixel-text-muted mb-4">
+                  Be the first to list your Genesis Baby for sale!
+                </p>
+                <button
+                  onClick={() => setActiveTab("collection")}
+                  className="font-pixel text-[9px] uppercase px-6 py-3 bg-pixel-warning text-pixel-text-dark border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-transform"
+                >
+                  Go to Collection
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {listings.map((listing) => (
+                  <div
+                    key={listing.tokenId}
+                    className="bg-pixel-bg-medium border-4 border-pixel-border p-4 shadow-[4px_4px_0_0_#000]"
+                  >
+                    {/* NFT Info */}
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-pixel text-[9px] text-pixel-text">
+                        #{listing.tokenId.toString().padStart(4, "0")}
+                      </span>
+                      <span className="font-pixel text-[7px] text-pixel-text-muted uppercase px-2 py-1 bg-pixel-bg-dark border border-pixel-border">
+                        {listing.nft.rarityTier}
+                      </span>
+                    </div>
+
+                    {/* Traits */}
+                    <div className="mb-3 space-y-1">
+                      <p className="font-pixel text-[7px] text-pixel-text-muted">
+                        Type:{" "}
+                        <span className="text-pixel-secondary capitalize">
+                          {listing.nft.baseType}
+                        </span>
+                      </p>
+                      <p className="font-pixel text-[7px] text-pixel-text-muted">
+                        Bloodline:{" "}
+                        <span className="text-pixel-secondary capitalize">
+                          {listing.nft.bloodline}
+                        </span>
+                      </p>
+                      <p className="font-pixel text-[7px] text-pixel-text-muted">
+                        Level:{" "}
+                        <span className="text-pixel-secondary">
+                          {listing.nft.level}
+                        </span>
+                      </p>
+                    </div>
+
+                    {/* Price */}
+                    <div className="mb-3 p-2 bg-pixel-bg-dark border-2 border-pixel-warning/30 text-center">
+                      <p className="font-pixel text-[7px] text-pixel-text-muted uppercase">
+                        Price
+                      </p>
+                      <p className="font-pixel text-sm text-pixel-warning">
+                        {(listing.price / 100_000_000).toFixed(8)} BTC
+                      </p>
+                      <p className="font-pixel text-[6px] text-pixel-text-muted">
+                        ({listing.price.toLocaleString()} sats)
+                      </p>
+                    </div>
+
+                    {/* Seller */}
+                    <p className="font-pixel text-[6px] text-pixel-text-muted mb-3 truncate">
+                      Seller: {listing.sellerAddress.slice(0, 12)}...
+                    </p>
+
+                    {/* Buy Button */}
+                    <button
+                      onClick={() => buyNFT(listing.tokenId)}
+                      disabled={
+                        !isWalletConnected ||
+                        isProcessingMarketplace ||
+                        listing.sellerAddress === wallet?.address
+                      }
+                      className="w-full font-pixel text-[8px] uppercase px-4 py-2 bg-pixel-success text-pixel-text-dark border-4 border-black shadow-[2px_2px_0_0_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_0_#000] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {listing.sellerAddress === wallet?.address
+                        ? "Your Listing"
+                        : isProcessingMarketplace
+                          ? "Processing..."
+                          : "Buy Now"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Info */}
+            <div className="mt-6 p-4 bg-pixel-bg-dark border-2 border-pixel-border">
+              <p className="font-pixel text-[7px] text-pixel-text-muted">
+                Note: To list your NFT for sale, go to your Collection and
+                select an NFT. Listing feature coming soon!
+              </p>
+            </div>
           </div>
         )}
 

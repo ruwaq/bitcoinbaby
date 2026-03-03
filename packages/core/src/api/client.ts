@@ -522,6 +522,77 @@ export class BitcoinBabyClient {
     );
     return response.json() as Promise<ApiResponse<NFTRecord>>;
   }
+
+  // ===========================================================================
+  // MARKETPLACE
+  // ===========================================================================
+
+  /**
+   * List an NFT for sale on the marketplace
+   */
+  async listNFT(
+    tokenId: number,
+    price: number,
+    sellerAddress: string,
+  ): Promise<ApiResponse<NFTListing>> {
+    const response = await fetchWithRetry(`${this.baseUrl}/api/nft/list`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tokenId, price, sellerAddress }),
+    });
+    return response.json() as Promise<ApiResponse<NFTListing>>;
+  }
+
+  /**
+   * Remove an NFT listing from the marketplace
+   */
+  async unlistNFT(
+    tokenId: number,
+    sellerAddress: string,
+  ): Promise<ApiResponse<{ tokenId: number; unlisted: boolean }>> {
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/nft/unlist/${tokenId}`,
+      {
+        method: "DELETE",
+        headers: { "X-Wallet-Address": sellerAddress },
+      },
+    );
+    return response.json() as Promise<
+      ApiResponse<{ tokenId: number; unlisted: boolean }>
+    >;
+  }
+
+  /**
+   * Get all active marketplace listings
+   */
+  async getListings(): Promise<
+    ApiResponse<{ listings: NFTListingWithNFT[]; count: number }>
+  > {
+    const response = await fetchWithRetry(`${this.baseUrl}/api/nft/listings`);
+    return response.json() as Promise<
+      ApiResponse<{ listings: NFTListingWithNFT[]; count: number }>
+    >;
+  }
+
+  /**
+   * Buy a listed NFT
+   */
+  async buyNFT(
+    tokenId: number,
+    buyerAddress: string,
+    txid?: string,
+  ): Promise<ApiResponse<NFTSale>> {
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/nft/buy/${tokenId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ buyerAddress, txid }),
+      },
+      0, // No retries for purchases
+    );
+    return response.json() as Promise<ApiResponse<NFTSale>>;
+  }
 }
 
 /**
@@ -544,6 +615,45 @@ export interface NFTRecord {
   tokensEarned: string;
   txid: string;
   mintedAt: number;
+}
+
+/**
+ * NFT marketplace listing
+ */
+export interface NFTListing {
+  tokenId: string;
+  price: string;
+  sellerAddress: string;
+  listedAt: string;
+}
+
+/**
+ * NFT listing with embedded NFT data for display
+ */
+export interface NFTListingWithNFT {
+  tokenId: number;
+  price: number;
+  sellerAddress: string;
+  listedAt: number;
+  nft: {
+    dna: string;
+    bloodline: string;
+    baseType: string;
+    rarityTier: string;
+    level: number;
+  };
+}
+
+/**
+ * NFT sale record
+ */
+export interface NFTSale {
+  tokenId: string;
+  seller: string;
+  buyer: string;
+  price: string;
+  txid: string;
+  soldAt: string;
 }
 
 // =============================================================================

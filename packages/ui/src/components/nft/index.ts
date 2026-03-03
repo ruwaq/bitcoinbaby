@@ -12,6 +12,7 @@ export type {
   RarityTier,
   BaseType,
   Heritage,
+  EvolutionStatus,
 } from "./types";
 
 export {
@@ -19,6 +20,7 @@ export {
   canLevelUp,
   getXpForNextLevel,
   getEvolutionCostDisplay,
+  getEvolutionStatus,
   MAX_LEVEL,
   XP_REQUIREMENTS,
   LEVEL_BOOSTS,
@@ -39,6 +41,10 @@ export { NFTStats, type NFTStatsProps } from "./NFTStats";
 export { NFTSprite } from "./NFTSprite";
 export { NFTInfoPanel } from "./NFTInfoPanel";
 export { PendingTransactions, type PendingTx } from "./PendingTransactions";
+export {
+  NFTEvolutionPanel,
+  type NFTEvolutionPanelProps,
+} from "./NFTEvolutionPanel";
 
 // Trait Configuration
 export {

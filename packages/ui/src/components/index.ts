@@ -56,11 +56,13 @@ export {
   NFTGrid,
   NFTStats,
   NFTInfoPanel,
+  NFTEvolutionPanel,
   PendingTransactions,
   getMiningBoost,
   canLevelUp,
   getXpForNextLevel,
   getEvolutionCostDisplay,
+  getEvolutionStatus,
   MAX_LEVEL,
   type NFTCardProps,
   type NFTGridProps,
@@ -68,12 +70,14 @@ export {
   type NFTSortKey,
   type NFTSortOrder,
   type NFTStatsProps,
+  type NFTEvolutionPanelProps,
   type BabyNFTState,
   type BabyNFTInfo,
   type Bloodline,
   type RarityTier,
   type BaseType,
   type PendingTx,
+  type EvolutionStatus,
 } from "./nft";
 
 // Help & Tooltips

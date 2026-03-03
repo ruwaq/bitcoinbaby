@@ -142,3 +142,43 @@ export function getEvolutionCostDisplay(level: number): string {
   if (!cost) return "MAX";
   return `${(Number(cost) / 100_000_000).toLocaleString()} BABTC`;
 }
+
+// =============================================================================
+// EVOLUTION STATUS TYPE
+// =============================================================================
+
+export interface EvolutionStatus {
+  currentLevel: number;
+  nextLevel: number;
+  currentXp: number;
+  xpRequired: number;
+  xpProgress: number; // 0-100
+  canEvolve: boolean;
+  tokenCost: bigint;
+  currentBoost: number;
+  nextBoost: number;
+  boostGain: number;
+}
+
+export function getEvolutionStatus(nft: BabyNFTState): EvolutionStatus {
+  const nextLevel = nft.level + 1;
+  const canEvolveNft = canLevelUp(nft);
+  const xpRequired = XP_REQUIREMENTS[nextLevel] || 0;
+  const tokenCost = EVOLUTION_COSTS[nextLevel] || 0n;
+  const currentBoost = getMiningBoost(nft);
+  const nextBoost =
+    (LEVEL_BOOSTS[nextLevel] || 0) + (RARITY_BOOSTS[nft.rarityTier] || 0);
+
+  return {
+    currentLevel: nft.level,
+    nextLevel: canEvolveNft ? nextLevel : nft.level,
+    currentXp: nft.xp,
+    xpRequired,
+    xpProgress: xpRequired > 0 ? (nft.xp / xpRequired) * 100 : 100,
+    canEvolve: canEvolveNft,
+    tokenCost,
+    currentBoost,
+    nextBoost,
+    boostGain: nextBoost - currentBoost,
+  };
+}

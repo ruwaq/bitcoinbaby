@@ -1493,6 +1493,385 @@ app.get("/api/nft/:tokenId", async (c) => {
 });
 
 // =============================================================================
+// NFT MARKETPLACE ENDPOINTS
+// =============================================================================
+
+/**
+ * POST /api/nft/list - List an NFT for sale
+ */
+app.post("/api/nft/list", async (c) => {
+  try {
+    const body = await c.req.json<{
+      tokenId: number;
+      price: number; // Price in satoshis
+      sellerAddress: string;
+    }>();
+
+    const { tokenId, price, sellerAddress } = body;
+
+    if (!tokenId || !price || !sellerAddress) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "tokenId, price, and sellerAddress are required",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    if (price < 1000) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Minimum price is 1000 satoshis",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    const redis = getRedis(c.env);
+
+    // Check NFT exists and belongs to seller
+    const nftData = await redis.hgetall(`nft:minted:${tokenId}`);
+    if (!nftData || Object.keys(nftData).length === 0) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "NFT not found",
+          timestamp: Date.now(),
+        },
+        404,
+      );
+    }
+
+    // Check ownership
+    const isOwned = await redis.sismember(
+      `nft:owned:${sellerAddress}`,
+      tokenId.toString(),
+    );
+    if (!isOwned) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "You do not own this NFT",
+          timestamp: Date.now(),
+        },
+        403,
+      );
+    }
+
+    // Check if already listed
+    const existingListing = await redis.hgetall(`nft:listing:${tokenId}`);
+    if (existingListing && Object.keys(existingListing).length > 0) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "NFT is already listed for sale",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    // Create listing
+    const listing = {
+      tokenId: tokenId.toString(),
+      price: price.toString(),
+      sellerAddress,
+      listedAt: Date.now().toString(),
+    };
+
+    await redis.hset(`nft:listing:${tokenId}`, listing);
+
+    // Add to active listings set
+    await redis.sadd("nft:active-listings", tokenId.toString());
+
+    console.log(`[Marketplace] Listed NFT #${tokenId} for ${price} sats`);
+
+    return c.json<ApiResponse<typeof listing>>({
+      success: true,
+      data: listing,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error("[Marketplace] List error:", error);
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: "Failed to list NFT",
+        timestamp: Date.now(),
+      },
+      500,
+    );
+  }
+});
+
+/**
+ * DELETE /api/nft/unlist/:tokenId - Remove NFT listing
+ */
+app.delete("/api/nft/unlist/:tokenId", async (c) => {
+  try {
+    const tokenId = parseInt(c.req.param("tokenId"), 10);
+    const sellerAddress = c.req.header("X-Wallet-Address");
+
+    if (!tokenId || isNaN(tokenId)) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Invalid token ID",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    if (!sellerAddress) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "X-Wallet-Address header required",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    const redis = getRedis(c.env);
+
+    // Check listing exists
+    const listing = await redis.hgetall(`nft:listing:${tokenId}`);
+    if (!listing || Object.keys(listing).length === 0) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "NFT is not listed",
+          timestamp: Date.now(),
+        },
+        404,
+      );
+    }
+
+    // Check seller matches
+    if (listing.sellerAddress !== sellerAddress) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Only the seller can unlist",
+          timestamp: Date.now(),
+        },
+        403,
+      );
+    }
+
+    // Remove listing
+    await redis.del(`nft:listing:${tokenId}`);
+    await redis.srem("nft:active-listings", tokenId.toString());
+
+    console.log(`[Marketplace] Unlisted NFT #${tokenId}`);
+
+    return c.json<ApiResponse>({
+      success: true,
+      data: { tokenId, unlisted: true },
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error("[Marketplace] Unlist error:", error);
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: "Failed to unlist NFT",
+        timestamp: Date.now(),
+      },
+      500,
+    );
+  }
+});
+
+/**
+ * GET /api/nft/listings - Get all active marketplace listings
+ */
+app.get("/api/nft/listings", async (c) => {
+  try {
+    const redis = getRedis(c.env);
+
+    // Get all active listing token IDs
+    const listingIds = await redis.smembers("nft:active-listings");
+
+    if (!listingIds || listingIds.length === 0) {
+      return c.json<ApiResponse<{ listings: unknown[]; count: number }>>({
+        success: true,
+        data: { listings: [], count: 0 },
+        timestamp: Date.now(),
+      });
+    }
+
+    // Fetch all listings with NFT data
+    const listings = await Promise.all(
+      listingIds.map(async (id) => {
+        const listing = await redis.hgetall(`nft:listing:${id}`);
+        const nftData = await redis.hgetall(`nft:minted:${id}`);
+
+        if (!listing || !nftData) return null;
+
+        return {
+          tokenId: parseInt(id, 10),
+          price: parseInt(listing.price as string, 10),
+          sellerAddress: listing.sellerAddress as string,
+          listedAt: parseInt(listing.listedAt as string, 10),
+          nft: {
+            dna: nftData.dna as string,
+            bloodline: nftData.bloodline as string,
+            baseType: nftData.baseType as string,
+            rarityTier: nftData.rarityTier as string,
+            level: parseInt(nftData.level as string, 10) || 1,
+          },
+        };
+      }),
+    );
+
+    const validListings = listings
+      .filter((l): l is NonNullable<typeof l> => l !== null)
+      .sort((a, b) => b.listedAt - a.listedAt); // Newest first
+
+    return c.json<
+      ApiResponse<{ listings: typeof validListings; count: number }>
+    >({
+      success: true,
+      data: { listings: validListings, count: validListings.length },
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error("[Marketplace] Get listings error:", error);
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: "Failed to get listings",
+        timestamp: Date.now(),
+      },
+      500,
+    );
+  }
+});
+
+/**
+ * POST /api/nft/buy/:tokenId - Buy a listed NFT
+ * Note: In production this would verify blockchain payment
+ * For testnet, we do a simple ownership transfer
+ */
+app.post("/api/nft/buy/:tokenId", async (c) => {
+  try {
+    const tokenId = parseInt(c.req.param("tokenId"), 10);
+    const body = await c.req.json<{
+      buyerAddress: string;
+      txid?: string; // Optional: payment txid for verification
+    }>();
+
+    const { buyerAddress, txid } = body;
+
+    if (!tokenId || isNaN(tokenId)) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Invalid token ID",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    if (!buyerAddress) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "buyerAddress is required",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    const redis = getRedis(c.env);
+
+    // Get listing
+    const listing = await redis.hgetall(`nft:listing:${tokenId}`);
+    if (!listing || Object.keys(listing).length === 0) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "NFT is not listed for sale",
+          timestamp: Date.now(),
+        },
+        404,
+      );
+    }
+
+    const sellerAddress = listing.sellerAddress as string;
+
+    // Cannot buy your own NFT
+    if (sellerAddress === buyerAddress) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Cannot buy your own NFT",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    // TODO: In production, verify payment txid on blockchain
+    // For testnet, we skip this and just do the transfer
+
+    // Transfer ownership
+    // 1. Remove from seller
+    await redis.srem(`nft:owned:${sellerAddress}`, tokenId.toString());
+
+    // 2. Add to buyer
+    await redis.sadd(`nft:owned:${buyerAddress}`, tokenId.toString());
+
+    // 3. Update NFT address
+    await redis.hset(`nft:minted:${tokenId}`, { address: buyerAddress });
+
+    // 4. Remove listing
+    await redis.del(`nft:listing:${tokenId}`);
+    await redis.srem("nft:active-listings", tokenId.toString());
+
+    // 5. Record sale
+    const sale = {
+      tokenId: tokenId.toString(),
+      seller: sellerAddress,
+      buyer: buyerAddress,
+      price: listing.price as string,
+      txid: txid || "testnet-simulated",
+      soldAt: Date.now().toString(),
+    };
+    await redis.lpush("nft:sales-history", JSON.stringify(sale));
+
+    console.log(
+      `[Marketplace] Sold NFT #${tokenId} from ${sellerAddress} to ${buyerAddress}`,
+    );
+
+    return c.json<ApiResponse<typeof sale>>({
+      success: true,
+      data: sale,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error("[Marketplace] Buy error:", error);
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: "Failed to complete purchase",
+        timestamp: Date.now(),
+      },
+      500,
+    );
+  }
+});
+
+// =============================================================================
 // ADMIN ENDPOINTS (Testnet Only)
 // =============================================================================
 

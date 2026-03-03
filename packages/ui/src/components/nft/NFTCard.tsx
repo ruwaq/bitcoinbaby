@@ -267,7 +267,9 @@ const MiningBoostDisplay: FC<{ boost: number }> = ({ boost }) => (
 export interface NFTCardProps {
   nft: BabyNFTState;
   onEvolve?: (nft: BabyNFTState) => void;
+  onSelect?: (nft: BabyNFTState) => void;
   isEvolving?: boolean;
+  isSelected?: boolean;
   showTokenId?: boolean;
   className?: string;
 }
@@ -275,7 +277,9 @@ export interface NFTCardProps {
 export const NFTCard: FC<NFTCardProps> = ({
   nft,
   onEvolve,
+  onSelect,
   isEvolving = false,
+  isSelected = false,
   showTokenId = true,
   className,
 }) => {
@@ -291,14 +295,18 @@ export const NFTCard: FC<NFTCardProps> = ({
 
   return (
     <div
+      onClick={() => onSelect?.(nft)}
       className={clsx(
         "relative flex flex-col",
         "bg-pixel-bg-medium border-4",
         "shadow-[8px_8px_0_0_#000,inset_-4px_-4px_0_0_rgba(0,0,0,0.3),inset_4px_4px_0_0_rgba(255,255,255,0.05)]",
         isGlowing && "animate-pulse",
+        onSelect && "cursor-pointer hover:scale-[1.02] transition-transform",
+        isSelected &&
+          "ring-4 ring-pixel-primary ring-offset-2 ring-offset-pixel-bg-dark",
         className,
       )}
-      style={{ borderColor: rarity.border }}
+      style={{ borderColor: isSelected ? "#f7931a" : rarity.border }}
     >
       {/* Header */}
       <div

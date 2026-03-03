@@ -93,6 +93,13 @@ export {
   type ClaimResult,
   type UseClaimNFTReturn,
 } from "./useClaimNFT";
+export {
+  useMarketplace,
+  type UseMarketplaceReturn,
+  type ListResult,
+  type UnlistResult,
+  type BuyResult,
+} from "./useMarketplace";
 
 // Platform hooks
 export { useCapacitor, type UseCapacitorReturn } from "./useCapacitor";
