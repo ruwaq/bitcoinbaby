@@ -4,9 +4,9 @@
  * Provides derived baby state values and visual state calculations.
  */
 
-'use client';
+"use client";
 
-import { useMemo } from 'react';
+import { useMemo } from "react";
 import {
   type GameBaby,
   STAGE_NAMES,
@@ -15,7 +15,7 @@ import {
   getStageVariant,
   type BabySpriteForm,
   type BabyVisualState,
-} from '@bitcoinbaby/core';
+} from "@bitcoinbaby/core";
 
 interface UseBabyStateReturn {
   // Identity
@@ -50,6 +50,9 @@ interface UseBabyStateReturn {
   isCritical: boolean;
   needsAttention: boolean;
 }
+
+// Re-export the type for external use
+export type { UseBabyStateReturn as BabyVisualState };
 
 export function useBabyState(baby: GameBaby | null): UseBabyStateReturn | null {
   return useMemo(() => {
@@ -94,7 +97,8 @@ export function useBabyState(baby: GameBaby | null): UseBabyStateReturn | null {
       level: baby.progression.level,
       xp: baby.progression.xp,
       xpToNextLevel: baby.progression.xpToNextLevel,
-      xpPercentage: (baby.progression.xp / baby.progression.xpToNextLevel) * 100,
+      xpPercentage:
+        (baby.progression.xp / baby.progression.xpToNextLevel) * 100,
 
       // Mining
       miningBonus,
