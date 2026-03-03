@@ -22,6 +22,9 @@ import {
   TransactionConfirmModal,
   PendingTransactions,
   getEvolutionStatus,
+  SectionHeader,
+  InfoBanner,
+  Button,
   type BabyNFTState,
   type TransactionDetails,
 } from "@bitcoinbaby/ui";
@@ -278,21 +281,20 @@ export function NFTsSection() {
     <div className="p-4 md:p-8 bg-pixel-bg-dark min-h-screen">
       <div className="max-w-7xl mx-auto">
         {/* Section Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <h2 className="font-pixel text-xl md:text-2xl text-pixel-primary">
-                GENESIS BABIES
-              </h2>
-              <HelpTooltip
-                content="Genesis Babies are NFTs that boost your mining rewards. Each NFT has unique traits and rarity levels."
-                title="NFT Collection"
-                description="Higher rarity = Higher mining boost. Level up your NFTs by burning $BABY tokens."
-                size="md"
-              />
-            </div>
-
-            {/* Sync Status */}
+        <SectionHeader
+          title="GENESIS BABIES"
+          description="Mint NFTs to boost your mining rewards"
+          icon="👶"
+          size="lg"
+          helpTooltip={
+            <HelpTooltip
+              content="Genesis Babies are NFTs that boost your mining rewards. Each NFT has unique traits and rarity levels."
+              title="NFT Collection"
+              description="Higher rarity = Higher mining boost. Level up your NFTs by burning $BABY tokens."
+              size="md"
+            />
+          }
+          action={
             <div className="flex items-center gap-2">
               {isFetching && (
                 <span className="font-pixel text-[7px] text-pixel-secondary animate-pulse">
@@ -304,7 +306,7 @@ export function NFTsSection() {
                   onClick={() => refreshNFTs()}
                   className="font-pixel text-[8px] text-pixel-error hover:text-pixel-primary bg-pixel-error/20 hover:bg-pixel-primary/20 px-2 py-1 rounded transition-colors"
                 >
-                  Sync failed - Click to retry
+                  Sync failed - Retry
                 </button>
               )}
               {!syncError && (
@@ -322,11 +324,9 @@ export function NFTsSection() {
                 </button>
               )}
             </div>
-          </div>
-          <p className="font-pixel-body text-sm text-pixel-text-muted">
-            Mint NFTs to boost your mining rewards
-          </p>
-        </div>
+          }
+          className="mb-6"
+        />
 
         {/* Sub-Tab Navigation */}
         <div className="flex gap-2 mb-6">
@@ -380,23 +380,15 @@ export function NFTsSection() {
 
         {/* List Feedback Banner */}
         {listFeedback && (
-          <div
-            className={`mb-4 p-3 border-4 ${
-              listFeedback.type === "success"
-                ? "bg-pixel-success/20 border-pixel-success"
-                : "bg-pixel-error/20 border-pixel-error"
-            }`}
+          <InfoBanner
+            variant={listFeedback.type}
+            onDismiss={() => setListFeedback(null)}
+            className="mb-4"
           >
-            <p
-              className={`font-pixel text-[9px] uppercase ${
-                listFeedback.type === "success"
-                  ? "text-pixel-success"
-                  : "text-pixel-error"
-              }`}
-            >
+            <span className="font-pixel text-[9px] uppercase">
               {listFeedback.message}
-            </p>
-          </div>
+            </span>
+          </InfoBanner>
         )}
 
         {/* Tab Content */}
@@ -451,15 +443,17 @@ export function NFTsSection() {
                 <h3 className="font-pixel text-[8px] text-pixel-secondary uppercase mb-3">
                   Expand Collection
                 </h3>
-                <button
+                <Button
                   onClick={() => {
                     setActiveTab("mint");
                     setMintState("info");
                   }}
-                  className="w-full font-pixel text-[8px] uppercase px-3 py-3 bg-pixel-success text-pixel-text-dark border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-transform"
+                  variant="success"
+                  size="sm"
+                  className="w-full"
                 >
                   Mint New Baby
-                </button>
+                </Button>
                 <p className="mt-2 font-pixel text-[7px] text-pixel-text-muted text-center">
                   {formattedPrice}
                 </p>
@@ -477,15 +471,15 @@ export function NFTsSection() {
                   <p className="font-pixel-body text-sm text-pixel-text-muted mb-4">
                     Mint your first Genesis Baby to start earning mining boosts!
                   </p>
-                  <button
+                  <Button
                     onClick={() => {
                       setActiveTab("mint");
                       setMintState("info");
                     }}
-                    className="font-pixel text-[9px] uppercase px-6 py-3 bg-pixel-success text-pixel-text-dark border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-transform"
+                    variant="success"
                   >
                     Mint Your First Baby
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <NFTGrid
@@ -567,13 +561,15 @@ export function NFTsSection() {
 
                 {/* Mint Button */}
                 <div className="text-center">
-                  <button
+                  <Button
                     onClick={handleMintClick}
                     disabled={!canMint}
-                    className="font-pixel text-sm uppercase px-8 py-4 bg-pixel-success text-pixel-text-dark border-4 border-black shadow-[6px_6px_0_0_#000] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[3px_3px_0_0_#000] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                    variant="success"
+                    size="lg"
+                    className="px-8"
                   >
                     💰 Mint Genesis Baby
-                  </button>
+                  </Button>
                   <p className="mt-3 font-pixel text-[7px] text-pixel-text-muted">
                     {isWalletConnected
                       ? "Will open wallet to sign transaction"
@@ -699,18 +695,22 @@ export function NFTsSection() {
 
                 {/* Action Buttons */}
                 <div className="flex gap-2">
-                  <button
+                  <Button
                     onClick={handleViewCollection}
-                    className="flex-1 font-pixel text-[8px] uppercase px-4 py-3 bg-pixel-bg-dark text-pixel-text border-2 border-pixel-border hover:border-pixel-primary transition-colors"
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1"
                   >
                     View Collection
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={handleMintAnother}
-                    className="flex-1 font-pixel text-[8px] uppercase px-4 py-3 bg-pixel-success text-pixel-text-dark border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-transform"
+                    variant="success"
+                    size="sm"
+                    className="flex-1"
                   >
                     Mint Another
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -753,11 +753,11 @@ export function NFTsSection() {
 
             {/* Error Display */}
             {claimError && (
-              <div className="mb-4 p-3 bg-pixel-error/20 border-4 border-pixel-error">
-                <p className="font-pixel text-[8px] text-pixel-error uppercase">
+              <InfoBanner variant="error" className="mb-4">
+                <span className="font-pixel text-[8px] uppercase">
                   {claimError}
-                </p>
-              </div>
+                </span>
+              </InfoBanner>
             )}
 
             {/* Claim Form */}
@@ -782,15 +782,16 @@ export function NFTsSection() {
                   Or paste: https://mempool.space/testnet4/tx/37b13f...
                 </p>
 
-                <button
+                <Button
                   onClick={handleClaimNFT}
                   disabled={
                     !isWalletConnected || isClaiming || !claimTxid.trim()
                   }
-                  className="w-full font-pixel text-[10px] uppercase px-6 py-4 bg-pixel-secondary text-pixel-text-dark border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                  variant="secondary"
+                  className="w-full"
                 >
                   {isClaiming ? "Claiming..." : "Claim NFT"}
-                </button>
+                </Button>
               </div>
             ) : (
               /* Claim Success */
@@ -858,21 +859,25 @@ export function NFTsSection() {
 
                 {/* Action Buttons */}
                 <div className="flex gap-2">
-                  <button
+                  <Button
                     onClick={handleViewCollection}
-                    className="flex-1 font-pixel text-[8px] uppercase px-4 py-3 bg-pixel-success text-pixel-text-dark border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-transform"
+                    variant="success"
+                    size="sm"
+                    className="flex-1"
                   >
                     View Collection
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => {
                       resetClaim();
                       setClaimTxid("");
                     }}
-                    className="flex-1 font-pixel text-[8px] uppercase px-4 py-3 bg-pixel-bg-dark text-pixel-text border-2 border-pixel-border hover:border-pixel-secondary transition-colors"
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1"
                   >
                     Claim Another
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -895,11 +900,11 @@ export function NFTsSection() {
 
             {/* Error Display */}
             {marketplaceError && (
-              <div className="mb-4 p-3 bg-pixel-error/20 border-4 border-pixel-error">
-                <p className="font-pixel text-[8px] text-pixel-error uppercase">
+              <InfoBanner variant="error" className="mb-4">
+                <span className="font-pixel text-[8px] uppercase">
                   {marketplaceError}
-                </p>
-              </div>
+                </span>
+              </InfoBanner>
             )}
 
             {/* Listings */}
@@ -919,12 +924,12 @@ export function NFTsSection() {
                 <p className="font-pixel-body text-sm text-pixel-text-muted mb-4">
                   Be the first to list your Genesis Baby for sale!
                 </p>
-                <button
+                <Button
                   onClick={() => setActiveTab("collection")}
-                  className="font-pixel text-[9px] uppercase px-6 py-3 bg-pixel-warning text-pixel-text-dark border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-transform"
+                  variant="warning"
                 >
                   Go to Collection
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -984,21 +989,23 @@ export function NFTsSection() {
                     </p>
 
                     {/* Buy Button */}
-                    <button
+                    <Button
                       onClick={() => buyNFT(listing.tokenId)}
                       disabled={
                         !isWalletConnected ||
                         isProcessingMarketplace ||
                         listing.sellerAddress === wallet?.address
                       }
-                      className="w-full font-pixel text-[8px] uppercase px-4 py-2 bg-pixel-success text-pixel-text-dark border-4 border-black shadow-[2px_2px_0_0_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_0_#000] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                      variant="success"
+                      size="sm"
+                      className="w-full"
                     >
                       {listing.sellerAddress === wallet?.address
                         ? "Your Listing"
                         : isProcessingMarketplace
                           ? "Processing..."
                           : "Buy Now"}
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>

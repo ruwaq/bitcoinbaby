@@ -35,7 +35,15 @@ import {
 } from "@bitcoinbaby/ui";
 import { useLeaderboard } from "@bitcoinbaby/core";
 import { useWallet } from "@/hooks/useWallet";
-import { Button, Input, Card, CardHeader, CardContent } from "@bitcoinbaby/ui";
+import {
+  Button,
+  Input,
+  Card,
+  CardHeader,
+  CardContent,
+  SectionHeader,
+  InfoBanner,
+} from "@bitcoinbaby/ui";
 import type { GameEvent } from "@bitcoinbaby/core";
 import type { TabType } from "@/components/app/TabNavigation";
 
@@ -90,18 +98,15 @@ function CreateBabyForm({
             </div>
 
             {/* PoUW Banner */}
-            <div className="p-3 bg-gradient-to-r from-pixel-primary/20 to-pixel-secondary/20 border-2 border-pixel-primary/50 rounded">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-lg">🧠</span>
-                <p className="font-pixel text-[9px] text-pixel-primary">
-                  PROOF OF USEFUL WORK
-                </p>
-              </div>
+            <InfoBanner variant="highlight" icon="🧠">
+              <p className="font-pixel text-[9px] text-pixel-primary mb-1">
+                PROOF OF USEFUL WORK
+              </p>
               <p className="font-pixel-body text-[11px] text-pixel-text">
                 Your mining trains artificial intelligence. Energy is not wasted
                 on meaningless algorithms.
               </p>
-            </div>
+            </InfoBanner>
 
             <div className="space-y-4">
               <div className="flex items-start gap-3 p-3 bg-pixel-bg-light border-2 border-pixel-border">
@@ -350,20 +355,21 @@ export function BabySection({ setActiveTab }: BabySectionProps) {
       ) : (
         <div className="max-w-4xl mx-auto">
           {/* Section Header */}
-          <div className="mb-6">
-            <div className="flex items-center gap-2">
-              <h2 className="font-pixel text-xl text-pixel-primary">MY BABY</h2>
+          <SectionHeader
+            title="MY BABY"
+            description="Take care of your BitcoinBaby"
+            icon="👶"
+            size="lg"
+            helpTooltip={
               <HelpTooltip
                 content="Your BitcoinBaby grows stronger as you mine and care for it. Higher levels unlock better mining bonuses."
                 title="Baby Care"
                 description="Feed, play, and mine regularly to keep your baby happy and earn XP faster."
                 size="md"
               />
-            </div>
-            <p className="font-pixel-body text-sm text-pixel-text-muted mt-1">
-              Take care of your BitcoinBaby
-            </p>
-          </div>
+            }
+            className="mb-6"
+          />
 
           <div className="grid md:grid-cols-2 gap-8">
             {/* Left: Baby Display */}
@@ -515,22 +521,22 @@ export function BabySection({ setActiveTab }: BabySectionProps) {
 
               {/* Quick Actions */}
               <div className="grid grid-cols-2 gap-3">
-                <button
+                <Button
                   onClick={() => setActiveTab("mining")}
-                  className="p-3 bg-pixel-success border-4 border-black shadow-[4px_4px_0_0_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0_0_#000]"
+                  variant="success"
+                  size="sm"
+                  className="w-full"
                 >
-                  <span className="font-pixel text-[10px] text-pixel-text-dark">
-                    MINING
-                  </span>
-                </button>
-                <button
+                  MINING
+                </Button>
+                <Button
                   onClick={() => setActiveTab("nfts")}
-                  className="p-3 bg-pixel-secondary border-4 border-black shadow-[4px_4px_0_0_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0_0_#000]"
+                  variant="secondary"
+                  size="sm"
+                  className="w-full"
                 >
-                  <span className="font-pixel text-[10px] text-pixel-text-dark">
-                    NFTs
-                  </span>
-                </button>
+                  NFTs
+                </Button>
               </div>
             </div>
           </div>

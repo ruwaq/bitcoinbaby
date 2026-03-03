@@ -11,7 +11,7 @@
  * - Network switching
  */
 
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import {
   useWallet,
   useBalance,
@@ -24,6 +24,9 @@ import {
   WalletOnboarding,
   QRCode,
   HelpTooltip,
+  SectionHeader,
+  InfoBanner,
+  Button,
 } from "@bitcoinbaby/ui";
 import {
   useNetworkStore,
@@ -32,7 +35,8 @@ import {
   useSendOverlay,
   useWithdrawOverlay,
   useHistoryOverlay,
-  MIN_PASSWORD_LENGTH,
+  useUnlockModal,
+  useDeleteWalletModal,
 } from "@bitcoinbaby/core";
 import {
   generateMnemonicFromEntropy,
@@ -72,99 +76,6 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
-// Password modal for unlock
-function UnlockModal({
-  onSubmit,
-  onCancel,
-  isLoading,
-  error,
-}: {
-  onSubmit: (password: string) => void;
-  onCancel: () => void;
-  isLoading: boolean;
-  error: string | null;
-}) {
-  const [password, setPassword] = useState("");
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Use MIN_PASSWORD_LENGTH for consistent security
-    if (password.length >= MIN_PASSWORD_LENGTH) {
-      onSubmit(password);
-    }
-  };
-
-  // Handle escape key to close modal
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape" && !isLoading) {
-      onCancel();
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="unlock-modal-title"
-      onKeyDown={handleKeyDown}
-    >
-      <div className="bg-pixel-bg-dark border-4 border-black p-6 shadow-[8px_8px_0_0_#000] max-w-sm mx-4">
-        <h3
-          id="unlock-modal-title"
-          className="font-pixel text-pixel-primary text-sm mb-4"
-        >
-          UNLOCK WALLET
-        </h3>
-
-        <form onSubmit={handleSubmit}>
-          <label htmlFor="unlock-password" className="sr-only">
-            Password
-          </label>
-          <input
-            id="unlock-password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter your password"
-            className="w-full px-3 py-2 mb-4 font-pixel text-xs bg-pixel-bg-light border-2 border-black text-pixel-text"
-            autoFocus
-            aria-describedby={error ? "unlock-error" : undefined}
-          />
-
-          {error && (
-            <p
-              id="unlock-error"
-              role="alert"
-              className="font-pixel text-pixel-2xs text-pixel-error mb-4"
-            >
-              {error}
-            </p>
-          )}
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={isLoading}
-              className="flex-1 px-4 py-3 min-h-[44px] font-pixel text-pixel-xs uppercase bg-pixel-bg-light text-pixel-text border-2 border-black hover:bg-pixel-bg-dark disabled:opacity-50 active:scale-95"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading || password.length < MIN_PASSWORD_LENGTH}
-              className="flex-1 px-4 py-3 min-h-[44px] font-pixel text-pixel-xs uppercase bg-pixel-success text-black border-2 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] disabled:opacity-50 active:scale-95"
-            >
-              {isLoading ? "..." : "Unlock"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 export function WalletSection() {
   const { network, switchNetwork, mainnetAllowed, setMainnetAllowed, config } =
     useNetworkStore();
@@ -173,6 +84,10 @@ export function WalletSection() {
   const { open: openSend } = useSendOverlay();
   const { open: openWithdraw } = useWithdrawOverlay();
   const { open: openHistory } = useHistoryOverlay();
+
+  // Modal hooks for centralized dialogs
+  const { open: openUnlockModal } = useUnlockModal();
+  const { open: openDeleteModal } = useDeleteWalletModal();
 
   const {
     wallet,
@@ -230,9 +145,6 @@ export function WalletSection() {
     refreshInterval: 120000,
   });
 
-  const [showUnlockModal, setShowUnlockModal] = useState(false);
-  const [unlockError, setUnlockError] = useState<string | null>(null);
-
   const handleGenerateMnemonic = useCallback((entropy: Uint8Array): string => {
     const entropySlice = entropy.slice(0, 16);
     return generateMnemonicFromEntropy(entropySlice);
@@ -252,66 +164,46 @@ export function WalletSection() {
     [importWallet],
   );
 
-  const handleUnlock = useCallback(
-    async (password: string) => {
-      setUnlockError(null);
-      try {
-        await unlock(password);
-        setShowUnlockModal(false);
-      } catch (err) {
-        setUnlockError(err instanceof Error ? err.message : "Failed to unlock");
-      }
-    },
-    [unlock],
-  );
+  // Open unlock modal - the modal handles the unlock flow
+  const handleOpenUnlock = useCallback(() => {
+    openUnlockModal(async (password: string) => {
+      await unlock(password);
+    });
+  }, [openUnlockModal, unlock]);
 
-  const handleDelete = useCallback(async () => {
-    const confirmed = window.confirm(
-      "Are you ABSOLUTELY sure?\n\n" +
-        "This will permanently delete your wallet from this device.\n" +
-        "Make sure you have your 12-word recovery phrase saved!\n\n" +
-        "Without the recovery phrase, your Bitcoin will be LOST FOREVER.",
-    );
-
-    if (confirmed) {
-      const doubleConfirm = window.confirm(
-        "FINAL WARNING: Type 'DELETE' mentally and click OK to confirm deletion.",
-      );
-      if (doubleConfirm) {
-        await deleteWallet();
-      }
-    }
-  }, [deleteWallet]);
+  // Open delete confirmation modal
+  const handleDelete = useCallback(() => {
+    openDeleteModal(async () => {
+      await deleteWallet();
+    });
+  }, [openDeleteModal, deleteWallet]);
 
   return (
     <div className="p-responsive safe-x bg-pixel-bg-dark min-h-screen-safe">
       <div className="max-w-2xl mx-auto">
         {/* Section Header */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              <h2 className="font-pixel text-pixel-lg text-pixel-primary">
-                WALLET
-              </h2>
-              <HelpTooltip
-                content="Your Bitcoin wallet for managing BTC and $BABY tokens. All funds are stored locally and encrypted."
-                title="Bitcoin Wallet"
-                description="We never have access to your private keys. Make sure to save your recovery phrase!"
-                size="md"
-              />
-            </div>
+        <SectionHeader
+          title="Wallet"
+          description={`Bitcoin ${network === "mainnet" ? "Mainnet" : "Testnet4"} - Taproot (P2TR/BIP86)`}
+          icon="&#128176;"
+          size="lg"
+          helpTooltip={
+            <HelpTooltip
+              content="Your Bitcoin wallet for managing BTC and $BABY tokens. All funds are stored locally and encrypted."
+              title="Bitcoin Wallet"
+              description="We never have access to your private keys. Make sure to save your recovery phrase!"
+              size="md"
+            />
+          }
+          action={
             <NetworkSwitcher
               network={network}
               mainnetAllowed={mainnetAllowed}
               onNetworkChange={switchNetwork}
               onEnableMainnet={() => setMainnetAllowed(true)}
             />
-          </div>
-          <p className="font-pixel-body text-body-sm text-pixel-text-muted mt-2">
-            Bitcoin {network === "mainnet" ? "Mainnet" : "Testnet4"} - Taproot
-            (P2TR/BIP86)
-          </p>
-        </div>
+          }
+        />
 
         {/* No wallet - Show onboarding */}
         {!hasStoredWallet && (
@@ -336,13 +228,14 @@ export function WalletSection() {
               <p className="font-pixel-body text-sm text-pixel-text-muted mb-6">
                 Enter your password to access your wallet
               </p>
-              <button
-                onClick={() => setShowUnlockModal(true)}
+              <Button
+                onClick={handleOpenUnlock}
                 disabled={walletLoading}
-                className="px-8 py-4 font-pixel text-sm border-4 border-black shadow-[4px_4px_0_0_#000] bg-pixel-success text-black hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all disabled:opacity-50"
+                variant="success"
+                size="lg"
               >
                 UNLOCK WALLET
-              </button>
+              </Button>
             </div>
 
             <div className="border-t-2 border-pixel-border pt-6 mt-6">
@@ -350,12 +243,9 @@ export function WalletSection() {
                 Forgot password? You can restore using your recovery phrase.
               </p>
               <div className="flex gap-3 justify-center">
-                <button
-                  onClick={handleDelete}
-                  className="px-4 py-3 min-h-[44px] font-pixel text-pixel-xs text-pixel-error border-2 border-pixel-error hover:bg-pixel-error hover:text-white transition-colors active:scale-95"
-                >
+                <Button onClick={handleDelete} variant="destructive" size="sm">
                   DELETE & RESTORE
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -533,24 +423,27 @@ export function WalletSection() {
 
               {/* Primary Actions */}
               <div className="flex gap-2 sm:gap-3 pt-4 border-t-2 border-pixel-border">
-                <button
+                <Button
                   onClick={() => openSend()}
-                  className="flex-1 py-3 min-h-[44px] font-pixel text-pixel-xs text-center bg-pixel-primary text-black border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all active:scale-95"
+                  variant="default"
+                  className="flex-1"
                 >
                   SEND
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={openWithdraw}
-                  className="flex-1 py-3 min-h-[44px] font-pixel text-pixel-xs text-center bg-pixel-success text-black border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all active:scale-95"
+                  variant="success"
+                  className="flex-1"
                 >
                   WITHDRAW
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={openHistory}
-                  className="flex-1 py-3 min-h-[44px] font-pixel text-pixel-xs text-center bg-pixel-bg-light text-pixel-text border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all active:scale-95"
+                  variant="outline"
+                  className="flex-1"
                 >
                   HISTORY
-                </button>
+                </Button>
               </div>
 
               {/* Get Testnet BTC */}
@@ -567,18 +460,12 @@ export function WalletSection() {
 
               {/* Secondary Actions */}
               <div className="flex gap-2 sm:gap-3 pt-3">
-                <button
-                  onClick={lock}
-                  className="flex-1 py-3 min-h-[44px] font-pixel text-pixel-xs bg-pixel-bg-light text-pixel-text border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all active:scale-95"
-                >
+                <Button onClick={lock} variant="ghost" className="flex-1">
                   LOCK
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="px-4 py-3 min-h-[44px] font-pixel text-pixel-xs bg-pixel-error text-white border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all active:scale-95"
-                >
+                </Button>
+                <Button onClick={handleDelete} variant="destructive">
                   DELETE
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -586,11 +473,9 @@ export function WalletSection() {
 
         {/* Error display */}
         {walletError && (
-          <div className="mt-4 p-3 bg-pixel-error/20 border-2 border-pixel-error">
-            <p className="font-pixel text-pixel-xs text-pixel-error text-center">
-              {walletError}
-            </p>
-          </div>
+          <InfoBanner variant="error" icon="&#9888;" className="mt-4">
+            {walletError}
+          </InfoBanner>
         )}
 
         {/* Info Section */}
@@ -644,19 +529,6 @@ export function WalletSection() {
           </div>
         )}
       </div>
-
-      {/* Unlock Modal */}
-      {showUnlockModal && (
-        <UnlockModal
-          onSubmit={handleUnlock}
-          onCancel={() => {
-            setShowUnlockModal(false);
-            setUnlockError(null);
-          }}
-          isLoading={walletLoading}
-          error={unlockError}
-        />
-      )}
     </div>
   );
 }
