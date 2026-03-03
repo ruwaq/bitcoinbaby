@@ -13,13 +13,17 @@
 // =============================================================================
 
 const connections = [];
+// MIN_DIFFICULTY = 22 (from @bitcoinbaby/core/tokenomics/constants)
+// This must match the value in packages/core/src/tokenomics/constants.ts
+const MIN_DIFFICULTY = 22;
+
 let miningState = {
   isRunning: false,
   isPaused: false,
   hashrate: 0,
   totalHashes: 0,
   shares: 0,
-  difficulty: 16,
+  difficulty: MIN_DIFFICULTY,
   nonce: 0,
   startTime: null,
   lastHashTime: null,
@@ -263,7 +267,9 @@ function startMining(config = {}) {
   }
 
   const difficulty = config.difficulty;
-  miningState.difficulty = validateDifficulty(difficulty) ? difficulty : 16;
+  miningState.difficulty = validateDifficulty(difficulty)
+    ? difficulty
+    : MIN_DIFFICULTY;
   miningState.isRunning = true;
   miningState.isPaused = false;
   miningState.startTime = Date.now();
