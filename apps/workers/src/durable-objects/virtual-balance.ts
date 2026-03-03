@@ -457,9 +457,13 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       return this.errorResponse("Address required", 400);
     }
 
-    const body = (await request.json()) as {
-      proof: MiningProof;
-    };
+    let body: { proof: MiningProof };
+    try {
+      body = (await request.json()) as { proof: MiningProof };
+    } catch (e) {
+      console.error(`[Credit] ${this.address}: JSON parse error:`, e);
+      return this.errorResponse("Invalid JSON body", 400);
+    }
 
     const { proof } = body;
 
@@ -467,6 +471,13 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     // SECURITY: Validate proof fields exist
     // =========================================================================
     if (!proof || !proof.hash || !proof.blockData) {
+      console.warn(`[Credit] ${this.address}: Missing fields`, {
+        hasProof: !!proof,
+        hasHash: !!proof?.hash,
+        hasBlockData: !!proof?.blockData,
+        hasNonce: proof?.nonce !== undefined,
+        hasDifficulty: proof?.difficulty !== undefined,
+      });
       return this.errorResponse(
         `Invalid proof: missing required fields (hash=${!!proof?.hash}, blockData=${!!proof?.blockData})`,
         400,
@@ -482,6 +493,10 @@ export class VirtualBalanceDO extends DurableObject<Env> {
           : NaN;
 
     if (isNaN(nonce)) {
+      console.warn(`[Credit] ${this.address}: Invalid nonce type`, {
+        nonceValue: proof.nonce,
+        nonceType: typeof proof.nonce,
+      });
       return this.errorResponse(
         `Invalid proof: nonce must be a number (got ${typeof proof.nonce})`,
         400,
@@ -506,6 +521,18 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     });
 
     if (!proofValidation.valid) {
+      // Detailed logging for debugging validation failures
+      console.warn(`[Credit] ${this.address}: Proof validation failed`, {
+        reason: proofValidation.reason,
+        hash: proofWithNonce.hash.slice(0, 16) + "...",
+        nonce: proofWithNonce.nonce,
+        difficulty: proofWithNonce.difficulty,
+        blockDataPreview: proofWithNonce.blockData.slice(0, 50) + "...",
+        timestamp: proofWithNonce.timestamp,
+        proofAge: proofWithNonce.timestamp
+          ? now - proofWithNonce.timestamp
+          : "N/A",
+      });
       return this.errorResponse(
         `Invalid proof: ${proofValidation.reason}`,
         400,
@@ -522,6 +549,9 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       this.env.ENVIRONMENT,
     );
     if (isUsed) {
+      console.info(
+        `[Credit] ${this.address}: Duplicate proof rejected (hash: ${proofWithNonce.hash.slice(0, 16)}...)`,
+      );
       return this.errorResponse("Proof already used", 409);
     }
 
@@ -538,6 +568,12 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     });
 
     if (!rateLimitCheck.valid) {
+      console.warn(`[Credit] ${this.address}: Rate limit hit`, {
+        sharesThisHour,
+        lastShareTime: balance.lastMiningAt,
+        timeSinceLastShare: now - balance.lastMiningAt,
+        reason: rateLimitCheck.reason,
+      });
       return this.errorResponse(rateLimitCheck.reason!, 429);
     }
 
@@ -556,6 +592,12 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       // But apply a penalty to reward to discourage abuse
       const minAcceptable = Math.max(assignedDiff - 1, MIN_DIFFICULTY);
       if (proofWithNonce.difficulty < minAcceptable) {
+        console.warn(`[Credit] ${this.address}: Difficulty too low`, {
+          submittedDiff: proofWithNonce.difficulty,
+          assignedDiff,
+          minAcceptable,
+          globalMinDiff: MIN_DIFFICULTY,
+        });
         return this.errorResponse(
           `Share difficulty D${proofWithNonce.difficulty} below minimum D${minAcceptable} (assigned: D${assignedDiff})`,
           400,
@@ -563,7 +605,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       }
       // Log below-assigned shares for monitoring (potential abuse indicator)
       console.warn(
-        `[VarDiff] Share at D${proofWithNonce.difficulty} below assigned D${assignedDiff}, accepting with penalty`,
+        `[VarDiff] ${this.address}: Share at D${proofWithNonce.difficulty} below assigned D${assignedDiff}, accepting with penalty`,
       );
     }
 
@@ -648,6 +690,11 @@ export class VirtualBalanceDO extends DurableObject<Env> {
 
     // Increment rate limit counter
     this.incrementShareCounter();
+
+    // Log successful credit for monitoring
+    console.log(
+      `[Credit] ${this.address}: +${boostedReward} $BABY (D${proofWithNonce.difficulty}, streak: ${balance.streakCount}x${streakMultiplier.toFixed(2)})`,
+    );
 
     // =========================================================================
     // Update leaderboard (non-blocking, don't fail if it errors)

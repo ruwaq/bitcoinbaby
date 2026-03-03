@@ -238,6 +238,18 @@ export const useNFTStore = create<NFTStore>()(
         selectedNFT: state.selectedNFT,
         lastUpdated: state.lastUpdated,
       }),
+      // Recalculate derived fields after rehydration from localStorage
+      onRehydrateStorage: () => (state) => {
+        if (state && state.ownedNFTs.length > 0) {
+          // Recalculate bestBoost and totalNFTs from rehydrated NFTs
+          const boosts = state.ownedNFTs.map((n) => getMiningBoost(n));
+          state.bestBoost = Math.max(...boosts, 0);
+          state.totalNFTs = state.ownedNFTs.length;
+          console.log(
+            `[NFTStore] Rehydrated ${state.totalNFTs} NFTs, bestBoost: ${state.bestBoost}%`,
+          );
+        }
+      },
     },
   ),
 );

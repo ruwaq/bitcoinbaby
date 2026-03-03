@@ -98,6 +98,18 @@ id = "c1629ef515ec48a0a2c2ef6872ea3ea3"
 [env.production.triggers]
 crons = ["0 */6 * * *"]
 
-# Secrets (set via wrangler secret put)
-# SCROLLS_API_KEY - API key for Charms Scrolls
-# BATCH_WALLET_SEED - Seed for batch transaction signing (NEVER commit!)
+# =============================================================================
+# SECRETS - Set via: wrangler secret put SECRET_NAME --env production
+# =============================================================================
+# Required for NFT Marketplace:
+#   UPSTASH_REDIS_REST_URL - Redis URL for leaderboard/listings cache
+#   UPSTASH_REDIS_REST_TOKEN - Redis auth token
+#
+# Required for Charms integration:
+#   SCROLLS_API_KEY - API key for Charms Scrolls
+#
+# Required for withdrawals:
+#   BATCH_WALLET_SEED - Seed for batch transaction signing (NEVER commit!)
+#
+# Optional:
+#   ADMIN_KEY - Admin API key for reset endpoints

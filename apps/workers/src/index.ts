@@ -1779,6 +1779,16 @@ app.delete("/api/nft/unlist/:tokenId", async (c) => {
  */
 app.get("/api/nft/listings", async (c) => {
   try {
+    // Check if Redis is configured
+    if (!c.env.UPSTASH_REDIS_REST_URL || !c.env.UPSTASH_REDIS_REST_TOKEN) {
+      // Return empty array if Redis not configured (marketplace not available)
+      return c.json<ApiResponse<{ listings: unknown[]; count: number }>>({
+        success: true,
+        data: { listings: [], count: 0 },
+        timestamp: Date.now(),
+      });
+    }
+
     const redis = getRedis(c.env);
 
     // Get all active listing token IDs

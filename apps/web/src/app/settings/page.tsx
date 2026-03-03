@@ -489,11 +489,12 @@ export default function SettingsPage() {
     ];
     keysToRemove.forEach((key) => localStorage.removeItem(key));
 
-    // 3. Clear IndexedDB databases (including share queue)
+    // 3. Clear ALL IndexedDB databases
     const dbsToDelete = [
-      "bitcoinbaby",
-      "bitcoinbaby-secure",
-      "BitcoinBabyShareQueue", // Mining share queue
+      "bitcoinbaby", // Game storage
+      "bitcoinbaby-secure", // Wallet/keys storage
+      "bitcoinbaby-mining", // Mining persistence (hashes, sessions)
+      "BitcoinBabyShareQueue", // Mining share queue (Dexie)
     ];
     for (const dbName of dbsToDelete) {
       try {
