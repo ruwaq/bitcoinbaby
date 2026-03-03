@@ -35,17 +35,10 @@ import {
 } from "@bitcoinbaby/ui";
 import { useLeaderboard } from "@bitcoinbaby/core";
 import { useWallet } from "@/hooks/useWallet";
-import {
-  Button,
-  Input,
-  Card,
-  CardHeader,
-  CardContent,
-  SectionHeader,
-  InfoBanner,
-} from "@bitcoinbaby/ui";
+import { Button, SectionHeader, InfoBanner } from "@bitcoinbaby/ui";
 import type { GameEvent } from "@bitcoinbaby/core";
 import type { TabType } from "@/components/app/TabNavigation";
+import { CreateBabyForm } from "@/components/features/baby";
 
 // =============================================================================
 // PROPS
@@ -54,147 +47,6 @@ import type { TabType } from "@/components/app/TabNavigation";
 interface BabySectionProps {
   /** Navigate to another tab */
   setActiveTab: (tab: TabType) => void;
-}
-
-// =============================================================================
-// BABY CREATION FORM
-// =============================================================================
-
-function CreateBabyForm({
-  onCreate,
-  currentMiningShares,
-  onGoToMining,
-}: {
-  onCreate: (name: string, miningSharesBaseline?: number) => void;
-  currentMiningShares: number;
-  onGoToMining: () => void;
-}) {
-  const [name, setName] = useState("");
-  const [showTutorial, setShowTutorial] = useState(true);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (name.trim()) {
-      onCreate(name.trim(), currentMiningShares);
-    }
-  };
-
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[500px] p-4">
-      {showTutorial ? (
-        // Tutorial/Welcome Screen
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <h2 className="font-pixel text-lg text-pixel-primary text-center">
-              WELCOME TO BITCOINBABY!
-            </h2>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="text-center">
-              <div className="text-6xl mb-4">👶</div>
-              <p className="font-pixel-body text-sm text-pixel-text">
-                Raise your own Baby and earn $BABY tokens!
-              </p>
-            </div>
-
-            {/* PoUW Banner */}
-            <InfoBanner variant="highlight" icon="🧠">
-              <p className="font-pixel text-[9px] text-pixel-primary mb-1">
-                PROOF OF USEFUL WORK
-              </p>
-              <p className="font-pixel-body text-[11px] text-pixel-text">
-                Your mining trains artificial intelligence. Energy is not wasted
-                on meaningless algorithms.
-              </p>
-            </InfoBanner>
-
-            <div className="space-y-4">
-              <div className="flex items-start gap-3 p-3 bg-pixel-bg-light border-2 border-pixel-border">
-                <span className="text-2xl">⛏️</span>
-                <div>
-                  <p className="font-pixel text-[10px] text-pixel-primary">
-                    MINE & TRAIN AI
-                  </p>
-                  <p className="font-pixel-body text-xs text-pixel-text-muted">
-                    Earn $BABY while contributing to AI training
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-3 bg-pixel-bg-light border-2 border-pixel-border">
-                <span className="text-2xl">🍼</span>
-                <div>
-                  <p className="font-pixel text-[10px] text-pixel-primary">
-                    CARE & EARN MORE
-                  </p>
-                  <p className="font-pixel-body text-xs text-pixel-text-muted">
-                    Baby care gives you bonus rewards (+50%)
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-3 bg-pixel-bg-light border-2 border-pixel-border">
-                <span className="text-2xl">⭐</span>
-                <div>
-                  <p className="font-pixel text-[10px] text-pixel-primary">
-                    EVOLVE
-                  </p>
-                  <p className="font-pixel-body text-xs text-pixel-text-muted">
-                    Level up through 21 evolution stages
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <Button onClick={() => setShowTutorial(false)} className="w-full">
-              CREATE MY BABY
-            </Button>
-
-            <button
-              onClick={onGoToMining}
-              className="w-full font-pixel text-[10px] text-pixel-secondary hover:text-pixel-secondary-light"
-            >
-              Skip to Mining →
-            </button>
-          </CardContent>
-        </Card>
-      ) : (
-        // Name Input Form
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <h2 className="font-pixel text-lg text-pixel-primary text-center">
-              NAME YOUR BABY
-            </h2>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block font-pixel text-xs text-pixel-text-muted mb-2">
-                  NAME
-                </label>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="My BitcoinBaby"
-                  maxLength={20}
-                  autoFocus
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={!name.trim()}>
-                CREATE BABY
-              </Button>
-            </form>
-            <button
-              onClick={() => setShowTutorial(true)}
-              className="w-full mt-4 font-pixel text-[10px] text-pixel-text-muted hover:text-pixel-text"
-            >
-              ← Back to tutorial
-            </button>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
 }
 
 // =============================================================================

@@ -31,35 +31,8 @@ import {
   formatHashrate,
   MIN_DIFFICULTY,
   useEngagement,
+  useThrottledValue,
 } from "@bitcoinbaby/core";
-
-// Throttle hook for smoother updates
-function useThrottledValue<T>(value: T, delay: number): T {
-  const [throttled, setThrottled] = useState(value);
-  const lastUpdate = useRef(0); // Start at 0, will be set on first update
-
-  useEffect(() => {
-    const now = Date.now();
-    if (now - lastUpdate.current >= delay) {
-      // Defer to avoid cascading renders
-      queueMicrotask(() => {
-        setThrottled(value);
-        lastUpdate.current = Date.now();
-      });
-    } else {
-      const timeout = setTimeout(
-        () => {
-          setThrottled(value);
-          lastUpdate.current = Date.now();
-        },
-        delay - (now - lastUpdate.current),
-      );
-      return () => clearTimeout(timeout);
-    }
-  }, [value, delay]);
-
-  return throttled;
-}
 
 export function MiningSection() {
   const wallet = useWalletStore((s) => s.wallet);

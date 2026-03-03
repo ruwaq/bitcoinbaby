@@ -87,6 +87,9 @@ export { HelpTooltip, InfoLabel, StatWithHelp } from "./common/HelpTooltip";
 export { SectionHeader } from "./common/SectionHeader";
 export { InfoBanner } from "./common/InfoBanner";
 export { StatCard } from "./common/StatCard";
+export { BalanceCard } from "./common/BalanceCard";
+export { CopyButton } from "./common/CopyButton";
+export { TabButton } from "./common/TabButton";
 
 // Sheet/Overlay Components
 export {

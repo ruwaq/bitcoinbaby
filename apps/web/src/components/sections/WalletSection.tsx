@@ -11,7 +11,7 @@
  * - Network switching
  */
 
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import {
   useWallet,
   useBalance,
@@ -27,6 +27,8 @@ import {
   SectionHeader,
   InfoBanner,
   Button,
+  CopyButton,
+  BalanceCard,
 } from "@bitcoinbaby/ui";
 import {
   useNetworkStore,
@@ -47,34 +49,6 @@ import {
 // Real App IDs from deployment
 const { appId: BABTC_APP_ID } = getDeploymentConfig("testnet4");
 const NFT_APP_ID = "genesis_babies_testnet4"; // Genesis Babies NFT collection
-
-// Copy button component
-function CopyButton({ text, label }: { text: string; label: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
-  };
-
-  return (
-    <button
-      onClick={copy}
-      className={`px-3 py-2 min-h-[36px] font-pixel text-pixel-2xs border-2 border-black transition-all active:scale-95 ${
-        copied
-          ? "bg-pixel-success text-black"
-          : "bg-pixel-bg-dark text-pixel-text hover:bg-pixel-primary hover:text-black"
-      }`}
-    >
-      {copied ? "COPIED!" : label}
-    </button>
-  );
-}
 
 export function WalletSection() {
   const { network, switchNetwork, mainnetAllowed, setMainnetAllowed, config } =

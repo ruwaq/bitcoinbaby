@@ -25,9 +25,11 @@ import {
   SectionHeader,
   InfoBanner,
   Button,
+  TabButton,
   type BabyNFTState,
   type TransactionDetails,
 } from "@bitcoinbaby/ui";
+import { MarketplaceListing } from "@/components/features/nft";
 import {
   useWalletStore,
   useNFTSale,
@@ -329,53 +331,41 @@ export function NFTsSection() {
         />
 
         {/* Sub-Tab Navigation */}
-        <div className="flex gap-2 mb-6">
-          <button
+        <div className="flex gap-2 mb-6 flex-wrap">
+          <TabButton
+            active={activeTab === "collection"}
             onClick={() => setActiveTab("collection")}
-            className={`font-pixel text-[9px] uppercase px-4 py-2 border-4 transition-all ${
-              activeTab === "collection"
-                ? "bg-pixel-primary text-pixel-text-dark border-black shadow-[4px_4px_0_0_#000]"
-                : "bg-pixel-bg-medium text-pixel-text border-pixel-border hover:border-pixel-primary"
-            }`}
+            variant="primary"
           >
             My Collection ({nfts.length})
-          </button>
-          <button
+          </TabButton>
+          <TabButton
+            active={activeTab === "mint"}
             onClick={() => {
               setActiveTab("mint");
               setMintState("info");
             }}
-            className={`font-pixel text-[9px] uppercase px-4 py-2 border-4 transition-all ${
-              activeTab === "mint"
-                ? "bg-pixel-success text-pixel-text-dark border-black shadow-[4px_4px_0_0_#000]"
-                : "bg-pixel-bg-medium text-pixel-text border-pixel-border hover:border-pixel-success"
-            }`}
+            variant="success"
           >
             Mint New
-          </button>
-          <button
+          </TabButton>
+          <TabButton
+            active={activeTab === "claim"}
             onClick={() => {
               setActiveTab("claim");
               resetClaim();
             }}
-            className={`font-pixel text-[9px] uppercase px-4 py-2 border-4 transition-all ${
-              activeTab === "claim"
-                ? "bg-pixel-secondary text-pixel-text-dark border-black shadow-[4px_4px_0_0_#000]"
-                : "bg-pixel-bg-medium text-pixel-text border-pixel-border hover:border-pixel-secondary"
-            }`}
+            variant="secondary"
           >
             Claim NFT
-          </button>
-          <button
+          </TabButton>
+          <TabButton
+            active={activeTab === "marketplace"}
             onClick={() => setActiveTab("marketplace")}
-            className={`font-pixel text-[9px] uppercase px-4 py-2 border-4 transition-all ${
-              activeTab === "marketplace"
-                ? "bg-pixel-warning text-pixel-text-dark border-black shadow-[4px_4px_0_0_#000]"
-                : "bg-pixel-bg-medium text-pixel-text border-pixel-border hover:border-pixel-warning"
-            }`}
+            variant="warning"
           >
             Marketplace ({listings.length})
-          </button>
+          </TabButton>
         </div>
 
         {/* List Feedback Banner */}
@@ -934,79 +924,13 @@ export function NFTsSection() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {listings.map((listing) => (
-                  <div
+                  <MarketplaceListing
                     key={listing.tokenId}
-                    className="bg-pixel-bg-medium border-4 border-pixel-border p-4 shadow-[4px_4px_0_0_#000]"
-                  >
-                    {/* NFT Info */}
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="font-pixel text-[9px] text-pixel-text">
-                        #{listing.tokenId.toString().padStart(4, "0")}
-                      </span>
-                      <span className="font-pixel text-[7px] text-pixel-text-muted uppercase px-2 py-1 bg-pixel-bg-dark border border-pixel-border">
-                        {listing.nft.rarityTier}
-                      </span>
-                    </div>
-
-                    {/* Traits */}
-                    <div className="mb-3 space-y-1">
-                      <p className="font-pixel text-[7px] text-pixel-text-muted">
-                        Type:{" "}
-                        <span className="text-pixel-secondary capitalize">
-                          {listing.nft.baseType}
-                        </span>
-                      </p>
-                      <p className="font-pixel text-[7px] text-pixel-text-muted">
-                        Bloodline:{" "}
-                        <span className="text-pixel-secondary capitalize">
-                          {listing.nft.bloodline}
-                        </span>
-                      </p>
-                      <p className="font-pixel text-[7px] text-pixel-text-muted">
-                        Level:{" "}
-                        <span className="text-pixel-secondary">
-                          {listing.nft.level}
-                        </span>
-                      </p>
-                    </div>
-
-                    {/* Price */}
-                    <div className="mb-3 p-2 bg-pixel-bg-dark border-2 border-pixel-warning/30 text-center">
-                      <p className="font-pixel text-[7px] text-pixel-text-muted uppercase">
-                        Price
-                      </p>
-                      <p className="font-pixel text-sm text-pixel-warning">
-                        {(listing.price / 100_000_000).toFixed(8)} BTC
-                      </p>
-                      <p className="font-pixel text-[6px] text-pixel-text-muted">
-                        ({listing.price.toLocaleString()} sats)
-                      </p>
-                    </div>
-
-                    {/* Seller */}
-                    <p className="font-pixel text-[6px] text-pixel-text-muted mb-3 truncate">
-                      Seller: {listing.sellerAddress.slice(0, 12)}...
-                    </p>
-
-                    {/* Buy Button */}
-                    <Button
-                      onClick={() => buyNFT(listing.tokenId)}
-                      disabled={
-                        !isWalletConnected ||
-                        isProcessingMarketplace ||
-                        listing.sellerAddress === wallet?.address
-                      }
-                      variant="success"
-                      size="sm"
-                      className="w-full"
-                    >
-                      {listing.sellerAddress === wallet?.address
-                        ? "Your Listing"
-                        : isProcessingMarketplace
-                          ? "Processing..."
-                          : "Buy Now"}
-                    </Button>
-                  </div>
+                    listing={listing}
+                    onBuy={buyNFT}
+                    currentUserAddress={wallet?.address}
+                    isProcessing={isProcessingMarketplace}
+                  />
                 ))}
               </div>
             )}

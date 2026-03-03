@@ -152,3 +152,10 @@ export {
   type UseEngagementOptions,
   type UseEngagementReturn,
 } from "./useEngagement";
+
+// =============================================================================
+// UTILITY HOOKS
+// =============================================================================
+
+// Throttled value hook (for performance with rapidly changing values)
+export { useThrottledValue } from "./useThrottledValue";
