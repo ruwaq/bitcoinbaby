@@ -250,6 +250,10 @@ export function useWallet(): UseWalletReturn {
             isLocked: false,
           });
 
+          // CRITICAL: Sync wallet info to global store
+          // This ensures components using useWalletStore directly see the wallet as connected
+          setStoreWallet(toStoreWalletInfo(singleton.info));
+
           // Re-setup signing functions
           setupSigningFunctions();
           // Mark as initialized AFTER restore

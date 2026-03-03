@@ -17,6 +17,7 @@ import {
 import { usePlatform } from "@/hooks";
 import { MiningProvider } from "./MiningProvider";
 import { QueryProvider } from "./QueryProvider";
+import { AppInitializer } from "./AppInitializer";
 import { usePendingTxStore, cleanupStuckTransactions } from "@bitcoinbaby/core";
 import { OverlayManager } from "@/components/overlays/OverlayManager";
 
@@ -113,6 +114,7 @@ export function RootProvider({ children }: RootProviderProps) {
 
   return (
     <QueryProvider>
+      <AppInitializer />
       <MiningProvider>
         {children}
         <OverlayManager />
