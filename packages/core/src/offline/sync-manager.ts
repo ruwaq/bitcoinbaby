@@ -22,6 +22,8 @@ import {
   cleanupSyncedShares,
   needsNonceMigration,
   migrateDecimalNoncesToHex,
+  needsLowDifficultyCleanup,
+  cleanupLowDifficultyShares,
   type QueuedShare,
   type QueueStats,
 } from "./share-queue";
@@ -121,8 +123,9 @@ class SyncManager {
   start(address: string): void {
     this.address = address;
 
-    // Run migration for old shares with decimal nonces (one-time fix)
+    // Run migrations (one-time fixes)
     this.runMigrationIfNeeded();
+    this.runLowDifficultyCleanupIfNeeded();
 
     // Start sync loop
     if (!this.syncTimer) {
@@ -182,6 +185,30 @@ class SyncManager {
       this.triggerSync();
     } catch (error) {
       console.error("[SyncManager] Migration failed:", error);
+    }
+  }
+
+  /**
+   * Clean up old shares below minimum difficulty
+   *
+   * Shares mined at D16-D21 will be rejected by the server (MIN_DIFFICULTY=22).
+   * This cleanup removes them to prevent repeated sync failures.
+   */
+  private async runLowDifficultyCleanupIfNeeded(): Promise<void> {
+    try {
+      const needs = await needsLowDifficultyCleanup();
+      if (!needs) {
+        console.log("[SyncManager] No low-difficulty cleanup needed");
+        return;
+      }
+
+      console.log("[SyncManager] Cleaning up low-difficulty shares...");
+      const result = await cleanupLowDifficultyShares();
+      console.log(
+        `[SyncManager] Cleanup complete: ${result.deleted} shares deleted, ${result.remaining} remaining`,
+      );
+    } catch (error) {
+      console.error("[SyncManager] Low-difficulty cleanup failed:", error);
     }
   }
 

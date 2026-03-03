@@ -5,11 +5,7 @@
  */
 
 import { create } from "zustand";
-import {
-  persist,
-  createJSONStorage,
-  type StateStorage,
-} from "zustand/middleware";
+import { persist } from "zustand/middleware";
 import type {
   BabyNFTState,
   BabyNFTInfo,
@@ -74,58 +70,34 @@ function deserializeWithBigIntMarker(obj: unknown): unknown {
 // =============================================================================
 
 /**
- * Convert BigInt to number if safe, otherwise to string
- * This is needed because Zustand's JSON storage can't handle BigInt directly
+ * Custom storage adapter that handles BigInt serialization properly.
+ *
+ * IMPORTANT: This storage does NOT use Zustand's createJSONStorage because
+ * createJSONStorage calls JSON.stringify BEFORE passing to setItem, which fails
+ * with BigInt values. Instead, we implement the full StorageValue interface
+ * and handle serialization ourselves.
  */
-function convertBigIntToSafe(obj: unknown): unknown {
-  if (obj === null || obj === undefined) return obj;
-  if (typeof obj === "bigint") {
-    // If it fits in a safe integer, convert to number
-    if (obj <= Number.MAX_SAFE_INTEGER && obj >= Number.MIN_SAFE_INTEGER) {
-      return Number(obj);
-    }
-    // Otherwise keep as string (will be parsed back as string)
-    return obj.toString();
-  }
-  if (Array.isArray(obj)) return obj.map(convertBigIntToSafe);
-  if (typeof obj === "object") {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      result[key] = convertBigIntToSafe(value);
-    }
-    return result;
-  }
-  return obj;
-}
-
-/**
- * Custom storage that handles BigInt serialization
- * Required because BabyNFTState.tokensEarned is bigint
- */
-const bigIntStorage: StateStorage = {
-  getItem: (name: string): string | null => {
+const bigIntSafeStorage = {
+  getItem: (name: string) => {
     const value = localStorage.getItem(name);
     if (!value) return null;
 
     try {
-      // Parse stored value and deserialize BigInt markers
+      // Parse and convert BigInt markers back to BigInt
       const parsed = JSON.parse(value);
       const deserialized = deserializeWithBigIntMarker(parsed);
-      // Convert BigInt to safe types for Zustand's internal JSON handling
-      const safe = convertBigIntToSafe(deserialized);
-      return JSON.stringify(safe);
+      return deserialized;
     } catch {
-      return value;
+      return null;
     }
   },
-  setItem: (name: string, value: string): void => {
+  setItem: (name: string, value: unknown): void => {
     try {
-      // Parse zustand's JSON, serialize with BigInt markers, and save
-      const parsed = JSON.parse(value);
-      const serialized = serializeWithBigIntMarker(parsed);
+      // Serialize with BigInt markers before storing
+      const serialized = serializeWithBigIntMarker(value);
       localStorage.setItem(name, JSON.stringify(serialized));
-    } catch {
-      localStorage.setItem(name, value);
+    } catch (e) {
+      console.error("[NFTStore] Failed to save:", e);
     }
   },
   removeItem: (name: string): void => {
@@ -332,8 +304,9 @@ export const useNFTStore = create<NFTStore>()(
     }),
     {
       name: "bitcoinbaby-nft-store",
-      // Custom storage handles BigInt serialization with marker format
-      storage: createJSONStorage(() => bigIntStorage),
+      // Use custom storage that handles BigInt serialization internally
+      // NOT using createJSONStorage because it calls JSON.stringify before setItem
+      storage: bigIntSafeStorage as never,
       partialize: (state) => ({
         ownedNFTs: state.ownedNFTs,
         selectedNFT: state.selectedNFT,

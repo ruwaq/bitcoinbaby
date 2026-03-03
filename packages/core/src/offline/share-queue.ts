@@ -84,6 +84,13 @@ class ShareQueueDB extends Dexie {
       shares:
         "++id, &hash, status, address, [status+address], timestamp, nextRetry",
     });
+
+    // Version 3: Add difficulty index for efficient low-difficulty cleanup
+    // Required by cleanupLowDifficultyShares() to quickly find shares below MIN_DIFFICULTY
+    this.version(3).stores({
+      shares:
+        "++id, &hash, status, address, [status+address], timestamp, nextRetry, difficulty",
+    });
   }
 }
 
@@ -613,4 +620,72 @@ export async function needsNonceMigration(): Promise<boolean> {
   }
 
   return false;
+}
+
+// =============================================================================
+// LOW DIFFICULTY CLEANUP
+// =============================================================================
+
+const MIN_DIFFICULTY_REQUIRED = 22;
+
+/**
+ * MIGRATION: Clean up shares below minimum difficulty
+ *
+ * Old shares mined at D16-D21 will be rejected by the server (MIN_DIFFICULTY=22).
+ * This migration removes them from the queue to prevent repeated failed syncs.
+ *
+ * @returns Number of shares deleted
+ */
+export async function cleanupLowDifficultyShares(): Promise<{
+  deleted: number;
+  remaining: number;
+}> {
+  const database = getDB();
+
+  try {
+    // Get all shares below minimum difficulty
+    const lowDiffShares = await database.shares
+      .where("difficulty")
+      .below(MIN_DIFFICULTY_REQUIRED)
+      .toArray();
+
+    if (lowDiffShares.length === 0) {
+      console.log("[ShareQueue] No low-difficulty shares to clean up");
+      return { deleted: 0, remaining: 0 };
+    }
+
+    console.log(
+      `[ShareQueue] Found ${lowDiffShares.length} shares below D${MIN_DIFFICULTY_REQUIRED}, cleaning up...`,
+    );
+
+    // Delete them
+    const ids = lowDiffShares.map((s) => s.id!);
+    await database.shares.bulkDelete(ids);
+
+    // Count remaining
+    const remaining = await database.shares.count();
+
+    console.log(
+      `[ShareQueue] Deleted ${ids.length} low-difficulty shares, ${remaining} remaining`,
+    );
+
+    return { deleted: ids.length, remaining };
+  } catch (error) {
+    console.error("[ShareQueue] Low-difficulty cleanup failed:", error);
+    throw error;
+  }
+}
+
+/**
+ * Check if low-difficulty cleanup is needed
+ */
+export async function needsLowDifficultyCleanup(): Promise<boolean> {
+  const database = getDB();
+
+  const count = await database.shares
+    .where("difficulty")
+    .below(MIN_DIFFICULTY_REQUIRED)
+    .count();
+
+  return count > 0;
 }
