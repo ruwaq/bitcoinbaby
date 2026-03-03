@@ -282,6 +282,52 @@ app.post("/api/balance/:address/set-hashrate", async (c) => {
   }
 });
 
+/**
+ * DELETE /api/balance/:address/reset - Reset user balance (testnet only)
+ *
+ * Clears all mining data for the user:
+ * - Virtual balance
+ * - Mining proofs
+ * - Difficulty state
+ */
+app.delete("/api/balance/:address/reset", async (c) => {
+  const address = c.req.param("address");
+
+  if (!address || !isValidBitcoinAddress(address)) {
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: "Invalid Bitcoin address",
+        timestamp: Date.now(),
+      },
+      400,
+    );
+  }
+
+  try {
+    const id = c.env.VIRTUAL_BALANCE.idFromName(address);
+    const stub = c.env.VIRTUAL_BALANCE.get(id);
+
+    const response = await stub.fetch(
+      new Request(`http://internal/balance/${address}/reset`, {
+        method: "DELETE",
+      }),
+    );
+
+    return response;
+  } catch (error) {
+    console.error("[Reset] Error:", error);
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: "Service temporarily unavailable. Please try again later.",
+        timestamp: Date.now(),
+      },
+      503,
+    );
+  }
+});
+
 // =============================================================================
 // WITHDRAW POOL API
 // =============================================================================
