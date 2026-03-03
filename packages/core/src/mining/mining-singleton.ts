@@ -420,29 +420,42 @@ class MiningManager {
   }
 
   /**
-   * Set difficulty
+   * Set difficulty (enforces MIN_DIFFICULTY)
    */
   setDifficulty(difficulty: number): void {
-    this.orchestrator?.setDifficulty(difficulty);
-    this.updateState({ difficulty });
+    // CRITICAL: Never allow difficulty below MIN_DIFFICULTY
+    // This prevents low-difficulty shares that will be rejected by server
+    const safeDifficulty = Math.max(difficulty, MIN_DIFFICULTY);
+
+    if (difficulty < MIN_DIFFICULTY) {
+      console.warn(
+        `[MiningManager] Attempted to set D${difficulty}, enforcing MIN_DIFFICULTY (D${MIN_DIFFICULTY})`,
+      );
+    }
+
+    this.orchestrator?.setDifficulty(safeDifficulty);
+    this.updateState({ difficulty: safeDifficulty });
   }
 
   /**
    * Update difficulty from VarDiff response (called by SyncManager)
    *
    * Only updates if the new difficulty is different from current.
-   * Logs the change for debugging.
+   * Enforces MIN_DIFFICULTY to prevent rejected shares.
    */
   updateDifficultyFromVarDiff(newDifficulty: number): boolean {
-    if (newDifficulty === this.state.difficulty) {
+    // Enforce MIN_DIFFICULTY
+    const safeDifficulty = Math.max(newDifficulty, MIN_DIFFICULTY);
+
+    if (safeDifficulty === this.state.difficulty) {
       return false;
     }
 
     const oldDiff = this.state.difficulty;
-    this.setDifficulty(newDifficulty);
+    this.setDifficulty(safeDifficulty);
 
     console.log(
-      `[MiningManager] VarDiff adjustment: D${oldDiff} -> D${newDifficulty}`,
+      `[MiningManager] VarDiff adjustment: D${oldDiff} -> D${safeDifficulty}${newDifficulty < MIN_DIFFICULTY ? ` (clamped from D${newDifficulty})` : ""}`,
     );
 
     return true;
@@ -526,6 +539,38 @@ class MiningManager {
   async clearSavedState(): Promise<void> {
     await this.persistence?.clearState();
     this.updateState({ canResume: false });
+  }
+
+  /**
+   * Reset all mining data (for testnet debugging)
+   * Clears:
+   * - Mining state (hashes, shares, difficulty)
+   * - Lifetime stats
+   * Does NOT clear: share queue (use SyncManager for that)
+   */
+  async resetAllMiningData(): Promise<void> {
+    console.log("[MiningManager] Resetting all mining data...");
+
+    // Stop mining first
+    this.orchestrator?.stop();
+
+    // Clear persistence (clearState handles both state and sessions via IndexedDB)
+    await this.persistence?.clearState();
+
+    // Reset state to defaults
+    this.updateState({
+      totalHashes: 0,
+      shares: 0,
+      difficulty: MIN_DIFFICULTY,
+      lastShare: null,
+      error: null,
+      sessionStartTime: null,
+      canResume: false,
+      lifetimeHashes: 0,
+      lifetimeShares: 0,
+    });
+
+    console.log("[MiningManager] All mining data reset complete");
   }
 
   /**

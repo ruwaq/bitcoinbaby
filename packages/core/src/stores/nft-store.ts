@@ -165,8 +165,20 @@ export const useNFTStore = create<NFTStore>()(
       // ===========================================================================
 
       setOwnedNFTs: (nfts) => {
+        const boosts = nfts.map((n) => ({
+          tokenId: n.tokenId,
+          level: n.level,
+          rarityTier: n.rarityTier,
+          boost: getMiningBoost(n),
+        }));
         const bestBoost =
-          nfts.length > 0 ? Math.max(...nfts.map((n) => getMiningBoost(n))) : 0;
+          nfts.length > 0 ? Math.max(...boosts.map((b) => b.boost)) : 0;
+
+        console.log("[NFTStore] setOwnedNFTs called:", {
+          count: nfts.length,
+          boosts,
+          bestBoost,
+        });
 
         set({
           ownedNFTs: nfts,

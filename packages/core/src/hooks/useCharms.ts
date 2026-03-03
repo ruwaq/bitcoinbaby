@@ -148,20 +148,41 @@ export function useOwnedNFTs(
 
 /**
  * Hook for mining boost
+ *
+ * Reads directly from the NFT store which is populated by useNFTSync.
+ * This avoids duplicate blockchain queries and ensures consistency.
+ *
+ * The NFT store is populated by:
+ * - useNFTSync (apps/web) - calls our Workers API for indexed NFT data
+ * - Persistence from localStorage (rehydrates on page load)
  */
 export function useMiningBoost(
-  address: string | null,
-  appId: string,
-  options?: UseCharmsOptions,
+  _address: string | null,
+  _appId: string,
+  _options?: UseCharmsOptions,
 ) {
-  const { bestBoost, totalNFTs, isLoading } = useNFTStore();
-  const { refresh } = useOwnedNFTs(address, appId, options);
+  // Read directly from NFT store (populated by useNFTSync in web app)
+  const { bestBoost, totalNFTs, isLoading, ownedNFTs } = useNFTStore();
+
+  // Debug: Log if store has data but boost is 0
+  useEffect(() => {
+    if (ownedNFTs.length > 0 && bestBoost === 0) {
+      console.warn(
+        "[useMiningBoost] NFTs found but bestBoost is 0. NFTs:",
+        ownedNFTs.map((n) => ({
+          tokenId: n.tokenId,
+          level: n.level,
+          rarityTier: n.rarityTier,
+        })),
+      );
+    }
+  }, [ownedNFTs, bestBoost]);
 
   return {
     boost: bestBoost,
     nftCount: totalNFTs,
     loading: isLoading,
-    refresh,
+    refresh: () => {}, // No-op - refresh handled by useNFTSync
   };
 }
 

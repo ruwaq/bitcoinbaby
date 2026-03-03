@@ -96,6 +96,9 @@ class SyncManager {
   // Circuit breaker for rate limiting (503 errors)
   private circuitBreakerUntil: number = 0;
   private consecutiveFailures: number = 0;
+  // Throttle rejected share logs to reduce console spam
+  private rejectedShareCount: number = 0;
+  private lastRejectedLogTime: number = 0;
 
   constructor(config: Partial<SyncManagerConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -244,9 +247,19 @@ class SyncManager {
 
     // Reject shares below minimum difficulty (server will reject anyway)
     if (share.difficulty < MIN_DIFFICULTY) {
-      console.warn(
-        `[SyncManager] Share rejected: D${share.difficulty} < MIN_DIFFICULTY (${MIN_DIFFICULTY})`,
-      );
+      // Throttle logging to reduce console spam (log every 10 rejections or every 5 seconds)
+      this.rejectedShareCount++;
+      const now = Date.now();
+      if (
+        this.rejectedShareCount === 1 ||
+        this.rejectedShareCount % 10 === 0 ||
+        now - this.lastRejectedLogTime > 5000
+      ) {
+        console.warn(
+          `[SyncManager] ${this.rejectedShareCount} share(s) rejected: D${share.difficulty} < MIN_DIFFICULTY (${MIN_DIFFICULTY}). Increase miner difficulty!`,
+        );
+        this.lastRejectedLogTime = now;
+      }
       return { queued: false, duplicate: false };
     }
 
