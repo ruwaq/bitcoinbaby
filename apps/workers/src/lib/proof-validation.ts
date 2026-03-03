@@ -273,23 +273,40 @@ export function calculateRewardWithStreak(
 // =============================================================================
 
 /**
- * Calculate SHA256 hash and return as hex string
+ * Calculate SHA256 hash and return as Uint8Array
  */
-async function sha256Hex(data: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const dataBuffer = encoder.encode(data);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", dataBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+async function sha256Bytes(data: Uint8Array): Promise<Uint8Array> {
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return new Uint8Array(hashBuffer);
+}
+
+/**
+ * Convert Uint8Array to hex string
+ */
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 /**
  * Double SHA256 (Bitcoin standard hash256)
  * hash256(data) = SHA256(SHA256(data))
+ *
+ * CRITICAL: The second SHA256 must be on the 32 BYTES of the first hash,
+ * NOT on the 64-character hex string representation!
  */
 async function hash256Hex(data: string): Promise<string> {
-  const firstHash = await sha256Hex(data);
-  return sha256Hex(firstHash);
+  const encoder = new TextEncoder();
+  const dataBuffer = encoder.encode(data);
+
+  // First SHA256 -> 32 bytes
+  const firstHash = await sha256Bytes(dataBuffer);
+
+  // Second SHA256 on the 32 BYTES (not hex string!)
+  const secondHash = await sha256Bytes(firstHash);
+
+  return bytesToHex(secondHash);
 }
 
 /**
