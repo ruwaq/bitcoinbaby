@@ -44,8 +44,13 @@ export function NFTsSection() {
   const [activeTab, setActiveTab] = useState<SubTab>("collection");
   const [mintState, setMintState] = useState<MintState>("info");
   const [evolvingIds, setEvolvingIds] = useState<Set<number>>(new Set());
+  const [listingIds, setListingIds] = useState<Set<number>>(new Set());
   const [claimTxid, setClaimTxid] = useState("");
   const [selectedNFT, setSelectedNFT] = useState<BabyNFTState | null>(null);
+  const [listFeedback, setListFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // NFT Sync with TanStack Query
   const {
@@ -96,6 +101,7 @@ export function NFTsSection() {
     listings,
     isLoading: isLoadingListings,
     buyNFT,
+    listNFT,
     isProcessing: isProcessingMarketplace,
     processingError: marketplaceError,
   } = useMarketplace();
@@ -237,6 +243,37 @@ export function NFTsSection() {
     [ownedNFTs, setOwnedNFTs, selectedNFT],
   );
 
+  // Handle listing an NFT for sale
+  const handleListNFT = useCallback(
+    async (nft: BabyNFTState, price: number) => {
+      setListingIds((prev) => new Set(prev).add(nft.tokenId));
+      setListFeedback(null);
+
+      const result = await listNFT(nft.tokenId, price);
+
+      if (result.success) {
+        setListFeedback({
+          type: "success",
+          message: `NFT #${nft.tokenId} listed for ${price.toLocaleString()} sats!`,
+        });
+        // Clear success message after 5 seconds
+        setTimeout(() => setListFeedback(null), 5000);
+      } else {
+        setListFeedback({
+          type: "error",
+          message: result.error || "Failed to list NFT",
+        });
+      }
+
+      setListingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(nft.tokenId);
+        return next;
+      });
+    },
+    [listNFT],
+  );
+
   return (
     <div className="p-4 md:p-8 bg-pixel-bg-dark min-h-screen">
       <div className="max-w-7xl mx-auto">
@@ -341,6 +378,27 @@ export function NFTsSection() {
           </button>
         </div>
 
+        {/* List Feedback Banner */}
+        {listFeedback && (
+          <div
+            className={`mb-4 p-3 border-4 ${
+              listFeedback.type === "success"
+                ? "bg-pixel-success/20 border-pixel-success"
+                : "bg-pixel-error/20 border-pixel-error"
+            }`}
+          >
+            <p
+              className={`font-pixel text-[9px] uppercase ${
+                listFeedback.type === "success"
+                  ? "text-pixel-success"
+                  : "text-pixel-error"
+              }`}
+            >
+              {listFeedback.message}
+            </p>
+          </div>
+        )}
+
         {/* Tab Content */}
         {activeTab === "collection" ? (
           /* Collection View */
@@ -435,8 +493,10 @@ export function NFTsSection() {
                   columns={3}
                   onEvolve={handleEvolve}
                   onSelect={handleSelectNFT}
+                  onList={handleListNFT}
                   selectedTokenId={selectedNFT?.tokenId}
                   evolvingIds={evolvingIds}
+                  listingIds={listingIds}
                   isLoading={isLoading}
                   skeletonCount={6}
                   showControls={true}

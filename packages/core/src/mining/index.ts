@@ -60,6 +60,16 @@ export {
   type WakeLockStatus,
 } from "./wake-lock";
 
+// AI Integration (Proof of Useful Work)
+export {
+  AIWorkIntegration,
+  getAIIntegration,
+  destroyAIIntegration,
+  type AIWorkResult,
+  type AIStatus,
+  type AIIntegrationConfig,
+} from "./ai-integration";
+
 // Types
 export type {
   Miner,

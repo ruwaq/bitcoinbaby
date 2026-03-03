@@ -13,6 +13,8 @@ export interface MiningResult {
   difficulty: number;
   timestamp: number;
   blockData?: string;
+  /** AI proof for Proof of Useful Work (optional) */
+  aiProof?: string;
 }
 
 /**
@@ -84,6 +86,10 @@ export interface OrchestratorConfig {
   throttleWhenHidden: boolean;
   initialDifficulty: number;
   minerAddress?: string;
+  /** Enable AI Proof of Useful Work alongside mining (default: false) */
+  enableAIPoUW?: boolean;
+  /** Execute AI task on every N shares found (default: 1) */
+  aiTaskFrequency?: number;
 }
 
 /**

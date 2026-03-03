@@ -1,6 +1,7 @@
 import type {
   Miner,
   MinerEvents,
+  MiningResult,
   OrchestratorConfig,
   DeviceCapabilities,
   BatteryManager,
@@ -13,6 +14,11 @@ import {
   getNavigator,
 } from "./capabilities";
 import { MIN_DIFFICULTY } from "../tokenomics/constants";
+import {
+  AIWorkIntegration,
+  type AIStatus,
+  type AIWorkResult,
+} from "./ai-integration";
 
 const defaultConfig: OrchestratorConfig = {
   preferWebGPU: true,
@@ -20,6 +26,8 @@ const defaultConfig: OrchestratorConfig = {
   throttleOnBattery: true,
   throttleWhenHidden: true,
   initialDifficulty: MIN_DIFFICULTY, // D22 - sustainable emission rate
+  enableAIPoUW: false, // AI PoUW disabled by default
+  aiTaskFrequency: 1, // Execute AI task on every share
 };
 
 /**
@@ -39,9 +47,19 @@ export class MiningOrchestrator {
   private capabilities: DeviceCapabilities | null = null;
   private cleanupFunctions: (() => void)[] = [];
   private currentBlockData?: string; // Store for fallback recovery
+  private aiIntegration: AIWorkIntegration | null = null; // AI PoUW integration
 
   constructor(config: Partial<OrchestratorConfig> = {}) {
     this.config = { ...defaultConfig, ...config };
+
+    // Initialize AI integration if enabled
+    if (this.config.enableAIPoUW) {
+      this.aiIntegration = new AIWorkIntegration({
+        enabled: true,
+        taskFrequency: this.config.aiTaskFrequency ?? 1,
+        preferWebGPU: this.config.preferWebGPU,
+      });
+    }
   }
 
   /**
@@ -106,7 +124,7 @@ export class MiningOrchestrator {
           address: this.config.minerAddress,
           onHashrateUpdate: (hashrate) =>
             this.events.onHashrateUpdate?.(hashrate),
-          onWorkFound: (result) => this.events.onWorkFound?.(result),
+          onWorkFound: (result) => this.handleWorkFound(result),
           onStatusChange: (status) => this.events.onStatusChange?.(status),
           onError: (error) => this.handleMinerError(error),
         });
@@ -156,7 +174,7 @@ export class MiningOrchestrator {
       difficulty: this.config.initialDifficulty,
       address: this.config.minerAddress,
       onHashrateUpdate: (hashrate) => this.events.onHashrateUpdate?.(hashrate),
-      onWorkFound: (result) => this.events.onWorkFound?.(result),
+      onWorkFound: (result) => this.handleWorkFound(result),
       onStatusChange: (status) => this.events.onStatusChange?.(status),
       onError: (error) => {
         console.error("[Orchestrator] CPU miner error:", error.message);
@@ -166,6 +184,48 @@ export class MiningOrchestrator {
         this.events.onStatusChange?.("stopped");
       },
     });
+  }
+
+  /**
+   * Handle work found from miners
+   * Integrates AI PoUW by executing AI tasks on each share
+   * AI work is non-blocking and optional
+   */
+  private handleWorkFound(result: MiningResult): void {
+    // If AI PoUW is not enabled, just pass through
+    if (!this.aiIntegration) {
+      this.events.onWorkFound?.(result);
+      return;
+    }
+
+    // Execute AI task asynchronously (non-blocking)
+    // The share is reported immediately, AI proof is added if available
+    this.aiIntegration
+      .onShareFound()
+      .then((aiResult) => {
+        if (aiResult?.success && aiResult.proof) {
+          // Add AI proof to the mining result
+          const enhancedResult: MiningResult = {
+            ...result,
+            aiProof: aiResult.proof,
+          };
+          console.log(
+            `[Orchestrator] Share with AI proof (task: ${aiResult.taskId}, time: ${aiResult.computeTime?.toFixed(0)}ms)`,
+          );
+          this.events.onWorkFound?.(enhancedResult);
+        } else {
+          // AI failed or skipped, report share without AI proof
+          if (aiResult?.error) {
+            console.warn("[Orchestrator] AI task failed:", aiResult.error);
+          }
+          this.events.onWorkFound?.(result);
+        }
+      })
+      .catch((error) => {
+        // AI completely failed, mining continues normally
+        console.warn("[Orchestrator] AI integration error:", error);
+        this.events.onWorkFound?.(result);
+      });
   }
 
   /**
@@ -242,6 +302,10 @@ export class MiningOrchestrator {
     this.activeMiner?.terminate();
     this.activeMiner = null;
     this.capabilities = null;
+
+    // Cleanup AI integration
+    this.aiIntegration?.terminate();
+    this.aiIntegration = null;
   }
 
   /**
@@ -410,5 +474,69 @@ export class MiningOrchestrator {
 
   getCapabilities(): DeviceCapabilities | null {
     return this.capabilities;
+  }
+
+  // ==========================================================================
+  // AI PoUW Methods
+  // ==========================================================================
+
+  /**
+   * Get AI integration status
+   */
+  getAIStatus(): AIStatus | null {
+    return this.aiIntegration?.getStatus() ?? null;
+  }
+
+  /**
+   * Check if AI PoUW is enabled and available
+   */
+  isAIEnabled(): boolean {
+    return this.aiIntegration?.isAvailable() ?? false;
+  }
+
+  /**
+   * Enable or disable AI PoUW
+   */
+  setAIEnabled(enabled: boolean): void {
+    if (enabled && !this.aiIntegration) {
+      // Create new AI integration
+      this.aiIntegration = new AIWorkIntegration({
+        enabled: true,
+        taskFrequency: this.config.aiTaskFrequency ?? 1,
+        preferWebGPU: this.config.preferWebGPU,
+      });
+    } else if (this.aiIntegration) {
+      this.aiIntegration.setEnabled(enabled);
+    }
+  }
+
+  /**
+   * Set AI task frequency (every N shares)
+   */
+  setAITaskFrequency(frequency: number): void {
+    this.config.aiTaskFrequency = frequency;
+    this.aiIntegration?.setTaskFrequency(frequency);
+  }
+
+  /**
+   * Get number of AI tasks completed
+   */
+  getAITasksCompleted(): number {
+    return this.aiIntegration?.getTasksCompleted() ?? 0;
+  }
+
+  /**
+   * Initialize AI engine proactively (optional)
+   * Can be called before mining starts to pre-load models
+   */
+  async initializeAI(): Promise<void> {
+    if (!this.aiIntegration) {
+      this.aiIntegration = new AIWorkIntegration({
+        enabled: true,
+        taskFrequency: this.config.aiTaskFrequency ?? 1,
+        preferWebGPU: this.config.preferWebGPU,
+      });
+    }
+    await this.aiIntegration.initialize();
   }
 }

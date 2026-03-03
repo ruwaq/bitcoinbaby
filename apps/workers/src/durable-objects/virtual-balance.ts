@@ -272,6 +272,9 @@ export class VirtualBalanceDO extends DurableObject<Env> {
           if (action === "set-hashrate") {
             return this.handleSetHashrate(request);
           }
+          if (action === "deduct") {
+            return this.handleDeductBalance(request);
+          }
           break;
 
         case "DELETE":
@@ -817,6 +820,65 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         availableNow: (
           balance.virtualBalance - balance.pendingWithdraw
         ).toString(),
+      },
+      timestamp: Date.now(),
+    };
+
+    return Response.json(response);
+  }
+
+  /**
+   * POST /balance/{address}/deduct - Deduct balance for purchases (NFT evolution, etc.)
+   * Unlike reserve, this immediately removes balance without pending state
+   */
+  private async handleDeductBalance(request: Request): Promise<Response> {
+    if (!this.address) {
+      return this.errorResponse("Address required", 400);
+    }
+
+    const body = (await request.json()) as {
+      amount: string;
+      reason: string;
+    };
+
+    if (!body.amount || !body.reason) {
+      return this.errorResponse("Amount and reason are required", 400);
+    }
+
+    const amount = BigInt(body.amount);
+
+    if (amount <= 0n) {
+      return this.errorResponse("Amount must be positive", 400);
+    }
+
+    const balance = this.getOrCreateBalance(this.address);
+    const available = balance.virtualBalance - balance.pendingWithdraw;
+
+    if (amount > available) {
+      return this.errorResponse(
+        `Insufficient balance. Available: ${available}, required: ${amount}`,
+        400,
+      );
+    }
+
+    // Deduct the amount directly
+    balance.virtualBalance -= amount;
+    this.updateBalance(balance);
+
+    console.log(
+      `[VirtualBalance] Deducted ${amount} from ${this.address} for: ${body.reason}`,
+    );
+
+    const response: ApiResponse<{
+      deducted: string;
+      newBalance: string;
+      reason: string;
+    }> = {
+      success: true,
+      data: {
+        deducted: amount.toString(),
+        newBalance: balance.virtualBalance.toString(),
+        reason: body.reason,
       },
       timestamp: Date.now(),
     };

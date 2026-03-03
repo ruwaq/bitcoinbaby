@@ -1757,15 +1757,22 @@ app.get("/api/nft/listings", async (c) => {
 
 /**
  * POST /api/nft/buy/:tokenId - Buy a listed NFT
- * Note: In production this would verify blockchain payment
- * For testnet, we do a simple ownership transfer
+ *
+ * SECURITY: Verifies payment on blockchain before transferring ownership.
+ * The buyer must provide a txid of a transaction that:
+ * 1. Sends from buyerAddress
+ * 2. Has an output to sellerAddress
+ * 3. Output amount >= listing price
+ *
+ * For testnet4: We verify the transaction exists and has correct outputs.
+ * For mainnet: Would require N confirmations (not implemented yet).
  */
 app.post("/api/nft/buy/:tokenId", async (c) => {
   try {
     const tokenId = parseInt(c.req.param("tokenId"), 10);
     const body = await c.req.json<{
       buyerAddress: string;
-      txid?: string; // Optional: payment txid for verification
+      txid: string; // REQUIRED: payment txid for verification
     }>();
 
     const { buyerAddress, txid } = body;
@@ -1792,7 +1799,43 @@ app.post("/api/nft/buy/:tokenId", async (c) => {
       );
     }
 
+    if (!txid) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "txid is required - payment must be verified on blockchain",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    // Validate txid format (64 hex chars)
+    if (!/^[a-fA-F0-9]{64}$/.test(txid)) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Invalid txid format",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
     const redis = getRedis(c.env);
+
+    // Check if this txid was already used for a purchase (prevent replay)
+    const existingPurchase = await redis.get(`nft:purchase:${txid}`);
+    if (existingPurchase) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "This transaction was already used for a purchase",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
 
     // Get listing
     const listing = await redis.hgetall(`nft:listing:${tokenId}`);
@@ -1808,6 +1851,7 @@ app.post("/api/nft/buy/:tokenId", async (c) => {
     }
 
     const sellerAddress = listing.sellerAddress as string;
+    const listingPrice = parseInt(listing.price as string, 10);
 
     // Cannot buy your own NFT
     if (sellerAddress === buyerAddress) {
@@ -1821,8 +1865,102 @@ app.post("/api/nft/buy/:tokenId", async (c) => {
       );
     }
 
-    // TODO: In production, verify payment txid on blockchain
-    // For testnet, we skip this and just do the transfer
+    // =========================================================================
+    // BLOCKCHAIN PAYMENT VERIFICATION
+    // =========================================================================
+
+    const mempoolUrl = "https://mempool.space/testnet4/api";
+
+    // Fetch transaction details
+    const txResponse = await fetch(`${mempoolUrl}/tx/${txid}`);
+    if (!txResponse.ok) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Payment transaction not found on blockchain",
+          timestamp: Date.now(),
+        },
+        404,
+      );
+    }
+
+    const txData = (await txResponse.json()) as {
+      txid: string;
+      status: { confirmed: boolean; block_height?: number };
+      vin: Array<{
+        txid: string;
+        vout: number;
+        prevout?: {
+          scriptpubkey_address?: string;
+          value: number;
+        };
+      }>;
+      vout: Array<{
+        scriptpubkey: string;
+        scriptpubkey_address?: string;
+        scriptpubkey_type: string;
+        value: number;
+      }>;
+    };
+
+    // For testnet: transaction must exist (confirmed OR in mempool)
+    // For mainnet: would require confirmations
+    // The tx existing in mempool is sufficient for testnet
+
+    // Verify buyer is the sender (check inputs)
+    const buyerIsInput = txData.vin.some(
+      (input) => input.prevout?.scriptpubkey_address === buyerAddress,
+    );
+
+    if (!buyerIsInput) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Transaction does not originate from buyer address",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    // Verify payment to seller (check outputs)
+    const paymentOutput = txData.vout.find(
+      (output) => output.scriptpubkey_address === sellerAddress,
+    );
+
+    if (!paymentOutput) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Transaction does not have payment output to seller",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    // Verify amount is sufficient (value is in satoshis)
+    if (paymentOutput.value < listingPrice) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: `Payment amount (${paymentOutput.value} sats) is less than listing price (${listingPrice} sats)`,
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    console.log(
+      `[Marketplace] Payment verified: ${txid.slice(0, 8)}... - ${paymentOutput.value} sats from ${buyerAddress.slice(0, 10)}... to ${sellerAddress.slice(0, 10)}...`,
+    );
+
+    // =========================================================================
+    // TRANSFER OWNERSHIP (Payment verified)
+    // =========================================================================
+
+    // Mark txid as used BEFORE transfer to prevent race conditions
+    await redis.set(`nft:purchase:${txid}`, tokenId.toString());
 
     // Transfer ownership
     // 1. Remove from seller
@@ -1838,19 +1976,21 @@ app.post("/api/nft/buy/:tokenId", async (c) => {
     await redis.del(`nft:listing:${tokenId}`);
     await redis.srem("nft:active-listings", tokenId.toString());
 
-    // 5. Record sale
+    // 5. Record sale with verified transaction
     const sale = {
       tokenId: tokenId.toString(),
       seller: sellerAddress,
       buyer: buyerAddress,
       price: listing.price as string,
-      txid: txid || "testnet-simulated",
+      txid,
+      verified: "true",
+      confirmed: txData.status.confirmed ? "true" : "false",
       soldAt: Date.now().toString(),
     };
     await redis.lpush("nft:sales-history", JSON.stringify(sale));
 
     console.log(
-      `[Marketplace] Sold NFT #${tokenId} from ${sellerAddress} to ${buyerAddress}`,
+      `[Marketplace] Sold NFT #${tokenId} from ${sellerAddress} to ${buyerAddress} (verified: ${txid.slice(0, 8)}...)`,
     );
 
     return c.json<ApiResponse<typeof sale>>({
@@ -1864,6 +2004,253 @@ app.post("/api/nft/buy/:tokenId", async (c) => {
       {
         success: false,
         error: "Failed to complete purchase",
+        timestamp: Date.now(),
+      },
+      500,
+    );
+  }
+});
+
+// =============================================================================
+// NFT EVOLUTION ENDPOINTS
+// =============================================================================
+
+// XP requirements per level (level -> XP needed to reach that level)
+const XP_REQUIREMENTS: Record<number, number> = {
+  2: 100,
+  3: 250,
+  4: 500,
+  5: 1000,
+  6: 2000,
+  7: 4000,
+  8: 8000,
+  9: 16000,
+  10: 32000,
+};
+
+// Evolution costs in BABTC (level -> cost to evolve TO that level)
+const EVOLUTION_COSTS: Record<number, bigint> = {
+  2: 100n * 100_000_000n, // 100 BABTC
+  3: 250n * 100_000_000n,
+  4: 500n * 100_000_000n,
+  5: 1000n * 100_000_000n,
+  6: 2500n * 100_000_000n,
+  7: 5000n * 100_000_000n,
+  8: 10000n * 100_000_000n,
+  9: 25000n * 100_000_000n,
+  10: 50000n * 100_000_000n,
+};
+
+/**
+ * POST /api/nft/evolve - Evolve an NFT to the next level
+ *
+ * Requirements:
+ * 1. NFT must exist and belong to the address
+ * 2. NFT must have enough XP for the next level
+ * 3. Address must have enough virtual balance for evolution cost
+ *
+ * Process:
+ * 1. Validate ownership and XP
+ * 2. Deduct evolution cost from virtual balance
+ * 3. Update NFT: level++, xp=0, evolutionCount++
+ */
+app.post("/api/nft/evolve", async (c) => {
+  try {
+    const body = await c.req.json<{
+      tokenId: number;
+      address: string;
+    }>();
+
+    const { tokenId, address } = body;
+
+    // Validate required fields
+    if (!tokenId || !address) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "tokenId and address are required",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    if (!isValidBitcoinAddress(address)) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Invalid Bitcoin address",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    const redis = getRedis(c.env);
+
+    // 1. Check if NFT exists
+    const nftData = await redis.hgetall(`nft:minted:${tokenId}`);
+    if (!nftData || Object.keys(nftData).length === 0) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "NFT not found",
+          timestamp: Date.now(),
+        },
+        404,
+      );
+    }
+
+    // 2. Check ownership
+    const isOwned = await redis.sismember(
+      `nft:owned:${address}`,
+      tokenId.toString(),
+    );
+    if (!isOwned) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "You do not own this NFT",
+          timestamp: Date.now(),
+        },
+        403,
+      );
+    }
+
+    // Parse current NFT state
+    const currentLevel = parseInt(nftData.level as string, 10) || 1;
+    const currentXp = parseInt(nftData.xp as string, 10) || 0;
+    const currentEvolutionCount =
+      parseInt(nftData.evolutionCount as string, 10) || 0;
+
+    // 3. Check max level
+    const nextLevel = currentLevel + 1;
+    if (nextLevel > 10) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "NFT is already at maximum level (10)",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    // 4. Check XP requirements
+    const requiredXp = XP_REQUIREMENTS[nextLevel];
+    if (currentXp < requiredXp) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: `Insufficient XP. Required: ${requiredXp}, Current: ${currentXp}`,
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    // 5. Get evolution cost
+    const evolutionCost = EVOLUTION_COSTS[nextLevel];
+    if (!evolutionCost) {
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: "Invalid evolution level",
+          timestamp: Date.now(),
+        },
+        400,
+      );
+    }
+
+    // 6. Deduct balance from VirtualBalanceDO
+    const balanceId = c.env.VIRTUAL_BALANCE.idFromName(address);
+    const balanceStub = c.env.VIRTUAL_BALANCE.get(balanceId);
+
+    const deductResponse = await balanceStub.fetch(
+      new Request(`http://internal/balance/${address}/deduct`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: evolutionCost.toString(),
+          reason: `NFT Evolution: Token #${tokenId} to Level ${nextLevel}`,
+        }),
+      }),
+    );
+
+    if (!deductResponse.ok) {
+      const errorData = (await deductResponse.json()) as ApiResponse;
+      // Map common status codes or default to 400
+      const status =
+        deductResponse.status === 400 || deductResponse.status === 403
+          ? deductResponse.status
+          : 400;
+      return c.json<ApiResponse>(
+        {
+          success: false,
+          error: errorData.error || "Failed to deduct evolution cost",
+          timestamp: Date.now(),
+        },
+        status,
+      );
+    }
+
+    // 7. Update NFT in Redis
+    const updatedNft = {
+      ...nftData,
+      level: nextLevel.toString(),
+      xp: "0", // Reset XP after evolution
+      evolutionCount: (currentEvolutionCount + 1).toString(),
+    };
+
+    await redis.hset(`nft:minted:${tokenId}`, updatedNft);
+
+    console.log(
+      `[NFT] Evolved token #${tokenId} to level ${nextLevel} for ${address}`,
+    );
+
+    // 8. Return updated NFT
+    const responseNft = {
+      tokenId,
+      dna: nftData.dna as string,
+      bloodline: nftData.bloodline as string,
+      baseType: nftData.baseType as string,
+      genesisBlock: parseInt(nftData.genesisBlock as string, 10) || 0,
+      rarityTier: nftData.rarityTier as string,
+      level: nextLevel,
+      xp: 0,
+      totalXp: parseInt(nftData.totalXp as string, 10) || 0,
+      workCount: parseInt(nftData.workCount as string, 10) || 0,
+      lastWorkBlock: parseInt(nftData.lastWorkBlock as string, 10) || 0,
+      evolutionCount: currentEvolutionCount + 1,
+      tokensEarned: (nftData.tokensEarned as string) || "0",
+      txid: nftData.txid as string,
+      address: nftData.address as string,
+      mintedAt: parseInt(nftData.mintedAt as string, 10),
+    };
+
+    return c.json<
+      ApiResponse<{
+        nft: typeof responseNft;
+        evolutionCost: string;
+        previousLevel: number;
+        newLevel: number;
+      }>
+    >({
+      success: true,
+      data: {
+        nft: responseNft,
+        evolutionCost: evolutionCost.toString(),
+        previousLevel: currentLevel,
+        newLevel: nextLevel,
+      },
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error("[NFT] Evolution error:", error);
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: "Failed to evolve NFT",
         timestamp: Date.now(),
       },
       500,

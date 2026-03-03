@@ -22,8 +22,10 @@ export interface NFTGridProps {
   columns?: 1 | 2 | 3 | 4;
   onEvolve?: NFTCardProps["onEvolve"];
   onSelect?: (nft: BabyNFTState) => void;
+  onList?: NFTCardProps["onList"];
   selectedTokenId?: number | null;
   evolvingIds?: Set<number>;
+  listingIds?: Set<number>;
   isLoading?: boolean;
   skeletonCount?: number;
   showControls?: boolean;
@@ -189,8 +191,10 @@ export const NFTGrid: FC<NFTGridProps> = ({
   columns,
   onEvolve,
   onSelect,
+  onList,
   selectedTokenId,
   evolvingIds = new Set(),
+  listingIds = new Set(),
   isLoading = false,
   skeletonCount = 6,
   showControls = true,
@@ -264,7 +268,9 @@ export const NFTGrid: FC<NFTGridProps> = ({
               nft={nft}
               onEvolve={onEvolve}
               onSelect={onSelect}
+              onList={onList}
               isEvolving={evolvingIds.has(nft.tokenId)}
+              isListing={listingIds.has(nft.tokenId)}
               isSelected={selectedTokenId === nft.tokenId}
             />
           ))

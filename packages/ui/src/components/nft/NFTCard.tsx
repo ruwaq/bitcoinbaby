@@ -268,7 +268,9 @@ export interface NFTCardProps {
   nft: BabyNFTState;
   onEvolve?: (nft: BabyNFTState) => void;
   onSelect?: (nft: BabyNFTState) => void;
+  onList?: (nft: BabyNFTState, price: number) => void;
   isEvolving?: boolean;
+  isListing?: boolean;
   isSelected?: boolean;
   showTokenId?: boolean;
   className?: string;
@@ -278,17 +280,36 @@ export const NFTCard: FC<NFTCardProps> = ({
   nft,
   onEvolve,
   onSelect,
+  onList,
   isEvolving = false,
+  isListing = false,
   isSelected = false,
   showTokenId = true,
   className,
 }) => {
+  const [showListForm, setShowListForm] = useState(false);
+  const [listPrice, setListPrice] = useState<string>("10000");
+
   const boost = getMiningBoost(nft);
   const levelUpReady = canLevelUp(nft);
   const evolutionCost = getEvolutionCostDisplay(nft.level);
   const rarity = RARITY_COLORS[nft.rarityTier];
   const bloodline = BLOODLINE_COLORS[nft.bloodline];
   const baseType = BASE_TYPE_COLORS[nft.baseType];
+
+  const handleListSubmit = () => {
+    const price = parseInt(listPrice, 10);
+    if (price >= 1000 && onList) {
+      onList(nft, price);
+      setShowListForm(false);
+      setListPrice("10000");
+    }
+  };
+
+  const handleListCancel = () => {
+    setShowListForm(false);
+    setListPrice("10000");
+  };
 
   const isGlowing =
     nft.rarityTier === "legendary" || nft.rarityTier === "mythic";
@@ -406,6 +427,107 @@ export const NFTCard: FC<NFTCardProps> = ({
               </>
             )}
           </button>
+        </div>
+      )}
+
+      {/* List for Sale button */}
+      {onList && !showListForm && (
+        <div className="px-3 pb-3 border-t-2 border-pixel-border pt-3">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowListForm(true);
+            }}
+            disabled={isListing}
+            className={clsx(
+              "w-full font-pixel text-[9px] uppercase tracking-wide",
+              "px-3 py-2.5 border-4 border-black",
+              "cursor-pointer select-none",
+              isListing
+                ? "bg-pixel-border text-pixel-text-muted opacity-60 cursor-not-allowed"
+                : [
+                    "bg-[#f59e0b] text-pixel-text-dark",
+                    "shadow-[4px_4px_0_0_#000,inset_-2px_-2px_0_0_#78350f,inset_2px_2px_0_0_#fcd34d]",
+                    "hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000]",
+                    "active:translate-x-[4px] active:translate-y-[4px] active:shadow-none",
+                    "transition-transform duration-100",
+                  ],
+            )}
+          >
+            {isListing ? (
+              <span className="animate-pulse">Listing...</span>
+            ) : (
+              "List for Sale"
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* List Price Form */}
+      {onList && showListForm && (
+        <div className="px-3 pb-3 border-t-2 border-pixel-border pt-3 space-y-2">
+          <label className="block font-pixel text-[7px] text-pixel-text-muted uppercase">
+            Price (satoshis)
+          </label>
+          <input
+            type="number"
+            min="1000"
+            step="1000"
+            value={listPrice}
+            onChange={(e) => setListPrice(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className={clsx(
+              "w-full font-pixel-mono text-sm",
+              "bg-pixel-bg-dark text-pixel-text",
+              "border-2 border-pixel-border",
+              "px-2 py-1.5",
+              "focus:border-pixel-warning focus:outline-none",
+            )}
+            placeholder="10000"
+          />
+          <p className="font-pixel text-[6px] text-pixel-text-muted">
+            Min: 1,000 sats (~
+            {(parseInt(listPrice, 10) / 100_000_000).toFixed(8)} BTC)
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleListCancel();
+              }}
+              className={clsx(
+                "flex-1 font-pixel text-[8px] uppercase",
+                "px-2 py-2 border-2 border-pixel-border",
+                "bg-pixel-bg-dark text-pixel-text-muted",
+                "hover:border-pixel-error hover:text-pixel-error",
+                "transition-colors cursor-pointer",
+              )}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleListSubmit();
+              }}
+              disabled={parseInt(listPrice, 10) < 1000 || isListing}
+              className={clsx(
+                "flex-1 font-pixel text-[8px] uppercase",
+                "px-2 py-2 border-4 border-black",
+                "cursor-pointer select-none",
+                parseInt(listPrice, 10) < 1000 || isListing
+                  ? "bg-pixel-border text-pixel-text-muted opacity-60 cursor-not-allowed"
+                  : [
+                      "bg-[#22c55e] text-pixel-text-dark",
+                      "shadow-[2px_2px_0_0_#000]",
+                      "hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_0_#000]",
+                      "transition-transform duration-100",
+                    ],
+              )}
+            >
+              {isListing ? "..." : "Confirm"}
+            </button>
+          </div>
         </div>
       )}
     </div>
