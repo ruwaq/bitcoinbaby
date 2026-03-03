@@ -17,3 +17,8 @@ export {
   type UseMiningOptions,
   type UseMiningReturn,
 } from "./useMining";
+
+export {
+  useWalletDashboard,
+  type UseWalletDashboardReturn,
+} from "./useWalletDashboard";

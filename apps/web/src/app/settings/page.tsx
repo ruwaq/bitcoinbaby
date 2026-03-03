@@ -9,6 +9,8 @@
  * - Display settings (theme, sound, notifications)
  * - Security settings (auto-lock, recovery phrase, password)
  * - About section (version, links)
+ *
+ * Uses centralized overlay store for modals.
  */
 
 import { useState, useCallback } from "react";
@@ -18,27 +20,33 @@ import {
   useNetworkStore,
   useWalletStore,
   getApiClient,
-  SecureStorage,
-  MIN_PASSWORD_LENGTH,
   type MiningDifficulty,
   type MinerTypePreference,
   type AutoLockTimeout,
   type ExplorerPreference,
   AUTO_LOCK_LABELS,
+  useRecoveryPhraseModal,
+  useChangePasswordModal,
 } from "@bitcoinbaby/core";
-import { NetworkSwitcher } from "@bitcoinbaby/ui";
+import { NetworkSwitcher, pixelCard, pixelShadows } from "@bitcoinbaby/ui";
 
 // Section component for consistent styling
-function SettingsSection({
+function SettingsSectionCard({
   title,
   children,
+  variant = "default",
 }: {
   title: string;
   children: React.ReactNode;
+  variant?: "default" | "danger";
 }) {
   return (
-    <div className="bg-pixel-bg-medium border-4 border-pixel-border p-6 shadow-[8px_8px_0_0_#000]">
-      <h2 className="font-pixel text-sm text-pixel-primary mb-6 pb-2 border-b-2 border-pixel-border">
+    <div
+      className={`${pixelCard.primary} p-6 ${variant === "danger" ? "border-pixel-error" : ""}`}
+    >
+      <h2
+        className={`font-pixel text-sm mb-6 pb-2 border-b-2 border-pixel-border ${variant === "danger" ? "text-pixel-error" : "text-pixel-primary"}`}
+      >
         {title}
       </h2>
       <div className="space-y-4">{children}</div>
@@ -172,255 +180,6 @@ function TextInput({
   );
 }
 
-// Password modal for recovery phrase
-function RecoveryPhraseModal({ onClose }: { onClose: () => void }) {
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [phrase, setPhrase] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  const handleReveal = async () => {
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Get mnemonic from secure storage using password
-      const mnemonic = await SecureStorage.getMnemonic(password);
-      setPhrase(mnemonic);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Invalid password or no wallet found",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCopy = async () => {
-    if (phrase) {
-      await navigator.clipboard.writeText(phrase);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
-      <div className="bg-pixel-bg-dark border-4 border-black p-6 shadow-[8px_8px_0_0_#000] max-w-md mx-4">
-        <h3 className="font-pixel text-pixel-primary text-sm mb-4">
-          RECOVERY PHRASE
-        </h3>
-
-        {!phrase ? (
-          <>
-            <p className="font-pixel-body text-sm text-pixel-text mb-4">
-              Enter your password to reveal your 12-word recovery phrase.
-            </p>
-
-            <div className="bg-pixel-error/20 border-2 border-pixel-error p-3 mb-4">
-              <p className="font-pixel text-[8px] text-pixel-error">
-                WARNING: Never share your recovery phrase with anyone!
-              </p>
-            </div>
-
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              className="w-full px-3 py-2 mb-4 font-pixel text-xs bg-pixel-bg-light border-4 border-black text-pixel-text"
-            />
-
-            {error && (
-              <p className="font-pixel text-[10px] text-pixel-error mb-4">
-                {error}
-              </p>
-            )}
-
-            <div className="flex gap-2">
-              <button
-                onClick={onClose}
-                className="flex-1 px-4 py-2 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text border-4 border-black hover:bg-pixel-bg-dark"
-              >
-                CANCEL
-              </button>
-              <button
-                onClick={handleReveal}
-                disabled={isLoading || password.length < MIN_PASSWORD_LENGTH}
-                className="flex-1 px-4 py-2 font-pixel text-[10px] bg-pixel-primary text-black border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] disabled:opacity-50"
-              >
-                {isLoading ? "..." : "REVEAL"}
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="bg-pixel-error/20 border-2 border-pixel-error p-3 mb-4">
-              <p className="font-pixel text-[8px] text-pixel-error">
-                NEVER share this phrase with anyone! Anyone with these words can
-                steal your funds.
-              </p>
-            </div>
-
-            <div className="bg-pixel-bg-light border-4 border-black p-4 mb-4">
-              <div className="grid grid-cols-3 gap-2">
-                {phrase.split(" ").map((word, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-1 bg-pixel-bg-dark px-2 py-1 border-2 border-pixel-border"
-                  >
-                    <span className="font-pixel text-[8px] text-pixel-text-muted">
-                      {i + 1}.
-                    </span>
-                    <span className="font-pixel-mono text-[10px] text-pixel-text">
-                      {word}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleCopy}
-                className="flex-1 px-4 py-2 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text border-4 border-black hover:bg-pixel-bg-dark"
-              >
-                {copied ? "COPIED!" : "COPY"}
-              </button>
-              <button
-                onClick={onClose}
-                className="flex-1 px-4 py-2 font-pixel text-[10px] bg-pixel-primary text-black border-4 border-black shadow-[4px_4px_0_0_#000]"
-              >
-                CLOSE
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Change password modal
-function ChangePasswordModal({ onClose }: { onClose: () => void }) {
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const [success, setSuccess] = useState(false);
-
-  const handleChange = async () => {
-    if (currentPassword.length < MIN_PASSWORD_LENGTH) {
-      setError(
-        `Current password must be at least ${MIN_PASSWORD_LENGTH} characters`,
-      );
-      return;
-    }
-    if (newPassword.length < MIN_PASSWORD_LENGTH) {
-      setError(
-        `New password must be at least ${MIN_PASSWORD_LENGTH} characters`,
-      );
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setError("New passwords do not match");
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      await SecureStorage.changePassword(currentPassword, newPassword);
-      setSuccess(true);
-      // Close modal after 2 seconds
-      setTimeout(() => onClose(), 2000);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to change password",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
-      <div className="bg-pixel-bg-dark border-4 border-black p-6 shadow-[8px_8px_0_0_#000] max-w-md mx-4">
-        <h3 className="font-pixel text-pixel-primary text-sm mb-4">
-          CHANGE PASSWORD
-        </h3>
-
-        <div className="space-y-3 mb-4">
-          <input
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            placeholder="Current password"
-            className="w-full px-3 py-2 font-pixel text-xs bg-pixel-bg-light border-4 border-black text-pixel-text"
-          />
-          <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="New password (min 8 chars)"
-            className="w-full px-3 py-2 font-pixel text-xs bg-pixel-bg-light border-4 border-black text-pixel-text"
-          />
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Confirm new password"
-            className="w-full px-3 py-2 font-pixel text-xs bg-pixel-bg-light border-4 border-black text-pixel-text"
-          />
-        </div>
-
-        {error && (
-          <p className="font-pixel text-[10px] text-pixel-error mb-4">
-            {error}
-          </p>
-        )}
-
-        {success && (
-          <div className="bg-pixel-success/20 border-2 border-pixel-success p-3 mb-4">
-            <p className="font-pixel text-[10px] text-pixel-success">
-              Password changed successfully!
-            </p>
-          </div>
-        )}
-
-        {!success && (
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text border-4 border-black hover:bg-pixel-bg-dark"
-            >
-              CANCEL
-            </button>
-            <button
-              onClick={handleChange}
-              disabled={isLoading}
-              className="flex-1 px-4 py-2 font-pixel text-[10px] bg-pixel-success text-black border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] disabled:opacity-50"
-            >
-              {isLoading ? "..." : "CHANGE"}
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function SettingsPage() {
   // Settings store
   const {
@@ -448,9 +207,11 @@ export default function SettingsPage() {
   // Wallet store (for backend reset)
   const walletAddress = useWalletStore((s) => s.wallet?.address);
 
-  // Modal state
-  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  // Overlay modal hooks
+  const { open: openRecoveryModal } = useRecoveryPhraseModal();
+  const { open: openPasswordModal } = useChangePasswordModal();
+
+  // Local confirm states (inline confirmations, not modals)
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showResetDataConfirm, setShowResetDataConfirm] = useState(false);
 
@@ -539,7 +300,7 @@ export default function SettingsPage() {
         {/* Settings Sections */}
         <div className="space-y-6">
           {/* Mining Settings */}
-          <SettingsSection title="MINING">
+          <SettingsSectionCard title="MINING">
             <Select
               label="DIFFICULTY"
               description="Higher difficulty = harder to mine but more rewards"
@@ -581,10 +342,10 @@ export default function SettingsPage() {
               onChange={setBackgroundMining}
               disabled={true}
             />
-          </SettingsSection>
+          </SettingsSectionCard>
 
           {/* Network Settings */}
-          <SettingsSection title="NETWORK">
+          <SettingsSectionCard title="NETWORK">
             <div className="flex items-center justify-between">
               <div>
                 <span className="font-pixel text-xs text-pixel-text">
@@ -637,10 +398,10 @@ export default function SettingsPage() {
               onChange={setCustomRpcUrl}
               placeholder="https://..."
             />
-          </SettingsSection>
+          </SettingsSectionCard>
 
           {/* Display Settings */}
-          <SettingsSection title="DISPLAY">
+          <SettingsSectionCard title="DISPLAY">
             <Select
               label="THEME"
               description="Visual theme (more coming soon)"
@@ -668,10 +429,10 @@ export default function SettingsPage() {
               checked={display.notificationsEnabled}
               onChange={setNotificationsEnabled}
             />
-          </SettingsSection>
+          </SettingsSectionCard>
 
           {/* Security Settings */}
-          <SettingsSection title="SECURITY">
+          <SettingsSectionCard title="SECURITY">
             <Select
               label="AUTO-LOCK TIMEOUT"
               description="Lock wallet after inactivity"
@@ -697,7 +458,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               <button
-                onClick={() => setShowRecoveryModal(true)}
+                onClick={() => openRecoveryModal()}
                 className="px-4 py-2 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text border-4 border-black hover:bg-pixel-bg-dark"
               >
                 SHOW
@@ -714,16 +475,16 @@ export default function SettingsPage() {
                 </p>
               </div>
               <button
-                onClick={() => setShowPasswordModal(true)}
+                onClick={openPasswordModal}
                 className="px-4 py-2 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text border-4 border-black hover:bg-pixel-bg-dark"
               >
                 CHANGE
               </button>
             </div>
-          </SettingsSection>
+          </SettingsSectionCard>
 
           {/* About Section */}
-          <SettingsSection title="ABOUT">
+          <SettingsSectionCard title="ABOUT">
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="font-pixel text-xs text-pixel-text-muted">
@@ -771,10 +532,12 @@ export default function SettingsPage() {
                 </a>
               </div>
             </div>
-          </SettingsSection>
+          </SettingsSectionCard>
 
           {/* Reset All Settings */}
-          <div className="bg-pixel-bg-medium border-4 border-pixel-error p-6 shadow-[8px_8px_0_0_#000]">
+          <div
+            className={`bg-pixel-bg-medium border-4 border-pixel-error p-6 ${pixelShadows.lg}`}
+          >
             <h2 className="font-pixel text-sm text-pixel-error mb-4">
               DANGER ZONE
             </h2>
@@ -802,7 +565,7 @@ export default function SettingsPage() {
                   </button>
                   <button
                     onClick={handleResetAll}
-                    className="px-4 py-2 font-pixel text-[10px] bg-pixel-error text-white border-4 border-black shadow-[4px_4px_0_0_#000]"
+                    className={`px-4 py-2 font-pixel text-[10px] bg-pixel-error text-white border-4 border-black ${pixelShadows.md}`}
                   >
                     CONFIRM
                   </button>
@@ -837,7 +600,7 @@ export default function SettingsPage() {
                   </button>
                   <button
                     onClick={handleResetAllData}
-                    className="px-4 py-2 font-pixel text-[10px] bg-pixel-error text-white border-4 border-black shadow-[4px_4px_0_0_#000] animate-pulse"
+                    className={`px-4 py-2 font-pixel text-[10px] bg-pixel-error text-white border-4 border-black ${pixelShadows.md} animate-pulse`}
                   >
                     DELETE EVERYTHING
                   </button>
@@ -854,14 +617,6 @@ export default function SettingsPage() {
           </p>
         </footer>
       </div>
-
-      {/* Modals */}
-      {showRecoveryModal && (
-        <RecoveryPhraseModal onClose={() => setShowRecoveryModal(false)} />
-      )}
-      {showPasswordModal && (
-        <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />
-      )}
     </main>
   );
 }
