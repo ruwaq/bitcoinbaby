@@ -554,6 +554,45 @@ app.get("/api/game/:roomId/state", async (c) => {
   return response;
 });
 
+/**
+ * GET /api/game/:roomId/achievements - Get achievements for a room
+ */
+app.get("/api/game/:roomId/achievements", async (c) => {
+  const roomId = c.req.param("roomId");
+
+  const id = c.env.GAME_ROOM.idFromName(roomId);
+  const stub = c.env.GAME_ROOM.get(id);
+
+  const response = await stub.fetch(
+    new Request(`http://internal/game/${roomId}/achievements`),
+  );
+
+  return response;
+});
+
+/**
+ * POST /api/game/:roomId/achievements - Add achievements to a room
+ *
+ * Body: { achievements: string[] }
+ */
+app.post("/api/game/:roomId/achievements", async (c) => {
+  const roomId = c.req.param("roomId");
+  const body = await c.req.json();
+
+  const id = c.env.GAME_ROOM.idFromName(roomId);
+  const stub = c.env.GAME_ROOM.get(id);
+
+  const response = await stub.fetch(
+    new Request(`http://internal/game/${roomId}/achievements`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+
+  return response;
+});
+
 // =============================================================================
 // LEADERBOARD API
 // =============================================================================
@@ -2541,6 +2580,217 @@ app.post("/api/admin/nft/register", async (c) => {
       {
         success: false,
         error: "Registration failed",
+        timestamp: Date.now(),
+      },
+      500,
+    );
+  }
+});
+
+// =============================================================================
+// TRANSACTION HISTORY
+// =============================================================================
+
+interface HistoryEntry {
+  id: string;
+  type: "mining" | "withdraw" | "nft_purchase" | "nft_sale" | "evolution";
+  amount: string; // BigInt as string
+  status: "completed" | "pending" | "failed" | "broadcast";
+  timestamp: number;
+  txid?: string | null;
+  details?: Record<string, unknown>;
+}
+
+/**
+ * GET /api/history/:address - Get transaction history for an address
+ *
+ * Returns combined history from:
+ * - Mining rewards (from VirtualBalanceDO)
+ * - Withdrawals (from WithdrawPoolDO)
+ * - NFT activities (from Redis)
+ */
+app.get("/api/history/:address", async (c) => {
+  const address = c.req.param("address");
+  const limit = parseInt(c.req.query("limit") || "50", 10);
+  const offset = parseInt(c.req.query("offset") || "0", 10);
+
+  if (!address || !isValidBitcoinAddress(address)) {
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: "Invalid Bitcoin address",
+        timestamp: Date.now(),
+      },
+      400,
+    );
+  }
+
+  try {
+    const history: HistoryEntry[] = [];
+
+    // 1. Get mining history from VirtualBalanceDO
+    try {
+      const balanceId = c.env.VIRTUAL_BALANCE.idFromName(address);
+      const balanceStub = c.env.VIRTUAL_BALANCE.get(balanceId);
+
+      const miningResponse = await balanceStub.fetch(
+        new Request(`http://internal/balance/${address}/history?limit=100`),
+      );
+
+      if (miningResponse.ok) {
+        const miningData = (await miningResponse.json()) as ApiResponse<{
+          history: Array<{
+            id: string;
+            amount: string;
+            timestamp: number;
+            type: string;
+          }>;
+        }>;
+
+        if (miningData.success && miningData.data?.history) {
+          for (const entry of miningData.data.history) {
+            history.push({
+              id: entry.id,
+              type: "mining",
+              amount: entry.amount,
+              status: "completed",
+              timestamp: entry.timestamp,
+            });
+          }
+        }
+      }
+    } catch {
+      // Mining history not available, continue
+    }
+
+    // 2. Get withdrawal history from WithdrawPoolDO
+    try {
+      // Check all pool types
+      for (const poolType of ["weekly", "monthly", "low_fee", "immediate"]) {
+        const poolId = c.env.WITHDRAW_POOL.idFromName(poolType);
+        const poolStub = c.env.WITHDRAW_POOL.get(poolId);
+
+        const withdrawResponse = await poolStub.fetch(
+          new Request(
+            `http://internal/pool/${poolType}/requests?address=${address}`,
+          ),
+        );
+
+        if (withdrawResponse.ok) {
+          const withdrawData = (await withdrawResponse.json()) as ApiResponse<{
+            requests: Array<{
+              id: string;
+              amount: string;
+              status: string;
+              txid: string | null;
+              requestedAt: number;
+              poolType: string;
+            }>;
+          }>;
+
+          if (withdrawData.success && withdrawData.data?.requests) {
+            for (const req of withdrawData.data.requests) {
+              const status =
+                req.status === "confirmed"
+                  ? "completed"
+                  : req.status === "failed" || req.status === "cancelled"
+                    ? "failed"
+                    : req.status === "broadcast"
+                      ? "broadcast"
+                      : "pending";
+
+              history.push({
+                id: req.id,
+                type: "withdraw",
+                amount: `-${req.amount}`, // Negative for withdrawals
+                status,
+                timestamp: req.requestedAt,
+                txid: req.txid,
+                details: { poolType: req.poolType },
+              });
+            }
+          }
+        }
+      }
+    } catch {
+      // Withdrawal history not available, continue
+    }
+
+    // 3. Get NFT transaction history from Redis
+    try {
+      const redis = getRedis(c.env);
+
+      // Get NFT purchases (buyer history)
+      const purchaseKeys = await redis.keys(`nft:purchase:*`);
+      for (const key of purchaseKeys.slice(0, 50)) {
+        const purchase = (await redis.get(key)) as string | null;
+        if (purchase) {
+          try {
+            const data = JSON.parse(purchase) as {
+              buyerAddress: string;
+              sellerAddress: string;
+              tokenId: number;
+              price: number;
+              timestamp: number;
+            };
+
+            if (data.buyerAddress === address) {
+              history.push({
+                id: key.replace("nft:purchase:", ""),
+                type: "nft_purchase",
+                amount: `-${data.price}`,
+                status: "completed",
+                timestamp: data.timestamp,
+                details: { tokenId: data.tokenId },
+              });
+            } else if (data.sellerAddress === address) {
+              history.push({
+                id: key.replace("nft:purchase:", ""),
+                type: "nft_sale",
+                amount: data.price.toString(),
+                status: "completed",
+                timestamp: data.timestamp,
+                details: { tokenId: data.tokenId },
+              });
+            }
+          } catch {
+            // Skip invalid entries
+          }
+        }
+      }
+    } catch {
+      // NFT history not available, continue
+    }
+
+    // Sort by timestamp descending (newest first)
+    history.sort((a, b) => b.timestamp - a.timestamp);
+
+    // Apply pagination
+    const paginatedHistory = history.slice(offset, offset + limit);
+
+    return c.json<
+      ApiResponse<{
+        history: HistoryEntry[];
+        total: number;
+        limit: number;
+        offset: number;
+      }>
+    >({
+      success: true,
+      data: {
+        history: paginatedHistory,
+        total: history.length,
+        limit,
+        offset,
+      },
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error("[History] Error:", error);
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: "Failed to get transaction history",
         timestamp: Date.now(),
       },
       500,

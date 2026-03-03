@@ -337,3 +337,17 @@ export function useDisplaySettings(): DisplaySettings {
 export function useSecuritySettings(): SecuritySettings {
   return useSettingsStore((state) => state.security);
 }
+
+/**
+ * Get auto-lock timeout value
+ */
+export function useAutoLockTimeout(): number {
+  return useSettingsStore((state) => state.security.autoLockTimeout);
+}
+
+/**
+ * Get auto-lock enabled status (0 means disabled)
+ */
+export function useAutoLockEnabled(): boolean {
+  return useSettingsStore((state) => state.security.autoLockTimeout !== 0);
+}

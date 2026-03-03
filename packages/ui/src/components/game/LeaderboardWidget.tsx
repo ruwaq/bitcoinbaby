@@ -138,9 +138,15 @@ export const LeaderboardWidget: FC<LeaderboardWidgetProps> = ({
             <SkeletonEntry />
           </>
         ) : entries.length === 0 ? (
-          <div className="py-2 text-center">
-            <span className="font-pixel text-[8px] text-pixel-text-muted">
-              Sin datos aun
+          <div className="py-4 text-center">
+            <div className="font-pixel text-lg text-pixel-border mb-2">[?]</div>
+            <span className="font-pixel text-[8px] text-pixel-text-muted block">
+              No rankings yet
+            </span>
+            <span className="font-pixel text-[6px] text-pixel-text-muted block mt-1">
+              {category === "miners" && "Be the first to mine!"}
+              {category === "babies" && "Raise a baby first!"}
+              {category === "earners" && "Start earning $BABY!"}
             </span>
           </div>
         ) : (

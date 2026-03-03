@@ -389,3 +389,102 @@ export const MEMPOOL_URLS: Record<ScrollsNetwork, string> = {
   main: NETWORK_ENDPOINTS.mainnet.mempoolApi,
   testnet4: NETWORK_ENDPOINTS.testnet4.mempoolApi,
 };
+
+// =============================================================================
+// BATCH TRANSFER (Withdrawal Pool)
+// =============================================================================
+
+/**
+ * Batch transfer recipient
+ */
+export interface BatchRecipient {
+  address: string;
+  amount: bigint;
+}
+
+/**
+ * Batch transfer parameters for withdrawal pool
+ */
+export interface BatchTransferParams {
+  /** App ID (BABTC token) */
+  appId: string;
+  /** Verification key */
+  appVk: string;
+  /** Source UTXOs with tokens */
+  sourceUtxos: Array<{
+    txid: string;
+    vout: number;
+    amount: bigint;
+  }>;
+  /** Recipients and amounts */
+  recipients: BatchRecipient[];
+  /** Change address for remaining tokens */
+  changeAddress: string;
+}
+
+/**
+ * Create a batch token transfer spell (v10 format)
+ *
+ * Used by the withdrawal pool to send tokens to multiple recipients
+ * in a single transaction, minimizing fees.
+ */
+export function createBatchTransferSpellV10(
+  params: BatchTransferParams,
+): SpellV10 {
+  const appRef = createAppReference("t", params.appId, params.appVk);
+
+  // Calculate total input amount
+  const totalInput = params.sourceUtxos.reduce(
+    (sum, utxo) => sum + utxo.amount,
+    0n,
+  );
+
+  // Calculate total output amount
+  const totalOutput = params.recipients.reduce((sum, r) => sum + r.amount, 0n);
+
+  // Validate amounts
+  if (totalOutput > totalInput) {
+    throw new Error(
+      `Insufficient token balance: have ${totalInput}, need ${totalOutput}`,
+    );
+  }
+
+  const changeAmount = totalInput - totalOutput;
+
+  // Build inputs
+  const ins: SpellV10Input[] = params.sourceUtxos.map((utxo) => ({
+    utxo_id: `${utxo.txid}:${utxo.vout}`,
+    charms: {
+      $01: Number(utxo.amount),
+    },
+  }));
+
+  // Build outputs - one per recipient
+  const outs: SpellV10Output[] = params.recipients.map((recipient) => ({
+    address: recipient.address,
+    charms: {
+      $01: Number(recipient.amount),
+    },
+    sats: DUST_LIMIT,
+  }));
+
+  // Add change output if there's any
+  if (changeAmount > 0n) {
+    outs.push({
+      address: params.changeAddress,
+      charms: {
+        $01: Number(changeAmount),
+      },
+      sats: DUST_LIMIT,
+    });
+  }
+
+  return {
+    version: 10,
+    apps: {
+      $01: appRef,
+    },
+    ins,
+    outs,
+  };
+}

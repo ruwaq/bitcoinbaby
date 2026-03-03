@@ -240,6 +240,14 @@ export class GameRoomDO extends DurableObject<Env> {
       switch (action) {
         case "state":
           return this.handleGetState();
+        case "achievements":
+          if (request.method === "POST") {
+            return this.handleUpdateAchievements(request);
+          }
+          if (request.method === "GET") {
+            return this.handleGetAchievements();
+          }
+          break;
         case "reset":
           if (request.method === "POST") {
             return this.handleReset();
@@ -445,6 +453,94 @@ export class GameRoomDO extends DurableObject<Env> {
     const response: ApiResponse<{ reset: boolean }> = {
       success: true,
       data: { reset: true },
+      timestamp: Date.now(),
+    };
+
+    return Response.json(response);
+  }
+
+  /**
+   * GET /game/{roomId}/achievements - Get achievement list
+   */
+  private handleGetAchievements(): Response {
+    const gameState = this.ydoc.getMap("gameState");
+    const achievements = gameState.get("achievements") as
+      | Y.Array<string>
+      | undefined;
+
+    const response: ApiResponse<{ achievements: string[] }> = {
+      success: true,
+      data: {
+        achievements: achievements ? achievements.toArray() : [],
+      },
+      timestamp: Date.now(),
+    };
+
+    return Response.json(response);
+  }
+
+  /**
+   * POST /game/{roomId}/achievements - Add new achievements
+   *
+   * Body: { achievements: string[] }
+   * Adds achievements to the list if not already present.
+   */
+  private async handleUpdateAchievements(request: Request): Promise<Response> {
+    const body = (await request.json()) as {
+      achievements: string[];
+    };
+
+    if (!Array.isArray(body.achievements)) {
+      return this.errorResponse("achievements must be an array", 400);
+    }
+
+    const gameState = this.ydoc.getMap("gameState");
+    let achievements = gameState.get("achievements") as Y.Array<string>;
+
+    if (!achievements) {
+      achievements = new Y.Array();
+      gameState.set("achievements", achievements);
+    }
+
+    // Get current achievements as Set for quick lookup
+    const currentSet = new Set(achievements.toArray());
+    const added: string[] = [];
+
+    // Add new achievements
+    for (const achievement of body.achievements) {
+      if (typeof achievement === "string" && !currentSet.has(achievement)) {
+        achievements.push([achievement]);
+        currentSet.add(achievement);
+        added.push(achievement);
+      }
+    }
+
+    // Broadcast update to all connected clients
+    if (added.length > 0) {
+      const state = Y.encodeStateAsUpdate(this.ydoc);
+      for (const [, conn] of this.connections) {
+        try {
+          conn.webSocket.send(
+            JSON.stringify({
+              type: "yjs-sync",
+              data: Array.from(state),
+            }),
+          );
+        } catch {
+          // Ignore send errors
+        }
+      }
+    }
+
+    const response: ApiResponse<{
+      added: string[];
+      total: number;
+    }> = {
+      success: true,
+      data: {
+        added,
+        total: achievements.length,
+      },
       timestamp: Date.now(),
     };
 

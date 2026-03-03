@@ -31,6 +31,9 @@ export {
   useCosmicMiningConditions,
 } from "./useMiningCosmic";
 
+// Mining XP integration (cosmic multipliers affect baby XP)
+export { useMiningXPIntegration } from "./useMiningXPIntegration";
+
 // Global mining hook (persists across navigation)
 export {
   useGlobalMining,
@@ -59,6 +62,9 @@ export {
   useWalletProvider,
   type UseWalletProviderReturn,
 } from "./useWalletProvider";
+
+// Wallet auto-lock hook (security timeout)
+export { useWalletAutoLock } from "./useWalletAutoLock";
 
 // Mining submission hook (connects mining to blockchain)
 export {

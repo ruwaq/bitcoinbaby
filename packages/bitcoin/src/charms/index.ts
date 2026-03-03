@@ -40,6 +40,9 @@ export type {
   ScrollsSignRequest,
   ScrollsSignInput,
   SignedCharmTransaction,
+  // Batch Transfer (Withdrawal Pool)
+  BatchRecipient,
+  BatchTransferParams,
 } from "./types";
 
 export {
@@ -55,6 +58,7 @@ export {
   // V10 Spell Builders
   createMiningMintSpellV10,
   createTokenTransferSpellV10,
+  createBatchTransferSpellV10,
 } from "./types";
 
 // =============================================================================

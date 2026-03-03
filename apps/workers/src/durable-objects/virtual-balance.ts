@@ -254,6 +254,11 @@ export class VirtualBalanceDO extends DurableObject<Env> {
           if (action === "get" || action === "") {
             return this.handleGetBalance();
           }
+          if (action === "history") {
+            const limitParam = url.searchParams.get("limit");
+            const limit = limitParam ? parseInt(limitParam, 10) : 100;
+            return this.handleGetHistory(limit);
+          }
           break;
 
         case "POST":
@@ -327,6 +332,49 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         suggestedDifficulty: this.difficultyState.currentDiff,
         averageShareTime: this.difficultyState.averageShareTime,
       },
+      timestamp: Date.now(),
+    };
+
+    return Response.json(response);
+  }
+
+  /**
+   * GET /balance/{address}/history - Get mining history
+   */
+  private handleGetHistory(limit: number): Response {
+    if (!this.address) {
+      return this.errorResponse("Address required", 400);
+    }
+
+    // Get mining proofs (reward history)
+    const rows = this.sql
+      .exec(
+        `SELECT id, reward, created_at
+         FROM mining_proofs
+         WHERE credited = 1
+         ORDER BY created_at DESC
+         LIMIT ?`,
+        Math.min(limit, 100), // Cap at 100
+      )
+      .toArray();
+
+    const history = rows.map((row) => ({
+      id: row.id as string,
+      amount: row.reward as string,
+      timestamp: row.created_at as number,
+      type: "mining" as const,
+    }));
+
+    const response: ApiResponse<{
+      history: Array<{
+        id: string;
+        amount: string;
+        timestamp: number;
+        type: string;
+      }>;
+    }> = {
+      success: true,
+      data: { history },
       timestamp: Date.now(),
     };
 

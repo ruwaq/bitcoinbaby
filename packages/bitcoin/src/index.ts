@@ -116,6 +116,10 @@ export {
   createBABTCMintSpellV10,
   createBABTCTransferSpellV10,
   validateAmountForSpell,
+  // Batch Transfer (Withdrawal Pool)
+  type BatchRecipient,
+  type BatchTransferParams,
+  createBatchTransferSpellV10,
   // Balance Service
   type BABTCBalance,
   type BalanceQueryOptions,

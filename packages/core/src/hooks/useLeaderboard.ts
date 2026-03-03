@@ -75,6 +75,10 @@ export interface UseLeaderboardReturn {
   // State
   isLoading: boolean;
   error: string | null;
+  /** True if data loaded successfully but no entries exist */
+  isEmpty: boolean;
+  /** True if this is the first load (no previous data) */
+  isInitialLoad: boolean;
 
   // Actions
   refresh: () => void;
@@ -148,6 +152,7 @@ export function useLeaderboard(
   const [page, setPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   // Data state
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
@@ -191,6 +196,7 @@ export function useLeaderboard(
       if (response.success && response.data) {
         setEntries(transformEntries(response.data.entries));
         setTotalEntries(response.data.totalEntries);
+        setHasLoadedOnce(true);
       } else {
         setError(response.error || "Failed to load leaderboard");
       }
@@ -260,6 +266,10 @@ export function useLeaderboard(
     [category],
   );
 
+  // Derived states
+  const isEmpty = !isLoading && !error && entries.length === 0 && hasLoadedOnce;
+  const isInitialLoad = isLoading && !hasLoadedOnce;
+
   return {
     // Data
     entries,
@@ -283,6 +293,8 @@ export function useLeaderboard(
     // State
     isLoading,
     error,
+    isEmpty,
+    isInitialLoad,
 
     // Actions
     refresh,

@@ -57,8 +57,15 @@ export default function CosmicPage() {
   // Track current time for event countdown (updates every second)
   const [now, setNow] = useState(() => Date.now());
   const { ownedNFTs } = useNFTStore();
-  // Currently showing the first NFT - future: add selector
-  const selectedBabyIndex = 0;
+  // Baby selector state - defaults to first NFT
+  const [selectedBabyIndex, setSelectedBabyIndex] = useState(0);
+
+  // Reset index if it's out of bounds (e.g., NFT was transferred)
+  useEffect(() => {
+    if (selectedBabyIndex >= ownedNFTs.length && ownedNFTs.length > 0) {
+      setSelectedBabyIndex(0);
+    }
+  }, [ownedNFTs.length, selectedBabyIndex]);
 
   // Get cosmic state
   const {
@@ -125,6 +132,33 @@ export default function CosmicPage() {
               <p className="font-pixel-body text-sm text-pixel-text-muted mt-1">
                 How the universe affects your Baby
               </p>
+              {/* Baby Selector - only shows when user has multiple NFTs */}
+              {ownedNFTs.length > 1 && (
+                <div className="mt-3">
+                  <label className="font-pixel text-[8px] text-pixel-text-muted uppercase block mb-1">
+                    Select Baby
+                  </label>
+                  <select
+                    value={selectedBabyIndex}
+                    onChange={(e) =>
+                      setSelectedBabyIndex(Number(e.target.value))
+                    }
+                    className="bg-pixel-bg-dark border-2 border-pixel-border text-pixel-text font-pixel text-[10px] px-3 py-2 pr-8 appearance-none cursor-pointer hover:border-pixel-primary transition-colors focus:outline-none focus:border-pixel-primary"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23f7931a' d='M2 4l4 4 4-4'/%3E%3C/svg%3E")`,
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "right 8px center",
+                    }}
+                  >
+                    {ownedNFTs.map((nft, index) => (
+                      <option key={nft.tokenId || index} value={index}>
+                        Baby #{index + 1} - {nft.baseType || "Unknown"} (
+                        {nft.rarityTier || "common"})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-3">
               {cosmicState && (

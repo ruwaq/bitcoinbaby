@@ -209,9 +209,21 @@ export const LeaderboardTable: FC<LeaderboardTableProps> = ({
           className,
         )}
       >
-        <div className="text-4xl mb-4">-</div>
-        <p className="font-pixel text-xs text-pixel-text-muted">
+        {/* Pixel art empty trophy */}
+        <div className="mb-4 flex justify-center">
+          <div className="relative">
+            <div className="font-pixel text-3xl text-pixel-border">[?]</div>
+            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-pixel-border" />
+          </div>
+        </div>
+        <p className="font-pixel text-xs text-pixel-text-muted mb-2">
           {emptyMessage}
+        </p>
+        <p className="font-pixel text-[8px] text-pixel-text-muted">
+          {category === "miners" &&
+            "Start mining to appear on the leaderboard!"}
+          {category === "babies" && "Raise a baby to compete for the top!"}
+          {category === "earners" && "Earn $BABY to climb the ranks!"}
         </p>
       </div>
     );

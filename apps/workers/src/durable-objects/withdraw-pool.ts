@@ -1,14 +1,21 @@
 /**
  * Withdraw Pool Durable Object
  *
- * Manages batched withdrawal requests.
+ * Manages batched withdrawal requests for BABTC token withdrawals.
  * Users add their withdrawal requests to a pool.
  * Pool is processed weekly/monthly to minimize Bitcoin fees.
+ *
+ * Architecture:
+ * - This DO collects and batches withdrawal requests
+ * - External signer service fetches ready batches via GET /pool/batches/ready
+ * - Signer constructs, signs, and broadcasts the transaction
+ * - Signer confirms via POST /pool/batches/{id}/confirm
  *
  * Pool Types:
  * - weekly: Processed every Sunday at 00:00 UTC
  * - monthly: Processed on 1st of each month
  * - low_fee: Processed when Bitcoin fees drop below threshold
+ * - immediate: Process ASAP (higher fees)
  */
 
 import { DurableObject } from "cloudflare:workers";
@@ -22,6 +29,18 @@ import type {
   PoolStatusResponse,
   FeeEstimate,
 } from "../lib/types";
+
+// Batch ready for external signing
+interface BatchForSigning {
+  id: string;
+  recipients: Array<{
+    address: string;
+    amount: string;
+  }>;
+  totalAmount: string;
+  feeRate: number;
+  createdAt: number;
+}
 
 // Pool configuration
 const POOL_CONFIG = {
@@ -47,6 +66,16 @@ const POOL_CONFIG = {
   },
 };
 
+// Fee rate cache
+interface FeeRateCache {
+  fastestFee: number;
+  halfHourFee: number;
+  hourFee: number;
+  economyFee: number;
+  minimumFee: number;
+  cachedAt: number;
+}
+
 export class WithdrawPoolDO extends DurableObject<Env> {
   private sql: SqlStorage;
 
@@ -56,6 +85,10 @@ export class WithdrawPoolDO extends DurableObject<Env> {
     { count: number; total: bigint; cachedAt: number }
   > = new Map();
   private static readonly STATS_CACHE_TTL_MS = 30_000; // 30 second cache
+
+  // Fee rate cache (5 minute TTL)
+  private feeRateCache: FeeRateCache | null = null;
+  private static readonly FEE_CACHE_TTL_MS = 5 * 60 * 1000;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -117,15 +150,103 @@ export class WithdrawPoolDO extends DurableObject<Env> {
   }
 
   /**
+   * Fetch current Bitcoin fee rates from mempool.space
+   * Caches for 5 minutes to avoid rate limiting
+   */
+  private async getFeeRates(): Promise<FeeRateCache> {
+    const now = Date.now();
+
+    // Return cached if fresh
+    if (
+      this.feeRateCache &&
+      now - this.feeRateCache.cachedAt < WithdrawPoolDO.FEE_CACHE_TTL_MS
+    ) {
+      return this.feeRateCache;
+    }
+
+    // Fetch from mempool.space
+    try {
+      // Use testnet4 for development, mainnet for production
+      const mempoolUrl =
+        this.env.ENVIRONMENT === "production"
+          ? "https://mempool.space/api/v1/fees/recommended"
+          : "https://mempool.space/testnet4/api/v1/fees/recommended";
+
+      const response = await fetch(mempoolUrl, {
+        headers: { "User-Agent": "BitcoinBaby/1.0" },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Mempool API error: ${response.status}`);
+      }
+
+      const fees = (await response.json()) as {
+        fastestFee: number;
+        halfHourFee: number;
+        hourFee: number;
+        economyFee: number;
+        minimumFee: number;
+      };
+
+      this.feeRateCache = {
+        ...fees,
+        cachedAt: now,
+      };
+
+      return this.feeRateCache;
+    } catch (error) {
+      console.error("[WithdrawPool] Failed to fetch fees:", error);
+
+      // Return cached even if stale, or defaults
+      if (this.feeRateCache) {
+        return this.feeRateCache;
+      }
+
+      // Default fallback
+      return {
+        fastestFee: 10,
+        halfHourFee: 5,
+        hourFee: 3,
+        economyFee: 2,
+        minimumFee: 1,
+        cachedAt: now,
+      };
+    }
+  }
+
+  /**
+   * Get appropriate fee rate for pool type
+   */
+  private async getFeeRateForPool(poolType: PoolType): Promise<number> {
+    const fees = await this.getFeeRates();
+
+    switch (poolType) {
+      case "immediate":
+        return fees.fastestFee;
+      case "weekly":
+      case "monthly":
+        return fees.economyFee;
+      case "low_fee":
+        return Math.min(fees.economyFee, POOL_CONFIG.low_fee.maxFeeRate);
+      default:
+        return fees.hourFee;
+    }
+  }
+
+  /**
    * Handle incoming requests
    *
-   * Path format: /pool/{poolType}/{action}
+   * Path format: /pool/{poolType}/{action} or /pool/batches/{action}
    * Examples:
    *   GET  /pool/weekly/status
    *   GET  /pool/weekly/requests?address=xxx
    *   POST /pool/weekly/request
    *   POST /pool/weekly/cancel
    *   POST /pool/weekly/process
+   *
+   * Signer Service Endpoints:
+   *   GET  /pool/batches/ready       - Get batches ready for signing
+   *   POST /pool/batches/{id}/confirm - Confirm batch was broadcast
    */
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -136,6 +257,26 @@ export class WithdrawPoolDO extends DurableObject<Env> {
       const pathParts = path.split("/").filter(Boolean);
       if (pathParts.length < 2 || pathParts[0] !== "pool") {
         return this.errorResponse("Invalid path", 400);
+      }
+
+      // Handle signer service endpoints: /pool/batches/*
+      if (pathParts[1] === "batches") {
+        const action = pathParts[2];
+
+        if (request.method === "GET" && action === "ready") {
+          return this.handleGetReadyBatches(request);
+        }
+
+        if (request.method === "POST" && pathParts[3] === "confirm") {
+          const batchId = pathParts[2];
+          return this.handleConfirmBatch(request, batchId);
+        }
+
+        if (request.method === "GET" && action) {
+          return this.handleGetBatch(action);
+        }
+
+        return this.errorResponse("Not found", 404);
       }
 
       const poolType = pathParts[1] as PoolType;
@@ -183,7 +324,7 @@ export class WithdrawPoolDO extends DurableObject<Env> {
    * GET /pool/status - Get pool status
    * OPTIMIZATION: Uses cached stats to reduce COUNT queries
    */
-  private handleGetPoolStatus(poolType: PoolType): Response {
+  private async handleGetPoolStatus(poolType: PoolType): Promise<Response> {
     const now = Date.now();
     const cached = this.poolStatsCache.get(poolType);
 
@@ -217,7 +358,7 @@ export class WithdrawPoolDO extends DurableObject<Env> {
     }
 
     const nextProcessingTime = this.getNextProcessingTime(poolType);
-    const feeRate = 5; // TODO: Fetch real fee rate
+    const feeRate = await this.getFeeRateForPool(poolType);
 
     const poolConfig = POOL_CONFIG[poolType];
     const response: ApiResponse<
@@ -366,7 +507,7 @@ export class WithdrawPoolDO extends DurableObject<Env> {
       .toArray()[0].pos as number;
 
     const nextProcessingTime = this.getNextProcessingTime(poolType);
-    const feeRate = 5; // TODO: Fetch real
+    const feeRate = await this.getFeeRateForPool(poolType);
 
     const response: ApiResponse<WithdrawResponse> = {
       success: true,
@@ -515,15 +656,20 @@ export class WithdrawPoolDO extends DurableObject<Env> {
       );
     }
 
-    // TODO: Actually build and broadcast the transaction
-    // This would call your existing Charms/Bitcoin transaction code
-    // For now, we mark as ready for manual processing
+    // Store recipient data for external signer service
+    const recipientData = JSON.stringify(
+      requests.map((r) => ({
+        address: r.toAddress,
+        amount: r.amount.toString(),
+      })),
+    );
 
     this.sql.exec(
       `UPDATE batch_transactions
-       SET status = 'ready', updated_at = ?
+       SET status = 'ready', updated_at = ?, tx_hex = ?
        WHERE id = ?`,
       now,
+      recipientData, // Using tx_hex field to store recipient JSON
       batchId,
     );
 
@@ -543,6 +689,194 @@ export class WithdrawPoolDO extends DurableObject<Env> {
         totalAmount: totalAmount.toString(),
         estimatedFee: totalFee,
         feePerUser: Math.ceil(totalFee / requests.length),
+      },
+      timestamp: now,
+    };
+
+    return Response.json(response);
+  }
+
+  // ===========================================================================
+  // SIGNER SERVICE ENDPOINTS
+  // ===========================================================================
+
+  /**
+   * GET /pool/batches/ready - Get all batches ready for external signing
+   *
+   * Used by the external signer service to fetch batches that need processing.
+   * Requires ADMIN_KEY header for authentication.
+   */
+  private handleGetReadyBatches(request: Request): Response {
+    // Verify admin key
+    const adminKey = request.headers.get("X-Admin-Key");
+    if (this.env.ADMIN_KEY && adminKey !== this.env.ADMIN_KEY) {
+      return this.errorResponse("Unauthorized", 401);
+    }
+
+    const rows = this.sql
+      .exec(
+        `SELECT id, total_amount, recipient_count, tx_hex, fee_rate, total_fee, created_at
+         FROM batch_transactions
+         WHERE status = 'ready'
+         ORDER BY created_at ASC`,
+      )
+      .toArray();
+
+    const batches: BatchForSigning[] = rows.map((row) => {
+      // Parse recipient data from tx_hex field
+      let recipients: Array<{ address: string; amount: string }> = [];
+      try {
+        if (row.tx_hex) {
+          recipients = JSON.parse(row.tx_hex as string);
+        }
+      } catch {
+        recipients = [];
+      }
+
+      return {
+        id: row.id as string,
+        recipients,
+        totalAmount: row.total_amount as string,
+        feeRate: row.fee_rate as number,
+        createdAt: row.created_at as number,
+      };
+    });
+
+    const response: ApiResponse<{ batches: BatchForSigning[] }> = {
+      success: true,
+      data: { batches },
+      timestamp: Date.now(),
+    };
+
+    return Response.json(response);
+  }
+
+  /**
+   * GET /pool/batches/{id} - Get specific batch details
+   */
+  private handleGetBatch(batchId: string): Response {
+    const rows = this.sql
+      .exec("SELECT * FROM batch_transactions WHERE id = ?", batchId)
+      .toArray();
+
+    if (rows.length === 0) {
+      return this.errorResponse("Batch not found", 404);
+    }
+
+    const row = rows[0];
+    let recipients: Array<{ address: string; amount: string }> = [];
+    try {
+      if (row.tx_hex) {
+        recipients = JSON.parse(row.tx_hex as string);
+      }
+    } catch {
+      // If it's actual tx_hex, leave recipients empty
+    }
+
+    const response: ApiResponse<{
+      id: string;
+      status: string;
+      totalAmount: string;
+      recipientCount: number;
+      recipients: Array<{ address: string; amount: string }>;
+      txid: string | null;
+      feeRate: number;
+      totalFee: number;
+      createdAt: number;
+      updatedAt: number;
+    }> = {
+      success: true,
+      data: {
+        id: row.id as string,
+        status: row.status as string,
+        totalAmount: row.total_amount as string,
+        recipientCount: row.recipient_count as number,
+        recipients,
+        txid: row.txid as string | null,
+        feeRate: row.fee_rate as number,
+        totalFee: row.total_fee as number,
+        createdAt: row.created_at as number,
+        updatedAt: row.updated_at as number,
+      },
+      timestamp: Date.now(),
+    };
+
+    return Response.json(response);
+  }
+
+  /**
+   * POST /pool/batches/{id}/confirm - Confirm batch was broadcast
+   *
+   * Called by external signer after successfully broadcasting the transaction.
+   * Updates batch status and all associated withdrawal requests.
+   */
+  private async handleConfirmBatch(
+    request: Request,
+    batchId: string,
+  ): Promise<Response> {
+    // Verify admin key
+    const adminKey = request.headers.get("X-Admin-Key");
+    if (this.env.ADMIN_KEY && adminKey !== this.env.ADMIN_KEY) {
+      return this.errorResponse("Unauthorized", 401);
+    }
+
+    const body = (await request.json()) as {
+      txid: string;
+      txHex?: string;
+    };
+
+    if (!body.txid) {
+      return this.errorResponse("txid required", 400);
+    }
+
+    // Verify batch exists and is ready
+    const batchRows = this.sql
+      .exec(
+        "SELECT * FROM batch_transactions WHERE id = ? AND status = 'ready'",
+        batchId,
+      )
+      .toArray();
+
+    if (batchRows.length === 0) {
+      return this.errorResponse("Batch not found or not ready", 404);
+    }
+
+    const now = Date.now();
+
+    // Update batch to broadcast status
+    this.sql.exec(
+      `UPDATE batch_transactions
+       SET status = 'broadcast', txid = ?, tx_hex = ?, updated_at = ?
+       WHERE id = ?`,
+      body.txid,
+      body.txHex || null,
+      now,
+      batchId,
+    );
+
+    // Update all requests in this batch
+    this.sql.exec(
+      `UPDATE withdraw_requests
+       SET status = 'broadcast', txid = ?, updated_at = ?
+       WHERE batch_id = ?`,
+      body.txid,
+      now,
+      batchId,
+    );
+
+    // Invalidate all pool caches
+    this.poolStatsCache.clear();
+
+    const response: ApiResponse<{
+      confirmed: boolean;
+      batchId: string;
+      txid: string;
+    }> = {
+      success: true,
+      data: {
+        confirmed: true,
+        batchId,
+        txid: body.txid,
       },
       timestamp: now,
     };
