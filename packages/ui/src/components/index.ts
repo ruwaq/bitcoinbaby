@@ -42,12 +42,14 @@ export {
   AnimatedTokenCounter,
   TokenCounterBadge,
   EngagementBonusPanel,
+  RewardsBreakdownPanel,
   type MiningStatusBadgeProps,
   type MiningStatsGridProps,
   type MiningStats,
   type MiningControlButtonProps,
   type NFTBoostPanelProps,
   type EngagementBonusPanelProps,
+  type RewardsBreakdownPanelProps,
 } from "./mining";
 
 // NFT Components
@@ -85,6 +87,12 @@ export { HelpTooltip, InfoLabel, StatWithHelp } from "./common/HelpTooltip";
 
 // Layout Primitives
 export { SectionHeader } from "./common/SectionHeader";
+export {
+  SectionWrapper,
+  SectionCard,
+  type SectionWrapperProps,
+  type SectionCardProps,
+} from "./common/SectionWrapper";
 export { InfoBanner } from "./common/InfoBanner";
 export { StatCard } from "./common/StatCard";
 export { BalanceCard } from "./common/BalanceCard";

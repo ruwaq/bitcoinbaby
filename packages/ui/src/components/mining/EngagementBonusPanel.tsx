@@ -4,11 +4,13 @@
  * EngagementBonusPanel
  *
  * Displays the user's engagement bonuses:
- * - Baby Care: +50%
- * - Daily Streak: +30%
- * - Play Time: +20%
+ * - Baby Care: +1.5%
+ * - Daily Streak: +1%
+ * - Play Time: +0.5%
+ * - Max Total: +3%
  *
- * Shows total multiplier and encourages engagement.
+ * NOTE: Currently COMING SOON - tracked client-side but
+ * not applied to rewards until server-side implementation.
  */
 
 import { PixelCard } from "../card";
@@ -19,7 +21,7 @@ import { clsx } from "clsx";
 // =============================================================================
 
 export interface EngagementBonusPanelProps {
-  /** Current engagement multiplier (1.0 - 2.0) */
+  /** Current engagement multiplier (1.0 - 1.03) */
   multiplier: number;
   /** Breakdown of individual bonuses */
   breakdown: {
@@ -37,6 +39,8 @@ export interface EngagementBonusPanelProps {
   babyHealth: number;
   /** Additional CSS classes */
   className?: string;
+  /** Feature status - when false, shows as "Coming Soon" */
+  isActive?: boolean;
 }
 
 // =============================================================================
@@ -82,9 +86,10 @@ export function EngagementBonusPanel({
   playTimeMinutes,
   babyHealth,
   className,
+  isActive = false, // Default to false (Coming Soon)
 }: EngagementBonusPanelProps) {
-  const tierStyle = TIER_STYLES[status];
-  const bonusPercent = Math.round((multiplier - 1) * 100);
+  const tierStyle = isActive ? TIER_STYLES[status] : TIER_STYLES.inactive;
+  const bonusPercent = ((multiplier - 1) * 100).toFixed(1);
 
   return (
     <PixelCard className={clsx("p-3", className)}>
@@ -96,14 +101,23 @@ export function EngagementBonusPanel({
             Engagement Bonus
           </span>
         </div>
-        <div
-          className={clsx(
-            "px-2 py-0.5 rounded font-pixel text-[6px] uppercase",
-            tierStyle.bgColor,
-            tierStyle.color,
+        <div className="flex items-center gap-2">
+          {!isActive && (
+            <span className="font-pixel text-[8px] text-pixel-warning bg-pixel-warning/20 px-2 py-0.5 border border-pixel-warning">
+              SOON
+            </span>
           )}
-        >
-          {tierStyle.label}
+          {isActive && (
+            <div
+              className={clsx(
+                "px-2 py-0.5 rounded font-pixel text-[6px] uppercase",
+                tierStyle.bgColor,
+                tierStyle.color,
+              )}
+            >
+              {tierStyle.label}
+            </div>
+          )}
         </div>
       </div>
 
@@ -124,9 +138,13 @@ export function EngagementBonusPanel({
           icon="💚"
           label="Baby Care"
           value={breakdown.babyCare}
-          maxValue={0.5}
+          maxValue={0.015}
           detail={`${Math.round(babyHealth)}% health`}
-          tip={babyHealth < 70 ? "Care for your baby for +50%" : undefined}
+          tip={
+            isActive && babyHealth < 70
+              ? "Care for your baby for +1.5%"
+              : undefined
+          }
         />
 
         {/* Daily Streak */}
@@ -134,10 +152,12 @@ export function EngagementBonusPanel({
           icon="🔥"
           label="Daily Streak"
           value={breakdown.dailyStreak}
-          maxValue={0.3}
+          maxValue={0.01}
           detail={`${streakDays} days`}
           tip={
-            streakDays < 7 ? `${7 - streakDays} more days for max` : undefined
+            isActive && streakDays < 7
+              ? `${7 - streakDays} more days for max`
+              : undefined
           }
         />
 
@@ -146,32 +166,39 @@ export function EngagementBonusPanel({
           icon="⏱️"
           label="Play Time"
           value={breakdown.playTime}
-          maxValue={0.2}
+          maxValue={0.005}
           detail={`${playTimeMinutes} min today`}
           tip={
-            playTimeMinutes < 30
+            isActive && playTimeMinutes < 30
               ? `${30 - playTimeMinutes} more min for max`
               : undefined
           }
         />
       </div>
 
-      {/* Tips */}
-      {status === "inactive" && (
+      {/* Coming Soon / Tips */}
+      {!isActive ? (
         <div className="mt-3 p-2 bg-pixel-warning/10 border border-pixel-warning/30 rounded">
           <p className="font-pixel text-[6px] text-pixel-warning text-center">
-            Care for your baby and play daily to earn up to 2x more!
+            Engagement rewards coming soon!
+          </p>
+          <p className="font-pixel-body text-[8px] text-pixel-text-muted text-center mt-1">
+            Keep playing - bonuses will activate in a future update.
           </p>
         </div>
-      )}
-
-      {status === "dedicated" && (
+      ) : status === "inactive" ? (
+        <div className="mt-3 p-2 bg-pixel-warning/10 border border-pixel-warning/30 rounded">
+          <p className="font-pixel text-[6px] text-pixel-warning text-center">
+            Care for your baby and play daily to earn up to +3% bonus!
+          </p>
+        </div>
+      ) : status === "dedicated" ? (
         <div className="mt-3 p-2 bg-pixel-primary/10 border border-pixel-primary/30 rounded">
           <p className="font-pixel text-[6px] text-pixel-primary text-center">
             Maximum bonus active! Keep it up!
           </p>
         </div>
-      )}
+      ) : null}
     </PixelCard>
   );
 }

@@ -45,3 +45,9 @@ export {
   EngagementBonusPanel,
   type EngagementBonusPanelProps,
 } from "./EngagementBonusPanel";
+
+// Rewards Breakdown Panel
+export {
+  RewardsBreakdownPanel,
+  type RewardsBreakdownPanelProps,
+} from "./RewardsBreakdownPanel";

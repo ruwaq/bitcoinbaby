@@ -16,6 +16,7 @@ import {
   MiningStatsGrid,
   NFTBoostPanel,
   EngagementBonusPanel,
+  RewardsBreakdownPanel,
   SectionHeader,
   InfoBanner,
   pixelBorders,
@@ -26,6 +27,7 @@ import {
   MiningVisualization,
   DeviceCapabilities,
   NotificationsPanel,
+  SyncStatusAlert,
 } from "@/components/features/mining";
 
 export function MiningSection() {
@@ -107,6 +109,16 @@ export function MiningSection() {
           </InfoBanner>
         )}
 
+        {/* Sync Status Alert - Circuit Breaker, Failed Shares, etc. */}
+        {wallet && (
+          <SyncStatusAlert
+            getSyncState={shares.getSyncState}
+            pendingShares={shares.pending}
+            failedShares={shares.failed}
+            onForceSync={shares.resetAndSync}
+          />
+        )}
+
         {/* Balance Panel */}
         {wallet && (
           <BalancePanel
@@ -118,6 +130,7 @@ export function MiningSection() {
             sessionShares={shares.session}
             submittedShares={shares.submitted}
             pendingShares={shares.pending}
+            failedShares={shares.failed}
             isSubmitting={shares.isSubmitting}
             getSyncState={shares.getSyncState}
             onForceSync={shares.resetAndSync}
@@ -175,17 +188,18 @@ export function MiningSection() {
           />
         </div>
 
-        {/* NFT Boost Panel */}
+        {/* NFT Boost Panel - COMING SOON (not yet applied server-side) */}
         <div className="mb-6">
           <NFTBoostPanel
-            bestBoost={nft.bestBoost / 100 + 1}
+            bestBoost={nft.bestBoost}
+            stackedBoost={nft.stackedBoost}
             totalNFTs={nft.totalNFTs}
-            boostMultiplier={miner.boostMultiplier}
             variant="panel"
+            isActive={false} // TODO: Enable when server-side NFT validation ready
           />
         </div>
 
-        {/* Engagement Bonus Panel */}
+        {/* Engagement Bonus Panel - COMING SOON (not yet tracked server-side) */}
         <div className="mb-6">
           <EngagementBonusPanel
             multiplier={engagement.multiplier}
@@ -194,6 +208,21 @@ export function MiningSection() {
             streakDays={engagement.state.dailyStreak}
             playTimeMinutes={engagement.state.playTimeToday}
             babyHealth={engagement.state.babyHealthScore}
+            isActive={false} // TODO: Enable when server-side engagement tracking ready
+          />
+        </div>
+
+        {/* Rewards Breakdown - Complete overview of all multipliers */}
+        <div className="mb-6">
+          <RewardsBreakdownPanel
+            baseReward={100}
+            streakMultiplier={miner.boostMultiplier}
+            streakCount={shares.session}
+            nftBoostPercent={nft.stackedBoost}
+            nftCount={nft.totalNFTs}
+            engagementMultiplier={engagement.multiplier}
+            cosmicMultiplier={1.0} // TODO: Get from cosmic hook when ready
+            cosmicStatus="normal"
           />
         </div>
 
