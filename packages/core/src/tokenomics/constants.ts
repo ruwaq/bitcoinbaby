@@ -49,13 +49,13 @@ export const BASE_UNIT = BigInt(10 ** DECIMALS);
  * Base reward per share at minimum difficulty
  *
  * BALANCING PHILOSOPHY:
- * - Target: MILES por dia, no cientos de miles
+ * - Target: Miles por dia, not hundreds of thousands
  * - If successful: Many miners sharing emission
  * - If few miners: Prevent instant whales
  *
- * 100 $BABY base = Very sustainable long-term
+ * 10 $BABY base = Conservative, sustainable long-term
  */
-export const BASE_REWARD_PER_SHARE = BigInt(100);
+export const BASE_REWARD_PER_SHARE = BigInt(10);
 
 /**
  * Minimum mining difficulty

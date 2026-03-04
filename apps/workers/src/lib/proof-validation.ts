@@ -16,7 +16,7 @@ export const MIN_DIFFICULTY = 22;
 export const MAX_DIFFICULTY = 32;
 
 /** Base reward per share at minimum difficulty */
-export const BASE_REWARD_PER_SHARE = BigInt(100);
+export const BASE_REWARD_PER_SHARE = BigInt(10);
 
 /** Maximum shares per hour per address
  * Safety cap to prevent abuse. WebGPU miners can find many shares quickly.
@@ -33,8 +33,11 @@ const proofLogger = new Logger("ProofValidation");
 /** Minimum time between shares in ms */
 export const MIN_SHARE_INTERVAL_MS = 1000;
 
-/** Maximum proof age in ms (5 minutes) */
-export const MAX_PROOF_AGE_MS = 5 * 60 * 1000;
+/** Maximum proof age in ms (2 hours)
+ * Extended to allow offline mining sync and network latency
+ * Previous 5 minute limit was causing 400 errors for pending shares
+ */
+export const MAX_PROOF_AGE_MS = 2 * 60 * 60 * 1000;
 
 /** Streak reset time (30 minutes) */
 export const STREAK_RESET_MS = 30 * 60 * 1000;

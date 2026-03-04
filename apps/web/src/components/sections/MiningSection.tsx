@@ -215,7 +215,7 @@ export function MiningSection() {
         {/* Rewards Breakdown - Complete overview of all multipliers */}
         <div className="mb-6">
           <RewardsBreakdownPanel
-            baseReward={100}
+            baseReward={10}
             streakMultiplier={miner.boostMultiplier}
             streakCount={shares.session}
             nftBoostPercent={nft.stackedBoost}
