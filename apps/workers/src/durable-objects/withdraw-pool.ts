@@ -19,6 +19,7 @@
  */
 
 import { DurableObject } from "cloudflare:workers";
+import { poolLogger } from "../lib/logger";
 import type {
   Env,
   WithdrawRequest,
@@ -29,6 +30,7 @@ import type {
   PoolStatusResponse,
   FeeEstimate,
 } from "../lib/types";
+import { fetchWithTimeout, TimeoutError, EXTERNAL_API } from "../lib/helpers";
 
 // Batch ready for external signing
 interface BatchForSigning {
@@ -169,12 +171,14 @@ export class WithdrawPoolDO extends DurableObject<Env> {
       // Use testnet4 for development, mainnet for production
       const mempoolUrl =
         this.env.ENVIRONMENT === "production"
-          ? "https://mempool.space/api/v1/fees/recommended"
-          : "https://mempool.space/testnet4/api/v1/fees/recommended";
+          ? `${EXTERNAL_API.MEMPOOL_MAINNET}/v1/fees/recommended`
+          : `${EXTERNAL_API.MEMPOOL_TESTNET4}/v1/fees/recommended`;
 
-      const response = await fetch(mempoolUrl, {
-        headers: { "User-Agent": "BitcoinBaby/1.0" },
-      });
+      const response = await fetchWithTimeout(
+        mempoolUrl,
+        { headers: { "User-Agent": "BitcoinBaby/1.0" } },
+        EXTERNAL_API.FEE_ESTIMATE_TIMEOUT_MS,
+      );
 
       if (!response.ok) {
         throw new Error(`Mempool API error: ${response.status}`);
@@ -195,7 +199,7 @@ export class WithdrawPoolDO extends DurableObject<Env> {
 
       return this.feeRateCache;
     } catch (error) {
-      console.error("[WithdrawPool] Failed to fetch fees:", error);
+      poolLogger.error("Failed to fetch fees", error);
 
       // Return cached even if stale, or defaults
       if (this.feeRateCache) {
@@ -312,7 +316,7 @@ export class WithdrawPoolDO extends DurableObject<Env> {
 
       return this.errorResponse("Not found", 404);
     } catch (error) {
-      console.error("[WithdrawPool] Error:", error);
+      poolLogger.error("Request error", error);
       return this.errorResponse(
         error instanceof Error ? error.message : "Internal error",
         500,
@@ -996,16 +1000,27 @@ export class WithdrawPoolDO extends DurableObject<Env> {
    */
   private async getCurrentFeeRate(): Promise<number> {
     try {
-      // Use mempool.space API
-      const response = await fetch(
-        "https://mempool.space/api/v1/fees/recommended",
+      const baseUrl =
+        this.env.ENVIRONMENT === "production"
+          ? EXTERNAL_API.MEMPOOL_MAINNET
+          : EXTERNAL_API.MEMPOOL_TESTNET4;
+
+      const response = await fetchWithTimeout(
+        `${baseUrl}/v1/fees/recommended`,
+        {},
+        EXTERNAL_API.FEE_ESTIMATE_TIMEOUT_MS,
       );
+
       if (response.ok) {
         const fees = (await response.json()) as FeeEstimate;
         return fees.economyFee;
       }
     } catch (error) {
-      console.error("[WithdrawPool] Failed to fetch fee rate:", error);
+      if (error instanceof TimeoutError) {
+        poolLogger.warn("Fee rate fetch timeout, using default");
+      } else {
+        poolLogger.error("Failed to fetch fee rate", error);
+      }
     }
     return 5; // Default fallback
   }

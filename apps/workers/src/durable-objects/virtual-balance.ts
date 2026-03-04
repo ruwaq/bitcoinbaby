@@ -15,6 +15,7 @@
  */
 
 import { DurableObject } from "cloudflare:workers";
+import { balanceLogger } from "../lib/logger";
 import type {
   Env,
   VirtualBalance,
@@ -291,7 +292,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
 
       return this.errorResponse("Not found", 404);
     } catch (error) {
-      console.error("[VirtualBalance] Error:", error);
+      balanceLogger.error("Request error", error);
       return this.errorResponse(
         error instanceof Error ? error.message : "Internal error",
         500,
@@ -421,9 +422,11 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       // Force save the updated difficulty state
       this.updateBalance(this.cachedBalance!);
 
-      console.log(
-        `[VarDiff] ${this.address}: Set initial difficulty to D${estimatedDiff} based on ${body.hashrate} H/s`,
-      );
+      balanceLogger.info("Set initial difficulty", {
+        address: this.address,
+        difficulty: estimatedDiff,
+        hashrate: body.hashrate,
+      });
     }
 
     const response: ApiResponse<{
@@ -461,7 +464,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     try {
       body = (await request.json()) as { proof: MiningProof };
     } catch (e) {
-      console.error(`[Credit] ${this.address}: JSON parse error:`, e);
+      balanceLogger.error("JSON parse error", e, { address: this.address });
       return this.errorResponse("Invalid JSON body", 400);
     }
 
@@ -471,7 +474,8 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     // SECURITY: Validate proof fields exist
     // =========================================================================
     if (!proof || !proof.hash || !proof.blockData) {
-      console.warn(`[Credit] ${this.address}: Missing fields`, {
+      balanceLogger.warn("Missing proof fields", {
+        address: this.address,
         hasProof: !!proof,
         hasHash: !!proof?.hash,
         hasBlockData: !!proof?.blockData,
@@ -493,7 +497,8 @@ export class VirtualBalanceDO extends DurableObject<Env> {
           : NaN;
 
     if (isNaN(nonce)) {
-      console.warn(`[Credit] ${this.address}: Invalid nonce type`, {
+      balanceLogger.warn("Invalid nonce type", {
+        address: this.address,
         nonceValue: proof.nonce,
         nonceType: typeof proof.nonce,
       });
@@ -522,12 +527,13 @@ export class VirtualBalanceDO extends DurableObject<Env> {
 
     if (!proofValidation.valid) {
       // Detailed logging for debugging validation failures
-      console.warn(`[Credit] ${this.address}: Proof validation failed`, {
+      balanceLogger.warn("Proof validation failed", {
+        address: this.address,
         reason: proofValidation.reason,
-        hash: proofWithNonce.hash.slice(0, 16) + "...",
+        hash: proofWithNonce.hash.slice(0, 16),
         nonce: proofWithNonce.nonce,
         difficulty: proofWithNonce.difficulty,
-        blockDataPreview: proofWithNonce.blockData.slice(0, 50) + "...",
+        blockDataPreview: proofWithNonce.blockData.slice(0, 50),
         timestamp: proofWithNonce.timestamp,
         proofAge: proofWithNonce.timestamp
           ? now - proofWithNonce.timestamp
@@ -543,15 +549,26 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     // SECURITY: Check global duplicate (prevents same proof to multiple addresses)
     // =========================================================================
     const kv = this.env.CACHE || null;
-    const isUsed = await isProofUsedGlobally(
+    const globalCheck = await isProofUsedGlobally(
       proofWithNonce.hash,
       kv,
       this.env.ENVIRONMENT,
     );
-    if (isUsed) {
-      console.info(
-        `[Credit] ${this.address}: Duplicate proof rejected (hash: ${proofWithNonce.hash.slice(0, 16)}...)`,
-      );
+
+    // If KV unavailable in production, reject the request
+    if (globalCheck.error) {
+      balanceLogger.warn("Proof rejected - KV unavailable", {
+        address: this.address,
+        hash: proofWithNonce.hash.slice(0, 16),
+      });
+      return this.errorResponse(globalCheck.error, 503);
+    }
+
+    if (globalCheck.used) {
+      balanceLogger.info("Duplicate proof rejected", {
+        address: this.address,
+        hash: proofWithNonce.hash.slice(0, 16),
+      });
       return this.errorResponse("Proof already used", 409);
     }
 
@@ -568,7 +585,8 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     });
 
     if (!rateLimitCheck.valid) {
-      console.warn(`[Credit] ${this.address}: Rate limit hit`, {
+      balanceLogger.warn("Rate limit hit", {
+        address: this.address,
         sharesThisHour,
         lastShareTime: balance.lastMiningAt,
         timeSinceLastShare: now - balance.lastMiningAt,
@@ -592,7 +610,8 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       // But apply a penalty to reward to discourage abuse
       const minAcceptable = Math.max(assignedDiff - 1, MIN_DIFFICULTY);
       if (proofWithNonce.difficulty < minAcceptable) {
-        console.warn(`[Credit] ${this.address}: Difficulty too low`, {
+        balanceLogger.warn("Difficulty too low", {
+          address: this.address,
           submittedDiff: proofWithNonce.difficulty,
           assignedDiff,
           minAcceptable,
@@ -604,8 +623,13 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         );
       }
       // Log below-assigned shares for monitoring (potential abuse indicator)
-      console.warn(
-        `[VarDiff] ${this.address}: Share at D${proofWithNonce.difficulty} below assigned D${assignedDiff}, accepting with penalty`,
+      balanceLogger.warn(
+        "Share below assigned difficulty, accepting with penalty",
+        {
+          address: this.address,
+          submittedDiff: proofWithNonce.difficulty,
+          assignedDiff,
+        },
       );
     }
 
@@ -614,9 +638,12 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     this.difficultyState = varDiffResult.state;
 
     if (varDiffResult.result.changed) {
-      console.log(
-        `[VarDiff] ${this.address}: D${assignedDiff} -> D${varDiffResult.result.newDifficulty} (${varDiffResult.result.reason})`,
-      );
+      balanceLogger.info("VarDiff adjustment", {
+        address: this.address,
+        from: assignedDiff,
+        to: varDiffResult.result.newDifficulty,
+        reason: varDiffResult.result.reason,
+      });
     }
 
     // =========================================================================
@@ -636,18 +663,15 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     const baseReward = proofValidation.calculatedReward!;
 
     // =========================================================================
-    // SECURITY: Mark proof globally FIRST (prevents race condition)
-    // If global marking fails after local insert, another address could use same proof
-    // =========================================================================
-    try {
-      await markProofUsedGlobally(proofWithNonce.hash, this.address, kv);
-    } catch (e) {
-      console.error("[VirtualBalance] Failed to mark proof globally:", e);
-      return this.errorResponse("Failed to register proof. Try again.", 500);
-    }
-
-    // =========================================================================
-    // Store proof with UNIQUE constraint (local duplicate check)
+    // CRITICAL: Store proof LOCALLY FIRST with UNIQUE constraint
+    // This prevents the race condition where global marking succeeds but
+    // local insert fails, causing the proof to be "burned" permanently.
+    //
+    // Order: SQLite INSERT → KV PUT (with retry)
+    // Risk mitigation:
+    //   - If SQLite fails first: No harm done, user can retry
+    //   - If KV fails after SQLite: User credited, small cross-address risk
+    //     (acceptable because KV retries and expires after 24h anyway)
     // =========================================================================
     const proofId = crypto.randomUUID();
 
@@ -666,11 +690,53 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       );
     } catch (e) {
       if (e instanceof Error && e.message.includes("UNIQUE")) {
-        // Proof already in local DB - this is fine, KV already has it
+        // Proof already credited to this address
         return this.errorResponse("Proof already credited", 409);
       }
-      throw e;
+      // Other SQLite errors - safe to fail here, nothing committed yet
+      balanceLogger.error("SQLite insert failed", e);
+      return this.errorResponse("Database error. Please retry.", 500);
     }
+
+    // =========================================================================
+    // Mark proof globally in KV with retry (best effort)
+    // If this fails, the proof is still credited locally. The small risk of
+    // cross-address double-spend is acceptable (proofs expire in 24h anyway).
+    // =========================================================================
+    const currentAddress = this.address!; // Safe: validated earlier in flow
+    const markGloballyWithRetry = async (retries = 3): Promise<boolean> => {
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          await markProofUsedGlobally(proofWithNonce.hash, currentAddress, kv);
+          return true;
+        } catch (e) {
+          balanceLogger.warn("KV mark attempt failed", {
+            attempt,
+            retries,
+            error: e instanceof Error ? e.message : String(e),
+          });
+          if (attempt < retries) {
+            // Exponential backoff: 50ms, 100ms, 200ms
+            await new Promise((r) =>
+              setTimeout(r, 50 * Math.pow(2, attempt - 1)),
+            );
+          }
+        }
+      }
+      return false;
+    };
+
+    // Non-blocking global mark - user is already credited locally
+    markGloballyWithRetry().then((success) => {
+      if (!success) {
+        balanceLogger.error(
+          "CRITICAL: Failed to mark proof globally after retries",
+          undefined,
+          { hash: proofWithNonce.hash, address: currentAddress },
+        );
+        // TODO: Add to dead-letter queue for manual review
+      }
+    });
 
     // =========================================================================
     // Update balance
@@ -692,9 +758,13 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     this.incrementShareCounter();
 
     // Log successful credit for monitoring
-    console.log(
-      `[Credit] ${this.address}: +${boostedReward} $BABY (D${proofWithNonce.difficulty}, streak: ${balance.streakCount}x${streakMultiplier.toFixed(2)})`,
-    );
+    balanceLogger.info("Credit awarded", {
+      address: this.address,
+      reward: boostedReward.toString(),
+      difficulty: proofWithNonce.difficulty,
+      streak: balance.streakCount,
+      multiplier: streakMultiplier.toFixed(2),
+    });
 
     // =========================================================================
     // Update leaderboard (non-blocking, don't fail if it errors)
@@ -976,9 +1046,11 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     balance.virtualBalance -= amount;
     this.updateBalance(balance);
 
-    console.log(
-      `[VirtualBalance] Deducted ${amount} from ${this.address} for: ${body.reason}`,
-    );
+    balanceLogger.info("Deducted balance", {
+      amount: amount.toString(),
+      address: this.address,
+      reason: body.reason,
+    });
 
     const response: ApiResponse<{
       deducted: string;
@@ -1017,7 +1089,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     this.sharesThisHourCache = 0;
     this.sharesHourStartedAt = 0;
 
-    console.log(`[VirtualBalance] Reset complete for ${this.address}`);
+    balanceLogger.info("Reset complete", { address: this.address });
 
     const response: ApiResponse<{ reset: boolean }> = {
       success: true,
@@ -1069,7 +1141,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
           });
         } catch (error) {
           // Log but don't fail - leaderboard is non-critical
-          console.error("[VirtualBalance] Leaderboard update failed:", error);
+          balanceLogger.error("Leaderboard update failed", error);
         }
       })(),
     );

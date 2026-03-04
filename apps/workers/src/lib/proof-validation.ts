@@ -21,8 +21,14 @@ export const BASE_REWARD_PER_SHARE = BigInt(100);
 /** Maximum shares per hour per address
  * Safety cap to prevent abuse. WebGPU miners can find many shares quickly.
  * This allows reasonable mining while preventing spam.
+ *
+ * IMPORTANT: Must be >= VarDiff target rate (1 share/3s = 1200/hr)
+ * Set to 1500 to give 25% headroom for burst mining.
  */
-export const MAX_SHARES_PER_HOUR = 1000;
+export const MAX_SHARES_PER_HOUR = 1500;
+
+import { Logger } from "./logger";
+const proofLogger = new Logger("ProofValidation");
 
 /** Minimum time between shares in ms */
 export const MIN_SHARE_INTERVAL_MS = 1000;
@@ -197,41 +203,31 @@ export function checkRateLimit(check: RateLimitCheck): ValidationResult {
 // =============================================================================
 
 /**
- * Calculate reward for a share at given difficulty
+ * Calculate reward for a share
  *
- * LOGARITHMIC FORMULA (Balanced for Fairness)
- * ============================================
+ * FLAT REWARD (Natural Bitcoin-like System)
+ * =========================================
  *
- * Old (exponential): reward = BASE * 2^extraDiff
- * - D22 = 100, D26 = 1600, D32 = 102,400 (1024x gap!)
+ * Every valid share earns the same reward regardless of difficulty.
+ * This is how real Bitcoin mining pools work:
  *
- * New (logarithmic): reward = BASE * (1 + sqrt(extraDiff) * 0.5)
- * - D22 = 100, D26 = 200, D32 = 258 (2.6x gap)
+ * - Difficulty is ONLY for server load balancing (VarDiff)
+ * - Difficulty does NOT affect reward per share
+ * - Your HASHRATE naturally determines how many shares you find
+ * - More powerful devices find more shares = earn more (natural)
  *
- * Why this matters:
- * - GPU miners still earn MORE (they do more work)
- * - But not 1000x more - only 2-4x more
- * - Casual players can compete through engagement bonuses
+ * Why this is fair:
+ * - GPU with 70 MH/s at D32 finds ~60 shares/hour = 6,000 tokens/hour
+ * - Phone with 500 H/s at D22 finds ~0.4 shares/hour = 40 tokens/hour
+ * - Gap of 150x reflects NATURAL power difference
+ * - No artificial boost or penalty - pure hashrate determines earnings
  *
- * | Difficulty | Old (2^x) | New (sqrt) |
- * |------------|-----------|------------|
- * | D22 (min)  | 100       | 100        |
- * | D24        | 400       | 170        |
- * | D26        | 1,600     | 200        |
- * | D32 (max)  | 102,400   | 258        |
+ * Streak bonuses still apply (rewards dedication, not power)
  */
-export function calculateShareReward(difficulty: number): bigint {
-  if (difficulty <= MIN_DIFFICULTY) {
-    return BASE_REWARD_PER_SHARE;
-  }
-
-  const extraDiff = difficulty - MIN_DIFFICULTY;
-
-  // Square root formula for diminishing returns
-  // Each difficulty level adds less bonus than the previous
-  const multiplier = 1 + Math.sqrt(extraDiff) * 0.5;
-
-  return BigInt(Math.floor(Number(BASE_REWARD_PER_SHARE) * multiplier));
+export function calculateShareReward(_difficulty: number): bigint {
+  // Flat reward for all valid shares
+  // Difficulty is validated but doesn't affect reward
+  return BASE_REWARD_PER_SHARE;
 }
 
 /**
@@ -356,30 +352,48 @@ let kvWarningLogged = false;
  * This prevents the same proof from being submitted to multiple addresses
  *
  * SECURITY: In production, KV MUST be configured for proper deduplication
+ *
+ * @returns Object with used flag and error if KV unavailable in production
  */
 export async function isProofUsedGlobally(
   hash: string,
   kv: KVNamespace | null,
   environment?: string,
-): Promise<boolean> {
+): Promise<{ used: boolean; error?: string }> {
   if (!kv) {
-    // CRITICAL: Log warning in production
-    if (environment === "production" && !kvWarningLogged) {
-      console.error(
-        "[SECURITY] CRITICAL: KV namespace not configured! " +
-          "Global proof deduplication is DISABLED. " +
-          "Same proof can be submitted to multiple addresses. " +
-          "Configure CACHE KV namespace immediately!",
-      );
-      kvWarningLogged = true;
+    // CRITICAL: In production, reject if KV not available
+    if (environment === "production") {
+      if (!kvWarningLogged) {
+        proofLogger.error(
+          "CRITICAL: KV namespace not configured in production! " +
+            "Rejecting proof submissions until KV is configured.",
+        );
+        kvWarningLogged = true;
+      }
+      return {
+        used: false,
+        error: "Service temporarily unavailable. Please try again later.",
+      };
     }
-    // Fall back to local-only check (each DO has its own UNIQUE constraint)
-    return false;
+    // In development/staging, allow without KV (local UNIQUE constraint still works)
+    return { used: false };
   }
 
-  const key = `proof:${hash}`;
-  const existing = await kv.get(key);
-  return existing !== null;
+  try {
+    const key = `proof:${hash}`;
+    const existing = await kv.get(key);
+    return { used: existing !== null };
+  } catch (error) {
+    // KV error - log and reject in production
+    proofLogger.error("KV read error:", error);
+    if (environment === "production") {
+      return {
+        used: false,
+        error: "Service temporarily unavailable. Please try again later.",
+      };
+    }
+    return { used: false };
+  }
 }
 
 /**

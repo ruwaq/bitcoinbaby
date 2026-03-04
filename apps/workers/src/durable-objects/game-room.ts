@@ -14,6 +14,7 @@
 import { DurableObject } from "cloudflare:workers";
 import * as Y from "yjs";
 import type { Env, ApiResponse, GameState } from "../lib/types";
+import { gameLogger } from "../lib/logger";
 
 // WebSocket connection with metadata
 interface Connection {
@@ -95,7 +96,7 @@ export class GameRoomDO extends DurableObject<Env> {
     if (rows.length > 0 && rows[0].yjs_state) {
       const state = rows[0].yjs_state as ArrayBuffer;
       Y.applyUpdate(this.ydoc, new Uint8Array(state));
-      console.log(`[GameRoom] Loaded state for room ${this.roomId}`);
+      gameLogger.debug("Loaded state", { roomId: this.roomId });
     } else {
       // Initialize default game state
       this.initializeDefaultState();
@@ -131,9 +132,7 @@ export class GameRoomDO extends DurableObject<Env> {
       gameState.set("totalShares", 0);
       gameState.set("lastSyncAt", Date.now());
 
-      console.log(
-        `[GameRoom] Initialized default state for room ${this.roomId}`,
-      );
+      gameLogger.debug("Initialized default state", { roomId: this.roomId });
     }
   }
 
@@ -171,7 +170,7 @@ export class GameRoomDO extends DurableObject<Env> {
       now,
     );
 
-    console.log(`[GameRoom] Saved state for room ${this.roomId}`);
+    gameLogger.debug("Saved state", { roomId: this.roomId });
   }
 
   /**
@@ -187,7 +186,7 @@ export class GameRoomDO extends DurableObject<Env> {
       try {
         conn.webSocket.send(message);
       } catch (error) {
-        console.error(`[GameRoom] Failed to send to ${clientId}:`, error);
+        gameLogger.error("Failed to send to client", error, { clientId });
         this.connections.delete(clientId);
       }
     }
@@ -257,7 +256,7 @@ export class GameRoomDO extends DurableObject<Env> {
 
       return this.errorResponse("Not found", 404);
     } catch (error) {
-      console.error("[GameRoom] Error:", error);
+      gameLogger.error("Request error", error);
       return this.errorResponse(
         error instanceof Error ? error.message : "Internal error",
         500,
@@ -295,12 +294,15 @@ export class GameRoomDO extends DurableObject<Env> {
     server.addEventListener("close", () => {
       this.connections.delete(clientId);
       this.logSyncAction(clientId, "disconnected");
-      console.log(`[GameRoom] Client ${clientId} disconnected`);
+      gameLogger.debug("Client disconnected", { clientId });
     });
 
     // Set up error handler
-    server.addEventListener("error", (error) => {
-      console.error(`[GameRoom] WebSocket error for ${clientId}:`, error);
+    server.addEventListener("error", (event) => {
+      gameLogger.error("WebSocket error", undefined, {
+        clientId,
+        message: event instanceof ErrorEvent ? event.message : "Unknown error",
+      });
       this.connections.delete(clientId);
     });
 
@@ -314,9 +316,7 @@ export class GameRoomDO extends DurableObject<Env> {
       }),
     );
 
-    console.log(
-      `[GameRoom] Client ${clientId} connected to room ${this.roomId}`,
-    );
+    gameLogger.info("Client connected", { clientId, roomId: this.roomId });
 
     return new Response(null, {
       status: 101,
@@ -365,10 +365,7 @@ export class GameRoomDO extends DurableObject<Env> {
         }
       }
     } catch (error) {
-      console.error(
-        `[GameRoom] Failed to handle message from ${clientId}:`,
-        error,
-      );
+      gameLogger.error("Failed to handle message", error, { clientId });
     }
   }
 
@@ -588,7 +585,7 @@ export class GameRoomDO extends DurableObject<Env> {
       if (conn.webSocket === ws) {
         this.connections.delete(clientId);
         this.logSyncAction(clientId, "disconnected");
-        console.log(`[GameRoom] Client ${clientId} disconnected (hibernation)`);
+        gameLogger.debug("Client disconnected (hibernation)", { clientId });
         break;
       }
     }

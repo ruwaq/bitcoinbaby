@@ -15,6 +15,7 @@ import type {
   LeaderboardEntry,
   UserStats,
 } from "./types";
+import { redisLogger } from "./logger";
 
 // =============================================================================
 // CLIENT FACTORY
@@ -286,7 +287,9 @@ export async function resetDailyLeaderboard(redis: Redis): Promise<void> {
     // Check if key exists before archiving
     const exists = await redis.exists(key);
     if (!exists) {
-      console.log(`[Leaderboard] ${key} does not exist, skipping archive`);
+      redisLogger.debug("Leaderboard key does not exist, skipping archive", {
+        key,
+      });
       continue;
     }
 
@@ -317,7 +320,9 @@ export async function resetWeeklyLeaderboard(redis: Redis): Promise<void> {
     // Check if key exists before archiving
     const exists = await redis.exists(key);
     if (!exists) {
-      console.log(`[Leaderboard] ${key} does not exist, skipping archive`);
+      redisLogger.debug("Leaderboard key does not exist, skipping archive", {
+        key,
+      });
       continue;
     }
 

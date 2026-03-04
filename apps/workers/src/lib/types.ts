@@ -209,6 +209,8 @@ export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
+  /** Validation error details */
+  details?: Record<string, string[] | undefined>;
   timestamp: number;
 }
 
