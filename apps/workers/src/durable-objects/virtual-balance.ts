@@ -602,35 +602,30 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       this.difficultyState = createInitialState();
     }
 
-    // Validate that submitted difficulty meets the assigned difficulty
-    // SECURITY: Reject shares below assigned difficulty to prevent reward farming
+    // Validate that submitted difficulty meets minimum
+    // NOTE: VarDiff is advisory - we accept any share >= MIN_DIFFICULTY
+    // The reward is always calculated based on actual difficulty submitted
+    // This prevents sync issues when client has stale difficulty assignment
     const assignedDiff = this.difficultyState.currentDiff;
-    if (proofWithNonce.difficulty < assignedDiff) {
-      // Grace period: allow 1 level below for network latency (stricter than before)
-      // But apply a penalty to reward to discourage abuse
-      const minAcceptable = Math.max(assignedDiff - 1, MIN_DIFFICULTY);
-      if (proofWithNonce.difficulty < minAcceptable) {
-        balanceLogger.warn("Difficulty too low", {
-          address: this.address,
-          submittedDiff: proofWithNonce.difficulty,
-          assignedDiff,
-          minAcceptable,
-          globalMinDiff: MIN_DIFFICULTY,
-        });
-        return this.errorResponse(
-          `Share difficulty D${proofWithNonce.difficulty} below minimum D${minAcceptable} (assigned: D${assignedDiff})`,
-          400,
-        );
-      }
-      // Log below-assigned shares for monitoring (potential abuse indicator)
-      balanceLogger.warn(
-        "Share below assigned difficulty, accepting with penalty",
-        {
-          address: this.address,
-          submittedDiff: proofWithNonce.difficulty,
-          assignedDiff,
-        },
+    if (proofWithNonce.difficulty < MIN_DIFFICULTY) {
+      balanceLogger.warn("Difficulty below global minimum", {
+        address: this.address,
+        submittedDiff: proofWithNonce.difficulty,
+        globalMinDiff: MIN_DIFFICULTY,
+      });
+      return this.errorResponse(
+        `Share difficulty D${proofWithNonce.difficulty} below minimum D${MIN_DIFFICULTY}`,
+        400,
       );
+    }
+
+    // Log if share is below assigned difficulty (for monitoring)
+    if (proofWithNonce.difficulty < assignedDiff) {
+      balanceLogger.debug("Share below assigned difficulty (accepted)", {
+        address: this.address,
+        submittedDiff: proofWithNonce.difficulty,
+        assignedDiff,
+      });
     }
 
     // Process this share through VarDiff algorithm
