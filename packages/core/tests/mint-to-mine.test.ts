@@ -49,11 +49,11 @@ function createMockNFT(overrides: Partial<BabyNFTState> = {}): BabyNFTState {
 
 describe("Mining Boost Calculation", () => {
   describe("Level-based boosts", () => {
-    it("should return 0% boost at level 1", () => {
+    it("should return 0.5% boost at level 1 common", () => {
       const nft = createMockNFT({ level: 1, rarityTier: "common" });
       const boost = getMiningBoost(nft);
-      // common rarity adds 10%, level 1 adds 0%
-      expect(boost).toBe(10);
+      // common rarity adds 0.5% (balanced values), level 1 adds 0%
+      expect(boost).toBe(0.5);
     });
 
     it("should increase boost with higher levels", () => {
@@ -73,7 +73,8 @@ describe("Mining Boost Calculation", () => {
       for (let level = 1; level <= 10; level++) {
         const nft = createMockNFT({ level, rarityTier: "common" });
         const boost = getMiningBoost(nft);
-        const expectedBoost = LEVEL_BOOSTS[level] + 10; // +10 from common rarity
+        // Common = 0.5% (balanced values)
+        const expectedBoost = LEVEL_BOOSTS[level] + 0.5;
         expect(boost).toBe(expectedBoost);
       }
     });
@@ -109,8 +110,8 @@ describe("Mining Boost Calculation", () => {
       const mythicBoost = getMiningBoost(mythic);
 
       expect(mythicBoost).toBeGreaterThan(commonBoost);
-      // Mythic should have significant boost advantage
-      expect(mythicBoost - commonBoost).toBeGreaterThanOrEqual(30);
+      // Mythic (8%) vs Common (0.5%) = 7.5% difference (balanced values)
+      expect(mythicBoost - commonBoost).toBeGreaterThanOrEqual(7);
     });
   });
 
@@ -133,11 +134,11 @@ describe("Mining Boost Calculation", () => {
       const maxedNFT = createMockNFT({ level: 10, rarityTier: "mythic" });
       const maxBoost = getMiningBoost(maxedNFT);
 
-      // Max boost: level 10 (120%) + mythic rarity (100%) = 220%
-      // This gives 3.2x hashrate multiplier at max
-      expect(maxBoost).toBeLessThanOrEqual(250); // Allow up to 250% (3.5x)
-      expect(maxBoost).toBeGreaterThan(150); // Should be at least 150% (2.5x)
-      expect(maxBoost).toBe(220); // Exact expected value
+      // Balanced values: level 10 (4%) + mythic rarity (8%) = 12%
+      // This is intentionally conservative to prevent pay-to-win
+      expect(maxBoost).toBeLessThanOrEqual(15); // Max reasonable for single NFT
+      expect(maxBoost).toBeGreaterThan(10); // Should be meaningful
+      expect(maxBoost).toBe(12); // Exact expected value
     });
   });
 });
