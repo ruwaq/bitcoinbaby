@@ -455,6 +455,74 @@ export async function cleanupSyncedShares(
 }
 
 /**
+ * Clean up old failed shares (dead letter queue)
+ *
+ * Failed shares are those that exceeded max retries or had permanent errors.
+ * They should be cleaned up after a while since they can't be recovered.
+ *
+ * @param daysToKeep Number of days to keep failed shares (default: 3)
+ * @returns Number of shares deleted
+ */
+export async function cleanupFailedShares(
+  daysToKeep: number = 3,
+): Promise<number> {
+  const database = getDB();
+  const cutoff = Date.now() - daysToKeep * 24 * 60 * 60 * 1000;
+
+  const toDelete = await database.shares
+    .where("status")
+    .equals("failed")
+    .filter((share) => share.timestamp < cutoff)
+    .toArray();
+
+  const ids = toDelete.map((s) => s.id!);
+  await database.shares.bulkDelete(ids);
+
+  if (ids.length > 0) {
+    console.log(
+      `[ShareQueue] Cleaned up ${ids.length} old failed shares (dead letter queue)`,
+    );
+  }
+
+  return ids.length;
+}
+
+/**
+ * Retry failed shares (move back to pending)
+ *
+ * Useful when server issues are resolved and user wants to retry.
+ * Resets attempts counter and status to pending.
+ *
+ * @returns Number of shares reset for retry
+ */
+export async function retryFailedShares(): Promise<number> {
+  const database = getDB();
+
+  const failed = await database.shares
+    .where("status")
+    .equals("failed")
+    .toArray();
+
+  if (failed.length === 0) return 0;
+
+  // Reset each share
+  await Promise.all(
+    failed.map((share) =>
+      database.shares.update(share.id!, {
+        status: "pending",
+        attempts: 0,
+        error: null,
+        nextRetry: null,
+      }),
+    ),
+  );
+
+  console.log(`[ShareQueue] Reset ${failed.length} failed shares for retry`);
+
+  return failed.length;
+}
+
+/**
  * Get total pending reward (for UI display)
  */
 export async function getPendingReward(address: string): Promise<bigint> {

@@ -14,6 +14,7 @@ import {
   type MiningProof,
 } from "@bitcoinbaby/bitcoin";
 import { useMiningStore } from "../stores/mining-store";
+import { useDeadLetterStore } from "../stores/dead-letter-store";
 import type { MiningResult } from "../mining/types";
 
 // =============================================================================
@@ -98,8 +99,10 @@ export function useMiningSubmission(
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Zustand store for token tracking
+  // Zustand stores
   const { addTokens } = useMiningStore();
+  const { addFailedProof, isInitialized: dlqInitialized } =
+    useDeadLetterStore();
 
   // Submitter ref (persist across renders)
   const submitterRef = useRef<ReturnType<typeof createMiningSubmitter> | null>(
@@ -178,17 +181,33 @@ export function useMiningSubmission(
             }
           }
         } else {
-          setError(submissionResult.error || "Submission failed");
-          onSubmissionError?.(
-            submissionResult.error || "Unknown error",
-            submissionResult.submission,
-          );
+          const errorMsg = submissionResult.error || "Submission failed";
+          setError(errorMsg);
+          onSubmissionError?.(errorMsg, submissionResult.submission);
+
+          // Add to dead letter queue for retry
+          if (dlqInitialized) {
+            addFailedProof(
+              result,
+              errorMsg,
+              "SUBMISSION_FAILED",
+              submissionResult.submission?.reward
+                ? Number(submissionResult.submission.reward)
+                : undefined,
+            );
+          }
         }
 
         return submissionResult;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         setError(message);
+
+        // Add to dead letter queue for retry
+        if (dlqInitialized) {
+          addFailedProof(result, message, "EXCEPTION");
+        }
+
         return {
           success: false,
           submission: {} as MiningSubmission,
@@ -198,7 +217,13 @@ export function useMiningSubmission(
         setIsSubmitting(false);
       }
     },
-    [autoSubmit, signTransaction, onSubmissionError],
+    [
+      autoSubmit,
+      signTransaction,
+      onSubmissionError,
+      dlqInitialized,
+      addFailedProof,
+    ],
   );
 
   // Sign and broadcast

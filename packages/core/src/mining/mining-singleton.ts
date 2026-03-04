@@ -26,6 +26,15 @@ import type {
   DeviceCapabilities,
 } from "./types";
 import { MIN_DIFFICULTY } from "../tokenomics/constants";
+import {
+  type ClientVarDiffState,
+  createInitialClientVarDiffState,
+  setInitialDifficultyFromHashrate,
+  processShareForVarDiff,
+  isHashrateStable,
+  getMinSafeDifficulty,
+  DEFAULT_CLIENT_VARDIFF_CONFIG,
+} from "./client-vardiff";
 
 // =============================================================================
 // TYPES
@@ -81,6 +90,12 @@ class MiningManager {
   private tabCoordinator: MiningTabCoordinator | null = null;
   private wakeLock: MiningWakeLock | null = null;
 
+  // Client-side VarDiff state (independent of server)
+  private clientVarDiffState: ClientVarDiffState =
+    createInitialClientVarDiffState();
+  private lastHashrateCheck: number = 0;
+  private hashrateCheckInterval: number = 5000; // Check every 5 seconds
+
   private state: MiningManagerState = {
     isRunning: false,
     isPaused: false,
@@ -132,10 +147,14 @@ class MiningManager {
 
     // Setup event handlers
     this.orchestrator.on("onHashrateUpdate", (hashrate) => {
+      const totalHashes = this.orchestrator?.getTotalHashes() ?? 0;
       this.updateState({
         hashrate,
-        totalHashes: this.orchestrator?.getTotalHashes() ?? 0,
+        totalHashes,
       });
+
+      // Auto-adjust difficulty based on hashrate (client-side VarDiff)
+      this.checkAndAdjustDifficulty(hashrate, totalHashes);
     });
 
     this.orchestrator.on("onWorkFound", (result) => {
@@ -143,6 +162,10 @@ class MiningManager {
         shares: this.state.shares + 1,
         lastShare: result,
       });
+
+      // Process share through client VarDiff for timing-based adjustment
+      this.processShareForClientVarDiff();
+
       this.config.onWorkFound?.(result);
     });
 
@@ -454,11 +477,103 @@ class MiningManager {
     const oldDiff = this.state.difficulty;
     this.setDifficulty(safeDifficulty);
 
+    // Also update client VarDiff state to stay in sync
+    this.clientVarDiffState = {
+      ...this.clientVarDiffState,
+      currentDiff: safeDifficulty,
+      // Reset share times since difficulty changed
+      recentShareTimes: [],
+      sharesSinceRetarget: 0,
+    };
+
     console.log(
       `[MiningManager] VarDiff adjustment: D${oldDiff} -> D${safeDifficulty}${newDifficulty < MIN_DIFFICULTY ? ` (clamped from D${newDifficulty})` : ""}`,
     );
 
     return true;
+  }
+
+  /**
+   * Check and auto-adjust difficulty based on hashrate (client-side VarDiff)
+   *
+   * This runs independently of server VarDiff to ensure miners start at
+   * appropriate difficulty even when server communication is blocked.
+   *
+   * CRITICAL: Prevents rate limiting by calculating correct difficulty locally.
+   */
+  private checkAndAdjustDifficulty(
+    hashrate: number,
+    totalHashes: number,
+  ): void {
+    const now = Date.now();
+
+    // Throttle checks to avoid excessive processing
+    if (now - this.lastHashrateCheck < this.hashrateCheckInterval) {
+      return;
+    }
+    this.lastHashrateCheck = now;
+
+    // Skip if hashrate not stable yet
+    if (!isHashrateStable(totalHashes, DEFAULT_CLIENT_VARDIFF_CONFIG)) {
+      return;
+    }
+
+    // Try to set initial difficulty from hashrate
+    const result = setInitialDifficultyFromHashrate(
+      this.clientVarDiffState,
+      hashrate,
+      totalHashes,
+      DEFAULT_CLIENT_VARDIFF_CONFIG,
+    );
+
+    if (result.changed) {
+      this.clientVarDiffState = result.state;
+
+      // Also check if we need a higher difficulty to avoid rate limits
+      const safeDiff = getMinSafeDifficulty(hashrate, 1500); // MAX_SHARES_PER_HOUR
+      const finalDiff = Math.max(result.newDifficulty, safeDiff);
+
+      if (finalDiff !== this.state.difficulty) {
+        const oldDiff = this.state.difficulty;
+        this.setDifficulty(finalDiff);
+        console.log(
+          `[MiningManager] Client VarDiff: D${oldDiff} -> D${finalDiff} ` +
+            `(hashrate: ${(hashrate / 1_000_000).toFixed(2)} MH/s, ` +
+            `optimal: D${result.newDifficulty}, safe: D${safeDiff})`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Process share through client VarDiff for timing-based adjustment
+   *
+   * This monitors actual share times and adjusts difficulty accordingly,
+   * providing a secondary adjustment mechanism to the hashrate-based one.
+   */
+  private processShareForClientVarDiff(): void {
+    const result = processShareForVarDiff(
+      this.clientVarDiffState,
+      Date.now(),
+      DEFAULT_CLIENT_VARDIFF_CONFIG,
+    );
+
+    this.clientVarDiffState = result.state;
+
+    if (result.adjustment.changed) {
+      // Only adjust if significantly different to avoid oscillation
+      const diff = Math.abs(
+        result.adjustment.newDifficulty - this.state.difficulty,
+      );
+      if (diff >= 1) {
+        const oldDiff = this.state.difficulty;
+        this.setDifficulty(result.adjustment.newDifficulty);
+        console.log(
+          `[MiningManager] Client VarDiff timing adjustment: D${oldDiff} -> D${result.adjustment.newDifficulty} ` +
+            `(${result.adjustment.reason})`,
+        );
+      }
+    }
   }
 
   /**

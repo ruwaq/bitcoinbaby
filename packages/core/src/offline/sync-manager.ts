@@ -20,6 +20,7 @@ import {
   markPermanentlyFailed,
   getQueueStats,
   cleanupSyncedShares,
+  cleanupFailedShares,
   needsNonceMigration,
   migrateDecimalNoncesToHex,
   needsLowDifficultyCleanup,
@@ -621,17 +622,26 @@ class SyncManager {
   }
 
   /**
-   * Schedule cleanup of old synced shares
+   * Schedule cleanup of old synced and failed shares
    */
   private scheduleCleanup(): void {
     // Run cleanup once per hour
     setInterval(
       async () => {
         try {
-          const deleted = await cleanupSyncedShares(7); // Keep 7 days
-          if (deleted > 0) {
+          // Clean up old synced shares (keep 7 days)
+          const deletedSynced = await cleanupSyncedShares(7);
+          if (deletedSynced > 0) {
             console.log(
-              `[SyncManager] Cleaned up ${deleted} old synced shares`,
+              `[SyncManager] Cleaned up ${deletedSynced} old synced shares`,
+            );
+          }
+
+          // Clean up old failed shares (dead letter queue - keep 3 days)
+          const deletedFailed = await cleanupFailedShares(3);
+          if (deletedFailed > 0) {
+            console.log(
+              `[SyncManager] Cleaned up ${deletedFailed} old failed shares (dead letter queue)`,
             );
           }
         } catch (error) {

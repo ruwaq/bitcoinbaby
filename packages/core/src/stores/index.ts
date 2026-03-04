@@ -86,3 +86,10 @@ export {
   type OverlayMode,
   type OverlayData,
 } from "./overlay-store";
+export {
+  useDeadLetterStore,
+  selectRetryableCount,
+  selectExhaustedProofs,
+  selectHasFailedProofs,
+  selectTokensAtRisk,
+} from "./dead-letter-store";

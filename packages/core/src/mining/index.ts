@@ -70,6 +70,31 @@ export {
   type AIIntegrationConfig,
 } from "./ai-integration";
 
+// Dead Letter Queue (Failed Proof Recovery)
+export {
+  DeadLetterQueue,
+  getDeadLetterQueue,
+  initDeadLetterQueue,
+  type FailedProof,
+  type DeadLetterQueueStats,
+  type DeadLetterQueueEvents,
+  type DeadLetterQueueConfig,
+} from "./dead-letter-queue";
+
+// Client-side VarDiff (hashrate-based difficulty adjustment)
+export {
+  estimateDifficultyFromHashrate,
+  isHashrateStable,
+  getMinSafeDifficulty,
+  getDifficultyForDevice,
+  expectedSharesPerHour,
+  willHitRateLimit,
+  DEVICE_HASHRATE_PRESETS,
+  DEFAULT_CLIENT_VARDIFF_CONFIG,
+  type ClientVarDiffConfig,
+  type ClientVarDiffState,
+} from "./client-vardiff";
+
 // Types
 export type {
   Miner,

@@ -15,6 +15,8 @@ export {
   markPermanentlyFailed,
   getQueueStats,
   cleanupSyncedShares,
+  cleanupFailedShares,
+  retryFailedShares,
   getPendingReward,
   isHashQueued,
   clearQueue,
