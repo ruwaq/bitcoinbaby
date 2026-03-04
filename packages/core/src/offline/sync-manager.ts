@@ -496,7 +496,7 @@ class SyncManager {
         nonce: share.nonce,
         difficulty: share.difficulty,
         blockData: share.blockData,
-        reward: share.reward,
+        timestamp: share.timestamp,
       });
 
       if (response.success) {

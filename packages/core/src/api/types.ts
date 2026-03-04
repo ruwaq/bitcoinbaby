@@ -80,7 +80,7 @@ export interface MiningProof {
   nonce: number;
   difficulty: number;
   blockData: string;
-  reward: string;
+  timestamp?: number;
 }
 
 // =============================================================================

@@ -287,7 +287,7 @@ export function useVirtualBalance(
       nonce: number;
       difficulty: number;
       blockData: string;
-      reward: bigint;
+      timestamp?: number;
     }): Promise<{ success: boolean; credited?: string; error?: string }> => {
       if (!address) {
         return { success: false, error: "No address" };
@@ -300,7 +300,7 @@ export function useVirtualBalance(
           nonce: proof.nonce,
           difficulty: proof.difficulty,
           blockData: proof.blockData,
-          reward: proof.reward.toString(),
+          timestamp: proof.timestamp,
         };
 
         const response = await client.creditMining(address, apiProof);

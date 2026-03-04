@@ -171,7 +171,7 @@ export class BitcoinBabyClient {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ proof }),
+        body: JSON.stringify(proof),
       },
       0, // No retries for POST - server handles idempotency via hash uniqueness
     );
