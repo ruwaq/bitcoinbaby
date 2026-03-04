@@ -14,6 +14,8 @@ import {
   NFTInfoPanel,
   NFTCard,
   Button,
+  pixelShadows,
+  pixelBorders,
   type BabyNFTState,
 } from "@bitcoinbaby/ui";
 
@@ -44,7 +46,9 @@ export function NFTMintFlow({
     return (
       <>
         {/* Price Banner */}
-        <div className="bg-pixel-bg-medium border-4 border-pixel-success p-4 mb-6 text-center shadow-[4px_4px_0_0_#000]">
+        <div
+          className={`bg-pixel-bg-medium ${pixelBorders.success} p-4 mb-6 text-center ${pixelShadows.md}`}
+        >
           <p className="font-pixel text-[8px] text-pixel-text-muted uppercase mb-1">
             Mint Price
           </p>
@@ -82,7 +86,9 @@ export function NFTMintFlow({
 
   if (state === "minting") {
     return (
-      <div className="bg-pixel-bg-medium border-4 border-pixel-border p-8 text-center">
+      <div
+        className={`bg-pixel-bg-medium ${pixelBorders.medium} p-8 text-center`}
+      >
         <div className="text-6xl animate-bounce mb-4">⛏️</div>
         <p className="font-pixel text-sm text-pixel-primary animate-pulse mb-2">
           MINTING...
@@ -96,7 +102,9 @@ export function NFTMintFlow({
 
   if (state === "revealing") {
     return (
-      <div className="bg-pixel-bg-medium border-4 border-pixel-primary p-8 text-center">
+      <div
+        className={`bg-pixel-bg-medium ${pixelBorders.accent} p-8 text-center`}
+      >
         <div className="relative">
           {/* Egg animation */}
           <div className="text-8xl animate-pulse mb-4">🥚</div>
@@ -136,7 +144,9 @@ export function NFTMintFlow({
 
   if (state === "success" && lastMinted) {
     return (
-      <div className="bg-pixel-bg-medium border-4 border-pixel-success p-6 shadow-[8px_8px_0_0_#000]">
+      <div
+        className={`bg-pixel-bg-medium ${pixelBorders.success} p-6 ${pixelShadows.lg}`}
+      >
         <div className="text-center mb-4">
           <p className="font-pixel text-sm text-pixel-success uppercase mb-2">
             Congratulations!

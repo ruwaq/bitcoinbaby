@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { pixelBorders } from "@bitcoinbaby/ui";
 
 // Import sprites directly since we're in the web app
 // In production, these would come from @bitcoinbaby/ui
@@ -375,7 +376,9 @@ export default function CharactersPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {/* Egg */}
-            <div className="bg-pixel-bg-medium border-4 border-pixel-border p-6 text-center">
+            <div
+              className={`bg-pixel-bg-medium ${pixelBorders.medium} p-6 text-center`}
+            >
               <div className="flex justify-center mb-4">
                 <CodeEgg size={96} state={eggState} />
               </div>
@@ -399,7 +402,9 @@ export default function CharactersPage() {
             </div>
 
             {/* Baby */}
-            <div className="bg-pixel-bg-medium border-4 border-pixel-border p-6 text-center">
+            <div
+              className={`bg-pixel-bg-medium ${pixelBorders.medium} p-6 text-center`}
+            >
               <div className="flex justify-center mb-4">
                 <BabySprite size={96} state={babyState} />
               </div>
@@ -423,7 +428,9 @@ export default function CharactersPage() {
             </div>
 
             {/* Teen */}
-            <div className="bg-pixel-bg-medium border-4 border-pixel-border p-6 text-center">
+            <div
+              className={`bg-pixel-bg-medium ${pixelBorders.medium} p-6 text-center`}
+            >
               <div className="flex justify-center mb-4">
                 <TeenSprite size={96} state={teenState} />
               </div>
@@ -473,7 +480,7 @@ export default function CharactersPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Oracle */}
-            <div className="bg-pixel-bg-medium border-4 border-pixel-border p-6">
+            <div className={`bg-pixel-bg-medium ${pixelBorders.medium} p-6`}>
               <div className="flex items-center gap-6">
                 <Oracle size={128} state={oracleState} />
                 <div>
@@ -500,7 +507,7 @@ export default function CharactersPage() {
             </div>
 
             {/* SatoBots */}
-            <div className="bg-pixel-bg-medium border-4 border-pixel-border p-6">
+            <div className={`bg-pixel-bg-medium ${pixelBorders.medium} p-6`}>
               <div className="flex items-center gap-6">
                 <SatoBots count={3} size={48} />
                 <div>

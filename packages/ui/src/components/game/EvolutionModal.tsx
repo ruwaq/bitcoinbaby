@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * EvolutionModal - Evolution Animation
  *

@@ -16,8 +16,9 @@ import {
   LeaderboardWidget,
   HelpTooltip,
   Button,
+  pixelCard,
+  pixelBorders,
 } from "@bitcoinbaby/ui";
-import { pixelCard } from "@bitcoinbaby/ui";
 import type { UseAchievementsReturn } from "@bitcoinbaby/core";
 
 // Tips data
@@ -113,7 +114,7 @@ export function BabySidebar({
       </div>
 
       {/* Achievement Progress */}
-      <div className="bg-pixel-bg-light border-4 border-pixel-border p-4">
+      <div className={`bg-pixel-bg-light ${pixelBorders.medium} p-4`}>
         <div className="flex items-center gap-2 mb-2">
           <h3 className="font-pixel text-xs text-pixel-primary">
             ACHIEVEMENTS

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
 
 export default function Error({
   error,
@@ -19,7 +20,9 @@ export default function Error({
     <main className="min-h-screen p-4 md:p-8 bg-pixel-bg-dark flex items-center justify-center">
       <div className="max-w-md w-full">
         {/* Error Card */}
-        <div className="bg-pixel-bg-medium border-4 border-pixel-border p-8 shadow-[8px_8px_0_0_#000] text-center">
+        <div
+          className={`bg-pixel-bg-medium ${pixelBorders.medium} p-8 ${pixelShadows.lg} text-center`}
+        >
           {/* Error Icon - Pixel Art Style */}
           <div className="mb-6">
             <svg
@@ -75,13 +78,13 @@ export default function Error({
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
               onClick={reset}
-              className="px-6 py-3 font-pixel text-[10px] bg-pixel-primary text-black border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none"
+              className={`px-6 py-3 font-pixel text-[10px] bg-pixel-primary text-black ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none`}
             >
               TRY AGAIN
             </button>
             <Link
               href="/"
-              className="px-6 py-3 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none text-center"
+              className={`px-6 py-3 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none text-center`}
             >
               GO HOME
             </Link>

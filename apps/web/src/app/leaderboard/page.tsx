@@ -10,6 +10,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { clsx } from "clsx";
+import { pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
 import {
   LeaderboardTable,
   LeaderboardPagination,
@@ -244,7 +245,9 @@ export default function LeaderboardPage() {
       {/* No Wallet Message */}
       {!wallet.wallet && (
         <div className="max-w-4xl mx-auto mb-6">
-          <div className="bg-pixel-bg-medium border-4 border-pixel-border p-4 shadow-[4px_4px_0_0_#000]">
+          <div
+            className={`bg-pixel-bg-medium ${pixelBorders.medium} p-4 ${pixelShadows.md}`}
+          >
             <p className="font-pixel text-xs text-pixel-text-muted text-center">
               Connect your wallet to see your rank and compete!
             </p>
@@ -302,7 +305,9 @@ export default function LeaderboardPage() {
 
       {/* Legend */}
       <div className="max-w-4xl mx-auto">
-        <div className="bg-pixel-bg-dark border-4 border-pixel-border p-4 shadow-[4px_4px_0_0_#000]">
+        <div
+          className={`bg-pixel-bg-dark ${pixelBorders.medium} p-4 ${pixelShadows.md}`}
+        >
           <h3 className="font-pixel text-xs text-pixel-text-muted mb-3">
             RANK BADGES
           </h3>

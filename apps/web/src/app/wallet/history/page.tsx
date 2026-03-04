@@ -18,6 +18,8 @@ import { useWallet, useTransactionHistory } from "@/hooks";
 import {
   TransactionList,
   NetworkBadge,
+  pixelShadows,
+  pixelBorders,
   type TransactionDisplay,
 } from "@bitcoinbaby/ui";
 import { useNetworkStore } from "@bitcoinbaby/core";
@@ -178,7 +180,7 @@ export default function TransactionHistoryPage() {
             </p>
             <Link
               href="/wallet"
-              className="inline-block px-6 py-3 font-pixel text-sm bg-pixel-primary text-black border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all"
+              className={`inline-block px-6 py-3 font-pixel text-sm bg-pixel-primary text-black ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all`}
             >
               GO TO WALLET
             </Link>
@@ -205,7 +207,7 @@ export default function TransactionHistoryPage() {
             </p>
             <Link
               href="/wallet"
-              className="inline-block px-6 py-3 font-pixel text-sm bg-pixel-success text-black border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all"
+              className={`inline-block px-6 py-3 font-pixel text-sm bg-pixel-success text-black ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all`}
             >
               UNLOCK WALLET
             </Link>

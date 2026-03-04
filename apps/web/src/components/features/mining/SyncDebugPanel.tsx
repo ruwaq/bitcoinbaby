@@ -32,10 +32,14 @@ export function SyncDebugPanel({
 }: SyncDebugPanelProps) {
   const [syncState, setSyncState] = useState<SyncState | null>(null);
   const [forceSyncTriggered, setForceSyncTriggered] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
 
-  // Update sync state periodically
+  // Update sync state and current time periodically
   useEffect(() => {
-    const update = () => setSyncState(getSyncState());
+    const update = () => {
+      setSyncState(getSyncState());
+      setNow(Date.now());
+    };
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
@@ -83,8 +87,7 @@ export function SyncDebugPanel({
       </div>
       {syncState.circuitBreakerActive && (
         <div className="text-yellow-400">
-          Resets in:{" "}
-          {Math.ceil((syncState.circuitBreakerUntil - Date.now()) / 1000)}s
+          Resets in: {Math.ceil((syncState.circuitBreakerUntil - now) / 1000)}s
         </div>
       )}
       <div className="flex justify-between">

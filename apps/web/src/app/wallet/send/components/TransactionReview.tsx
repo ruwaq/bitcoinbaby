@@ -12,6 +12,7 @@
 import { useState } from "react";
 import type { FeeLevel } from "./FeeSelector";
 import type { BitcoinNetwork } from "@bitcoinbaby/bitcoin";
+import { pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
 
 interface TransactionReviewProps {
   recipient: string;
@@ -78,7 +79,7 @@ export function TransactionReview({
       </div>
 
       {/* Transaction details */}
-      <div className="bg-pixel-bg-dark border-4 border-pixel-border p-4 space-y-4">
+      <div className={`bg-pixel-bg-dark ${pixelBorders.medium} p-4 space-y-4`}>
         {/* From */}
         <div>
           <label className="font-pixel text-[8px] text-pixel-text-muted block mb-1">
@@ -106,7 +107,7 @@ export function TransactionReview({
       </div>
 
       {/* Amount breakdown */}
-      <div className="bg-pixel-bg-light border-4 border-pixel-border p-4 space-y-3">
+      <div className={`bg-pixel-bg-light ${pixelBorders.medium} p-4 space-y-3`}>
         {/* Amount */}
         <div className="flex items-center justify-between">
           <span className="font-pixel text-[10px] text-pixel-text-muted">
@@ -238,7 +239,7 @@ export function TransactionReview({
           type="button"
           onClick={onBack}
           disabled={isLoading}
-          className="flex-1 py-4 font-pixel text-sm text-pixel-text bg-pixel-bg-light border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all disabled:opacity-50"
+          className={`flex-1 py-4 font-pixel text-sm text-pixel-text bg-pixel-bg-light ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all disabled:opacity-50`}
         >
           BACK
         </button>
@@ -247,7 +248,7 @@ export function TransactionReview({
           type="button"
           onClick={onConfirm}
           disabled={isLoading}
-          className="flex-1 py-4 font-pixel text-sm text-black bg-pixel-success border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all disabled:opacity-50"
+          className={`flex-1 py-4 font-pixel text-sm text-black bg-pixel-success ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all disabled:opacity-50`}
         >
           {isLoading ? "SIGNING..." : "CONFIRM & SEND"}
         </button>

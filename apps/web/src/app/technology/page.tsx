@@ -13,6 +13,7 @@
 
 import Link from "next/link";
 import { clsx } from "clsx";
+import { pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
 
 interface TechCard {
   id: string;
@@ -158,7 +159,7 @@ function TechCardComponent({ card }: { card: TechCard }) {
     <div
       className={clsx(
         "p-6 border-4",
-        "bg-pixel-bg-medium shadow-[8px_8px_0_0_#000]",
+        `bg-pixel-bg-medium ${pixelShadows.lg}`,
         card.highlight ? "border-pixel-primary" : "border-pixel-border",
       )}
     >
@@ -236,7 +237,9 @@ export default function TechnologyPage() {
         </header>
 
         {/* AI Hero Banner */}
-        <div className="mb-8 p-8 bg-gradient-to-r from-purple-900/30 to-blue-900/30 border-4 border-purple-500 shadow-[8px_8px_0_0_#000]">
+        <div
+          className={`mb-8 p-8 bg-gradient-to-r from-purple-900/30 to-blue-900/30 border-4 border-purple-500 ${pixelShadows.lg}`}
+        >
           <div className="text-center">
             <div className="text-5xl mb-4">🧠</div>
             <h2 className="font-pixel text-lg text-purple-400 mb-4">
@@ -271,7 +274,9 @@ export default function TechnologyPage() {
         </div>
 
         {/* Bitcoin Native Banner */}
-        <div className="mb-12 p-8 bg-gradient-to-r from-pixel-primary/20 to-pixel-secondary/20 border-4 border-pixel-primary shadow-[8px_8px_0_0_#000]">
+        <div
+          className={`mb-12 p-8 bg-gradient-to-r from-pixel-primary/20 to-pixel-secondary/20 ${pixelBorders.accent} ${pixelShadows.lg}`}
+        >
           <div className="text-center">
             <h2 className="font-pixel text-lg text-pixel-primary mb-4">
               100% NATIVO EN BITCOIN
@@ -286,7 +291,7 @@ export default function TechnologyPage() {
                 href="https://explorer.charms.dev"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-6 py-3 bg-pixel-primary text-pixel-text-dark font-pixel text-xs border-2 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all"
+                className={`px-6 py-3 bg-pixel-primary text-pixel-text-dark font-pixel text-xs border-2 border-black ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all`}
               >
                 VER EN CHARMS EXPLORER
               </a>
@@ -294,7 +299,7 @@ export default function TechnologyPage() {
                 href="https://ordinals.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-6 py-3 bg-pixel-bg-medium text-pixel-text font-pixel text-xs border-2 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all"
+                className={`px-6 py-3 bg-pixel-bg-medium text-pixel-text font-pixel text-xs border-2 border-black ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all`}
               >
                 VER EN ORDINALS
               </a>
@@ -307,7 +312,9 @@ export default function TechnologyPage() {
           <h2 className="font-pixel text-sm text-pixel-secondary mb-6">
             ARQUITECTURA DE CAPAS
           </h2>
-          <div className="bg-pixel-bg-medium border-4 border-pixel-border p-6 shadow-[8px_8px_0_0_#000]">
+          <div
+            className={`bg-pixel-bg-medium ${pixelBorders.medium} p-6 ${pixelShadows.lg}`}
+          >
             <div className="space-y-3">
               {ARCHITECTURE_LAYERS.map((layer, i) => (
                 <div
@@ -362,7 +369,9 @@ export default function TechnologyPage() {
           </h2>
           <div className="grid md:grid-cols-2 gap-6">
             {/* Dual Layer NFTs */}
-            <div className="p-6 bg-pixel-bg-medium border-4 border-pixel-secondary shadow-[8px_8px_0_0_#000]">
+            <div
+              className={`p-6 bg-pixel-bg-medium ${pixelBorders.medium} ${pixelShadows.lg}`}
+            >
               <h3 className="font-pixel text-sm text-pixel-secondary mb-4">
                 NFTs DUAL-LAYER
               </h3>
@@ -410,7 +419,9 @@ export default function TechnologyPage() {
             </div>
 
             {/* Mining Flow */}
-            <div className="p-6 bg-pixel-bg-medium border-4 border-pixel-primary shadow-[8px_8px_0_0_#000]">
+            <div
+              className={`p-6 bg-pixel-bg-medium ${pixelBorders.accent} ${pixelShadows.lg}`}
+            >
               <h3 className="font-pixel text-sm text-pixel-primary mb-4">
                 FLUJO DE MINERIA V10
               </h3>
@@ -483,7 +494,7 @@ export default function TechnologyPage() {
               href={link.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-3 p-4 bg-pixel-bg-medium border-4 border-pixel-border shadow-[4px_4px_0_0_#000] hover:border-pixel-primary hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all"
+              className={`flex items-center gap-3 p-4 bg-pixel-bg-medium ${pixelBorders.medium} ${pixelShadows.md} hover:border-pixel-primary hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all`}
             >
               <span className="text-2xl">{link.icon}</span>
               <span className="font-pixel text-[10px] text-pixel-text">

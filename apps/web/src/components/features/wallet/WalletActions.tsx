@@ -9,7 +9,7 @@
  * - Get testnet BTC link
  */
 
-import { Button } from "@bitcoinbaby/ui";
+import { Button, pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
 
 interface WalletActionsProps {
   onSend: () => void;
@@ -49,7 +49,7 @@ export function WalletActions({
           href="https://mempool.space/testnet4/faucet"
           target="_blank"
           rel="noopener noreferrer"
-          className="block w-full py-3 min-h-[44px] font-pixel text-pixel-xs text-center bg-pixel-secondary text-black border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all active:scale-95"
+          className={`block w-full py-3 min-h-[44px] font-pixel text-pixel-xs text-center bg-pixel-secondary text-black ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all active:scale-95`}
         >
           GET TESTNET BTC
         </a>

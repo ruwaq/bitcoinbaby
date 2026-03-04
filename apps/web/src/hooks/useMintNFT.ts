@@ -188,7 +188,14 @@ export function useMintNFT(): UseMintNFTReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [wallet, signPsbt, mintService, mempoolClient]);
+  }, [
+    wallet,
+    signPsbt,
+    mintService,
+    mempoolClient,
+    addTransaction,
+    startTracking,
+  ]);
 
   /**
    * Reset state

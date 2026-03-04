@@ -22,3 +22,5 @@ export {
   useWalletDashboard,
   type UseWalletDashboardReturn,
 } from "./useWalletDashboard";
+
+export { useNFTs, type UseNFTsReturn } from "./useNFTs";

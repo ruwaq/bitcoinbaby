@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMiningWithNFTs, useVirtualBalance } from "@/hooks";
 import { useMiningShareSubmission } from "@/hooks/useMiningShareSubmission";
 import {

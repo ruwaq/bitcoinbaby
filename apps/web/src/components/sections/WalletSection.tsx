@@ -9,15 +9,12 @@
  * - Balance display
  * - Send/receive
  * - Network switching
+ *
+ * Uses consolidated useWalletDashboard hook for all state management.
  */
 
 import { useCallback } from "react";
-import {
-  useWallet,
-  useBalance,
-  useTokenBalance,
-  useVirtualBalance,
-} from "@/hooks";
+import { useWalletDashboard } from "@/hooks/features";
 import {
   NetworkSwitcher,
   NetworkBadge,
@@ -30,19 +27,8 @@ import {
 } from "@bitcoinbaby/ui";
 import { pixelCard } from "@bitcoinbaby/ui";
 import {
-  useNetworkStore,
-  useTokenBalance as useCharmsTokenBalance,
-  useMiningBoost,
-  useSendOverlay,
-  useWithdrawOverlay,
-  useHistoryOverlay,
-  useUnlockModal,
-  useDeleteWalletModal,
-} from "@bitcoinbaby/core";
-import {
   generateMnemonicFromEntropy,
   validateMnemonic,
-  getDeploymentConfig,
 } from "@bitcoinbaby/bitcoin";
 import {
   LockedWallet,
@@ -51,78 +37,9 @@ import {
   WalletActions,
 } from "@/components/features/wallet";
 
-// Real App IDs from deployment
-const { appId: BABTC_APP_ID } = getDeploymentConfig("testnet4");
-const NFT_APP_ID = "genesis_babies_testnet4";
-
 export function WalletSection() {
-  const { network, switchNetwork, mainnetAllowed, setMainnetAllowed, config } =
-    useNetworkStore();
-
-  // Overlay hooks for opening sheets
-  const { open: openSend } = useSendOverlay();
-  const { open: openWithdraw } = useWithdrawOverlay();
-  const { open: openHistory } = useHistoryOverlay();
-
-  // Modal hooks for centralized dialogs
-  const { open: openUnlockModal } = useUnlockModal();
-  const { open: openDeleteModal } = useDeleteWalletModal();
-
-  const {
-    wallet,
-    isLocked,
-    hasStoredWallet,
-    isLoading: walletLoading,
-    error: walletError,
-    createWallet,
-    importWallet,
-    unlock,
-    lock,
-    deleteWallet,
-  } = useWallet();
-
-  const {
-    btcBalance,
-    balance: addressBalance,
-    isLoading: balanceLoading,
-    refresh: refreshBalance,
-    lastUpdated,
-  } = useBalance({
-    address: wallet?.address,
-    network,
-    autoRefresh: !isLocked,
-    refreshInterval: 30000,
-  });
-
-  // Use token balance hook to keep connection alive
-  useTokenBalance({ address: wallet?.address });
-
-  // Virtual balance from Workers API
-  const {
-    virtualBalance,
-    totalMined,
-    isLoading: virtualBalanceLoading,
-  } = useVirtualBalance({
-    address: wallet?.address,
-  });
-
-  const {
-    formatted: babtcFormatted,
-    loading: babtcLoading,
-    error: babtcError,
-  } = useCharmsTokenBalance(wallet?.address ?? null, BABTC_APP_ID, {
-    autoRefresh: !isLocked,
-    refreshInterval: 60000,
-  });
-
-  const {
-    boost: miningBoost,
-    nftCount,
-    loading: boostLoading,
-  } = useMiningBoost(wallet?.address ?? null, NFT_APP_ID, {
-    autoRefresh: !isLocked,
-    refreshInterval: 120000,
-  });
+  // Single composite hook replaces 10+ individual hooks
+  const { wallet, balances, network, actions, overlays } = useWalletDashboard();
 
   const handleGenerateMnemonic = useCallback((entropy: Uint8Array): string => {
     const entropySlice = entropy.slice(0, 16);
@@ -131,29 +48,17 @@ export function WalletSection() {
 
   const handleWalletCreated = useCallback(
     async (mnemonic: string, password: string) => {
-      await createWallet(password, 12, mnemonic);
+      await actions.createWallet(password, 12, mnemonic);
     },
-    [createWallet],
+    [actions],
   );
 
   const handleWalletImported = useCallback(
     async (mnemonic: string, password: string) => {
-      await importWallet(mnemonic, password);
+      await actions.importWallet(mnemonic, password);
     },
-    [importWallet],
+    [actions],
   );
-
-  const handleOpenUnlock = useCallback(() => {
-    openUnlockModal(async (password: string) => {
-      await unlock(password);
-    });
-  }, [openUnlockModal, unlock]);
-
-  const handleDelete = useCallback(() => {
-    openDeleteModal(async () => {
-      await deleteWallet();
-    });
-  }, [openDeleteModal, deleteWallet]);
 
   return (
     <div className="p-responsive safe-x bg-pixel-bg-dark min-h-screen-safe">
@@ -161,7 +66,7 @@ export function WalletSection() {
         {/* Section Header */}
         <SectionHeader
           title="Wallet"
-          description={`Bitcoin ${network === "mainnet" ? "Mainnet" : "Testnet4"} - Taproot (P2TR/BIP86)`}
+          description={`Bitcoin ${network.current === "mainnet" ? "Mainnet" : "Testnet4"} - Taproot (P2TR/BIP86)`}
           icon="&#128176;"
           size="lg"
           helpTooltip={
@@ -174,16 +79,16 @@ export function WalletSection() {
           }
           action={
             <NetworkSwitcher
-              network={network}
-              mainnetAllowed={mainnetAllowed}
-              onNetworkChange={switchNetwork}
-              onEnableMainnet={() => setMainnetAllowed(true)}
+              network={network.current}
+              mainnetAllowed={network.mainnetAllowed}
+              onNetworkChange={network.switch}
+              onEnableMainnet={network.enableMainnet}
             />
           }
         />
 
         {/* No wallet - Show onboarding */}
-        {!hasStoredWallet && (
+        {!wallet.hasStoredWallet && (
           <WalletOnboarding
             onWalletCreated={handleWalletCreated}
             onWalletImported={handleWalletImported}
@@ -193,16 +98,16 @@ export function WalletSection() {
         )}
 
         {/* Wallet exists but locked */}
-        {hasStoredWallet && isLocked && (
+        {wallet.hasStoredWallet && wallet.isLocked && (
           <LockedWallet
-            isLoading={walletLoading}
-            onUnlock={handleOpenUnlock}
-            onDelete={handleDelete}
+            isLoading={wallet.isLoading}
+            onUnlock={overlays.openUnlock}
+            onDelete={overlays.openDelete}
           />
         )}
 
         {/* Wallet unlocked - Show dashboard */}
-        {hasStoredWallet && !isLocked && wallet && (
+        {wallet.hasStoredWallet && !wallet.isLocked && wallet.address && (
           <div className={`${pixelCard.primary} p-6`}>
             <div className="space-y-6">
               {/* Address Section */}
@@ -212,7 +117,7 @@ export function WalletSection() {
                     YOUR ADDRESS
                   </label>
                   <div className="flex items-center gap-2">
-                    <NetworkBadge network={network} />
+                    <NetworkBadge network={network.current} />
                     <span className="px-2 py-1 font-pixel text-pixel-2xs bg-pixel-bg-light text-pixel-text-muted border border-pixel-border">
                       TAPROOT
                     </span>
@@ -231,44 +136,44 @@ export function WalletSection() {
 
               {/* Balances */}
               <BalancesGrid
-                btcBalance={btcBalance}
-                btcUnconfirmed={addressBalance?.unconfirmed}
-                btcLoading={balanceLoading}
-                onRefreshBtc={refreshBalance}
-                virtualBalance={virtualBalance}
-                totalMined={totalMined}
-                virtualLoading={virtualBalanceLoading}
-                babtcFormatted={babtcFormatted}
-                babtcLoading={babtcLoading}
-                babtcError={babtcError}
-                miningBoost={miningBoost}
-                nftCount={nftCount}
-                boostLoading={boostLoading}
+                btcBalance={balances.btc.confirmed}
+                btcUnconfirmed={balances.btc.unconfirmed}
+                btcLoading={balances.btc.loading}
+                onRefreshBtc={actions.refreshBalances}
+                virtualBalance={balances.virtual.balance}
+                totalMined={balances.virtual.totalMined}
+                virtualLoading={balances.virtual.loading}
+                babtcFormatted={balances.babtc.formatted}
+                babtcLoading={balances.babtc.loading}
+                babtcError={balances.babtc.error}
+                miningBoost={balances.nftBoost.boost}
+                nftCount={balances.nftBoost.nftCount}
+                boostLoading={balances.nftBoost.loading}
               />
 
-              {lastUpdated && (
+              {balances.btc.lastUpdated && (
                 <p className="font-pixel text-pixel-2xs text-pixel-text-muted text-center">
-                  Last updated: {new Date(lastUpdated).toLocaleTimeString()}
+                  Last updated: {balances.btc.lastUpdated.toLocaleTimeString()}
                 </p>
               )}
 
               {/* Actions */}
               <WalletActions
-                onSend={() => openSend()}
-                onWithdraw={openWithdraw}
-                onHistory={openHistory}
-                onLock={lock}
-                onDelete={handleDelete}
-                showTestnetFaucet={network === "testnet4"}
+                onSend={() => overlays.openSend()}
+                onWithdraw={overlays.openWithdraw}
+                onHistory={overlays.openHistory}
+                onLock={actions.lock}
+                onDelete={overlays.openDelete}
+                showTestnetFaucet={network.current === "testnet4"}
               />
             </div>
           </div>
         )}
 
         {/* Error display */}
-        {walletError && (
+        {wallet.error && (
           <InfoBanner variant="error" icon="&#9888;" className="mt-4">
-            {walletError}
+            {wallet.error}
           </InfoBanner>
         )}
 
@@ -276,10 +181,10 @@ export function WalletSection() {
         <SecurityInfo />
 
         {/* Explorer link */}
-        {wallet && (
+        {wallet.address && (
           <div className="mt-4 text-center">
             <a
-              href={`${config.explorerUrl}/address/${wallet.address}`}
+              href={`${network.explorerUrl}/address/${wallet.address}`}
               target="_blank"
               rel="noopener noreferrer"
               className="font-pixel text-pixel-xs text-pixel-secondary hover:text-pixel-primary underline py-2 inline-block"

@@ -1,11 +1,14 @@
 import Link from "next/link";
+import { pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
 
 export default function NotFound() {
   return (
     <main className="min-h-screen p-4 md:p-8 bg-pixel-bg-dark flex items-center justify-center">
       <div className="max-w-md w-full">
         {/* 404 Card */}
-        <div className="bg-pixel-bg-medium border-4 border-pixel-border p-8 shadow-[8px_8px_0_0_#000] text-center">
+        <div
+          className={`bg-pixel-bg-medium ${pixelBorders.medium} p-8 ${pixelShadows.lg} text-center`}
+        >
           {/* Lost Baby Icon - Pixel Art Style */}
           <div className="mb-6">
             <svg
@@ -51,7 +54,7 @@ export default function NotFound() {
           {/* Action Button */}
           <Link
             href="/"
-            className="inline-block px-6 py-3 font-pixel text-[10px] bg-pixel-primary text-black border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none"
+            className={`inline-block px-6 py-3 font-pixel text-[10px] bg-pixel-primary text-black ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none`}
           >
             GO HOME
           </Link>

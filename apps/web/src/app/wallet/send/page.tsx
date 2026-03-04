@@ -22,6 +22,7 @@ import {
   type TxUTXO,
 } from "@bitcoinbaby/bitcoin";
 
+import { pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
 import {
   AddressInput,
   AmountInput,
@@ -56,7 +57,6 @@ export default function SendPage() {
   const { network, config } = useNetworkStore();
   const {
     address,
-    publicKey,
     isLocked,
     isLoading: walletLoading,
     withPrivateKey,
@@ -333,7 +333,7 @@ export default function SendPage() {
           </p>
           <a
             href="/wallet"
-            className="inline-block px-8 py-4 font-pixel text-sm border-4 border-black shadow-[4px_4px_0_0_#000] bg-pixel-primary text-black hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all"
+            className={`inline-block px-8 py-4 font-pixel text-sm ${pixelBorders.thick} ${pixelShadows.md} bg-pixel-primary text-black hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all`}
           >
             GO TO WALLET
           </a>
@@ -357,7 +357,7 @@ export default function SendPage() {
           </p>
           <a
             href="/wallet"
-            className="inline-block px-8 py-4 font-pixel text-sm border-4 border-black shadow-[4px_4px_0_0_#000] bg-pixel-success text-black hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all"
+            className={`inline-block px-8 py-4 font-pixel text-sm ${pixelBorders.thick} ${pixelShadows.md} bg-pixel-success text-black hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all`}
           >
             UNLOCK WALLET
           </a>
@@ -399,7 +399,9 @@ export default function SendPage() {
 
         {/* Input Step */}
         {step === "input" && !walletLoading && !balanceLoading && (
-          <div className="bg-pixel-bg-medium border-4 border-pixel-border p-4 sm:p-6 shadow-[4px_4px_0_0_#000] sm:shadow-[8px_8px_0_0_#000] space-y-4 sm:space-y-6">
+          <div
+            className={`bg-pixel-bg-medium ${pixelBorders.medium} p-4 sm:p-6 ${pixelShadows.md} sm:${pixelShadows.lg} space-y-4 sm:space-y-6`}
+          >
             {/* Balance display */}
             <div className="bg-pixel-bg-dark p-4 border-2 border-pixel-border">
               <div className="flex items-center justify-between mb-1">
@@ -454,7 +456,7 @@ export default function SendPage() {
               type="button"
               onClick={handleReview}
               disabled={!isFormValid || isProcessing}
-              className="w-full py-4 font-pixel text-sm text-black bg-pixel-primary border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`w-full py-4 font-pixel text-sm text-black bg-pixel-primary ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               REVIEW TRANSACTION
             </button>
@@ -477,7 +479,9 @@ export default function SendPage() {
 
         {/* Review Step */}
         {step === "review" && address && (
-          <div className="bg-pixel-bg-medium border-4 border-pixel-border p-4 sm:p-6 shadow-[4px_4px_0_0_#000] sm:shadow-[8px_8px_0_0_#000]">
+          <div
+            className={`bg-pixel-bg-medium ${pixelBorders.medium} p-4 sm:p-6 ${pixelShadows.md} sm:${pixelShadows.lg}`}
+          >
             <TransactionReview
               recipient={sendState.recipient}
               amountSatoshis={sendState.amountSatoshis}
@@ -495,7 +499,9 @@ export default function SendPage() {
 
         {/* Result Step */}
         {step === "result" && txResult && (
-          <div className="bg-pixel-bg-medium border-4 border-pixel-border p-4 sm:p-6 shadow-[4px_4px_0_0_#000] sm:shadow-[8px_8px_0_0_#000]">
+          <div
+            className={`bg-pixel-bg-medium ${pixelBorders.medium} p-4 sm:p-6 ${pixelShadows.md} sm:${pixelShadows.lg}`}
+          >
             <SendConfirmation
               status={txResult.success ? "success" : "error"}
               txid={txResult.txid}

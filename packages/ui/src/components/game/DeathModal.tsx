@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * DeathModal - Baby Death / Revival Screen
  *

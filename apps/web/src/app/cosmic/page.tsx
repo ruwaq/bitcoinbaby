@@ -19,6 +19,8 @@ import {
   CosmicStatusBar,
   BabyEnergyIndicator,
   CosmicIndicator,
+  pixelShadows,
+  pixelBorders,
 } from "@bitcoinbaby/ui";
 
 // Default baby data for users without NFTs
@@ -57,15 +59,14 @@ export default function CosmicPage() {
   // Track current time for event countdown (updates every second)
   const [now, setNow] = useState(() => Date.now());
   const { ownedNFTs } = useNFTStore();
-  // Baby selector state - defaults to first NFT
-  const [selectedBabyIndex, setSelectedBabyIndex] = useState(0);
+  // Baby selector state - defaults to first NFT, auto-reset if out of bounds
+  const [selectedBabyIndex, setSelectedBabyIndex] = useState(() => 0);
 
-  // Reset index if it's out of bounds (e.g., NFT was transferred)
-  useEffect(() => {
-    if (selectedBabyIndex >= ownedNFTs.length && ownedNFTs.length > 0) {
-      setSelectedBabyIndex(0);
-    }
-  }, [ownedNFTs.length, selectedBabyIndex]);
+  // Compute safe index (reset to 0 if out of bounds)
+  const safeSelectedIndex =
+    ownedNFTs.length > 0 && selectedBabyIndex < ownedNFTs.length
+      ? selectedBabyIndex
+      : 0;
 
   // Get cosmic state
   const {
@@ -89,8 +90,8 @@ export default function CosmicPage() {
 
   // Get selected baby from NFTs or use default (new user)
   const selectedBaby = useMemo(() => {
-    if (ownedNFTs.length > 0 && ownedNFTs[selectedBabyIndex]) {
-      const nft = ownedNFTs[selectedBabyIndex];
+    if (ownedNFTs.length > 0 && ownedNFTs[safeSelectedIndex]) {
+      const nft = ownedNFTs[safeSelectedIndex];
       return {
         baseType: (nft.baseType || "human") as typeof DEFAULT_BABY.baseType,
         bloodline: (nft.bloodline || "royal") as typeof DEFAULT_BABY.bloodline,
@@ -102,7 +103,7 @@ export default function CosmicPage() {
       };
     }
     return DEFAULT_BABY;
-  }, [ownedNFTs]);
+  }, [ownedNFTs, safeSelectedIndex]);
 
   // Get mining cosmic integration
   const {
@@ -209,7 +210,9 @@ export default function CosmicPage() {
         </div>
 
         {/* Mining Impact Panel */}
-        <div className="bg-pixel-bg-medium border-4 border-pixel-border p-6 mb-6 shadow-[8px_8px_0_0_#000]">
+        <div
+          className={`bg-pixel-bg-medium ${pixelBorders.medium} p-6 mb-6 ${pixelShadows.lg}`}
+        >
           <h2 className="font-pixel text-[10px] text-pixel-secondary uppercase mb-4">
             Mining Impact
           </h2>
@@ -334,7 +337,7 @@ export default function CosmicPage() {
 
         {/* Upcoming Events */}
         {upcomingEvents.length > 0 && (
-          <div className="bg-pixel-bg-medium border-4 border-pixel-border p-6 mb-6">
+          <div className={`bg-pixel-bg-medium ${pixelBorders.medium} p-6 mb-6`}>
             <h2 className="font-pixel text-[10px] text-pixel-secondary uppercase mb-4">
               Upcoming Cosmic Events
             </h2>
@@ -373,7 +376,7 @@ export default function CosmicPage() {
         )}
 
         {/* How Cosmic Energy Works */}
-        <div className="bg-pixel-bg-medium border-4 border-pixel-border p-6">
+        <div className={`bg-pixel-bg-medium ${pixelBorders.medium} p-6`}>
           <h2 className="font-pixel text-[10px] text-pixel-secondary uppercase mb-4">
             How Cosmic Energy Works
           </h2>

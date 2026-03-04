@@ -24,7 +24,6 @@ import {
 } from "@bitcoinbaby/bitcoin";
 import {
   useNetworkStore,
-  MIN_DIFFICULTY,
   calculateShareReward,
   type NetworkConfig,
 } from "@bitcoinbaby/core";

@@ -11,7 +11,11 @@
  */
 
 import { useState } from "react";
-import { AnimatedTokenCounter, HelpTooltip } from "@bitcoinbaby/ui";
+import {
+  AnimatedTokenCounter,
+  HelpTooltip,
+  pixelBorders,
+} from "@bitcoinbaby/ui";
 import { SyncDebugPanel } from "./SyncDebugPanel";
 
 interface BalancePanelProps {
@@ -98,7 +102,7 @@ export function BalancePanel({
       </div>
 
       {/* Total Mined */}
-      <div className="bg-pixel-bg-medium border-4 border-pixel-border p-3 sm:p-4">
+      <div className={`bg-pixel-bg-medium ${pixelBorders.medium} p-3 sm:p-4`}>
         <div className="flex items-center gap-1 mb-2">
           <span className="font-pixel text-pixel-2xs text-pixel-text-muted uppercase truncate">
             Total Mined
@@ -118,7 +122,7 @@ export function BalancePanel({
       </div>
 
       {/* Session Shares */}
-      <div className="bg-pixel-bg-medium border-4 border-pixel-border p-3 sm:p-4">
+      <div className={`bg-pixel-bg-medium ${pixelBorders.medium} p-3 sm:p-4`}>
         <div className="flex items-center gap-1 mb-2">
           <span className="font-pixel text-pixel-2xs text-pixel-text-muted uppercase truncate">
             Session Shares
@@ -153,7 +157,7 @@ export function BalancePanel({
       </div>
 
       {/* On-Chain Balance */}
-      <div className="bg-pixel-bg-medium border-4 border-pixel-border p-3 sm:p-4">
+      <div className={`bg-pixel-bg-medium ${pixelBorders.medium} p-3 sm:p-4`}>
         <div className="flex items-center gap-1 mb-2">
           <span className="font-pixel text-pixel-2xs text-pixel-text-muted uppercase truncate">
             On-Chain $BABY

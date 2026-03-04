@@ -9,7 +9,12 @@
  * - Buy functionality
  */
 
-import { InfoBanner, Button } from "@bitcoinbaby/ui";
+import {
+  InfoBanner,
+  Button,
+  pixelShadows,
+  pixelBorders,
+} from "@bitcoinbaby/ui";
 import type { NFTListingWithNFT } from "@bitcoinbaby/core";
 import { MarketplaceListing } from "./MarketplaceListing";
 
@@ -35,7 +40,9 @@ export function NFTMarketplaceView({
   return (
     <div className="max-w-4xl mx-auto">
       {/* Marketplace Header */}
-      <div className="bg-pixel-bg-medium border-4 border-pixel-warning p-4 mb-6 shadow-[4px_4px_0_0_#000]">
+      <div
+        className={`bg-pixel-bg-medium ${pixelBorders.warning} p-4 mb-6 ${pixelShadows.md}`}
+      >
         <h3 className="font-pixel text-[10px] text-pixel-warning uppercase mb-2">
           NFT Marketplace
         </h3>
@@ -61,7 +68,9 @@ export function NFTMarketplaceView({
           </p>
         </div>
       ) : listings.length === 0 ? (
-        <div className="bg-pixel-bg-medium border-4 border-pixel-border p-8 text-center">
+        <div
+          className={`bg-pixel-bg-medium ${pixelBorders.medium} p-8 text-center`}
+        >
           <div className="text-6xl mb-4">🏪</div>
           <h3 className="font-pixel text-sm text-pixel-text mb-2">
             No Listings Yet

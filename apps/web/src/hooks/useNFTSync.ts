@@ -115,8 +115,6 @@ async function fetchOwnedNFTs(address: string): Promise<BabyNFTState[]> {
 // =============================================================================
 
 export function useNFTSync(): UseNFTSyncReturn {
-  const queryClient = useQueryClient();
-
   // Stores
   const { setOwnedNFTs, ownedNFTs: localNFTs } = useNFTStore();
   const wallet = useWalletStore((s) => s.wallet);

@@ -17,11 +17,7 @@
 import { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Sheet, SheetContent, ModalDialog } from "@bitcoinbaby/ui";
-import {
-  useOverlayStore,
-  getOverlayMode,
-  type OverlayType,
-} from "@bitcoinbaby/core";
+import { useOverlayStore, type OverlayType } from "@bitcoinbaby/core";
 
 // Sheet imports
 import { WithdrawSheet } from "./WithdrawSheet";

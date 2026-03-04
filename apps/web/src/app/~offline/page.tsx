@@ -1,9 +1,13 @@
 "use client";
 
+import { pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
+
 export default function OfflinePage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-pixel-bg-dark p-4">
-      <div className="max-w-md text-center bg-pixel-bg-medium border-4 border-pixel-border p-8 shadow-[8px_8px_0_0_#000]">
+      <div
+        className={`max-w-md text-center bg-pixel-bg-medium ${pixelBorders.medium} p-8 ${pixelShadows.lg}`}
+      >
         {/* Pixel art style offline indicator */}
         <div className="mb-8 text-6xl">
           <span className="font-pixel text-pixel-secondary">{"[  ]"}</span>

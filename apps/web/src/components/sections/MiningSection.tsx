@@ -18,6 +18,7 @@ import {
   EngagementBonusPanel,
   SectionHeader,
   InfoBanner,
+  pixelBorders,
 } from "@bitcoinbaby/ui";
 import { useMining } from "@/hooks/features";
 import {
@@ -170,7 +171,7 @@ export function MiningSection() {
                   : `CPU (${capabilities?.cores || "?"} cores)`,
             }}
             variant="grid"
-            className="bg-pixel-bg-medium border-4 border-pixel-border p-4"
+            className={`bg-pixel-bg-medium ${pixelBorders.medium} p-4`}
           />
         </div>
 

@@ -9,8 +9,7 @@
  * - Delete/restore option
  */
 
-import { Button } from "@bitcoinbaby/ui";
-import { pixelCard } from "@bitcoinbaby/ui";
+import { Button, pixelCard, pixelBorders } from "@bitcoinbaby/ui";
 
 interface LockedWalletProps {
   isLoading: boolean;
@@ -26,7 +25,9 @@ export function LockedWallet({
   return (
     <div className={`${pixelCard.primary} p-6`}>
       <div className="text-center py-12">
-        <div className="w-20 h-20 mx-auto mb-6 flex items-center justify-center bg-pixel-error/20 border-4 border-pixel-error">
+        <div
+          className={`w-20 h-20 mx-auto mb-6 flex items-center justify-center bg-pixel-error/20 ${pixelBorders.error}`}
+        >
           <span className="font-pixel text-3xl text-pixel-error">🔒</span>
         </div>
         <h2 className="font-pixel text-lg text-pixel-text mb-2">

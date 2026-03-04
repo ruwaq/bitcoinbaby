@@ -6,7 +6,7 @@
  * Displays a single NFT listing with traits, price, and buy button.
  */
 
-import { Button } from "@bitcoinbaby/ui";
+import { Button, pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
 import type { NFTListingWithNFT } from "@bitcoinbaby/core";
 
 interface MarketplaceListingProps {
@@ -26,7 +26,9 @@ export function MarketplaceListing({
   const isWalletConnected = !!currentUserAddress;
 
   return (
-    <div className="bg-pixel-bg-medium border-4 border-pixel-border p-4 shadow-[4px_4px_0_0_#000]">
+    <div
+      className={`bg-pixel-bg-medium ${pixelBorders.medium} p-4 ${pixelShadows.md}`}
+    >
       {/* NFT Info */}
       <div className="flex items-center justify-between mb-3">
         <span className="font-pixel text-[9px] text-pixel-text">

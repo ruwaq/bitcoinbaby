@@ -6,7 +6,12 @@
  * For claiming legacy NFTs minted before indexing system.
  */
 
-import { InfoBanner, Button } from "@bitcoinbaby/ui";
+import {
+  InfoBanner,
+  Button,
+  pixelShadows,
+  pixelBorders,
+} from "@bitcoinbaby/ui";
 import type { NFTRecord } from "@bitcoinbaby/core";
 
 interface NFTClaimFlowProps {
@@ -36,7 +41,9 @@ export function NFTClaimFlow({
     <div className="max-w-2xl mx-auto">
       {/* Connection Required */}
       {!isWalletConnected && (
-        <div className="mb-6 p-4 bg-pixel-bg-medium border-4 border-pixel-warning text-center">
+        <div
+          className={`mb-6 p-4 bg-pixel-bg-medium ${pixelBorders.warning} text-center`}
+        >
           <p className="font-pixel text-[9px] text-pixel-warning uppercase mb-2">
             Wallet Required
           </p>
@@ -50,7 +57,9 @@ export function NFTClaimFlow({
       )}
 
       {/* Claim Instructions */}
-      <div className="bg-pixel-bg-medium border-4 border-pixel-secondary p-4 mb-6 shadow-[4px_4px_0_0_#000]">
+      <div
+        className={`bg-pixel-bg-medium border-4 border-pixel-secondary p-4 mb-6 ${pixelShadows.md}`}
+      >
         <h3 className="font-pixel text-[10px] text-pixel-secondary uppercase mb-3">
           Claim Existing NFT
         </h3>
@@ -74,7 +83,7 @@ export function NFTClaimFlow({
 
       {/* Claim Form */}
       {!lastClaimed ? (
-        <div className="bg-pixel-bg-medium border-4 border-pixel-border p-6">
+        <div className={`bg-pixel-bg-medium ${pixelBorders.medium} p-6`}>
           <label className="block font-pixel text-[8px] text-pixel-text-muted uppercase mb-2">
             Transaction ID (txid)
           </label>
@@ -83,7 +92,7 @@ export function NFTClaimFlow({
             value={claimTxid}
             onChange={(e) => onClaimTxidChange(e.target.value)}
             placeholder="Enter txid or mempool.space URL..."
-            className="w-full font-pixel-body text-sm bg-pixel-bg-dark text-pixel-text border-4 border-pixel-border p-3 mb-4 focus:border-pixel-secondary outline-none"
+            className={`w-full font-pixel-body text-sm bg-pixel-bg-dark text-pixel-text ${pixelBorders.medium} p-3 mb-4 focus:border-pixel-secondary outline-none`}
             disabled={isClaiming}
           />
 
@@ -105,7 +114,9 @@ export function NFTClaimFlow({
         </div>
       ) : (
         /* Claim Success */
-        <div className="bg-pixel-bg-medium border-4 border-pixel-success p-6 shadow-[8px_8px_0_0_#000]">
+        <div
+          className={`bg-pixel-bg-medium ${pixelBorders.success} p-6 ${pixelShadows.lg}`}
+        >
           <div className="text-center mb-4">
             <p className="font-pixel text-sm text-pixel-success uppercase mb-2">
               NFT Claimed Successfully!

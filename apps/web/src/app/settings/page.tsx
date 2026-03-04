@@ -9,17 +9,13 @@
  * - Display settings (theme, sound, notifications)
  * - Security settings (auto-lock, recovery phrase, password)
  * - About section (version, links)
- *
- * Uses centralized overlay store for modals.
  */
 
-import { useState, useCallback } from "react";
 import Link from "next/link";
 import {
   useSettingsStore,
   useNetworkStore,
   useWalletStore,
-  getApiClient,
   type MiningDifficulty,
   type MinerTypePreference,
   type AutoLockTimeout,
@@ -28,157 +24,15 @@ import {
   useRecoveryPhraseModal,
   useChangePasswordModal,
 } from "@bitcoinbaby/core";
-import { NetworkSwitcher, pixelCard, pixelShadows } from "@bitcoinbaby/ui";
-
-// Section component for consistent styling
-function SettingsSectionCard({
-  title,
-  children,
-  variant = "default",
-}: {
-  title: string;
-  children: React.ReactNode;
-  variant?: "default" | "danger";
-}) {
-  return (
-    <div
-      className={`${pixelCard.primary} p-6 ${variant === "danger" ? "border-pixel-error" : ""}`}
-    >
-      <h2
-        className={`font-pixel text-sm mb-6 pb-2 border-b-2 border-pixel-border ${variant === "danger" ? "text-pixel-error" : "text-pixel-primary"}`}
-      >
-        {title}
-      </h2>
-      <div className="space-y-4">{children}</div>
-    </div>
-  );
-}
-
-// Toggle switch component
-function Toggle({
-  label,
-  description,
-  checked,
-  onChange,
-  disabled = false,
-}: {
-  label: string;
-  description?: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <div>
-        <span className="font-pixel text-xs text-pixel-text">{label}</span>
-        {description && (
-          <p className="font-pixel-body text-[10px] text-pixel-text-muted mt-1">
-            {description}
-          </p>
-        )}
-      </div>
-      <button
-        onClick={() => onChange(!checked)}
-        disabled={disabled}
-        className={`
-          relative w-14 h-8 border-4 border-black transition-colors
-          ${checked ? "bg-pixel-success" : "bg-pixel-bg-light"}
-          ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-        `}
-      >
-        <div
-          className={`
-            absolute top-0 w-5 h-5 bg-pixel-text border-2 border-black
-            transition-transform duration-150
-            ${checked ? "translate-x-6" : "translate-x-0"}
-          `}
-        />
-      </button>
-    </div>
-  );
-}
-
-// Select component
-function Select<T extends string>({
-  label,
-  description,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  description?: string;
-  value: T;
-  options: { value: T; label: string }[];
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <div className="flex-1">
-        <span className="font-pixel text-xs text-pixel-text">{label}</span>
-        {description && (
-          <p className="font-pixel-body text-[10px] text-pixel-text-muted mt-1">
-            {description}
-          </p>
-        )}
-      </div>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-        className="px-3 py-2 font-pixel text-[10px] bg-pixel-bg-dark text-pixel-text border-4 border-black cursor-pointer appearance-none min-w-[120px]"
-      >
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-// Input component for text/url
-function TextInput({
-  label,
-  description,
-  value,
-  onChange,
-  placeholder,
-  disabled = false,
-}: {
-  label: string;
-  description?: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <div>
-      <label className="block font-pixel text-xs text-pixel-text mb-2">
-        {label}
-      </label>
-      {description && (
-        <p className="font-pixel-body text-[10px] text-pixel-text-muted mb-2">
-          {description}
-        </p>
-      )}
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-        className={`
-          w-full px-3 py-2 font-pixel text-xs bg-pixel-bg-dark text-pixel-text
-          border-4 border-black
-          ${disabled ? "opacity-50 cursor-not-allowed" : ""}
-        `}
-      />
-    </div>
-  );
-}
+import { NetworkSwitcher } from "@bitcoinbaby/ui";
+import {
+  SettingsCard,
+  Toggle,
+  Select,
+  TextInput,
+  ActionRow,
+  DangerZone,
+} from "./components";
 
 export default function SettingsPage() {
   // Settings store
@@ -211,73 +65,6 @@ export default function SettingsPage() {
   const { open: openRecoveryModal } = useRecoveryPhraseModal();
   const { open: openPasswordModal } = useChangePasswordModal();
 
-  // Local confirm states (inline confirmations, not modals)
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [showResetDataConfirm, setShowResetDataConfirm] = useState(false);
-
-  // Handle reset all settings
-  const handleResetAll = useCallback(() => {
-    resetAllSettings();
-    setShowResetConfirm(false);
-  }, [resetAllSettings]);
-
-  // Handle reset ALL data (full localStorage + IndexedDB + backend)
-  const handleResetAllData = useCallback(async () => {
-    // 1. Reset backend balance if wallet is connected
-    if (walletAddress) {
-      try {
-        const apiClient = getApiClient();
-        await apiClient.resetBalance(walletAddress);
-        console.log("[Settings] Backend balance reset successful");
-      } catch (err) {
-        console.warn("[Settings] Backend reset failed (continuing):", err);
-        // Continue with local reset even if backend fails
-      }
-    }
-
-    // 2. Clear all BitcoinBaby localStorage keys
-    const keysToRemove = [
-      "bitcoinbaby-nft-store",
-      "bitcoinbaby-mining-store",
-      "bitcoinbaby-baby-store",
-      "bitcoinbaby-wallet-store",
-      "bitcoinbaby-network",
-      "bitcoinbaby-settings",
-      "bitcoinbaby-leaderboard",
-      "bitcoinbaby-tutorial",
-      "bitcoinbaby-game",
-      "bitcoinbaby_game_state", // Game storage fallback
-    ];
-    keysToRemove.forEach((key) => localStorage.removeItem(key));
-
-    // 3. Clear ALL IndexedDB databases
-    const dbsToDelete = [
-      "bitcoinbaby", // Game storage
-      "bitcoinbaby-secure", // Wallet/keys storage
-      "bitcoinbaby-mining", // Mining persistence (hashes, sessions)
-      "BitcoinBabyShareQueue", // Mining share queue (Dexie)
-    ];
-    for (const dbName of dbsToDelete) {
-      try {
-        await new Promise<void>((resolve, reject) => {
-          const request = indexedDB.deleteDatabase(dbName);
-          request.onsuccess = () => resolve();
-          request.onerror = () => reject(request.error);
-          request.onblocked = () => {
-            console.warn(`IndexedDB ${dbName} blocked, forcing close`);
-            resolve();
-          };
-        });
-      } catch (err) {
-        console.warn(`Failed to delete IndexedDB ${dbName}:`, err);
-      }
-    }
-
-    setShowResetDataConfirm(false);
-    // Reload to apply changes
-    window.location.reload();
-  }, [walletAddress]);
-
   return (
     <main className="min-h-screen p-4 md:p-8 bg-pixel-bg-dark">
       <div className="max-w-2xl mx-auto">
@@ -300,7 +87,7 @@ export default function SettingsPage() {
         {/* Settings Sections */}
         <div className="space-y-6">
           {/* Mining Settings */}
-          <SettingsSectionCard title="MINING">
+          <SettingsCard title="MINING">
             <Select
               label="DIFFICULTY"
               description="Higher difficulty = harder to mine but more rewards"
@@ -342,10 +129,10 @@ export default function SettingsPage() {
               onChange={setBackgroundMining}
               disabled={true}
             />
-          </SettingsSectionCard>
+          </SettingsCard>
 
           {/* Network Settings */}
-          <SettingsSectionCard title="NETWORK">
+          <SettingsCard title="NETWORK">
             <div className="flex items-center justify-between">
               <div>
                 <span className="font-pixel text-xs text-pixel-text">
@@ -398,10 +185,10 @@ export default function SettingsPage() {
               onChange={setCustomRpcUrl}
               placeholder="https://..."
             />
-          </SettingsSectionCard>
+          </SettingsCard>
 
           {/* Display Settings */}
-          <SettingsSectionCard title="DISPLAY">
+          <SettingsCard title="DISPLAY">
             <Select
               label="THEME"
               description="Visual theme (more coming soon)"
@@ -429,10 +216,10 @@ export default function SettingsPage() {
               checked={display.notificationsEnabled}
               onChange={setNotificationsEnabled}
             />
-          </SettingsSectionCard>
+          </SettingsCard>
 
           {/* Security Settings */}
-          <SettingsSectionCard title="SECURITY">
+          <SettingsCard title="SECURITY">
             <Select
               label="AUTO-LOCK TIMEOUT"
               description="Lock wallet after inactivity"
@@ -448,43 +235,23 @@ export default function SettingsPage() {
               }
             />
 
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="font-pixel text-xs text-pixel-text">
-                  RECOVERY PHRASE
-                </span>
-                <p className="font-pixel-body text-[10px] text-pixel-text-muted mt-1">
-                  View your 12-word backup phrase
-                </p>
-              </div>
-              <button
-                onClick={() => openRecoveryModal()}
-                className="px-4 py-2 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text border-4 border-black hover:bg-pixel-bg-dark"
-              >
-                SHOW
-              </button>
-            </div>
+            <ActionRow
+              label="RECOVERY PHRASE"
+              description="View your 12-word backup phrase"
+              buttonLabel="SHOW"
+              onClick={() => openRecoveryModal()}
+            />
 
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="font-pixel text-xs text-pixel-text">
-                  CHANGE PASSWORD
-                </span>
-                <p className="font-pixel-body text-[10px] text-pixel-text-muted mt-1">
-                  Update your wallet encryption password
-                </p>
-              </div>
-              <button
-                onClick={openPasswordModal}
-                className="px-4 py-2 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text border-4 border-black hover:bg-pixel-bg-dark"
-              >
-                CHANGE
-              </button>
-            </div>
-          </SettingsSectionCard>
+            <ActionRow
+              label="CHANGE PASSWORD"
+              description="Update your wallet encryption password"
+              buttonLabel="CHANGE"
+              onClick={openPasswordModal}
+            />
+          </SettingsCard>
 
           {/* About Section */}
-          <SettingsSectionCard title="ABOUT">
+          <SettingsCard title="ABOUT">
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="font-pixel text-xs text-pixel-text-muted">
@@ -532,82 +299,13 @@ export default function SettingsPage() {
                 </a>
               </div>
             </div>
-          </SettingsSectionCard>
+          </SettingsCard>
 
-          {/* Reset All Settings */}
-          <div
-            className={`bg-pixel-bg-medium border-4 border-pixel-error p-6 ${pixelShadows.lg}`}
-          >
-            <h2 className="font-pixel text-sm text-pixel-error mb-4">
-              DANGER ZONE
-            </h2>
-
-            {/* Reset Settings */}
-            <div className="mb-6 pb-6 border-b-2 border-pixel-border">
-              <p className="font-pixel-body text-sm text-pixel-text-muted mb-4">
-                Reset all settings to their default values. This will not affect
-                your wallet or mining progress.
-              </p>
-              {!showResetConfirm ? (
-                <button
-                  onClick={() => setShowResetConfirm(true)}
-                  className="px-4 py-2 font-pixel text-[10px] text-pixel-error border-4 border-pixel-error hover:bg-pixel-error hover:text-white transition-colors"
-                >
-                  RESET SETTINGS
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowResetConfirm(false)}
-                    className="px-4 py-2 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text border-4 border-black"
-                  >
-                    CANCEL
-                  </button>
-                  <button
-                    onClick={handleResetAll}
-                    className={`px-4 py-2 font-pixel text-[10px] bg-pixel-error text-white border-4 border-black ${pixelShadows.md}`}
-                  >
-                    CONFIRM
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Reset ALL Data */}
-            <div>
-              <p className="font-pixel-body text-sm text-pixel-text-muted mb-2">
-                Delete ALL app data including wallet, NFTs, mining progress, and
-                settings. Start completely fresh.
-              </p>
-              <p className="font-pixel text-[8px] text-pixel-error mb-4">
-                WARNING: This cannot be undone! Make sure you have your recovery
-                phrase backed up.
-              </p>
-              {!showResetDataConfirm ? (
-                <button
-                  onClick={() => setShowResetDataConfirm(true)}
-                  className="px-4 py-2 font-pixel text-[10px] bg-pixel-error text-white border-4 border-black hover:bg-pixel-error/80 transition-colors"
-                >
-                  RESET ALL DATA
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowResetDataConfirm(false)}
-                    className="px-4 py-2 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text border-4 border-black"
-                  >
-                    CANCEL
-                  </button>
-                  <button
-                    onClick={handleResetAllData}
-                    className={`px-4 py-2 font-pixel text-[10px] bg-pixel-error text-white border-4 border-black ${pixelShadows.md} animate-pulse`}
-                  >
-                    DELETE EVERYTHING
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Danger Zone */}
+          <DangerZone
+            walletAddress={walletAddress}
+            onResetSettings={resetAllSettings}
+          />
         </div>
 
         {/* Footer */}

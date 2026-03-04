@@ -18,6 +18,7 @@ import {
   PendingTransactions,
   Button,
   getEvolutionStatus,
+  pixelBorders,
   type BabyNFTState,
 } from "@bitcoinbaby/ui";
 import type { PendingTransaction } from "@bitcoinbaby/core";
@@ -108,7 +109,7 @@ export function NFTCollectionView({
         )}
 
         {/* Mint CTA in sidebar */}
-        <div className="mt-6 bg-pixel-bg-medium border-4 border-pixel-border p-4">
+        <div className={`mt-6 bg-pixel-bg-medium ${pixelBorders.medium} p-4`}>
           <h3 className="font-pixel text-[8px] text-pixel-secondary uppercase mb-3">
             Expand Collection
           </h3>
@@ -129,7 +130,9 @@ export function NFTCollectionView({
       {/* NFT Grid (Main Content) */}
       <div className="lg:col-span-3 order-1 lg:order-2">
         {nfts.length === 0 && !isLoading ? (
-          <div className="bg-pixel-bg-medium border-4 border-pixel-border p-8 text-center">
+          <div
+            className={`bg-pixel-bg-medium ${pixelBorders.medium} p-8 text-center`}
+          >
             <div className="text-6xl mb-4">👶</div>
             <h3 className="font-pixel text-sm text-pixel-text mb-2">
               No Genesis Babies Yet

@@ -137,13 +137,16 @@ export function useBaby(options: UseBabyOptions = {}): UseBabyReturn {
   ]);
 
   // Sync mining state with game
+  /* eslint-disable react-hooks/exhaustive-deps -- intentionally depend on specific game properties */
   useEffect(() => {
     if (game.baby && !game.isDead) {
       game.setMining(mining.isRunning);
     }
   }, [mining.isRunning, game.baby, game.isDead, game.setMining]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Record mining progress for XP
+  /* eslint-disable react-hooks/exhaustive-deps -- intentionally depend on specific game properties */
   useEffect(() => {
     if (!game.baby || game.isDead) return;
 
@@ -165,6 +168,7 @@ export function useBaby(options: UseBabyOptions = {}): UseBabyReturn {
     game.isDead,
     game.recordMiningProgress,
   ]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const clearEvolution = useCallback(() => {
     setEvolutionData(null);

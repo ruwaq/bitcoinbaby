@@ -9,6 +9,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { pixelBorders } from "@bitcoinbaby/ui";
 
 // Dynamic import to avoid SSR issues
 const WithdrawSection = dynamic(
@@ -51,7 +52,7 @@ export default function WithdrawPage() {
         <WithdrawSection />
 
         {/* Help Text */}
-        <div className="mt-8 p-4 bg-pixel-bg-medium border-4 border-pixel-border">
+        <div className={`mt-8 p-4 bg-pixel-bg-medium ${pixelBorders.medium}`}>
           <h3 className="font-pixel text-[10px] text-pixel-primary mb-2">
             HOW IT WORKS
           </h3>

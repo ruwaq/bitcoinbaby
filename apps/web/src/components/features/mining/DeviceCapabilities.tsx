@@ -11,7 +11,7 @@
  * - Blockchain submission status
  */
 
-import { HelpTooltip } from "@bitcoinbaby/ui";
+import { HelpTooltip, pixelBorders } from "@bitcoinbaby/ui";
 
 interface DeviceCapabilitiesProps {
   capabilities: {
@@ -28,7 +28,7 @@ export function DeviceCapabilities({
   canSubmitToBlockchain,
 }: DeviceCapabilitiesProps) {
   return (
-    <div className="bg-pixel-bg-medium border-4 border-pixel-border p-4">
+    <div className={`bg-pixel-bg-medium ${pixelBorders.medium} p-4`}>
       <div className="flex items-center gap-2 mb-3">
         <h3 className="font-pixel text-pixel-2xs text-pixel-text-muted uppercase">
           Device Capabilities

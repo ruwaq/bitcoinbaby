@@ -7,6 +7,7 @@
  */
 
 import { useState, useCallback } from "react";
+import { pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
 
 interface SendConfirmationProps {
   status: "success" | "error";
@@ -69,7 +70,9 @@ export function SendConfirmation({
         </div>
 
         {/* Transaction details */}
-        <div className="bg-pixel-bg-dark border-4 border-pixel-border p-4 space-y-4 text-left">
+        <div
+          className={`bg-pixel-bg-dark ${pixelBorders.medium} p-4 space-y-4 text-left`}
+        >
           {/* Amount */}
           <div>
             <label className="font-pixel text-[8px] text-pixel-text-muted block mb-1">
@@ -106,7 +109,7 @@ export function SendConfirmation({
           href={`${explorerUrl}/tx/${txid}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block w-full py-4 font-pixel text-sm text-black bg-pixel-secondary border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all text-center"
+          className={`inline-block w-full py-4 font-pixel text-sm text-black bg-pixel-secondary ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all text-center`}
         >
           VIEW ON EXPLORER
         </a>
@@ -115,7 +118,7 @@ export function SendConfirmation({
         <button
           type="button"
           onClick={handleCopyTxid}
-          className={`w-full py-3 font-pixel text-[10px] border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all ${
+          className={`w-full py-3 font-pixel text-[10px] ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all ${
             copyStatus === "copied"
               ? "bg-pixel-success text-black"
               : copyStatus === "error"
@@ -135,14 +138,14 @@ export function SendConfirmation({
           <button
             type="button"
             onClick={onSendAnother}
-            className="flex-1 py-3 font-pixel text-[10px] text-pixel-text bg-pixel-bg-light border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all"
+            className={`flex-1 py-3 font-pixel text-[10px] text-pixel-text bg-pixel-bg-light ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all`}
           >
             SEND ANOTHER
           </button>
           <button
             type="button"
             onClick={onViewWallet}
-            className="flex-1 py-3 font-pixel text-[10px] text-black bg-pixel-primary border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all"
+            className={`flex-1 py-3 font-pixel text-[10px] text-black bg-pixel-primary ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all`}
           >
             VIEW WALLET
           </button>
@@ -185,7 +188,7 @@ export function SendConfirmation({
       </div>
 
       {/* Troubleshooting tips */}
-      <div className="bg-pixel-bg-dark border-4 border-pixel-border p-4 text-left">
+      <div className={`bg-pixel-bg-dark ${pixelBorders.medium} p-4 text-left`}>
         <h3 className="font-pixel text-[10px] text-pixel-secondary mb-3">
           TROUBLESHOOTING
         </h3>
@@ -202,14 +205,14 @@ export function SendConfirmation({
         <button
           type="button"
           onClick={onSendAnother}
-          className="flex-1 py-4 font-pixel text-sm text-black bg-pixel-primary border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all"
+          className={`flex-1 py-4 font-pixel text-sm text-black bg-pixel-primary ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all`}
         >
           TRY AGAIN
         </button>
         <button
           type="button"
           onClick={onViewWallet}
-          className="flex-1 py-4 font-pixel text-sm text-pixel-text bg-pixel-bg-light border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all"
+          className={`flex-1 py-4 font-pixel text-sm text-pixel-text bg-pixel-bg-light ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all`}
         >
           BACK TO WALLET
         </button>
