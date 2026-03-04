@@ -5,6 +5,7 @@
  */
 
 export { SyncDebugPanel } from "./SyncDebugPanel";
+export { SyncStatusAlert } from "./SyncStatusAlert";
 export { BalancePanel } from "./BalancePanel";
 export { MiningVisualization } from "./MiningVisualization";
 export { DeviceCapabilities } from "./DeviceCapabilities";

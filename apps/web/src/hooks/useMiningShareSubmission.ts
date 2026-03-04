@@ -61,6 +61,8 @@ export interface UseMiningShareSubmissionReturn {
   sessionShares: number;
   /** Number of shares pending submission */
   pendingShares: number;
+  /** Number of shares that permanently failed (dead letter queue) */
+  failedShares: number;
   /** Total shares submitted (synced to API) */
   submittedShares: number;
   /** Whether currently submitting */
@@ -118,6 +120,7 @@ export function useMiningShareSubmission(
 
   // State
   const [pendingShares, setPendingShares] = useState(0);
+  const [failedShares, setFailedShares] = useState(0);
   const [submittedShares, setSubmittedShares] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSubmission, setLastSubmission] = useState<SubmissionResult | null>(
@@ -151,6 +154,7 @@ export function useMiningShareSubmission(
     getQueueStats(address).then((stats) => {
       console.debug("[ShareSubmission] Queue stats:", stats);
       setPendingShares(stats.pending + stats.syncing);
+      setFailedShares(stats.failed);
       setSubmittedShares(stats.synced);
     });
 
@@ -338,6 +342,7 @@ export function useMiningShareSubmission(
   return {
     sessionShares: mining.shares, // Shares found this session (from miner)
     pendingShares,
+    failedShares,
     submittedShares,
     isSubmitting,
     lastSubmission,

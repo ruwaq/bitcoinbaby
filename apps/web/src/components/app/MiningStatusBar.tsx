@@ -15,6 +15,7 @@ import {
   formatHashrate,
   MIN_DIFFICULTY,
 } from "@bitcoinbaby/core";
+import { SyncStatusIndicator } from "./SyncStatusIndicator";
 
 interface MiningStatusBarProps {
   onClick?: () => void;
@@ -78,6 +79,9 @@ export function MiningStatusBar({ onClick, className }: MiningStatusBarProps) {
           +{shares}
         </span>
       )}
+
+      {/* Sync status indicator */}
+      <SyncStatusIndicator />
     </button>
   );
 }

@@ -32,6 +32,7 @@ interface BalancePanelProps {
   sessionShares: number;
   submittedShares: number;
   pendingShares: number;
+  failedShares: number;
   isSubmitting: boolean;
 
   // Sync
@@ -57,6 +58,7 @@ export function BalancePanel({
   sessionShares,
   submittedShares,
   pendingShares,
+  failedShares,
   isSubmitting,
   getSyncState,
   onForceSync,
@@ -128,7 +130,7 @@ export function BalancePanel({
             Session Shares
           </span>
           <HelpTooltip
-            content="Valid mining proofs found this session. Each share earns you $BABY tokens based on difficulty."
+            content="Valid mining proofs found this session. Each share earns 100 $BABY tokens (plus streak bonuses)."
             title="Mining Shares"
             size="sm"
           />
@@ -138,13 +140,21 @@ export function BalancePanel({
         </div>
         <button
           onClick={() => setShowSyncDebug(!showSyncDebug)}
-          className="font-pixel text-pixel-2xs text-pixel-text-muted hover:text-pixel-primary cursor-pointer underline truncate max-w-full"
+          className={`font-pixel text-pixel-2xs hover:text-pixel-primary cursor-pointer underline truncate max-w-full ${
+            failedShares > 0
+              ? "text-pixel-error"
+              : pendingShares > 0
+                ? "text-pixel-warning"
+                : "text-pixel-text-muted"
+          }`}
         >
           {isSubmitting
             ? "Syncing..."
-            : pendingShares > 0
-              ? `${pendingShares.toLocaleString()} pending sync`
-              : `${submittedShares} synced`}
+            : failedShares > 0
+              ? `${failedShares} failed, ${pendingShares} pending`
+              : pendingShares > 0
+                ? `${pendingShares.toLocaleString()} pending sync`
+                : `${submittedShares} synced`}
         </button>
 
         {/* Sync Debug Panel */}
