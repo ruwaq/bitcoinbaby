@@ -215,34 +215,40 @@ export interface BabyCosmicEnergy {
 // BALANCE CONSTANTS
 // =============================================================================
 
+/**
+ * BALANCED: Conservative limits for fair gameplay
+ * Cosmic effects are small bonuses, not game-changers
+ *
+ * NOTE: Cosmic system is COMING SOON - not applied to rewards yet
+ */
 export const BALANCE_LIMITS = {
-  // Global limits
-  MAX_TOTAL_BONUS: 1.0, // +100% max (x2.0)
-  MIN_MULTIPLIER: 0.5, // -50% min (x0.5)
-  MAX_DISPARITY: 4.0, // Max difference between best and worst
+  // Global limits (conservative)
+  MAX_TOTAL_BONUS: 0.1, // +10% max (x1.1)
+  MIN_MULTIPLIER: 0.95, // -5% min (x0.95)
+  MAX_DISPARITY: 1.15, // Max difference between best and worst
 
-  // Category caps
+  // Category caps (reduced significantly)
   CAPS: {
-    type: 0.3, // ±30%
-    bloodline: 0.15, // +15%
-    heritage: 0.05, // +5%
-    cosmic: 0.4, // ±40%
-    items: 0.25, // +25%
-    level: 0.2, // +20%
-    rarity: 0.15, // +15%
+    type: 0.03, // ±3%
+    bloodline: 0.02, // +2%
+    heritage: 0.01, // +1%
+    cosmic: 0.05, // ±5%
+    items: 0.03, // +3%
+    level: 0.02, // +2%
+    rarity: 0.02, // +2%
   },
 
   // Diminishing returns factor
-  DIMINISHING_FACTOR: 0.7,
+  DIMINISHING_FACTOR: 0.5, // Stronger diminishing returns
 
-  // Catch-up settings
-  CATCHUP_PER_LEVEL: 0.05, // +5% per level behind
-  CATCHUP_MAX: 0.5, // +50% max
+  // Catch-up settings (reduced)
+  CATCHUP_PER_LEVEL: 0.01, // +1% per level behind
+  CATCHUP_MAX: 0.05, // +5% max
 
-  // Community tax for top players
-  TAX_TOP_1_PERCENT: 0.15,
-  TAX_TOP_5_PERCENT: 0.1,
-  TAX_TOP_10_PERCENT: 0.05,
+  // Community tax for top players (kept for fairness)
+  TAX_TOP_1_PERCENT: 0.02,
+  TAX_TOP_5_PERCENT: 0.01,
+  TAX_TOP_10_PERCENT: 0.005,
 } as const;
 
 // =============================================================================

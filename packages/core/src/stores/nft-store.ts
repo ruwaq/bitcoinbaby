@@ -33,7 +33,8 @@ interface NFTStore {
   lastUpdated: number | null;
 
   // Computed (cached)
-  bestBoost: number;
+  bestBoost: number; // Best single NFT boost (for display)
+  stackedBoost: number; // Combined boost from all NFTs with diminishing returns
   totalNFTs: number;
 
   // Actions
@@ -63,8 +64,49 @@ const initialState = {
   error: null,
   lastUpdated: null,
   bestBoost: 0,
+  stackedBoost: 0,
   totalNFTs: 0,
 };
+
+// =============================================================================
+// NFT STACKING WITH DIMINISHING RETURNS
+// =============================================================================
+
+/**
+ * Diminishing returns multipliers for stacking multiple NFTs
+ * 1st NFT: 100% of boost
+ * 2nd NFT: 50% of boost
+ * 3rd NFT: 25% of boost
+ * 4th NFT: 12.5% of boost
+ * 5th+ NFT: 5% of boost each
+ *
+ * This incentivizes collecting multiple NFTs while preventing
+ * excessive advantages from owning many.
+ */
+const STACKING_MULTIPLIERS = [1.0, 0.5, 0.25, 0.125, 0.05];
+
+/**
+ * Calculate combined boost from all NFTs with diminishing returns
+ * NFTs are sorted by individual boost (highest first)
+ */
+function calculateStackedBoost(nfts: BabyNFTState[]): number {
+  if (nfts.length === 0) return 0;
+
+  // Sort NFTs by boost (highest first)
+  const sortedBoosts = nfts
+    .map((nft) => getMiningBoost(nft))
+    .sort((a, b) => b - a);
+
+  let totalBoost = 0;
+  for (let i = 0; i < sortedBoosts.length; i++) {
+    // Use diminishing multiplier (5th+ NFTs use last multiplier)
+    const multiplier =
+      STACKING_MULTIPLIERS[Math.min(i, STACKING_MULTIPLIERS.length - 1)];
+    totalBoost += sortedBoosts[i] * multiplier;
+  }
+
+  return Math.round(totalBoost * 100) / 100; // Round to 2 decimals
+}
 
 // =============================================================================
 // STORE
@@ -88,17 +130,20 @@ export const useNFTStore = create<NFTStore>()(
         }));
         const bestBoost =
           nfts.length > 0 ? Math.max(...boosts.map((b) => b.boost)) : 0;
+        const stackedBoost = calculateStackedBoost(nfts);
 
         console.log("[NFTStore] setOwnedNFTs called:", {
           count: nfts.length,
           boosts,
           bestBoost,
+          stackedBoost,
         });
 
         set({
           ownedNFTs: nfts,
           totalNFTs: nfts.length,
           bestBoost,
+          stackedBoost,
           lastUpdated: Date.now(),
           error: null,
         });
@@ -124,6 +169,7 @@ export const useNFTStore = create<NFTStore>()(
             nfts.length > 0
               ? Math.max(...nfts.map((n) => getMiningBoost(n)))
               : 0;
+          const stackedBoost = calculateStackedBoost(nfts);
 
           const selectedNFT =
             state.selectedNFT?.tokenId === tokenId
@@ -134,6 +180,7 @@ export const useNFTStore = create<NFTStore>()(
             ownedNFTs: nfts,
             selectedNFT,
             bestBoost,
+            stackedBoost,
             lastUpdated: Date.now(),
           };
         });
@@ -143,11 +190,13 @@ export const useNFTStore = create<NFTStore>()(
         set((state) => {
           const nfts = [...state.ownedNFTs, nft];
           const bestBoost = Math.max(...nfts.map((n) => getMiningBoost(n)));
+          const stackedBoost = calculateStackedBoost(nfts);
 
           return {
             ownedNFTs: nfts,
             totalNFTs: nfts.length,
             bestBoost,
+            stackedBoost,
             lastUpdated: Date.now(),
           };
         });
@@ -160,6 +209,7 @@ export const useNFTStore = create<NFTStore>()(
             nfts.length > 0
               ? Math.max(...nfts.map((n) => getMiningBoost(n)))
               : 0;
+          const stackedBoost = calculateStackedBoost(nfts);
 
           const selectedNFT =
             state.selectedNFT?.tokenId === tokenId ? null : state.selectedNFT;
@@ -169,6 +219,7 @@ export const useNFTStore = create<NFTStore>()(
             totalNFTs: nfts.length,
             selectedNFT,
             bestBoost,
+            stackedBoost,
             lastUpdated: Date.now(),
           };
         });
@@ -241,12 +292,13 @@ export const useNFTStore = create<NFTStore>()(
       // Recalculate derived fields after rehydration from localStorage
       onRehydrateStorage: () => (state) => {
         if (state && state.ownedNFTs.length > 0) {
-          // Recalculate bestBoost and totalNFTs from rehydrated NFTs
+          // Recalculate bestBoost, stackedBoost, and totalNFTs from rehydrated NFTs
           const boosts = state.ownedNFTs.map((n) => getMiningBoost(n));
           state.bestBoost = Math.max(...boosts, 0);
+          state.stackedBoost = calculateStackedBoost(state.ownedNFTs);
           state.totalNFTs = state.ownedNFTs.length;
           console.log(
-            `[NFTStore] Rehydrated ${state.totalNFTs} NFTs, bestBoost: ${state.bestBoost}%`,
+            `[NFTStore] Rehydrated ${state.totalNFTs} NFTs, bestBoost: ${state.bestBoost}%, stackedBoost: ${state.stackedBoost}%`,
           );
         }
       },
@@ -259,9 +311,15 @@ export const useNFTStore = create<NFTStore>()(
 // =============================================================================
 
 /**
- * Get best boost percentage
+ * Get best single NFT boost percentage (for display)
  */
 export const selectBestBoost = (state: NFTStore) => state.bestBoost;
+
+/**
+ * Get combined stacked boost from all NFTs (for mining calculations)
+ * This is the actual boost applied to mining rewards
+ */
+export const selectStackedBoost = (state: NFTStore) => state.stackedBoost;
 
 /**
  * Get total owned NFTs

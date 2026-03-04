@@ -21,13 +21,14 @@ export const GENESIS_BABIES_CONFIG = {
   appType: "n" as AppType,
 
   // Rarity tiers
+  // BALANCED: Low individual values, incentivizes collecting multiple NFTs
   rarityTiers: {
-    common: { weight: 50, boost: 10 },
-    uncommon: { weight: 25, boost: 15 },
-    rare: { weight: 15, boost: 25 },
-    epic: { weight: 7, boost: 35 },
-    legendary: { weight: 2.5, boost: 50 },
-    mythic: { weight: 0.5, boost: 100 },
+    common: { weight: 50, boost: 0.5 },
+    uncommon: { weight: 25, boost: 1 },
+    rare: { weight: 15, boost: 2 },
+    epic: { weight: 7, boost: 3 },
+    legendary: { weight: 2.5, boost: 5 },
+    mythic: { weight: 0.5, boost: 8 },
   },
 
   // Base types
@@ -140,18 +141,20 @@ export const EVOLUTION_COSTS: Record<number, bigint> = {
 
 /**
  * Mining boost percentage by level
+ * BALANCED: Very gradual progression, max 4% at level 10
+ * Leveling is expensive (burns tokens), so boost is modest
  */
 export const LEVEL_BOOSTS: Record<number, number> = {
   1: 0,
-  2: 5,
-  3: 10,
-  4: 15,
-  5: 25,
-  6: 35,
-  7: 50,
-  8: 70,
-  9: 90,
-  10: 120,
+  2: 0.25,
+  3: 0.5,
+  4: 0.75,
+  5: 1,
+  6: 1.5,
+  7: 2,
+  8: 2.5,
+  9: 3,
+  10: 4,
 };
 
 /**

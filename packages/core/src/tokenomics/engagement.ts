@@ -3,25 +3,21 @@
  *
  * Philosophy:
  * ===========
- * Hardware mining (hashrate) is NOT the only way to earn.
- * Active engagement with the game provides equal or greater rewards.
+ * Small bonuses for active engagement. Main rewards come from:
+ * 1. Natural hashrate (flat 100 tokens/share)
+ * 2. NFT collection (stacking with diminishing returns)
+ * 3. Streak bonuses (server-side, up to 2x)
  *
- * This creates a fair system where:
- * - Hardcore GPU miners: 2-4x base from difficulty
- * - Engaged casual users: 2-3x base from engagement
- * - Both feel rewarded, neither dominates
+ * Engagement provides a SMALL extra bonus (max 3%):
+ * 1. Baby Care (1.5% bonus) - Keep your baby healthy
+ * 2. Daily Streak (1% bonus) - Login every day
+ * 3. Play Time (0.5% bonus) - Spend time in app
  *
- * Engagement Categories:
- * 1. Baby Care (50% bonus) - Keep your baby healthy
- * 2. Daily Streak (30% bonus) - Login every day
- * 3. Play Time (20% bonus) - Spend time in app
- * 4. Achievements (variable) - Complete milestones
- *
- * Maximum engagement multiplier: 2.0x (100% bonus)
- * This stacks WITH difficulty rewards, so:
- * - Phone (D22) + full engagement: 100 * 2.0 = 200/share
- * - GPU (D32) no engagement: 258 * 1.0 = 258/share
- * - GPU (D32) + some engagement: 258 * 1.5 = 387/share
+ * Maximum engagement multiplier: 1.03x (3% bonus)
+ * This is intentionally low - the main incentives are:
+ * - Mining more shares (natural hashrate)
+ * - Collecting NFTs (stacking system)
+ * - Maintaining streaks (server-side bonus)
  */
 
 // =============================================================================
@@ -40,10 +36,10 @@ export interface EngagementConfig {
 }
 
 export const DEFAULT_ENGAGEMENT_CONFIG: EngagementConfig = {
-  babyCareBonus: 0.5, // +50%
-  dailyStreakBonus: 0.3, // +30%
-  playTimeBonus: 0.2, // +20%
-  maxMultiplier: 2.0, // Cap at 2x
+  babyCareBonus: 0.015, // +1.5%
+  dailyStreakBonus: 0.01, // +1%
+  playTimeBonus: 0.005, // +0.5%
+  maxMultiplier: 1.03, // Cap at 1.03x (3% max)
 };
 
 // =============================================================================
@@ -232,13 +228,13 @@ export function calculateEngagementMultiplier(
   const totalBonus = babyCare + dailyStreak + playTime;
   const multiplier = Math.min(1 + totalBonus, config.maxMultiplier);
 
-  // Determine status based on multiplier
+  // Determine status based on multiplier (adjusted for 3% max)
   let status: EngagementMultiplierResult["status"];
-  if (multiplier < 1.1) {
+  if (multiplier < 1.005) {
     status = "inactive";
-  } else if (multiplier < 1.4) {
+  } else if (multiplier < 1.015) {
     status = "casual";
-  } else if (multiplier < 1.8) {
+  } else if (multiplier < 1.025) {
     status = "engaged";
   } else {
     status = "dedicated";
@@ -310,30 +306,30 @@ export function calculateRewardWithEngagement(
 export const ENGAGEMENT_TIERS = {
   inactive: {
     minMultiplier: 1.0,
-    maxMultiplier: 1.09,
+    maxMultiplier: 1.005,
     label: "Inactive",
     description: "Login and care for your baby to earn bonuses!",
     color: "gray",
   },
   casual: {
-    minMultiplier: 1.1,
-    maxMultiplier: 1.39,
+    minMultiplier: 1.005,
+    maxMultiplier: 1.015,
     label: "Casual",
     description: "Good start! Keep playing for more bonuses.",
     color: "blue",
   },
   engaged: {
-    minMultiplier: 1.4,
-    maxMultiplier: 1.79,
+    minMultiplier: 1.015,
+    maxMultiplier: 1.025,
     label: "Engaged",
     description: "Great engagement! Almost at max bonus.",
     color: "green",
   },
   dedicated: {
-    minMultiplier: 1.8,
-    maxMultiplier: 2.0,
+    minMultiplier: 1.025,
+    maxMultiplier: 1.03,
     label: "Dedicated",
-    description: "Maximum engagement bonus active!",
+    description: "Maximum engagement bonus active! (+3%)",
     color: "gold",
   },
 } as const;

@@ -66,6 +66,15 @@ export const BASE_REWARD_PER_SHARE = BigInt(100);
  */
 export const MIN_DIFFICULTY = 22;
 
+/**
+ * Maximum mining difficulty
+ * Reasonable cap to prevent overflow and ensure shares remain findable
+ *
+ * D32 = 2^32 hashes expected per share
+ * At 100 MH/s: ~43 seconds per share
+ */
+export const MAX_DIFFICULTY = 32;
+
 /** Halving interval in Bitcoin blocks (~4 years) */
 export const HALVING_BLOCKS = 210_000;
 
@@ -78,58 +87,51 @@ export const HALVING_BLOCKS = 210_000;
 export const GLOBAL_DAILY_EMISSION_CAP = BigInt(100_000_000); // 100M soft reference
 
 /**
- * Calculate reward for a share at given difficulty
+ * Calculate reward for a share
  *
- * LOGARITHMIC FORMULA (Balanced for Fairness)
- * ============================================
+ * FLAT REWARD (Natural Bitcoin-like System)
+ * =========================================
  *
- * Old (exponential): reward = BASE * 2^extraDiff
- * - D22 = 100, D26 = 1600, D32 = 102,400 (1024x gap!)
+ * Every valid share earns the same reward regardless of difficulty.
+ * This mirrors how real Bitcoin mining pools work:
  *
- * New (logarithmic): reward = BASE * (1 + sqrt(extraDiff) * 0.5)
- * - D22 = 100, D26 = 200, D32 = 258 (2.6x gap)
+ * - Difficulty is ONLY for server load balancing (VarDiff)
+ * - Difficulty does NOT affect reward per share
+ * - Your HASHRATE naturally determines how many shares you find
+ * - More powerful devices find more shares = earn more (natural)
  *
- * Why this matters:
- * - GPU miners still earn MORE (they do more work)
- * - But not 1000x more - only 2-4x more
- * - Casual players can compete through engagement
- * - Hardcore miners feel rewarded but not dominant
+ * Example earnings (natural, based on hashrate):
+ * | Device    | Hashrate | Shares/Hour | Tokens/Hour |
+ * |-----------|----------|-------------|-------------|
+ * | Phone     | 500 H/s  | 0.4         | 40          |
+ * | Laptop    | 100 KH/s | 5           | 500         |
+ * | Desktop   | 350 KH/s | 5           | 500         |
+ * | GPU       | 70 MH/s  | 60          | 6,000       |
  *
- * With engagement bonuses (baby care, streaks, playtime):
- * - Active phone user: 100 base * 2.0x engagement = 200/share
- * - Idle GPU miner: 258 base * 1.0x engagement = 258/share
- * - Engaged laptop: 200 base * 1.5x engagement = 300/share
+ * Gap of ~150x reflects NATURAL power difference.
+ * No artificial boost - pure hashrate determines earnings.
+ *
+ * Streak bonuses still apply (rewards dedication, not power).
  */
-export function calculateShareReward(difficulty: number): bigint {
-  if (difficulty <= MIN_DIFFICULTY) {
-    return BASE_REWARD_PER_SHARE;
-  }
-
-  const extraDiff = difficulty - MIN_DIFFICULTY;
-
-  // Square root formula for diminishing returns
-  // Each difficulty level adds less bonus than the previous
-  // sqrt(10) = 3.16, so D32 gets ~2.6x base (not 1024x)
-  const multiplier = 1 + Math.sqrt(extraDiff) * 0.5;
-
-  return BigInt(Math.floor(Number(BASE_REWARD_PER_SHARE) * multiplier));
+export function calculateShareReward(_difficulty: number): bigint {
+  // Flat reward for all valid shares
+  // Difficulty is validated but doesn't affect reward
+  return BASE_REWARD_PER_SHARE;
 }
 
 /**
- * REWARD COMPARISON TABLE
+ * NATURAL REWARD SYSTEM (All shares equal)
  *
- * | Difficulty | Old (2^x) | New (sqrt) | Reduction |
- * |------------|-----------|------------|-----------|
- * | D22 (min)  | 100       | 100        | 0%        |
- * | D23        | 200       | 150        | -25%      |
- * | D24        | 400       | 170        | -57%      |
- * | D25        | 800       | 186        | -77%      |
- * | D26        | 1,600     | 200        | -87%      |
- * | D28        | 6,400     | 222        | -97%      |
- * | D30        | 25,600    | 241        | -99%      |
- * | D32 (max)  | 102,400   | 258        | -99.7%    |
+ * | Difficulty | Reward/Share | Why Same? |
+ * |------------|--------------|-----------|
+ * | D22        | 100          | Flat rate |
+ * | D24        | 100          | Flat rate |
+ * | D26        | 100          | Flat rate |
+ * | D28        | 100          | Flat rate |
+ * | D32        | 100          | Flat rate |
  *
- * Result: GPU (D32) earns 2.6x phone (D22), not 1024x
+ * Earnings are determined by HASHRATE (how many shares you find),
+ * not by difficulty. This is how Bitcoin mining pools work.
  */
 
 // =============================================================================
@@ -403,46 +405,43 @@ export function validateWithdrawal(params: {
 // =============================================================================
 
 /**
- * SUSTAINABLE TOKENOMICS SUMMARY (NO HARD LIMITS)
+ * NATURAL TOKENOMICS (Bitcoin-like System)
  *
  * FILOSOFIA:
- * - Ganancias naturales: MILES por dia (no cientos de miles)
- * - SIN LIMITES: Si quieren minar 24/7, que sigan!
- * - La DIFICULTAD controla la emision, no caps artificiales
+ * - Sistema NATURAL como Bitcoin mining pools
+ * - Tu HASHRATE determina tus ganancias (no dificultad)
+ * - Cada share vale IGUAL (100 tokens)
+ * - Dispositivos potentes ganan más porque encuentran más shares
  *
- * FOR USERS:
- * - Mine → Get $BABY (100 per share at D22)
- * - Higher difficulty → 2x reward per level
- * - Streak bonus → Up to 2x for continuous mining
- * - NO LIMITS → Mina todo lo que quieras
- * - Withdraw → 100% goes to Bitcoin (NO penalty)
+ * COMO FUNCIONA:
+ * - VarDiff ajusta dificultad para balancear carga del servidor
+ * - Dificultad NO afecta reward (solo controla tasa de shares)
+ * - Tu hashrate natural determina cuántos shares encuentras
  *
- * STREAK SYSTEM (Rewards dedication):
- * - 0-9 shares:    100 $BABY (base)
- * - 10-49 shares:  120 $BABY (+20%)
- * - 50-99 shares:  150 $BABY (+50%)
- * - 100-249:       175 $BABY (+75%)
- * - 250-499:       190 $BABY (+90%)
- * - 500+:          200 $BABY (+100%) MAX
+ * EJEMPLO DE GANANCIAS NATURALES:
+ * | Dispositivo | Hashrate  | Shares/Hora | Tokens/Hora |
+ * |-------------|-----------|-------------|-------------|
+ * | Phone       | 500 H/s   | 0.4         | 40          |
+ * | Phone Mid   | 7.5 KH/s  | 6           | 600         |
+ * | Laptop      | 100 KH/s  | 5           | 500         |
+ * | Desktop     | 350 KH/s  | 5           | 500         |
+ * | GPU Low     | 3 MH/s    | 10          | 1,000       |
+ * | GPU High    | 70 MH/s   | 60          | 6,000       |
  *
- * EXPECTED EARNINGS (D22, natural - no limits):
- * - Phone:   ~10-100 $BABY/day
- * - Laptop:  ~100-1,000 $BABY/day
- * - Desktop: ~500-3,000 $BABY/day
- * - GPU:     ~2,000-15,000 $BABY/day (with streak)
+ * STREAK SYSTEM (Rewards dedication, not power):
+ * - 0-9 shares:    1.0x base
+ * - 10-49 shares:  1.2x (+20%)
+ * - 50-99 shares:  1.5x (+50%)
+ * - 100-249:       1.75x (+75%)
+ * - 250-499:       1.9x (+90%)
+ * - 500+:          2.0x (+100%) MAX
  *
- * CONTROL NATURAL:
- * - D22 = shares muy dificiles de encontrar
- * - GPU: ~10 shares/hora (no 700 como en D16)
- * - Esto NATURALMENTE limita ganancias a miles
- * - Sin necesidad de caps artificiales
+ * WHY THIS IS FAIR:
+ * - GPU gana 150x más que phone = refleja 140,000x más hashrate
+ * - No hay "handouts" artificiales
+ * - El poder natural se recompensa naturalmente
+ * - Streaks recompensan DEDICACIÓN (todos igual)
  *
  * BURNS (Give VALUE, not penalty):
  * - NFTs, Evolution, Premium features
- *
- * RESULT:
- * - Mineria libre sin restricciones
- * - Ganancias naturalmente en miles
- * - Streak recompensa dedicacion
- * - Muy sostenible a largo plazo
  */
