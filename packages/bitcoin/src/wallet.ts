@@ -67,7 +67,8 @@ export class BitcoinWallet {
   private readonly networkConfig: bitcoin.Network;
 
   constructor(options: WalletOptions = {}) {
-    this.network = options.network ?? "testnet";
+    // Default to testnet4 (Bitcoin's current testnet)
+    this.network = options.network ?? "testnet4";
     this.networkConfig = NETWORKS[this.network];
   }
 

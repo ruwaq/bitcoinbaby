@@ -12,21 +12,24 @@ export interface CharmSpell {
 }
 
 interface SpellOperation {
-  type: 'mint' | 'transfer' | 'burn';
+  type: "mint" | "transfer" | "burn";
   token: string;
   amount: string | number;
   recipient?: string;
   proof?: string;
 }
 
+/**
+ * @deprecated Use CharmsClient from './charms/client' instead
+ */
 export interface CharmsConfig {
   apiUrl: string;
-  network: 'mainnet' | 'testnet';
+  network: "mainnet" | "testnet4";
 }
 
 const defaultConfig: CharmsConfig = {
-  apiUrl: 'https://api.charms.dev',
-  network: 'testnet',
+  apiUrl: "https://api.charms.dev",
+  network: "testnet4",
 };
 
 /**
@@ -45,15 +48,15 @@ export class CharmsClient {
   createMineSpell(
     minerAddress: string,
     workProof: string,
-    amount: number
+    amount: number,
   ): CharmSpell {
     return {
-      name: 'mine-baby',
-      version: '1.0.0',
+      name: "mine-baby",
+      version: "1.0.0",
       operations: [
         {
-          type: 'mint',
-          token: 'BABY',
+          type: "mint",
+          token: "BABY",
           amount,
           recipient: minerAddress,
           proof: workProof,
@@ -67,9 +70,9 @@ export class CharmsClient {
    */
   async submitSpell(spell: CharmSpell): Promise<string> {
     const response = await fetch(`${this.config.apiUrl}/v1/spells`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(spell),
     });
@@ -85,7 +88,9 @@ export class CharmsClient {
   /**
    * Obtiene el estado de un Spell
    */
-  async getSpellStatus(txid: string): Promise<'pending' | 'confirmed' | 'failed'> {
+  async getSpellStatus(
+    txid: string,
+  ): Promise<"pending" | "confirmed" | "failed"> {
     const response = await fetch(`${this.config.apiUrl}/v1/spells/${txid}`);
 
     if (!response.ok) {

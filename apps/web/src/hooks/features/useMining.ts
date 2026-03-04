@@ -78,6 +78,7 @@ export interface UseMiningReturn {
     session: number;
     submitted: number;
     pending: number;
+    failed: number;
     isSubmitting: boolean;
     canSubmitToBlockchain: boolean;
     lastSubmission: ReturnType<
@@ -94,6 +95,7 @@ export interface UseMiningReturn {
   // NFT boost
   nft: {
     bestBoost: number;
+    stackedBoost: number;
     totalNFTs: number;
   };
 
@@ -124,7 +126,7 @@ export function useMining(options: UseMiningOptions = {}): UseMiningReturn {
   const wallet = useWalletStore((s) => s.wallet);
 
   // NFT store
-  const { bestBoost, totalNFTs } = useNFTStore();
+  const { bestBoost, stackedBoost, totalNFTs } = useNFTStore();
 
   // Uptime counter
   const [uptime, setUptime] = useState(0);
@@ -233,6 +235,7 @@ export function useMining(options: UseMiningOptions = {}): UseMiningReturn {
       session: shareSubmission.sessionShares,
       submitted: shareSubmission.submittedShares,
       pending: shareSubmission.pendingShares,
+      failed: shareSubmission.failedShares,
       isSubmitting: shareSubmission.isSubmitting,
       canSubmitToBlockchain: shareSubmission.canSubmitToBlockchain,
       lastSubmission: shareSubmission.lastSubmission,
@@ -244,6 +247,7 @@ export function useMining(options: UseMiningOptions = {}): UseMiningReturn {
 
     nft: {
       bestBoost,
+      stackedBoost,
       totalNFTs,
     },
 
