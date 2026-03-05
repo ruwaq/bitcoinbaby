@@ -1134,9 +1134,11 @@ export class VirtualBalanceDO extends DurableObject<Env> {
           const redis = getRedis(this.env);
 
           // Update miners category (total tokens mined)
-          // Using Number() is safe here since totalMined won't exceed safe integer range
-          // in practice (would require mining trillions of tokens)
-          const score = Number(totalMined);
+          // Clamp to safe integer range to prevent precision loss
+          const score =
+            totalMined > BigInt(Number.MAX_SAFE_INTEGER)
+              ? Number.MAX_SAFE_INTEGER
+              : Number(totalMined);
 
           await updateAllPeriods(redis, "miners", address, score);
 

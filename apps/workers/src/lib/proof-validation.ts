@@ -105,31 +105,39 @@ export async function validateMiningProof(
   }
   const embeddedNonceStr = blockDataParts[blockDataParts.length - 1];
 
-  // Support both decimal and hex nonce formats
-  // WebGPU sends lowercase hex (e.g., "1a2b" or "999"), CPU sends decimal
-  // FIX: Try both interpretations since hex nonces with only 0-9 digits
-  // (like "999" for decimal 2457) were incorrectly parsed as decimal
+  // Parse nonce from blockData - support both hex and decimal formats
+  // SECURITY: To prevent same blockData validating with two different nonces,
+  // we determine format based on content, not based on what "matches"
   let embeddedNonce: number;
 
-  // Check for explicit hex prefix first
+  // Check for explicit hex prefix
   if (embeddedNonceStr.startsWith("0x")) {
     embeddedNonce = parseInt(embeddedNonceStr.slice(2), 16);
   } else {
-    // Try both hex and decimal interpretation
-    const asHex = parseInt(embeddedNonceStr, 16);
-    const asDecimal = parseInt(embeddedNonceStr, 10);
+    // If contains a-f characters, it's definitely hex
+    const hasHexChars = /[a-fA-F]/.test(embeddedNonceStr);
 
-    // Use whichever matches proof.nonce
-    if (!isNaN(asHex) && asHex === proof.nonce) {
-      embeddedNonce = asHex;
-    } else if (!isNaN(asDecimal) && asDecimal === proof.nonce) {
-      embeddedNonce = asDecimal;
+    if (hasHexChars) {
+      // Hex format (contains letters)
+      embeddedNonce = parseInt(embeddedNonceStr, 16);
     } else {
-      // Neither matches - report the mismatch with both interpretations
-      return {
-        valid: false,
-        reason: `Nonce mismatch: blockData "${embeddedNonceStr}" (hex=${asHex}, dec=${asDecimal}) doesn't match proof.nonce=${proof.nonce}`,
-      };
+      // Pure digits (0-9) - prefer hex interpretation since both miners now use hex
+      // Fall back to decimal only if hex interpretation doesn't match
+      const asHex = parseInt(embeddedNonceStr, 16);
+      const asDecimal = parseInt(embeddedNonceStr, 10);
+
+      // Prefer hex for consistency with current miners
+      if (!isNaN(asHex) && asHex === proof.nonce) {
+        embeddedNonce = asHex;
+      } else if (!isNaN(asDecimal) && asDecimal === proof.nonce) {
+        // Fallback for old shares (backwards compatibility)
+        embeddedNonce = asDecimal;
+      } else {
+        return {
+          valid: false,
+          reason: `Nonce mismatch: blockData "${embeddedNonceStr}" (hex=${asHex}, dec=${asDecimal}) doesn't match proof.nonce=${proof.nonce}`,
+        };
+      }
     }
   }
 
