@@ -1073,9 +1073,10 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       return this.errorResponse("Address required", 400);
     }
 
-    // Delete all data for this address
-    this.sql.exec("DELETE FROM mining_proofs WHERE 1=1");
-    this.sql.exec("DELETE FROM balance WHERE 1=1");
+    // Delete all data for THIS address only (NOT all users!)
+    // SECURITY FIX: Previous code had `WHERE 1=1` which deleted ALL users' data
+    this.sql.exec("DELETE FROM mining_proofs WHERE address = ?", this.address);
+    this.sql.exec("DELETE FROM balance WHERE address = ?", this.address);
 
     // Clear caches
     this.cachedBalance = null;

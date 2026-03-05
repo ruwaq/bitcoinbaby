@@ -252,6 +252,16 @@ export function useMiningShareSubmission(
     // Skip if already processed (deduplicate by hash)
     if (processedSharesRef.current.has(share.hash)) return;
 
+    // DEBUG: Log share details for diagnosis
+    console.log("[DEBUG] Share found:", {
+      hash: share.hash?.slice(0, 16) + "...",
+      nonce: share.nonce,
+      difficulty: share.difficulty,
+      blockData: share.blockData?.slice(0, 50) + "...",
+      minerType: mining.minerType, // 'cpu' | 'webgpu' | null
+      timestamp: new Date().toISOString(),
+    });
+
     // Calculate reward based on actual difficulty from the share
     const reward = calculateShareReward(share.difficulty);
 
@@ -277,6 +287,7 @@ export function useMiningShareSubmission(
     processedSharesRef.current.add(share.hash);
 
     // Add to SyncManager (persists to IndexedDB + auto-syncs when online)
+    console.log("[DEBUG] Queueing share to SyncManager...");
     syncManagerRef.current
       .addShare({
         hash: share.hash,
@@ -287,6 +298,7 @@ export function useMiningShareSubmission(
         timestamp: share.timestamp,
       })
       .then(({ queued, duplicate }) => {
+        console.log("[DEBUG] Share queue result:", { queued, duplicate });
         if (queued) {
           setPendingShares((prev) => prev + 1);
           // Notification for new share queued
@@ -305,7 +317,7 @@ export function useMiningShareSubmission(
         }
       })
       .catch((error) => {
-        console.error("[ShareSubmission] Failed to queue share:", error);
+        console.error("[DEBUG] Failed to queue share:", error);
       });
   }, [mining.lastShare, mining.isRunning, addNotification]);
 

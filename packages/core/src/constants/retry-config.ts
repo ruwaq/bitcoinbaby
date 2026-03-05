@@ -26,13 +26,18 @@ export const RETRY_DELAYS = {
 /**
  * Circuit breaker delays
  * Progressive cooldown when service is unhealthy
+ *
+ * REDUCED: Previous delays were too aggressive (up to 10 min)
+ * which caused mining to appear "stuck" after a single error.
+ * Now max is 60s with faster recovery.
  */
 export const CIRCUIT_BREAKER_DELAYS = [
+  3_000, // 3 seconds - quick retry for transient errors
+  5_000, // 5 seconds
+  10_000, // 10 seconds
+  20_000, // 20 seconds
   30_000, // 30 seconds
-  60_000, // 1 minute
-  120_000, // 2 minutes
-  300_000, // 5 minutes
-  600_000, // 10 minutes
+  60_000, // 1 minute max
 ] as const;
 
 /**

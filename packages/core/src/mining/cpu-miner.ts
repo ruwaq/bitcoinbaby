@@ -177,19 +177,34 @@ export class CPUMiner implements Miner {
    */
   private getWorkerCode(): string {
     return `
-      // SHA256 implementation for Web Worker
-      const sha256 = async (message) => {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(message);
+      // SHA256 returning raw bytes (Uint8Array)
+      const sha256Bytes = async (data) => {
         const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+        return new Uint8Array(hashBuffer);
       };
 
-      // Double SHA256 (Bitcoin standard)
+      // Convert bytes to hex string
+      const bytesToHex = (bytes) => {
+        return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+      };
+
+      /**
+       * Double SHA256 (Bitcoin standard hash256)
+       * CRITICAL: Second SHA256 must be on the 32 BYTES, not the hex string!
+       * This matches the server implementation in proof-validation.ts
+       */
       const hash256 = async (message) => {
-        const first = await sha256(message);
-        return sha256(first);
+        const encoder = new TextEncoder();
+        const data = encoder.encode(message);
+
+        // First SHA256 -> 32 bytes
+        const firstHash = await sha256Bytes(data);
+
+        // Second SHA256 on the 32 BYTES (not hex string!)
+        const secondHash = await sha256Bytes(firstHash);
+
+        // Return as hex string
+        return bytesToHex(secondHash);
       };
 
       // Count leading zero bits in a hash
@@ -425,19 +440,37 @@ export class CPUMiner implements Miner {
     let hashesThisSecond = 0;
     const currentBlock = Date.now().toString();
 
-    // SHA-256 using Web Crypto API
-    const sha256 = async (message: string): Promise<string> => {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(message);
+    // SHA-256 returning raw bytes
+    const sha256Bytes = async (data: BufferSource): Promise<Uint8Array> => {
       const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+      return new Uint8Array(hashBuffer);
     };
 
-    // Double SHA-256 (Bitcoin standard)
+    // Convert bytes to hex string
+    const bytesToHex = (bytes: Uint8Array): string => {
+      return Array.from(bytes)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+    };
+
+    /**
+     * Double SHA-256 (Bitcoin standard hash256)
+     * CRITICAL: Second SHA256 must be on the 32 BYTES, not the hex string!
+     * This matches the server implementation in proof-validation.ts
+     */
     const hash256 = async (message: string): Promise<string> => {
-      const first = await sha256(message);
-      return sha256(first);
+      const encoder = new TextEncoder();
+      const data = encoder.encode(message);
+
+      // First SHA256 -> 32 bytes
+      const firstHash = await sha256Bytes(data);
+
+      // Second SHA256 on the 32 BYTES (not hex string!)
+      // Cast to ArrayBuffer to satisfy TypeScript (Uint8Array.buffer is always ArrayBuffer in practice)
+      const secondHash = await sha256Bytes(firstHash.buffer as ArrayBuffer);
+
+      // Return as hex string
+      return bytesToHex(secondHash);
     };
 
     // Count leading zero bits
