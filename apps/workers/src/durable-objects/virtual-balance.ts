@@ -119,14 +119,27 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         block_data TEXT NOT NULL,
         reward TEXT NOT NULL,
         credited INTEGER NOT NULL DEFAULT 0,
+        address TEXT,
         created_at INTEGER NOT NULL
       )
     `);
+
+    // Migration: Add address column if it doesn't exist (for existing tables)
+    try {
+      this.sql.exec(`ALTER TABLE mining_proofs ADD COLUMN address TEXT`);
+    } catch {
+      // Column already exists
+    }
 
     // Indexes
     this.sql.exec(`
       CREATE INDEX IF NOT EXISTS idx_proofs_credited
       ON mining_proofs(credited)
+    `);
+
+    this.sql.exec(`
+      CREATE INDEX IF NOT EXISTS idx_proofs_address
+      ON mining_proofs(address)
     `);
   }
 
@@ -673,14 +686,15 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     try {
       this.sql.exec(
         `INSERT INTO mining_proofs
-         (id, hash, nonce, difficulty, block_data, reward, credited, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
+         (id, hash, nonce, difficulty, block_data, reward, credited, address, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
         proofId,
         proofWithNonce.hash,
         proofWithNonce.nonce,
         proofWithNonce.difficulty,
         proofWithNonce.blockData,
         boostedReward.toString(),
+        this.address,
         now,
       );
     } catch (e) {

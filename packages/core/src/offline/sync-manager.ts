@@ -92,6 +92,7 @@ class SyncManager {
   private syncPromise: Promise<void> | null = null; // Mutex for sync operations
   private syncTimer: ReturnType<typeof setInterval> | null = null;
   private healthTimer: ReturnType<typeof setInterval> | null = null;
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
   private eventHandlers: Set<SyncEventHandler> = new Set();
   private address: string | null = null;
   private apiHealthy: boolean = true;
@@ -101,6 +102,9 @@ class SyncManager {
   // Throttle rejected share logs to reduce console spam
   private rejectedShareCount: number = 0;
   private lastRejectedLogTime: number = 0;
+  // Event handler references for cleanup
+  private onlineHandler: (() => void) | null = null;
+  private offlineHandler: (() => void) | null = null;
 
   constructor(config: Partial<SyncManagerConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -109,16 +113,20 @@ class SyncManager {
     if (typeof window !== "undefined") {
       this.isOnline = navigator.onLine;
 
-      window.addEventListener("online", () => {
+      // Store handler references for cleanup
+      this.onlineHandler = () => {
         this.isOnline = true;
         this.emit({ type: "online", timestamp: Date.now() });
         this.triggerSync();
-      });
+      };
 
-      window.addEventListener("offline", () => {
+      this.offlineHandler = () => {
         this.isOnline = false;
         this.emit({ type: "offline", timestamp: Date.now() });
-      });
+      };
+
+      window.addEventListener("online", this.onlineHandler);
+      window.addEventListener("offline", this.offlineHandler);
     }
   }
 
@@ -229,6 +237,23 @@ class SyncManager {
     if (this.healthTimer) {
       clearInterval(this.healthTimer);
       this.healthTimer = null;
+    }
+
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
+
+    // Remove event listeners to prevent memory leaks
+    if (typeof window !== "undefined") {
+      if (this.onlineHandler) {
+        window.removeEventListener("online", this.onlineHandler);
+        this.onlineHandler = null;
+      }
+      if (this.offlineHandler) {
+        window.removeEventListener("offline", this.offlineHandler);
+        this.offlineHandler = null;
+      }
     }
   }
 
@@ -625,8 +650,11 @@ class SyncManager {
    * Schedule cleanup of old synced and failed shares
    */
   private scheduleCleanup(): void {
+    // Prevent duplicate cleanups
+    if (this.cleanupTimer) return;
+
     // Run cleanup once per hour
-    setInterval(
+    this.cleanupTimer = setInterval(
       async () => {
         try {
           // Clean up old synced shares (keep 7 days)
