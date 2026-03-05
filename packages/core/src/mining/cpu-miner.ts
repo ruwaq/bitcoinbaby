@@ -249,7 +249,9 @@ export class CPUMiner implements Miner {
           const batchSize = Math.max(1, Math.floor(100 * (throttle / 100)));
 
           for (let i = 0; i < batchSize && isRunning && !isPaused; i++) {
-            const blockData = currentBlock + ':' + minerAddress + ':' + nonce;
+            // Use hex nonce for consistency with WebGPU miner
+            const nonceHex = nonce.toString(16);
+            const blockData = currentBlock + ':' + minerAddress + ':' + nonceHex;
             const hash = await hash256(blockData);
             totalHashes++;
             hashesThisSecond++;
@@ -501,7 +503,9 @@ export class CPUMiner implements Miner {
       const batchSize = Math.max(1, Math.floor(10 * (this.throttle / 100)));
 
       for (let i = 0; i < batchSize && this.running && !this.paused; i++) {
-        const blockData = `${currentBlock}:${this.minerAddress}:${nonce}`;
+        // Use hex nonce for consistency with WebGPU miner
+        const nonceHex = nonce.toString(16);
+        const blockData = `${currentBlock}:${this.minerAddress}:${nonceHex}`;
         const hash = await hash256(blockData);
         this.totalHashes++;
         hashesThisSecond++;

@@ -460,15 +460,15 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       return this.errorResponse("Address required", 400);
     }
 
-    let body: { proof: MiningProof };
+    // NOTE: The proof is sent directly (not wrapped in { proof: ... })
+    // because the Hono middleware already validated it via miningProofSchema
+    let proof: MiningProof;
     try {
-      body = (await request.json()) as { proof: MiningProof };
+      proof = (await request.json()) as MiningProof;
     } catch (e) {
       balanceLogger.error("JSON parse error", e, { address: this.address });
       return this.errorResponse("Invalid JSON body", 400);
     }
-
-    const { proof } = body;
 
     // =========================================================================
     // SECURITY: Validate proof fields exist
