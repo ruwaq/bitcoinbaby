@@ -31,7 +31,7 @@ t/87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681b/acf2ec0b7245e
 
 ### Prover Hosted de Charms
 
-El prover hosted en `v7.charms.dev` es el mismo usado por BRO token (bro.charms.dev).
+El prover hosted en `v11.charms.dev` es el más actualizado (confirmado por Charms team).
 - Mantenido por Charms Inc.
 - Funciona para mainnet y testnet4
 - **Ya configurado por defecto** en BitcoinBaby
