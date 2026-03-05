@@ -32,6 +32,19 @@ export interface MiningStats {
 }
 
 /**
+ * XP gained event data
+ * Emitted when a valid share is found, allowing NFT system to award XP
+ */
+export interface XPGainedEvent {
+  /** The mining result that triggered the XP gain */
+  result: MiningResult;
+  /** Base XP amount (before NFT multipliers) */
+  baseXP: number;
+  /** Timestamp of the XP gain */
+  timestamp: number;
+}
+
+/**
  * Events emitted by miners
  */
 export interface MinerEvents {
@@ -39,6 +52,8 @@ export interface MinerEvents {
   onWorkFound: (result: MiningResult) => void;
   onStatusChange: (status: "running" | "paused" | "stopped") => void;
   onError: (error: Error) => void;
+  /** Emitted when a valid share is found - use to award XP to equipped NFT */
+  onXPGained?: (event: XPGainedEvent) => void;
 }
 
 /**

@@ -24,6 +24,7 @@ import type {
   OrchestratorConfig,
   MiningResult,
   DeviceCapabilities,
+  XPGainedEvent,
 } from "./types";
 import { MIN_DIFFICULTY } from "../tokenomics/constants";
 import {
@@ -65,6 +66,8 @@ export interface MiningManagerState {
 export interface MiningManagerConfig extends Partial<OrchestratorConfig> {
   onStateChange?: (state: MiningManagerState) => void;
   onWorkFound?: (result: MiningResult) => void;
+  /** Callback when XP is gained from mining (for NFT work proof) */
+  onXPGained?: (event: XPGainedEvent) => void;
   onError?: (error: Error) => void;
 
   // Feature options
@@ -167,6 +170,11 @@ class MiningManager {
       this.processShareForClientVarDiff();
 
       this.config.onWorkFound?.(result);
+    });
+
+    // XP gained event (for NFT work proof system)
+    this.orchestrator.on("onXPGained", (event) => {
+      this.config.onXPGained?.(event);
     });
 
     this.orchestrator.on("onStatusChange", (status) => {

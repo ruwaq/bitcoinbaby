@@ -472,6 +472,24 @@ export class BitcoinBabyClient {
   }
 
   /**
+   * Release a reserved NFT ID (when mint fails after reservation)
+   * This allows the ID to be re-used
+   */
+  async releaseNFT(
+    tokenId: number,
+  ): Promise<ApiResponse<{ released: boolean }>> {
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/nft/release/${tokenId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      },
+      0, // No retries - release is idempotent but should not spam
+    );
+    return response.json() as Promise<ApiResponse<{ released: boolean }>>;
+  }
+
+  /**
    * Confirm NFT mint after successful broadcast
    * Records the txid, address and full NFT data for indexing
    */
@@ -553,16 +571,30 @@ export class BitcoinBabyClient {
 
   /**
    * List an NFT for sale on the marketplace
+   *
+   * @param tokenId - NFT token ID
+   * @param price - Price in satoshis
+   * @param sellerAddress - Seller's Bitcoin address
+   * @param sellerPsbt - Optional: Seller's signed PSBT (SIGHASH_SINGLE|ANYONECANPAY)
+   * @param nftUtxo - Optional: NFT UTXO info for PSBT-based listings
    */
   async listNFT(
     tokenId: number,
     price: number,
     sellerAddress: string,
+    sellerPsbt?: string,
+    nftUtxo?: { txid: string; vout: number; value: number },
   ): Promise<ApiResponse<NFTListing>> {
     const response = await fetchWithRetry(`${this.baseUrl}/api/nft/list`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tokenId, price, sellerAddress }),
+      body: JSON.stringify({
+        tokenId,
+        price,
+        sellerAddress,
+        sellerPsbt,
+        nftUtxo,
+      }),
     });
     return response.json() as Promise<ApiResponse<NFTListing>>;
   }
@@ -617,6 +649,36 @@ export class BitcoinBabyClient {
     );
     return response.json() as Promise<ApiResponse<NFTSale>>;
   }
+
+  // ===========================================================================
+  // WORK PROOF (XP FROM MINING)
+  // ===========================================================================
+
+  /**
+   * Submit work proof to gain XP for an NFT
+   *
+   * When a user mines a valid share, their equipped NFT gains XP.
+   */
+  async submitWorkProof(
+    tokenId: number,
+    params: {
+      ownerAddress: string;
+      shareHash: string;
+      difficulty: number;
+      timestamp: number;
+    },
+  ): Promise<ApiResponse<WorkProofResult>> {
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/nft/${tokenId}/work-proof`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      },
+      0, // No retries to prevent double XP
+    );
+    return response.json() as Promise<ApiResponse<WorkProofResult>>;
+  }
 }
 
 /**
@@ -659,6 +721,14 @@ export interface NFTListingWithNFT {
   price: number;
   sellerAddress: string;
   listedAt: number;
+  /** Seller's partially signed PSBT (SIGHASH_SINGLE|ANYONECANPAY) */
+  sellerPsbt?: string;
+  /** NFT UTXO info for transaction construction */
+  nftUtxo?: {
+    txid: string;
+    vout: number;
+    value: number;
+  };
   nft: {
     dna: string;
     bloodline: string;
@@ -678,6 +748,21 @@ export interface NFTSale {
   price: string;
   txid: string;
   soldAt: string;
+}
+
+/**
+ * Work proof result from submitting mining XP
+ */
+export interface WorkProofResult {
+  tokenId: number;
+  xpGained: number;
+  newXp: number;
+  totalXp: number;
+  workCount: number;
+  bloodline: string;
+  multiplier: number;
+  canEvolve: boolean;
+  xpToNextLevel: number;
 }
 
 // =============================================================================

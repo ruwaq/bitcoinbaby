@@ -63,20 +63,100 @@ function getNFTQueryKey(address: string | undefined) {
 }
 
 // =============================================================================
+// TYPE GUARDS
+// =============================================================================
+
+/** Valid bloodline values */
+const VALID_BLOODLINES = ["royal", "warrior", "rogue", "mystic"] as const;
+type Bloodline = (typeof VALID_BLOODLINES)[number];
+
+/** Valid base type values */
+const VALID_BASE_TYPES = [
+  "human",
+  "animal",
+  "robot",
+  "mystic",
+  "alien",
+] as const;
+type BaseType = (typeof VALID_BASE_TYPES)[number];
+
+/** Valid rarity tier values */
+const VALID_RARITY_TIERS = [
+  "common",
+  "uncommon",
+  "rare",
+  "epic",
+  "legendary",
+  "mythic",
+] as const;
+type RarityTier = (typeof VALID_RARITY_TIERS)[number];
+
+/**
+ * Type guard for bloodline validation
+ */
+function isValidBloodline(value: unknown): value is Bloodline {
+  return (
+    typeof value === "string" && VALID_BLOODLINES.includes(value as Bloodline)
+  );
+}
+
+/**
+ * Type guard for base type validation
+ */
+function isValidBaseType(value: unknown): value is BaseType {
+  return (
+    typeof value === "string" && VALID_BASE_TYPES.includes(value as BaseType)
+  );
+}
+
+/**
+ * Type guard for rarity tier validation
+ */
+function isValidRarityTier(value: unknown): value is RarityTier {
+  return (
+    typeof value === "string" &&
+    VALID_RARITY_TIERS.includes(value as RarityTier)
+  );
+}
+
+// =============================================================================
 // CONVERSION
 // =============================================================================
 
 /**
  * Convert server NFTRecord to BabyNFTState for local use
+ * Validates all enum fields before casting
  */
-function convertToNFTState(record: NFTRecord): BabyNFTState {
+function convertToNFTState(record: NFTRecord): BabyNFTState | null {
+  // Validate enum fields
+  if (!isValidBloodline(record.bloodline)) {
+    console.warn(
+      `[NFTSync] Invalid bloodline: "${record.bloodline}" for tokenId ${record.tokenId}`,
+    );
+    return null;
+  }
+
+  if (!isValidBaseType(record.baseType)) {
+    console.warn(
+      `[NFTSync] Invalid baseType: "${record.baseType}" for tokenId ${record.tokenId}`,
+    );
+    return null;
+  }
+
+  if (!isValidRarityTier(record.rarityTier)) {
+    console.warn(
+      `[NFTSync] Invalid rarityTier: "${record.rarityTier}" for tokenId ${record.tokenId}`,
+    );
+    return null;
+  }
+
   return {
     tokenId: record.tokenId,
     dna: record.dna,
-    bloodline: record.bloodline as BabyNFTState["bloodline"],
-    baseType: record.baseType as BabyNFTState["baseType"],
+    bloodline: record.bloodline,
+    baseType: record.baseType,
     genesisBlock: record.genesisBlock,
-    rarityTier: record.rarityTier as BabyNFTState["rarityTier"],
+    rarityTier: record.rarityTier,
     level: record.level,
     xp: record.xp,
     totalXp: record.totalXp,
@@ -106,8 +186,10 @@ async function fetchOwnedNFTs(address: string): Promise<BabyNFTState[]> {
     throw new Error(response.error || "Failed to fetch NFTs");
   }
 
-  // Convert server records to BabyNFTState
-  return response.data.nfts.map(convertToNFTState);
+  // Convert server records to BabyNFTState, filtering out invalid records
+  return response.data.nfts
+    .map(convertToNFTState)
+    .filter((nft): nft is BabyNFTState => nft !== null);
 }
 
 // =============================================================================
@@ -259,7 +341,8 @@ export function useNFTSync(): UseNFTSyncReturn {
     nfts: displayNFTs,
     isLoading,
     isFetching,
-    error: error ? (error as Error).message : null,
+    error:
+      error instanceof Error ? error.message : error ? String(error) : null,
     lastSynced: dataUpdatedAt || null,
     refresh,
     count: displayNFTs.length,

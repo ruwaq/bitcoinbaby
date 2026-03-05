@@ -1,108 +1,126 @@
-# BitcoinBaby - Contexto del Proyecto
+# CLAUDE.md
 
-> **Filosofia de desarrollo:** Codigo modular, escalable y con decisiones profesionales.
-> **Estilo visual:** Pixel Art 8-bit inspirado en NES/SNES
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-BitcoinBaby es un ecosistema de mineria gamificado sobre Bitcoin usando Proof of Useful Work (PoUW). Los usuarios "crian" un bebe digital realizando tareas de IA que contribuyen a entrenar un modelo colectivo.
+## Project Overview
 
-## Estilo Visual: Pixel Art 8-bit
+BitcoinBaby is a gamified mining ecosystem on Bitcoin using Proof of Useful Work (PoUW). Users "raise" a digital baby by performing AI tasks that contribute to training a collective model. Built with BitcoinOS and Charms protocol.
 
-**IMPORTANTE:** Todo el proyecto tiene estetica Pixel Art retro.
+**Visual Style:** Pixel Art 8-bit (NES/SNES aesthetic) - see `docs/PIXEL_ART_DESIGN.md`
 
-```css
-/* Fuentes */
---font-pixel: 'Press Start 2P';      /* Titulos */
---font-pixel-body: 'Pixelify Sans';  /* Cuerpo */
-
-/* Colores principales */
---pixel-primary: #f7931a;   /* Bitcoin Gold */
---pixel-secondary: #4fc3f7; /* Baby Blue */
---pixel-bg-dark: #0f0f1b;   /* Fondo oscuro */
-```
-
-Ver guia completa: @docs/PIXEL_ART_DESIGN.md
-
-## Stack Tecnologico
-
-| Capa | Tecnologia |
-|------|------------|
-| Monorepo | Turborepo + pnpm |
-| Web | Next.js 15, React 19, Tailwind, shadcn/ui |
-| Mobile | Next.js Static + Capacitor |
-| State | Zustand |
-| Mining | Web Workers + WebGPU |
-| Blockchain | BitcoinOS, Charms, bitcoinjs-lib |
-| AI | Transformers.js |
-
-## Estructura del Monorepo
-
-```
-bitcoinbaby/
-├── apps/
-│   ├── web/           # Next.js 15 SSR (Vercel)
-│   └── native/        # Next.js Static + Capacitor
-└── packages/
-    ├── ui/            # Componentes React compartidos
-    ├── core/          # Logica de negocio + Zustand
-    ├── bitcoin/       # bitcoinjs-lib + Charms SDK
-    ├── ai/            # Transformers.js wrapper
-    └── config/        # ESLint, Tailwind, TypeScript
-```
-
-## Comandos Esenciales
+## Commands
 
 ```bash
-# Desarrollo
-pnpm dev                    # Corre todo en paralelo
-pnpm dev --filter web       # Solo apps/web
-pnpm build                  # Build todo
-pnpm typecheck              # Verificar tipos
+# Development
+pnpm dev                           # Run all packages in parallel
+pnpm dev --filter @bitcoinbaby/web # Run only web app
+pnpm dev:pwa                       # Web with PWA/service worker (webpack)
 
-# Agregar dependencias
-pnpm add <pkg> --filter @bitcoinbaby/core
-pnpm add @bitcoinbaby/ui --filter @bitcoinbaby/web --workspace
+# Build
+pnpm build                         # Build all packages
+pnpm build --filter @bitcoinbaby/core # Build single package
+
+# Type checking & Linting
+pnpm typecheck                     # Check types across all packages
+pnpm lint                          # Lint all packages
+pnpm format                        # Format with Prettier
 
 # Testing
-pnpm test                   # Tests de todo
-pnpm test --filter web      # Tests de web
+pnpm test                          # Run all tests (Vitest)
+pnpm test --filter @bitcoinbaby/bitcoin  # Test single package
+pnpm --filter @bitcoinbaby/web test -- --watch  # Watch mode
+pnpm --filter @bitcoinbaby/bitcoin test:coverage # Coverage
+
+# Dependencies
+pnpm add <pkg> --filter @bitcoinbaby/core       # Add to package
+pnpm add @bitcoinbaby/ui --filter @bitcoinbaby/web --workspace  # Add workspace dep
+
+# Mobile (Capacitor)
+pnpm --filter @bitcoinbaby/web cap:sync         # Sync native projects
+pnpm --filter @bitcoinbaby/web cap:run:ios      # Build & run iOS
+pnpm --filter @bitcoinbaby/web cap:run:android  # Build & run Android
 ```
 
-## Reglas de Codigo
+## Architecture
 
-- TypeScript strict mode siempre
-- ES modules (import/export), no CommonJS
-- 2 espacios de indentacion
-- Prettier para formateo automatico
-- Componentes funcionales de React
-- Server Components por defecto, Client Components con 'use client'
+### Package Dependencies
 
-## Arquitectura de Mining
+```
+@bitcoinbaby/web ─────┬─> @bitcoinbaby/ui
+                      ├─> @bitcoinbaby/core ──> @bitcoinbaby/bitcoin
+                      ├─> @bitcoinbaby/bitcoin
+                      └─> @bitcoinbaby/ai (optional)
+```
 
-El motor de mineria sigue el patron del BRO token:
-- `packages/core/src/mining/orchestrator.ts` - Orquestador principal
-- `packages/core/src/mining/cpu-miner.ts` - Mineria CPU
-- `packages/core/src/mining/webgpu-miner.ts` - Mineria WebGPU
-- Web Workers para no bloquear UI
+### Mining System (`packages/core/src/mining/`)
 
-## Testing
+The mining engine follows the BRO token pattern:
+- `orchestrator.ts` - Coordinates CPU/WebGPU miners, handles battery/visibility throttling
+- `cpu-miner.ts` - SHA-256 hashing in Web Workers
+- `webgpu-miner.ts` - GPU-accelerated mining (when available)
+- `ai-integration.ts` - AI PoUW task integration
+- `client-vardiff.ts` - Client-side variable difficulty adjustment
+- `persistence.ts` - Mining state persistence across sessions
 
-- Jest para unit tests
-- Playwright para E2E
-- Tests colocados junto al codigo (`*.test.ts`)
-- Coverage minimo: 80% en paths criticos
+### Charms Integration (`packages/bitcoin/src/charms/`)
+
+Bitcoin smart contracts via Charms protocol:
+- `token.ts` - $BABTC token (mining rewards, transfers)
+- `nft.ts` - Genesis Babies NFTs with XP/evolution
+- `prover.ts` - ZK proof generation client
+- `minting-manager.ts` - Complete minting flow orchestration
+- `balance.ts` - V10 balance queries via Scrolls API
+
+Spell versions:
+- V9: PoW Direct (current, CLI 0.11.1)
+- V10: Merkle Proofs (newer)
+
+### State Management (`packages/core/src/stores/`)
+
+Zustand stores with persistence:
+- `mining-store.ts` - Mining session stats, hashrate
+- `wallet-store.ts` - Wallet connection state
+- `nft-store.ts` - NFT boost calculations (single source of truth)
+- `baby-store.ts` - Baby state, evolution, XP
+
+### Key Hooks (`packages/core/src/hooks/`)
+
+- `useGlobalMining.ts` - Main mining hook (combines store + orchestrator)
+- `useCharms.ts` - Charms transaction building
+- `useWalletProvider.ts` - Multi-wallet support (UniSat, Xverse, internal)
+
+## Code Style
+
+- TypeScript strict mode, ES modules only
+- 2 spaces indentation, Prettier formatting
+- `interface` over `type` for objects
+- Server Components by default, `'use client'` only when needed
+- Tests colocated (`*.test.ts`)
+
+### Pixel Art UI Requirements
+
+All UI must follow 8-bit aesthetic:
+```css
+--font-pixel: 'Press Start 2P';      /* Titles */
+--font-pixel-body: 'Pixelify Sans';  /* Body text */
+--pixel-primary: #f7931a;            /* Bitcoin Gold */
+--pixel-secondary: #4fc3f7;          /* Baby Blue */
+--pixel-bg-dark: #0f0f1b;            /* Background */
+```
+
+Use `image-rendering: pixelated`, hard-edge borders (no rounded corners), `steps()` animations.
+
+## Blockchain Security
+
+- NEVER log private keys or hardcode secrets
+- Always validate addresses before transactions
+- Use testnet for development (`bitcoin.networks.testnet`)
+- Verify balance before building transactions
+- Clean sensitive data from memory after use
 
 ## Git Workflow
 
 - Branches: `feature/`, `fix/`, `docs/`
 - Commits: `type(scope): description`
-- PRs requieren CI verde
-- NUNCA commits de .env o secretos
-
-## Referencias
-
-- @ARCHITECTURE.md - Arquitectura detallada
-- @ROADMAP.md - Fases de desarrollo
-- @SETUP.md - Instrucciones de setup
-- @docs/TECH_COMPARISON.md - Decisiones tecnologicas
-- @docs/PIXEL_ART_DESIGN.md - Guia de diseno pixel art
-- @docs/CLAUDE_CONFIG.md - Configuracion de Claude Code
+- PRs require CI green
+- Never commit `.env` files

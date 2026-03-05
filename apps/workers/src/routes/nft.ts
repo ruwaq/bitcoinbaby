@@ -85,19 +85,48 @@ const listNftSchema = z.object({
   tokenId: z.number().int().positive(),
   price: z.number().int().min(1000, "Minimum price is 1000 satoshis"),
   sellerAddress: bitcoinAddressSchema,
+  /** Seller's signed PSBT (SIGHASH_SINGLE|ANYONECANPAY) for atomic swap */
+  sellerPsbt: z.string().optional(),
+  /** NFT UTXO location for PSBT-based listings */
+  nftUtxo: z
+    .object({
+      txid: z
+        .string()
+        .length(64)
+        .regex(/^[a-fA-F0-9]+$/),
+      vout: z.number().int().min(0),
+      value: z.number().int().positive(),
+    })
+    .optional(),
 });
 
 const buyNftSchema = z.object({
   buyerAddress: bitcoinAddressSchema,
+  /** Transaction ID (required for PSBT-based purchases, optional for legacy) */
   txid: z
     .string()
     .length(64)
-    .regex(/^[a-fA-F0-9]+$/),
+    .regex(/^[a-fA-F0-9]+$/)
+    .optional(),
 });
 
 const evolveNftSchema = z.object({
   tokenId: z.number().int().positive(),
   address: bitcoinAddressSchema,
+});
+
+const workProofSchema = z.object({
+  /** Owner's Bitcoin address */
+  ownerAddress: bitcoinAddressSchema,
+  /** Mining share hash (proof of work) */
+  shareHash: z
+    .string()
+    .length(64)
+    .regex(/^[a-fA-F0-9]+$/),
+  /** Difficulty of the share */
+  difficulty: z.number().int().min(1),
+  /** Timestamp when share was found */
+  timestamp: z.number().int().positive(),
 });
 
 // =============================================================================
@@ -131,6 +160,20 @@ const EVOLUTION_COSTS: Record<number, bigint> = {
   9: 25000n * 100_000_000n,
   10: 50000n * 100_000_000n,
 };
+
+// Base XP per valid share
+const BASE_XP_PER_SHARE = 100;
+
+// Bloodline XP multipliers
+const BLOODLINE_XP_MULTIPLIERS: Record<string, number> = {
+  royal: 1.5,
+  warrior: 1.2,
+  mystic: 1.3,
+  rogue: 1.0,
+};
+
+// Minimum difficulty to earn XP
+const MIN_DIFFICULTY_FOR_XP = 16;
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -453,8 +496,36 @@ nftRouter.post("/claim", validateBody(claimNftSchema), async (c) => {
 });
 
 /**
+ * Check if a UTXO exists (not spent) using mempool.space API
+ */
+async function checkUtxoExists(txid: string, vout: number): Promise<boolean> {
+  try {
+    const response = await fetchWithTimeout(
+      `${EXTERNAL_API.MEMPOOL_TESTNET4}/tx/${txid}/outspend/${vout}`,
+      {},
+      5000, // 5 second timeout
+    );
+
+    if (!response.ok) {
+      // If we can't verify, assume it exists (fail-safe)
+      return true;
+    }
+
+    const data = (await response.json()) as { spent: boolean };
+    // UTXO exists if it's not spent
+    return !data.spent;
+  } catch {
+    // On error, assume UTXO exists (fail-safe)
+    return true;
+  }
+}
+
+/**
  * GET /api/nft/listings - Get all active marketplace listings
  * Must be defined BEFORE /:tokenId to avoid route conflict
+ *
+ * Validates UTXO existence for PSBT-based listings and auto-invalidates
+ * listings where the NFT has been spent.
  */
 nftRouter.get("/listings", async (c) => {
   try {
@@ -476,7 +547,41 @@ nftRouter.get("/listings", async (c) => {
 
         if (!listing || !nftData) return null;
 
-        return {
+        // For PSBT-based listings, validate that the UTXO still exists
+        if (listing.nftUtxoTxid && listing.nftUtxoVout !== undefined) {
+          const utxoExists = await checkUtxoExists(
+            listing.nftUtxoTxid as string,
+            parseInt(listing.nftUtxoVout as string, 10),
+          );
+
+          if (!utxoExists) {
+            // Auto-invalidate the listing - UTXO was spent
+            marketplaceLogger.info("Auto-invalidating listing - UTXO spent", {
+              tokenId: id,
+              txid: (listing.nftUtxoTxid as string).slice(0, 8),
+            });
+            await redis.del(`nft:listing:${id}`);
+            await redis.srem("nft:active-listings", id);
+            return null;
+          }
+        }
+
+        // Build response object
+        const result: {
+          tokenId: number;
+          price: number;
+          sellerAddress: string;
+          listedAt: number;
+          sellerPsbt?: string;
+          nftUtxo?: { txid: string; vout: number; value: number };
+          nft: {
+            dna: string;
+            bloodline: string;
+            baseType: string;
+            rarityTier: string;
+            level: number;
+          };
+        } = {
           tokenId: parseInt(id, 10),
           price: parseInt(listing.price as string, 10),
           sellerAddress: listing.sellerAddress as string,
@@ -489,6 +594,20 @@ nftRouter.get("/listings", async (c) => {
             level: parseInt(nftData.level as string, 10) || 1,
           },
         };
+
+        // Include PSBT data if present
+        if (listing.sellerPsbt) {
+          result.sellerPsbt = listing.sellerPsbt as string;
+        }
+        if (listing.nftUtxoTxid) {
+          result.nftUtxo = {
+            txid: listing.nftUtxoTxid as string,
+            vout: parseInt(listing.nftUtxoVout as string, 10),
+            value: parseInt(listing.nftUtxoValue as string, 10),
+          };
+        }
+
+        return result;
       }),
     );
 
@@ -533,9 +652,14 @@ nftRouter.get("/:tokenId", validateParams(tokenIdParamSchema), async (c) => {
 
 /**
  * POST /api/nft/list - List an NFT for sale
+ *
+ * Supports two modes:
+ * 1. Legacy: Simple server-side listing (no PSBT)
+ * 2. PSBT-based: Atomic swap with seller's signed PSBT
  */
 nftRouter.post("/list", validateBody(listNftSchema), async (c) => {
-  const { tokenId, price, sellerAddress } = c.get("validatedBody");
+  const { tokenId, price, sellerAddress, sellerPsbt, nftUtxo } =
+    c.get("validatedBody");
 
   try {
     const redis = getRedis(c.env);
@@ -561,17 +685,32 @@ nftRouter.post("/list", validateBody(listNftSchema), async (c) => {
       return errorResponse(c, "NFT is already listed for sale", 400);
     }
 
-    const listing = {
+    // Create listing record
+    const listing: Record<string, string> = {
       tokenId: tokenId.toString(),
       price: price.toString(),
       sellerAddress,
       listedAt: Date.now().toString(),
     };
 
+    // Add PSBT fields if provided (atomic swap mode)
+    if (sellerPsbt) {
+      listing.sellerPsbt = sellerPsbt;
+    }
+    if (nftUtxo) {
+      listing.nftUtxoTxid = nftUtxo.txid;
+      listing.nftUtxoVout = nftUtxo.vout.toString();
+      listing.nftUtxoValue = nftUtxo.value.toString();
+    }
+
     await redis.hset(`nft:listing:${tokenId}`, listing);
     await redis.sadd("nft:active-listings", tokenId.toString());
 
-    marketplaceLogger.info("Listed NFT", { tokenId, price });
+    marketplaceLogger.info("Listed NFT", {
+      tokenId,
+      price,
+      hasPsbt: Boolean(sellerPsbt),
+    });
 
     return successResponse(c, listing);
   } catch (error) {
@@ -622,6 +761,9 @@ nftRouter.delete(
 /**
  * POST /api/nft/buy/:tokenId - Buy a listed NFT
  *
+ * For PSBT-based purchases, the buyer broadcasts the transaction and provides
+ * the txid. The server verifies the payment and updates ownership.
+ *
  * SECURITY: Verifies payment on blockchain before transferring ownership.
  */
 nftRouter.post(
@@ -631,6 +773,11 @@ nftRouter.post(
   async (c) => {
     const { tokenId } = c.get("validatedParams");
     const { buyerAddress, txid } = c.get("validatedBody");
+
+    // txid is required for purchase verification
+    if (!txid) {
+      return errorResponse(c, "Transaction ID is required for purchase", 400);
+    }
 
     try {
       const redis = getRedis(c.env);
@@ -889,3 +1036,118 @@ nftRouter.post("/evolve", validateBody(evolveNftSchema), async (c) => {
     return errorResponse(c, "Failed to evolve NFT", 500);
   }
 });
+
+// =============================================================================
+// NFT WORK PROOF (XP FROM MINING)
+// =============================================================================
+
+/**
+ * POST /api/nft/:tokenId/work-proof - Submit work proof to gain XP
+ *
+ * When a user mines a valid share, their equipped NFT gains XP.
+ * XP is calculated based on:
+ * - Base XP (100)
+ * - Bloodline multiplier (Royal: 1.5x, Warrior: 1.2x, Mystic: 1.3x, Rogue: 1.0x)
+ * - Difficulty bonus (higher difficulty = more XP)
+ */
+nftRouter.post(
+  "/:tokenId/work-proof",
+  validateParams(tokenIdParamSchema),
+  validateBody(workProofSchema),
+  async (c) => {
+    const { tokenId } = c.get("validatedParams");
+    const { ownerAddress, shareHash, difficulty, timestamp } =
+      c.get("validatedBody");
+
+    try {
+      const redis = getRedis(c.env);
+
+      // Check NFT exists
+      const nftData = await redis.hgetall(`nft:minted:${tokenId}`);
+      if (!nftData || Object.keys(nftData).length === 0) {
+        return errorResponse(c, "NFT not found", 404);
+      }
+
+      // Check ownership
+      const isOwned = await redis.sismember(
+        `nft:owned:${ownerAddress}`,
+        tokenId.toString(),
+      );
+      if (!isOwned) {
+        return errorResponse(c, "You do not own this NFT", 403);
+      }
+
+      // Validate difficulty meets minimum
+      if (difficulty < MIN_DIFFICULTY_FOR_XP) {
+        return errorResponse(
+          c,
+          `Difficulty ${difficulty} is below minimum ${MIN_DIFFICULTY_FOR_XP}`,
+          400,
+        );
+      }
+
+      // Check for duplicate share hash (prevent double-counting)
+      const shareKey = `nft:share:${shareHash}`;
+      const existingShare = await redis.get(shareKey);
+      if (existingShare) {
+        return errorResponse(c, "This share was already submitted", 400);
+      }
+
+      // Calculate XP
+      const bloodline = (nftData.bloodline as string) || "rogue";
+      const multiplier = BLOODLINE_XP_MULTIPLIERS[bloodline] || 1.0;
+      const difficultyBonus = Math.max(0, difficulty - MIN_DIFFICULTY_FOR_XP);
+      const xpGained = Math.floor(
+        BASE_XP_PER_SHARE * multiplier * (1 + difficultyBonus * 0.1),
+      );
+
+      // Update NFT XP
+      const currentXp = parseInt(nftData.xp as string, 10) || 0;
+      const currentTotalXp = parseInt(nftData.totalXp as string, 10) || 0;
+      const currentWorkCount = parseInt(nftData.workCount as string, 10) || 0;
+
+      const newXp = currentXp + xpGained;
+      const newTotalXp = currentTotalXp + xpGained;
+      const newWorkCount = currentWorkCount + 1;
+
+      await redis.hset(`nft:minted:${tokenId}`, {
+        xp: newXp.toString(),
+        totalXp: newTotalXp.toString(),
+        workCount: newWorkCount.toString(),
+        lastWorkBlock: timestamp.toString(),
+      });
+
+      // Mark share as used (expire after 24 hours to prevent infinite storage)
+      await redis.set(shareKey, tokenId.toString(), { ex: 86400 });
+
+      // Check if NFT can now evolve
+      const currentLevel = parseInt(nftData.level as string, 10) || 1;
+      const nextLevel = currentLevel + 1;
+      const xpRequired = XP_REQUIREMENTS[nextLevel] || Infinity;
+      const canEvolve = nextLevel <= 10 && newXp >= xpRequired;
+
+      nftLogger.info("Work proof submitted", {
+        tokenId,
+        xpGained,
+        newXp,
+        bloodline,
+        difficulty,
+      });
+
+      return successResponse(c, {
+        tokenId,
+        xpGained,
+        newXp,
+        totalXp: newTotalXp,
+        workCount: newWorkCount,
+        bloodline,
+        multiplier,
+        canEvolve,
+        xpToNextLevel: Math.max(0, xpRequired - newXp),
+      });
+    } catch (error) {
+      nftLogger.error("[NFT] Work proof error:", error);
+      return errorResponse(c, "Failed to submit work proof", 500);
+    }
+  },
+);

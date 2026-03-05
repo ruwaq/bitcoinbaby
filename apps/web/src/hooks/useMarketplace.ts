@@ -1,18 +1,30 @@
 /**
  * useMarketplace Hook
  *
- * Manages NFT marketplace listings, buying, and selling.
+ * Manages NFT marketplace listings, buying, and selling with PSBT-based atomic swaps.
+ *
+ * Architecture follows Magic Eden / OKX pattern:
+ * - Seller signs with SIGHASH_SINGLE | ANYONECANPAY
+ * - Buyer completes PSBT with payment UTXOs
+ * - Single atomic transaction swaps NFT for BTC
  */
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getApiClient,
   useWalletStore,
   type NFTListingWithNFT,
 } from "@bitcoinbaby/core";
+import {
+  createListingService,
+  createMempoolClient,
+  getRoyaltyAddress,
+  MARKETPLACE_CONFIG,
+  Psbt,
+} from "@bitcoinbaby/bitcoin";
 
 // =============================================================================
 // TYPES
@@ -55,6 +67,7 @@ export interface UnlistResult {
 
 export interface BuyResult {
   success: boolean;
+  txid?: string;
   error?: string;
 }
 
@@ -92,7 +105,18 @@ export function useMarketplace(): UseMarketplaceReturn {
 
   // Wallet
   const wallet = useWalletStore((s) => s.wallet);
+  const signPsbt = useWalletStore((s) => s.signPsbt);
   const isWalletConnected = Boolean(wallet?.address);
+
+  // Services
+  const listingService = useMemo(
+    () => createListingService({ network: "testnet4" }),
+    [],
+  );
+  const mempoolClient = useMemo(
+    () => createMempoolClient({ network: "testnet4" }),
+    [],
+  );
 
   // Query for listings
   const {
@@ -117,7 +141,13 @@ export function useMarketplace(): UseMarketplaceReturn {
   }, [refetch]);
 
   /**
-   * List an NFT for sale
+   * List an NFT for sale using PSBT
+   *
+   * Flow:
+   * 1. Get NFT UTXO from blockchain (Charms extraction)
+   * 2. Create listing PSBT using ListingService
+   * 3. Sign with wallet (SIGHASH_SINGLE|ANYONECANPAY)
+   * 4. Send signed PSBT to server for indexing
    */
   const listNFT = useCallback(
     async (tokenId: number, price: number): Promise<ListResult> => {
@@ -125,12 +155,70 @@ export function useMarketplace(): UseMarketplaceReturn {
         return { success: false, error: "Wallet not connected" };
       }
 
+      if (!signPsbt) {
+        return { success: false, error: "Wallet signing not available" };
+      }
+
       setIsProcessing(true);
       setProcessingError(null);
 
       try {
+        // 1. Get NFT UTXO from server/blockchain
+        // For now, we'll get it from the API client
         const apiClient = getApiClient();
-        const result = await apiClient.listNFT(tokenId, price, wallet.address);
+
+        // Get the NFT's current UTXO location
+        // TODO: This should query Scrolls/Charms for the actual UTXO
+        const nftResponse = await apiClient.getNFT(tokenId);
+        if (!nftResponse.success || !nftResponse.data) {
+          throw new Error("Failed to get NFT data");
+        }
+
+        // Get UTXOs for the wallet to find the NFT
+        const utxos = await mempoolClient.getUTXOs(wallet.address);
+        if (utxos.length === 0) {
+          throw new Error("No UTXOs found for wallet");
+        }
+
+        // For now, use a placeholder UTXO - in production, this would
+        // query Scrolls API to find the specific Charm UTXO
+        // TODO: Integrate with Scrolls API to get exact NFT UTXO
+        const nftUtxo = {
+          txid: utxos[0].txid,
+          vout: utxos[0].vout,
+          value: utxos[0].value,
+        };
+
+        // 2. Create listing PSBT
+        const priceSats = BigInt(price);
+        const listingResult = listingService.createListingPSBT({
+          nftUtxo,
+          sellerAddress: wallet.address,
+          priceSats,
+          royaltyAddress: getRoyaltyAddress(),
+          royaltyPercent: MARKETPLACE_CONFIG.royaltyPercent,
+        });
+
+        if (!listingResult.success || !listingResult.psbt) {
+          throw new Error(
+            listingResult.error || "Failed to create listing PSBT",
+          );
+        }
+
+        // 3. Sign with wallet (SIGHASH_SINGLE|ANYONECANPAY)
+        const signedPsbt = await signPsbt(listingResult.psbt);
+        if (!signedPsbt) {
+          throw new Error("Failed to sign listing PSBT");
+        }
+
+        // 4. Send to server
+        const result = await apiClient.listNFT(
+          tokenId,
+          price,
+          wallet.address,
+          signedPsbt,
+          nftUtxo,
+        );
 
         if (!result.success) {
           throw new Error(result.error || "Failed to list NFT");
@@ -151,7 +239,7 @@ export function useMarketplace(): UseMarketplaceReturn {
         setIsProcessing(false);
       }
     },
-    [wallet, queryClient],
+    [wallet, signPsbt, queryClient, listingService, mempoolClient],
   );
 
   /**
@@ -190,7 +278,15 @@ export function useMarketplace(): UseMarketplaceReturn {
   );
 
   /**
-   * Buy a listed NFT
+   * Buy a listed NFT using PSBT atomic swap
+   *
+   * Flow:
+   * 1. Get listing with seller's signed PSBT from server
+   * 2. Get buyer's UTXOs for payment
+   * 3. Complete PSBT with ListingService
+   * 4. Sign buyer's inputs
+   * 5. Broadcast to network
+   * 6. Notify server of purchase
    */
   const buyNFT = useCallback(
     async (tokenId: number): Promise<BuyResult> => {
@@ -198,16 +294,71 @@ export function useMarketplace(): UseMarketplaceReturn {
         return { success: false, error: "Wallet not connected" };
       }
 
+      if (!signPsbt) {
+        return { success: false, error: "Wallet signing not available" };
+      }
+
       setIsProcessing(true);
       setProcessingError(null);
 
       try {
-        const apiClient = getApiClient();
-        const result = await apiClient.buyNFT(tokenId, wallet.address);
-
-        if (!result.success) {
-          throw new Error(result.error || "Failed to buy NFT");
+        // 1. Get listing with seller's PSBT
+        const listing = listings.find((l) => l.tokenId === tokenId);
+        if (!listing) {
+          throw new Error("Listing not found");
         }
+
+        // Check if listing has PSBT (new PSBT-based listing)
+        if (!listing.sellerPsbt) {
+          // Fallback to legacy server-based purchase
+          const apiClient = getApiClient();
+          const result = await apiClient.buyNFT(tokenId, wallet.address);
+          if (!result.success) {
+            throw new Error(result.error || "Failed to buy NFT");
+          }
+          // Invalidate queries
+          queryClient.invalidateQueries({ queryKey: LISTINGS_QUERY_KEY });
+          queryClient.invalidateQueries({
+            queryKey: ["owned-nfts-indexed", wallet.address],
+          });
+          return { success: true };
+        }
+
+        // 2. Get buyer's UTXOs
+        const utxos = await mempoolClient.getUTXOs(wallet.address);
+        if (utxos.length === 0) {
+          throw new Error("No UTXOs found for payment");
+        }
+
+        // 3. Complete PSBT with buyer's payment
+        const purchaseResult = listingService.completePurchasePSBT({
+          listingPsbt: listing.sellerPsbt,
+          buyerAddress: wallet.address,
+          buyerUtxos: utxos,
+          feeRate: 10, // TODO: Get dynamic fee rate
+        });
+
+        if (!purchaseResult.success || !purchaseResult.psbt) {
+          throw new Error(
+            purchaseResult.error || "Failed to complete purchase PSBT",
+          );
+        }
+
+        // 4. Sign buyer's inputs
+        const signedPsbt = await signPsbt(purchaseResult.psbt);
+        if (!signedPsbt) {
+          throw new Error("Failed to sign purchase PSBT");
+        }
+
+        // 5. Finalize and broadcast
+        const psbt = Psbt.fromBase64(signedPsbt);
+        psbt.finalizeAllInputs();
+        const rawTxHex = psbt.extractTransaction().toHex();
+        const txid = await mempoolClient.broadcastTransaction(rawTxHex);
+
+        // 6. Notify server
+        const apiClient = getApiClient();
+        await apiClient.buyNFT(tokenId, wallet.address, txid);
 
         // Invalidate queries to refresh data
         queryClient.invalidateQueries({ queryKey: LISTINGS_QUERY_KEY });
@@ -215,7 +366,7 @@ export function useMarketplace(): UseMarketplaceReturn {
           queryKey: ["owned-nfts-indexed", wallet.address],
         });
 
-        return { success: true };
+        return { success: true, txid };
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to buy";
         setProcessingError(message);
@@ -224,7 +375,7 @@ export function useMarketplace(): UseMarketplaceReturn {
         setIsProcessing(false);
       }
     },
-    [wallet, queryClient],
+    [wallet, signPsbt, queryClient, listings, listingService, mempoolClient],
   );
 
   return {

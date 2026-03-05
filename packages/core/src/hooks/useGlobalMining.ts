@@ -51,6 +51,8 @@ export interface UseGlobalMiningOptions {
   cosmicMultiplier?: number;
   /** Callback when work is found */
   onWorkFound?: MiningManagerConfig["onWorkFound"];
+  /** Callback when XP is gained (for NFT work proof) */
+  onXPGained?: MiningManagerConfig["onXPGained"];
   /** Callback on error */
   onError?: MiningManagerConfig["onError"];
 }
@@ -94,6 +96,7 @@ export function useGlobalMining(
     // nftBoost is deprecated - read from NFTStore instead
     cosmicMultiplier: initialCosmicMultiplier = 1.0,
     onWorkFound,
+    onXPGained,
     onError,
   } = options;
 
@@ -120,6 +123,7 @@ export function useGlobalMining(
       initialDifficulty: difficulty,
       minerAddress,
       onWorkFound,
+      onXPGained,
       onError,
     });
 
@@ -142,7 +146,15 @@ export function useGlobalMining(
       // Note: We do NOT destroy the manager here!
       // The manager persists across navigation
     };
-  }, [manager, difficulty, minerAddress, onWorkFound, onError, updateStats]);
+  }, [
+    manager,
+    difficulty,
+    minerAddress,
+    onWorkFound,
+    onXPGained,
+    onError,
+    updateStats,
+  ]);
 
   // Auto-start if requested
   useEffect(() => {

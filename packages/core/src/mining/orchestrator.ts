@@ -5,6 +5,7 @@ import type {
   OrchestratorConfig,
   DeviceCapabilities,
   BatteryManager,
+  XPGainedEvent,
 } from "./types";
 import { CPUMiner } from "./cpu-miner";
 import {
@@ -198,8 +199,15 @@ export class MiningOrchestrator {
    * Handle work found from miners
    * Integrates AI PoUW by executing AI tasks on each share
    * AI work is non-blocking and optional
+   *
+   * Also emits XP gained event for NFT system integration
    */
   private handleWorkFound(result: MiningResult): void {
+    // Emit XP gained event for NFT system (symbiosis: mining → NFT XP)
+    // Base XP is calculated from difficulty - higher difficulty = more XP
+    const baseXP = this.calculateBaseXP(result.difficulty);
+    this.emitXPGained(result, baseXP);
+
     // If AI PoUW is not enabled, just pass through
     if (!this.aiIntegration) {
       this.events.onWorkFound?.(result);
@@ -234,6 +242,32 @@ export class MiningOrchestrator {
         console.warn("[Orchestrator] AI integration error:", error);
         this.events.onWorkFound?.(result);
       });
+  }
+
+  /**
+   * Calculate base XP from difficulty
+   * Higher difficulty = more XP (rewards harder work)
+   */
+  private calculateBaseXP(difficulty: number): number {
+    // Base: 100 XP at MIN_DIFFICULTY
+    // Each additional difficulty bit doubles the XP
+    const difficultyBonus = difficulty - MIN_DIFFICULTY;
+    return Math.floor(100 * Math.pow(1.5, difficultyBonus));
+  }
+
+  /**
+   * Emit XP gained event for NFT system
+   * This enables the symbiosis between mining and NFT progression
+   */
+  private emitXPGained(result: MiningResult, baseXP: number): void {
+    if (this.events.onXPGained) {
+      const event: XPGainedEvent = {
+        result,
+        baseXP,
+        timestamp: Date.now(),
+      };
+      this.events.onXPGained(event);
+    }
   }
 
   /**

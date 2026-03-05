@@ -92,10 +92,13 @@ export function useMintNFT(): UseMintNFTReturn {
     setIsLoading(true);
     setError(null);
 
+    // Track reserved token ID for cleanup on error
+    let reservedTokenId: number | null = null;
+    const apiClient = getApiClient();
+
     try {
       // Reserve next NFT ID from server (atomic counter)
       // Uses centralized API client for proper environment handling
-      const apiClient = getApiClient();
       const reserveResult = await apiClient.reserveNFT();
 
       if (!reserveResult.success || !reserveResult.data) {
@@ -105,7 +108,7 @@ export function useMintNFT(): UseMintNFTReturn {
         );
       }
 
-      const reservedTokenId = reserveResult.data.tokenId;
+      reservedTokenId = reserveResult.data.tokenId;
       console.log(
         `[MintNFT] Reserved token ID: ${reservedTokenId} (total minted: ${reserveResult.data.totalMinted})`,
       );
@@ -177,6 +180,9 @@ export function useMintNFT(): UseMintNFTReturn {
         .confirmNFTMint(reservedTokenId, broadcastTxid, wallet.address, nftData)
         .catch((err) => console.warn("[MintNFT] Failed to confirm mint:", err));
 
+      // Clear reservedTokenId on success (no cleanup needed)
+      reservedTokenId = null;
+
       setLastMinted(mintResult.nft!);
       setTxid(broadcastTxid);
 
@@ -184,6 +190,22 @@ export function useMintNFT(): UseMintNFTReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Mint failed";
       setError(message);
+
+      // Release reserved token ID if mint failed after reservation
+      if (reservedTokenId !== null) {
+        console.log(
+          `[MintNFT] Releasing reserved token ID ${reservedTokenId} due to error`,
+        );
+        apiClient
+          .releaseNFT(reservedTokenId)
+          .catch((releaseErr) =>
+            console.warn(
+              `[MintNFT] Failed to release token ${reservedTokenId}:`,
+              releaseErr,
+            ),
+          );
+      }
+
       return { success: false, error: message };
     } finally {
       setIsLoading(false);

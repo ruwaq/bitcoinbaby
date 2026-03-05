@@ -100,6 +100,16 @@ export {
   type UnlistResult,
   type BuyResult,
 } from "./useMarketplace";
+export {
+  useEvolution,
+  type UseEvolutionReturn,
+  type EvolutionResult,
+} from "./useEvolution";
+export {
+  useWorkProof,
+  type UseWorkProofReturn,
+  type WorkProofParams,
+} from "./useWorkProof";
 
 // Platform hooks
 export { useCapacitor, type UseCapacitorReturn } from "./useCapacitor";

@@ -363,6 +363,36 @@ export {
   getBestProvider,
 } from "./providers";
 
+// Marketplace (PSBT-based NFT Trading)
+export {
+  // Types
+  type MarketplaceListing,
+  type CreateListingParams,
+  type CreateListingResult,
+  type CompletePurchaseParams,
+  type CompletePurchaseResult,
+  type SaleRecord,
+  type PurchaseFeeBreakdown,
+  // Config
+  MARKETPLACE_CONFIG,
+  type MarketplaceConfig,
+  getRoyaltyAddress,
+  getMarketplaceFeeAddress,
+  calculateRoyalty,
+  calculateBuyerFee,
+  calculateSellerFee,
+  calculateSellerReceives,
+  calculateBuyerTotalCost,
+  validateListingPrice,
+  isListingExpired,
+  calculateExpirationTime,
+  // Service
+  ListingService,
+  ListingError,
+  createListingService,
+  type ListingServiceOptions,
+} from "./marketplace";
+
 // Inscription System (Genesis Babies NFTs on Bitcoin)
 export {
   // PNG Exporter

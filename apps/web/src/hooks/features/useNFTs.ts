@@ -13,6 +13,7 @@ import { useNFTSync, useInvalidateNFTs } from "@/hooks/useNFTSync";
 import { useClaimNFT } from "@/hooks/useClaimNFT";
 import { useVirtualBalance } from "@/hooks/useVirtualBalance";
 import { useMarketplace } from "@/hooks/useMarketplace";
+import { useEvolution } from "@/hooks/useEvolution";
 import type { BabyNFTState } from "@bitcoinbaby/bitcoin";
 import type { TransactionDetails } from "@bitcoinbaby/ui";
 
@@ -88,6 +89,22 @@ export interface UseNFTsReturn {
     ) => Promise<{ success: boolean; error?: string }>;
   };
 
+  // Evolution
+  evolution: {
+    evolve: (nft: BabyNFTState) => Promise<{
+      success: boolean;
+      txid?: string;
+      newLevel?: number;
+      error?: string;
+    }>;
+    isEvolving: boolean;
+    error: string | null;
+    canEvolve: (nft: BabyNFTState) => boolean;
+    getEvolutionCost: (nft: BabyNFTState) => bigint;
+    getXPRequired: (nft: BabyNFTState) => number;
+    clearError: () => void;
+  };
+
   // Balances
   balances: {
     virtualBABY: bigint;
@@ -157,6 +174,17 @@ export function useNFTs(): UseNFTsReturn {
     processingError: marketplaceError,
   } = useMarketplace();
 
+  // Evolution hook
+  const {
+    evolve,
+    isEvolving,
+    error: evolutionError,
+    canEvolve,
+    getEvolutionCost,
+    getXPRequired,
+    clearError: clearEvolutionError,
+  } = useEvolution();
+
   // NFT Sale hook for pricing
   const { formattedPrice, price } = useNFTSale({
     buyerAddress: walletAddress,
@@ -193,11 +221,14 @@ export function useNFTs(): UseNFTsReturn {
     [formattedPrice, priceSats, feeSats],
   );
 
-  // Filter NFT-related transactions
+  // Filter NFT-related transactions (including evolution)
   const nftTransactions = useMemo(
     () =>
       pendingTransactions.filter(
-        (tx) => tx.type === "nft_mint" || tx.type === "nft_purchase",
+        (tx) =>
+          tx.type === "nft_mint" ||
+          tx.type === "nft_purchase" ||
+          tx.type === "nft_evolution",
       ),
     [pendingTransactions],
   );
@@ -258,6 +289,16 @@ export function useNFTs(): UseNFTsReturn {
       error: marketplaceError,
       buyNFT,
       listNFT,
+    },
+
+    evolution: {
+      evolve,
+      isEvolving,
+      error: evolutionError,
+      canEvolve,
+      getEvolutionCost,
+      getXPRequired,
+      clearError: clearEvolutionError,
     },
 
     balances: {

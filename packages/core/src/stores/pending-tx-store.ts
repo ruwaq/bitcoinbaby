@@ -21,6 +21,7 @@ import {
 export type TransactionType =
   | "nft_mint"
   | "nft_purchase"
+  | "nft_evolution"
   | "withdraw"
   | "other";
 

@@ -12,6 +12,7 @@ export {
   type NFTListing,
   type NFTListingWithNFT,
   type NFTSale,
+  type WorkProofResult,
 } from "./client";
 export type {
   ApiResponse,

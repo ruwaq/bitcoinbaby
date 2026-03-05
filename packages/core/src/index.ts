@@ -25,6 +25,7 @@ export {
   type NFTListing,
   type NFTListingWithNFT,
   type NFTSale,
+  type WorkProofResult,
 } from "./api";
 export type {
   ApiResponse,

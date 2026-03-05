@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
-import { getEvolutionStatus, type BabyNFTState } from "@bitcoinbaby/ui";
+import { type BabyNFTState } from "@bitcoinbaby/ui";
+import { type BabyNFTState as CoreBabyNFTState } from "@bitcoinbaby/bitcoin";
 import { useNFTs } from "@/hooks/features";
 
 type SubTab = "collection" | "mint" | "claim" | "marketplace";
@@ -79,28 +80,44 @@ export function useNFTsSection() {
 
   const handleEvolve = useCallback(
     async (nft: BabyNFTState) => {
+      // Mark as evolving
       setEvolvingIds((prev) => new Set(prev).add(nft.tokenId));
-      await new Promise((r) => setTimeout(r, 2000));
 
-      const evolutionStatus = getEvolutionStatus(nft);
-      if (evolutionStatus.canEvolve) {
-        const updatedNFTs = nfts.collection.nfts.map((n) =>
-          n.tokenId === nft.tokenId ? { ...n, level: n.level + 1, xp: 0 } : n,
-        );
-        nfts.collection.setNFTs(updatedNFTs);
+      try {
+        // Cast to core type for blockchain operations
+        // UI type is a superset of core type, so this is safe for canonical bloodlines
+        const coreNFT = nft as unknown as CoreBabyNFTState;
 
-        if (selectedNFT?.tokenId === nft.tokenId) {
-          setSelectedNFT({ ...nft, level: nft.level + 1, xp: 0 });
+        // Execute real blockchain evolution
+        const result = await nfts.evolution.evolve(coreNFT);
+
+        if (result.success && result.newLevel) {
+          // Optimistically update local state while tx confirms
+          const updatedNFTs = nfts.collection.nfts.map((n) =>
+            n.tokenId === nft.tokenId
+              ? { ...n, level: result.newLevel!, xp: 0 }
+              : n,
+          );
+          nfts.collection.setNFTs(updatedNFTs);
+
+          // Update selected NFT if it was the evolved one
+          if (selectedNFT?.tokenId === nft.tokenId) {
+            setSelectedNFT({ ...nft, level: result.newLevel, xp: 0 });
+          }
+
+          // Invalidate cache to refetch from server
+          nfts.collection.invalidate();
         }
+      } finally {
+        // Remove from evolving set
+        setEvolvingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(nft.tokenId);
+          return next;
+        });
       }
-
-      setEvolvingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(nft.tokenId);
-        return next;
-      });
     },
-    [nfts.collection, selectedNFT],
+    [nfts.evolution, nfts.collection, selectedNFT],
   );
 
   const handleListNFT = useCallback(
