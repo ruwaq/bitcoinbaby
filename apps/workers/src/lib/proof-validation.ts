@@ -9,8 +9,8 @@
 // CONSTANTS (must match packages/core/src/tokenomics/constants.ts)
 // =============================================================================
 
-/** Minimum difficulty (D22 for sustainable emission) */
-export const MIN_DIFFICULTY = 22;
+/** Minimum difficulty (D16 to match contract) */
+export const MIN_DIFFICULTY = 16;
 
 /** Maximum difficulty (reasonable cap to prevent overflow) */
 export const MAX_DIFFICULTY = 32;

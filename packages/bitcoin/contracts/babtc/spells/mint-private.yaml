@@ -1,0 +1,7 @@
+# Mining witness (private inputs)
+# Passed separately via --private-inputs
+
+t/87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681b/469fd40e1f860643db24763ec462ba4250e3f8253c322a9e395f3ec7e31f84c4:
+  challenge: "${CHALLENGE}"
+  nonce: "${NONCE}"
+  difficulty: ${DIFFICULTY}

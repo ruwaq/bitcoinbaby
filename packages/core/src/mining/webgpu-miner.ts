@@ -47,7 +47,7 @@ export class WebGPUMiner implements Miner {
   private running = false;
   private paused = false;
   private nonce = 0n;
-  private difficulty = 22; // D22 for natural emission control
+  private difficulty = 16; // D16 minimum to match contract
   private throttle = 100;
   private challenge = "";
   private challengeByteLength = 0; // Cached challenge byte length for performance
@@ -81,7 +81,7 @@ export class WebGPUMiner implements Miner {
       onError?: (error: Error) => void;
     } = {},
   ) {
-    this.difficulty = options.difficulty ?? 22; // D22 for natural emission control
+    this.difficulty = options.difficulty ?? 16; // D16 minimum to match contract
     this.minerAddress = options.address ?? "";
     this.onHashrateUpdate = options.onHashrateUpdate;
     this.onWorkFound = options.onWorkFound;

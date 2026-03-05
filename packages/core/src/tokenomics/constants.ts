@@ -59,12 +59,13 @@ export const BASE_REWARD_PER_SHARE = BigInt(10);
 
 /**
  * Minimum mining difficulty
- * Increased to D22 for very sustainable emission rate
+ * Set to D16 to match the BABTC contract
  *
- * D22 = ~10 shares/hour for GPU (vs 700 at D16)
- * Shares are hard to find = very valuable
+ * Reward formula: BASE_REWARD × D² ÷ DIFFICULTY_FACTOR
+ * D16 = 2.56 BABTC reward per valid share
+ * D22 = 4.84 BABTC reward per valid share
  */
-export const MIN_DIFFICULTY = 22;
+export const MIN_DIFFICULTY = 16;
 
 /**
  * Maximum mining difficulty

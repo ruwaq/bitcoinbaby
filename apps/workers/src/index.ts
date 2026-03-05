@@ -22,6 +22,10 @@ import {
 } from "./lib/redis";
 import { fetchWithTimeout, EXTERNAL_API } from "./lib/helpers";
 import { scheduledLogger } from "./lib/logger";
+import {
+  createBatchMintingService,
+  type ReadyBatch,
+} from "./services/batch-minting";
 
 // Import modular routers
 import {
@@ -152,6 +156,101 @@ app.route("/api/admin", adminRouter);
 app.route("/api/history", historyRouter);
 
 // =============================================================================
+// BATCH MINTING PROCESSING
+// =============================================================================
+
+/**
+ * Process ready batches through Prover API
+ *
+ * This function fetches batches that are ready for processing and submits
+ * them to the Charms Prover API to generate commit + spell transactions.
+ */
+async function processReadyBatchesWithProver(env: Env): Promise<void> {
+  const batchMintingService = createBatchMintingService(env);
+
+  // Check if prover is available
+  const proverAvailable = await batchMintingService.isProverAvailable();
+  if (!proverAvailable) {
+    scheduledLogger.warn(
+      "Prover service unavailable, skipping batch minting processing",
+    );
+    return;
+  }
+
+  // Get ready batches from all pool types
+  const poolTypes = ["weekly", "monthly", "low_fee", "immediate"] as const;
+
+  for (const poolType of poolTypes) {
+    try {
+      const id = env.WITHDRAW_POOL.idFromName(poolType);
+      const stub = env.WITHDRAW_POOL.get(id);
+
+      // Fetch ready batches
+      const response = await stub.fetch(
+        new Request("http://internal/pool/batches/ready", {
+          method: "GET",
+          headers: {
+            "X-Admin-Key": env.ADMIN_KEY || "",
+          },
+        }),
+      );
+
+      if (!response.ok) {
+        scheduledLogger.warn("Failed to fetch ready batches", {
+          poolType,
+          status: response.status,
+        });
+        continue;
+      }
+
+      const data = (await response.json()) as {
+        success: boolean;
+        data?: {
+          batches: ReadyBatch[];
+        };
+      };
+
+      if (!data.success || !data.data?.batches?.length) {
+        continue;
+      }
+
+      // Process each batch through Prover API
+      for (const batch of data.data.batches) {
+        scheduledLogger.info("Processing batch through Prover API", {
+          batchId: batch.id,
+          poolType,
+          recipientCount: batch.recipients.length,
+        });
+
+        const result = await batchMintingService.processBatch(batch);
+
+        if (result.success) {
+          scheduledLogger.info("Batch processed successfully", {
+            batchId: batch.id,
+            hasCommitTx: !!result.commitTxHex,
+            hasSpellTx: !!result.spellTxHex,
+          });
+
+          // TODO: Store commit/spell TXs for external signing
+          // For now, log the result. In production, these TXs would be
+          // stored in the batch record and fetched by an external signer.
+          // The signer would then sign both TXs and broadcast them.
+        } else {
+          scheduledLogger.error("Batch processing failed", null, {
+            batchId: batch.id,
+            error: result.error,
+          });
+        }
+      }
+    } catch (error) {
+      scheduledLogger.error("Error processing pool batches", error, {
+        poolType,
+      });
+    }
+  }
+}
+
+// =============================================================================
 // SCHEDULED TASKS (Cron)
 // =============================================================================
 
@@ -247,6 +346,20 @@ async function handleScheduled(event: ScheduledEvent, env: Env): Promise<void> {
     } catch (error) {
       scheduledLogger.error("Failed to check fees", error);
     }
+  }
+
+  // ==========================================================================
+  // BATCH MINTING - PROVER API PROCESSING
+  // ==========================================================================
+
+  // Process ready batches every hour (after any pool processing)
+  // This calls the Charms Prover API to generate commit + spell TXs
+  scheduledLogger.info("Processing ready batches through Prover API");
+  try {
+    await processReadyBatchesWithProver(env);
+    scheduledLogger.info("Batch minting processing complete");
+  } catch (error) {
+    scheduledLogger.error("Failed to process batches with Prover", error);
   }
 }
 

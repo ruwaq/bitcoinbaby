@@ -17,7 +17,13 @@ export type {
   SpellV2,
   SpellV2Input,
   SpellV2Output,
-  // Spell Format V10 (current)
+  // Spell Format V9 (PoW Direct - CLI 0.11.1)
+  SpellV9,
+  SpellV9Input,
+  SpellV9Output,
+  PoWPrivateInputs,
+  PoWMintSpellParams,
+  // Spell Format V10 (Merkle Proofs)
   SpellV10,
   SpellV10Input,
   SpellV10Output,
@@ -55,7 +61,9 @@ export {
   // Utilities
   parseAppReference,
   createAppReference,
-  // V10 Spell Builders
+  // V9 Spell Builders (PoW Direct)
+  createPoWMintSpellV9,
+  // V10 Spell Builders (Merkle Proofs)
   createMiningMintSpellV10,
   createTokenTransferSpellV10,
   createBatchTransferSpellV10,
@@ -71,6 +79,9 @@ export type {
   MiningReward,
   TokenMintParams,
   TokenTransferParams,
+  // V9 (PoW Direct - primary)
+  TokenMintParamsV9,
+  // V10 (Merkle Proofs)
   TokenMintParamsV10,
 } from "./token";
 
@@ -82,12 +93,17 @@ export {
   getCurrentEpoch,
   calculateBlockReward,
   calculateMiningReward,
+  calculateRewardForDifficulty,
+  getRewardTable,
   formatTokenAmount,
   parseTokenAmount,
   // Spell Generation (V2 - deprecated)
   createTokenMintSpell,
   createTokenTransferSpell,
-  // Spell Generation (V10 - current)
+  // Spell Generation (V9 - PoW Direct, primary)
+  createBABTCMintSpellV9,
+  createBABTCMintSpellV9WithRewards,
+  // Spell Generation (V10 - Merkle Proofs)
   createBABTCMintSpellV10,
   createBABTCTransferSpellV10,
   validateAmountForSpell,
@@ -195,3 +211,41 @@ export {
   calculatePurchaseOutputs,
   calculateSalesStats,
 } from "./nft-sale";
+
+// =============================================================================
+// PROVER CLIENT (Charms Proving Service)
+// =============================================================================
+
+export type {
+  ProverResponse,
+  ProverRequest,
+  CharmsProverClientOptions,
+} from "./prover";
+
+export {
+  CharmsProverClient,
+  ProverError,
+  createCharmsProverClient,
+  getProverUrl,
+  getLocalProverUrl,
+  getHostedProverUrl,
+} from "./prover";
+
+// =============================================================================
+// MINTING MANAGER (Complete Minting Flow)
+// =============================================================================
+
+export type {
+  MintingManagerOptions,
+  MiningData,
+  MintingStep,
+  MintingProgressCallback,
+  MintingResult,
+  PreparedMintingTxs,
+} from "./minting-manager";
+
+export {
+  MintingManager,
+  MintingError,
+  createMintingManager,
+} from "./minting-manager";

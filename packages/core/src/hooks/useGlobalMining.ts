@@ -88,7 +88,7 @@ export function useGlobalMining(
   options: UseGlobalMiningOptions = {},
 ): UseGlobalMiningReturn {
   const {
-    difficulty = 22, // D22 for very sustainable emission
+    difficulty = 16, // D16 minimum to match contract
     minerAddress,
     autoStart = false,
     // nftBoost is deprecated - read from NFTStore instead

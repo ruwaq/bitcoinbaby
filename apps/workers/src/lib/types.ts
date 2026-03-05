@@ -31,6 +31,10 @@ export interface Env {
   SCROLLS_API_KEY?: string;
   BATCH_WALLET_SEED?: string;
   ADMIN_KEY?: string;
+
+  // Charms/Prover configuration
+  PROVER_URL?: string;
+  TREASURY_ADDRESS?: string;
 }
 
 // =============================================================================

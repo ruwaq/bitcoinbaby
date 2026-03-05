@@ -1,93 +1,81 @@
-# BABTC Contract Build & Deploy
+# BABTC Contract Build Instructions
 
 ## Prerequisites
 
-1. **Rust toolchain**
-   ```bash
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   rustup target add wasm32-unknown-unknown
-   ```
+- Rust with wasm32-wasip1 target: `rustup target add wasm32-wasip1`
+- Charms CLI: `cargo install charms-cli`
 
-2. **Charms CLI**
-   ```bash
-   cargo install --locked charms
-   ```
-
-3. **SP1 zkVM SDK** (for proof generation)
-   Follow instructions at: https://docs.charms.dev/getting-started/
-
-## Build Contract
+## Build
 
 ```bash
 cd packages/bitcoin/contracts/babtc
 
-# Build WASM binary
-cargo build --release --target wasm32-unknown-unknown
+# Build the contract
+charms app build
 
-# Output: target/wasm32-unknown-unknown/release/babtc_contract.wasm
+# Output: ./target/wasm32-wasip1/release/babtc-contract.wasm
 ```
 
-## Generate Verification Key
+## Get Verification Key
 
 ```bash
-# Hash the WASM binary to get the verification key
-sha256sum target/wasm32-unknown-unknown/release/babtc_contract.wasm
+charms app vk ./target/wasm32-wasip1/release/babtc-contract.wasm
+# Output: 72cddbf02e3412f92ed134fd88dffdfa918c74faf5695db118ff6cb98fc602f0
 ```
 
-## Deploy to Testnet4
+## Test Spell
 
-1. **Create Genesis UTXO**
-   Send a small amount of tBTC to a new address to create the genesis UTXO.
-
-2. **Deploy App**
-   ```bash
-   charms deploy \
-     --network testnet4 \
-     --wasm target/wasm32-unknown-unknown/release/babtc_contract.wasm \
-     --genesis-utxo <txid>:<vout>
-   ```
-
-3. **Save App ID and VK**
-   The deploy command outputs:
-   - App ID: SHA256 of genesis UTXO
-   - VK: SHA256 of WASM binary
-
-4. **Update TypeScript Config**
-   Update `packages/bitcoin/src/charms/token.ts`:
-   ```typescript
-   export const BABTC_DEPLOYED = {
-     appId: '<your_app_id>',
-     appVk: '<your_vk>',
-   };
-   ```
-
-## Test on Testnet4
-
-1. Get testnet4 tBTC from a faucet
-2. Start mining in the app
-3. Find a valid share
-4. Submit mining TX
-5. Wait for confirmation
-6. Submit mint spell
-7. Verify balance in Charms explorer
-
-## Contract Verification
-
-The contract validates:
-- Mining TX inclusion via Merkle proof
-- PoW difficulty (minimum 16 leading zeros)
-- Reward calculation per halving schedule
-- Distribution: 70% miner, 20% dev, 10% staking
-
-## Troubleshooting
-
-### Build fails with "charms-sdk not found"
 ```bash
-# Add Charms crates.io registry
-echo '[registries.charms]' >> ~/.cargo/config.toml
-echo 'index = "https://github.com/CharmsDev/crates-index"' >> ~/.cargo/config.toml
+# 1. Create a valid PoW (for testing)
+# The contract validates: SHA256(challenge + nonce) has >= D leading zeros
+
+# 2. Run spell check
+charms spell check \
+  --spell spells/mint.yaml \
+  --prev-txs <hex> \
+  --app-bins ./target/wasm32-wasip1/release/babtc-contract.wasm \
+  --mock
 ```
 
-### Proof generation fails
-Ensure SP1 zkVM is properly installed and configured.
-Check: https://docs.charms.dev/troubleshooting/
+## Contract Configuration
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| MIN_DIFFICULTY | 16 | Minimum leading zero bits |
+| BASE_REWARD | 1 BABTC | Base reward (100,000,000 units) |
+| DIFFICULTY_FACTOR | 100 | Divisor for reward calculation |
+| MINER_SHARE | 90% | Miner's portion |
+| DEV_SHARE | 5% | Dev fund portion |
+| STAKING_SHARE | 5% | Staking pool portion |
+
+## Reward Formula
+
+```
+reward = BASE_REWARD × D² ÷ DIFFICULTY_FACTOR
+```
+
+Examples:
+- D16: 1 × 256 / 100 = 2.56 BABTC
+- D20: 1 × 400 / 100 = 4.00 BABTC
+- D22: 1 × 484 / 100 = 4.84 BABTC
+- D24: 1 × 576 / 100 = 5.76 BABTC
+
+## Hash Verification
+
+The contract uses single SHA256 for PoW verification:
+```
+hash = SHA256(challenge + nonce)
+```
+
+Format:
+- challenge: String (e.g., "mining_test_1234567890")
+- nonce: Hex string (e.g., "1ef16")
+- No separator between challenge and nonce
+
+## Deployment
+
+Current deployment (testnet4):
+- App ID: `87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681b`
+- App VK: `72cddbf02e3412f92ed134fd88dffdfa918c74faf5695db118ff6cb98fc602f0`
+
+Configuration: `packages/bitcoin/src/config/deployment.ts`

@@ -176,6 +176,24 @@ export {
   EvolutionService,
   EvolutionError,
   createEvolutionService,
+  // Prover Client (Charms Proving Service)
+  type ProverResponse,
+  type ProverRequest,
+  type CharmsProverClientOptions,
+  CharmsProverClient,
+  ProverError,
+  createCharmsProverClient,
+  getProverUrl,
+  // Minting Manager (Complete Minting Flow)
+  type MintingManagerOptions,
+  type MiningData,
+  type MintingStep,
+  type MintingProgressCallback,
+  type MintingResult,
+  type PreparedMintingTxs,
+  MintingManager,
+  MintingError,
+  createMintingManager,
 } from "./charms/index";
 
 // Scrolls API & Charms Service

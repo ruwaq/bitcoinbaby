@@ -51,13 +51,12 @@ describe("BABTC_CONFIG", () => {
     expect(BABTC_CONFIG.distribution.staking).toBe(5);
   });
 
-  it("should have halving every 210,000 blocks", () => {
-    expect(BABTC_CONFIG.halving.blocksPerEpoch).toBe(210_000);
-  });
-
-  it("should have initial reward of 500 BABTC per block", () => {
-    const expectedInitialReward = 500n * 100_000_000n;
-    expect(BABTC_CONFIG.halving.initialReward).toBe(expectedInitialReward);
+  it("should have BRO-style reward configuration", () => {
+    expect(BABTC_CONFIG.rewards).toBeDefined();
+    expect(BABTC_CONFIG.rewards.baseReward).toBe(100_000_000n); // 1 BABTC
+    expect(BABTC_CONFIG.rewards.minDifficulty).toBe(16);
+    expect(BABTC_CONFIG.rewards.maxDifficulty).toBe(32);
+    expect(BABTC_CONFIG.rewards.difficultyFactor).toBe(100n);
   });
 });
 
@@ -79,73 +78,77 @@ describe("BABTC_METADATA", () => {
 // Epoch & Reward Calculation Tests
 // ============================================
 
-describe("getCurrentEpoch", () => {
-  it("should return epoch 0 for block 0", () => {
+describe("getCurrentEpoch (deprecated)", () => {
+  // BRO-style has no epochs - this is kept for backwards compatibility
+  it("should always return 0 (no epochs in BRO model)", () => {
     expect(getCurrentEpoch(0)).toBe(0);
-  });
-
-  it("should return epoch 0 for block 209999", () => {
     expect(getCurrentEpoch(209_999)).toBe(0);
-  });
-
-  it("should return epoch 1 for block 210000", () => {
-    expect(getCurrentEpoch(210_000)).toBe(1);
-  });
-
-  it("should return epoch 1 for block 419999", () => {
-    expect(getCurrentEpoch(419_999)).toBe(1);
-  });
-
-  it("should return epoch 2 for block 420000", () => {
-    expect(getCurrentEpoch(420_000)).toBe(2);
-  });
-
-  it("should calculate correct epoch for large block heights", () => {
-    // Block 2,100,000 should be epoch 10
-    expect(getCurrentEpoch(2_100_000)).toBe(10);
+    expect(getCurrentEpoch(210_000)).toBe(0);
+    expect(getCurrentEpoch(2_100_000)).toBe(0);
   });
 });
 
-describe("calculateBlockReward", () => {
-  const initialReward = 500n * 100_000_000n; // 500 BABTC
+describe("calculateBlockReward (deprecated)", () => {
+  // BRO-style uses difficulty-based rewards, not block height
+  // This function is kept for backwards compatibility
+  const baseReward = 100_000_000n; // 1 BABTC
 
-  it("should return full reward at block 0", () => {
-    expect(calculateBlockReward(0)).toBe(initialReward);
-  });
-
-  it("should return full reward at block 209999", () => {
-    expect(calculateBlockReward(209_999)).toBe(initialReward);
-  });
-
-  it("should return half reward at block 210000 (first halving)", () => {
-    expect(calculateBlockReward(210_000)).toBe(initialReward / 2n);
-  });
-
-  it("should return quarter reward at block 420000 (second halving)", () => {
-    expect(calculateBlockReward(420_000)).toBe(initialReward / 4n);
-  });
-
-  it("should return 1/8 reward at block 630000 (third halving)", () => {
-    expect(calculateBlockReward(630_000)).toBe(initialReward / 8n);
-  });
-
-  it("should approach zero for very high block numbers", () => {
-    // After 64 halvings, reward should be 0
-    const veryHighBlock = 210_000 * 64;
-    expect(calculateBlockReward(veryHighBlock)).toBe(0n);
+  it("should return base reward (no halving in BRO model)", () => {
+    expect(calculateBlockReward(0)).toBe(baseReward);
+    expect(calculateBlockReward(209_999)).toBe(baseReward);
+    expect(calculateBlockReward(210_000)).toBe(baseReward);
+    expect(calculateBlockReward(2_100_000)).toBe(baseReward);
   });
 });
 
-describe("calculateMiningReward", () => {
-  it("should return correct total reward at block 0", () => {
-    const reward = calculateMiningReward(0);
-    const expectedTotal = 500n * 100_000_000n;
+describe("calculateMiningReward (BRO-style)", () => {
+  // BRO formula: BASE_REWARD * D² / DIFFICULTY_FACTOR
+  // BASE_REWARD = 1 BABTC = 100_000_000
+  // DIFFICULTY_FACTOR = 100
+  // MIN_DIFFICULTY = 16, MAX_DIFFICULTY = 32
+
+  it("should return correct total reward at D16 (minimum)", () => {
+    const reward = calculateMiningReward(16);
+    // D16: 1 * 16² / 100 = 256 / 100 = 2.56 BABTC
+    const expectedTotal = (100_000_000n * 256n) / 100n;
 
     expect(reward.total).toBe(expectedTotal);
   });
 
+  it("should return correct total reward at D20", () => {
+    const reward = calculateMiningReward(20);
+    // D20: 1 * 20² / 100 = 400 / 100 = 4.00 BABTC
+    const expectedTotal = (100_000_000n * 400n) / 100n;
+
+    expect(reward.total).toBe(expectedTotal);
+  });
+
+  it("should return correct total reward at D32 (maximum)", () => {
+    const reward = calculateMiningReward(32);
+    // D32: 1 * 32² / 100 = 1024 / 100 = 10.24 BABTC
+    const expectedTotal = (100_000_000n * 1024n) / 100n;
+
+    expect(reward.total).toBe(expectedTotal);
+  });
+
+  it("should clamp difficulty below minimum to D16", () => {
+    const reward = calculateMiningReward(10);
+    const rewardAtMin = calculateMiningReward(16);
+
+    expect(reward.total).toBe(rewardAtMin.total);
+    expect(reward.difficulty).toBe(16);
+  });
+
+  it("should clamp difficulty above maximum to D32", () => {
+    const reward = calculateMiningReward(40);
+    const rewardAtMax = calculateMiningReward(32);
+
+    expect(reward.total).toBe(rewardAtMax.total);
+    expect(reward.difficulty).toBe(32);
+  });
+
   it("should distribute 90% to miner", () => {
-    const reward = calculateMiningReward(0);
+    const reward = calculateMiningReward(16);
     const expectedMinerShare =
       (reward.total * BigInt(BABTC_CONFIG.distribution.miner)) / 100n;
 
@@ -153,7 +156,7 @@ describe("calculateMiningReward", () => {
   });
 
   it("should distribute 5% to dev fund", () => {
-    const reward = calculateMiningReward(0);
+    const reward = calculateMiningReward(16);
     const expectedDevShare =
       (reward.total * BigInt(BABTC_CONFIG.distribution.dev)) / 100n;
 
@@ -161,7 +164,7 @@ describe("calculateMiningReward", () => {
   });
 
   it("should distribute 5% to staking pool", () => {
-    const reward = calculateMiningReward(0);
+    const reward = calculateMiningReward(16);
     const expectedStakingShare =
       (reward.total * BigInt(BABTC_CONFIG.distribution.staking)) / 100n;
 
@@ -169,30 +172,40 @@ describe("calculateMiningReward", () => {
   });
 
   it("should have shares that sum to total", () => {
-    const reward = calculateMiningReward(0);
+    const reward = calculateMiningReward(16);
     const sharesSum = reward.minerShare + reward.devShare + reward.stakingShare;
 
     expect(sharesSum).toBe(reward.total);
   });
 
-  it("should include correct epoch", () => {
-    expect(calculateMiningReward(0).epoch).toBe(0);
-    expect(calculateMiningReward(210_000).epoch).toBe(1);
-    expect(calculateMiningReward(420_000).epoch).toBe(2);
+  it("should include correct leadingZeros field", () => {
+    expect(calculateMiningReward(16).leadingZeros).toBe(16);
+    expect(calculateMiningReward(20).leadingZeros).toBe(20);
+    expect(calculateMiningReward(24).leadingZeros).toBe(24);
   });
 
-  it("should include correct block height", () => {
-    expect(calculateMiningReward(12345).blockHeight).toBe(12345);
+  it("should include correct difficulty field", () => {
+    expect(calculateMiningReward(16).difficulty).toBe(16);
+    expect(calculateMiningReward(22).difficulty).toBe(22);
   });
 
-  it("should halve all shares after halving", () => {
-    const rewardEpoch0 = calculateMiningReward(0);
-    const rewardEpoch1 = calculateMiningReward(210_000);
+  it("should increase reward quadratically with difficulty", () => {
+    const rewardD16 = calculateMiningReward(16);
+    const rewardD20 = calculateMiningReward(20);
+    const rewardD24 = calculateMiningReward(24);
 
-    expect(rewardEpoch1.total).toBe(rewardEpoch0.total / 2n);
-    expect(rewardEpoch1.minerShare).toBe(rewardEpoch0.minerShare / 2n);
-    expect(rewardEpoch1.devShare).toBe(rewardEpoch0.devShare / 2n);
-    expect(rewardEpoch1.stakingShare).toBe(rewardEpoch0.stakingShare / 2n);
+    // D20 > D16
+    expect(rewardD20.total).toBeGreaterThan(rewardD16.total);
+    // D24 > D20
+    expect(rewardD24.total).toBeGreaterThan(rewardD20.total);
+
+    // Verify quadratic relationship: reward ∝ D²
+    // ratio should be (20/16)² = 1.5625 and (24/20)² = 1.44
+    const ratio1 = Number(rewardD20.total) / Number(rewardD16.total);
+    const ratio2 = Number(rewardD24.total) / Number(rewardD20.total);
+
+    expect(ratio1).toBeCloseTo(400 / 256, 2); // 1.5625
+    expect(ratio2).toBeCloseTo(576 / 400, 2); // 1.44
   });
 });
 
@@ -288,7 +301,7 @@ describe("createTokenMintSpell", () => {
     minerAddress: "tb1qminer_address",
     devAddress: "tb1qdev_address",
     stakingAddress: "tb1qstaking_address",
-    blockHeight: 1000,
+    leadingZeros: 16, // D16 minimum difficulty
     workProofHash: "abc123hash",
   };
 
@@ -335,14 +348,14 @@ describe("createTokenMintSpell", () => {
     expect(spell.public_inputs?.work_proof).toBe(defaultParams.workProofHash);
   });
 
-  it("should include block height in public inputs", () => {
+  it("should include difficulty in public inputs", () => {
     const spell = createTokenMintSpell(defaultParams);
-    expect(spell.public_inputs?.block_height).toBe(defaultParams.blockHeight);
+    expect(spell.public_inputs?.difficulty).toBe(defaultParams.leadingZeros);
   });
 
   it("should distribute tokens according to config percentages", () => {
     const spell = createTokenMintSpell(defaultParams);
-    const reward = calculateMiningReward(defaultParams.blockHeight);
+    const reward = calculateMiningReward(defaultParams.leadingZeros);
 
     expect(spell.outs[0].charms.$00).toBe(Number(reward.minerShare));
     expect(spell.outs[1].charms.$00).toBe(Number(reward.devShare));

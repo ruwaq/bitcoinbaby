@@ -68,17 +68,56 @@ export interface SpellV2Output {
 }
 
 // =============================================================================
-// SPELL FORMAT (v10 - Current Protocol Version)
+// SPELL FORMAT (v9 - CLI 0.11.1)
 // =============================================================================
 
 /**
- * Charms Spell v10 format (Current - January 2026)
+ * Charms Spell v9 format (CLI 0.11.1)
+ *
+ * Used for direct PoW validation without Merkle proofs.
+ * The contract validates pow_challenge + pow_nonce produces valid hash.
+ *
+ * NOTE: This format does NOT have a version field in the YAML.
+ * The CLI infers the version from the structure.
+ */
+export interface SpellV9 {
+  apps: Record<string, string>; // "$01" -> "t/<app_id>/<vk>"
+  ins: SpellV9Input[];
+  outs: SpellV9Output[];
+  private_inputs?: Record<string, PoWPrivateInputs>;
+}
+
+export interface SpellV9Input {
+  utxo_id: string; // "txid:vout"
+  charms: Record<string, unknown>; // "$01" -> {} for mint or amount for transfer
+}
+
+export interface SpellV9Output {
+  address: string;
+  charms: Record<string, unknown>;
+  sats: number;
+}
+
+/**
+ * PoW private inputs for BABTC mining
+ * These are passed to the contract for validation
+ */
+export interface PoWPrivateInputs {
+  pow_challenge: string; // Format: "timestamp:address"
+  pow_nonce: string; // Hex nonce that produces valid hash
+  pow_difficulty: number; // Required leading zero bits
+}
+
+// =============================================================================
+// SPELL FORMAT (v10 - With Merkle Proofs)
+// =============================================================================
+
+/**
+ * Charms Spell v10 format (With Merkle Proofs)
  * Reference: https://docs.charms.dev/references/spell-json/
  *
- * Key changes from v2:
- * - private_inputs for Merkle proofs (tx_block_proof)
- * - SP1 zkVM proof format
- * - Updated app reference format
+ * Used when mining TX needs to be proven via Merkle inclusion.
+ * For direct PoW validation, use SpellV9 instead.
  */
 export interface SpellV10 {
   version: 10;
@@ -106,7 +145,7 @@ export interface SpellV10Output {
 }
 
 /**
- * Mining private inputs for token minting
+ * Mining private inputs for token minting (Merkle proof style)
  * Required to prove the mining transaction was included in a block
  */
 export interface MiningPrivateInputs {
@@ -114,6 +153,39 @@ export interface MiningPrivateInputs {
   tx: string;
   /** Merkle block proof in hex format */
   tx_block_proof: string;
+}
+
+/**
+ * Parameters for creating a PoW mint spell (V9)
+ */
+export interface PoWMintSpellParams {
+  /** App ID (SHA256 of genesis UTXO) */
+  appId: string;
+  /** Verification key (SHA256 of WASM binary) */
+  appVk: string;
+  /** UTXO to consume (can be any available UTXO) */
+  inputUtxo: {
+    txid: string;
+    vout: number;
+  };
+  /** Recipient address for minted tokens */
+  minerAddress: string;
+  /** Dev fund address */
+  devAddress: string;
+  /** Staking pool address */
+  stakingAddress: string;
+  /** PoW challenge (format: "timestamp:address") */
+  challenge: string;
+  /** Nonce that produces valid hash (hex) */
+  nonce: string;
+  /** Difficulty (leading zero bits) */
+  difficulty: number;
+  /** Miner's share of the reward */
+  minerReward: bigint;
+  /** Dev fund share */
+  devReward: bigint;
+  /** Staking pool share */
+  stakingReward: bigint;
 }
 
 /**
@@ -140,11 +212,14 @@ export interface MiningMintSpellParams {
 }
 
 /**
- * Current spell type alias (points to latest version)
+ * Current spell type alias
+ *
+ * SpellV9 is the default for BABTC mining (direct PoW validation)
+ * SpellV10 is used when Merkle proofs are needed
  */
-export type Spell = SpellV10;
-export type SpellInput = SpellV10Input;
-export type SpellOutput = SpellV10Output;
+export type Spell = SpellV9 | SpellV10;
+export type SpellInput = SpellV9Input | SpellV10Input;
+export type SpellOutput = SpellV9Output | SpellV10Output;
 
 /**
  * App type prefix
@@ -286,7 +361,66 @@ export const CHARMS_PROTOCOL_VERSION = 10;
 export const MIN_SPELL_OUTPUT_SATS = 700;
 
 // =============================================================================
-// SPELL CREATION HELPERS (v10)
+// SPELL CREATION HELPERS (v9 - PoW Mining)
+// =============================================================================
+
+/**
+ * Create a PoW mint spell for mining rewards (v9 format)
+ *
+ * This format is used with CLI 0.11.1 and directly validates PoW
+ * without requiring Merkle proofs. The contract receives:
+ * - pow_challenge: The challenge string
+ * - pow_nonce: The nonce that produces valid hash
+ * - pow_difficulty: Required leading zeros
+ */
+export function createPoWMintSpellV9(params: PoWMintSpellParams): SpellV9 {
+  const appRef = createAppReference("t", params.appId, params.appVk);
+
+  return {
+    apps: {
+      $01: appRef,
+    },
+    ins: [
+      {
+        utxo_id: `${params.inputUtxo.txid}:${params.inputUtxo.vout}`,
+        charms: {}, // No input charms for mint
+      },
+    ],
+    outs: [
+      {
+        address: params.minerAddress,
+        charms: {
+          $01: Number(params.minerReward),
+        },
+        sats: MIN_SPELL_OUTPUT_SATS,
+      },
+      {
+        address: params.devAddress,
+        charms: {
+          $01: Number(params.devReward),
+        },
+        sats: MIN_SPELL_OUTPUT_SATS,
+      },
+      {
+        address: params.stakingAddress,
+        charms: {
+          $01: Number(params.stakingReward),
+        },
+        sats: MIN_SPELL_OUTPUT_SATS,
+      },
+    ],
+    private_inputs: {
+      $01: {
+        pow_challenge: params.challenge,
+        pow_nonce: params.nonce,
+        pow_difficulty: params.difficulty,
+      },
+    },
+  };
+}
+
+// =============================================================================
+// SPELL CREATION HELPERS (v10 - With Merkle Proofs)
 // =============================================================================
 
 /**

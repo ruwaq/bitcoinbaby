@@ -41,7 +41,7 @@ export class CPUMiner implements Miner {
       onError?: (error: Error) => void;
     } = {},
   ) {
-    this.difficulty = options.difficulty ?? 22; // D22 for natural emission control
+    this.difficulty = options.difficulty ?? 16; // D16 minimum to match contract
     this.minerAddress = options.address ?? "";
     // Use specified count, or auto-detect CPU cores, or fallback to 1
     this.workerCount =
@@ -227,7 +227,7 @@ export class CPUMiner implements Miner {
       // Worker state
       let isRunning = false;
       let isPaused = false;
-      let difficulty = 22; // D22 for natural emission control
+      let difficulty = 16; // D16 minimum to match contract
       let throttle = 100;
       let nonce = 0;
       let totalHashes = 0;
@@ -250,8 +250,10 @@ export class CPUMiner implements Miner {
 
           for (let i = 0; i < batchSize && isRunning && !isPaused; i++) {
             // Use hex nonce for consistency with WebGPU miner
+            // Format: challenge:nonce where challenge = timestamp:address
             const nonceHex = nonce.toString(16);
-            const blockData = currentBlock + ':' + minerAddress + ':' + nonceHex;
+            const challenge = currentBlock + ':' + minerAddress;
+            const blockData = challenge + ':' + nonceHex;
             const hash = await hash256(blockData);
             totalHashes++;
             hashesThisSecond++;
@@ -265,6 +267,7 @@ export class CPUMiner implements Miner {
                 nonce: nonce - 1,
                 difficulty: zeroBits,
                 blockData,
+                challenge, // Include challenge for spell generation
               });
             }
           }
@@ -504,8 +507,10 @@ export class CPUMiner implements Miner {
 
       for (let i = 0; i < batchSize && this.running && !this.paused; i++) {
         // Use hex nonce for consistency with WebGPU miner
+        // Format: challenge:nonce where challenge = timestamp:address
         const nonceHex = nonce.toString(16);
-        const blockData = `${currentBlock}:${this.minerAddress}:${nonceHex}`;
+        const challenge = `${currentBlock}:${this.minerAddress}`;
+        const blockData = `${challenge}:${nonceHex}`;
         const hash = await hash256(blockData);
         this.totalHashes++;
         hashesThisSecond++;
@@ -519,6 +524,7 @@ export class CPUMiner implements Miner {
             difficulty: zeroBits,
             timestamp: Date.now(),
             blockData, // Include blockData for server validation
+            challenge, // Include challenge for spell generation
           });
         }
       }

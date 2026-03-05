@@ -10,3 +10,4 @@ export { BalancePanel } from "./BalancePanel";
 export { MiningVisualization } from "./MiningVisualization";
 export { DeviceCapabilities } from "./DeviceCapabilities";
 export { NotificationsPanel } from "./NotificationsPanel";
+export { RewardInfoPanel } from "./RewardInfoPanel";

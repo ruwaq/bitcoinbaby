@@ -1,0 +1,45 @@
+# BABTC Mining Mint Spell
+# Compatible with Charms CLI 0.11.x
+#
+# Reward Formula: BASE_REWARD * D² / DIFFICULTY_FACTOR
+# - BASE_REWARD = 1 BABTC (100,000,000 units)
+# - DIFFICULTY_FACTOR = 100
+# - D = leading zero bits in hash
+#
+# Distribution: 90% miner, 5% dev, 5% staking
+#
+# Usage:
+#   export MINING_UTXO="txid:vout"
+#   export MINER_ADDRESS="tb1p..."
+#   export DEV_ADDRESS="tb1p..."
+#   export STAKING_ADDRESS="tb1p..."
+#   export DIFFICULTY=16
+#   cat spells/mint.yaml | envsubst | charms spell check ...
+
+version: 9
+apps:
+  $01: t/${BABTC_APP_ID}/${BABTC_APP_VK}
+ins:
+  - utxo_id: ${MINING_UTXO}
+outs:
+  # Miner share (90%)
+  - address: ${MINER_ADDRESS}
+    charms:
+      $01: ${MINER_SHARE}
+    sats: 546
+  # Dev share (5%)
+  - address: ${DEV_ADDRESS}
+    charms:
+      $01: ${DEV_SHARE}
+    sats: 546
+  # Staking share (5%)
+  - address: ${STAKING_ADDRESS}
+    charms:
+      $01: ${STAKING_SHARE}
+    sats: 546
+
+private_inputs:
+  $01:
+    challenge: "${CHALLENGE}"
+    nonce: "${NONCE}"
+    difficulty: ${DIFFICULTY}

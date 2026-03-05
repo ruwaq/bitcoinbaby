@@ -28,6 +28,7 @@ import {
   DeviceCapabilities,
   NotificationsPanel,
   SyncStatusAlert,
+  RewardInfoPanel,
 } from "@/components/features/mining";
 
 export function MiningSection() {
@@ -185,6 +186,14 @@ export function MiningSection() {
             }}
             variant="grid"
             className={`bg-pixel-bg-medium ${pixelBorders.medium} p-4`}
+          />
+        </div>
+
+        {/* Reward Info Panel - Shows reward tiers by difficulty */}
+        <div className="mb-6">
+          <RewardInfoPanel
+            currentDifficulty={miner.difficulty}
+            defaultExpanded={false}
           />
         </div>
 

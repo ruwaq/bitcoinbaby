@@ -12,7 +12,10 @@ export interface MiningResult {
   nonce: number;
   difficulty: number;
   timestamp: number;
+  /** Full block data (challenge:nonce) for validation */
   blockData?: string;
+  /** Challenge string (timestamp:address) for spell generation */
+  challenge?: string;
   /** AI proof for Proof of Useful Work (optional) */
   aiProof?: string;
 }

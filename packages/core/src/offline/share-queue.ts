@@ -698,12 +698,12 @@ export async function needsNonceMigration(): Promise<boolean> {
 // LOW DIFFICULTY CLEANUP
 // =============================================================================
 
-const MIN_DIFFICULTY_REQUIRED = 22;
+const MIN_DIFFICULTY_REQUIRED = 16;
 
 /**
  * MIGRATION: Clean up shares below minimum difficulty
  *
- * Old shares mined at D16-D21 will be rejected by the server (MIN_DIFFICULTY=22).
+ * Shares below D16 will be rejected by the server (MIN_DIFFICULTY=16).
  * This migration removes them from the queue to prevent repeated failed syncs.
  *
  * @returns Number of shares deleted

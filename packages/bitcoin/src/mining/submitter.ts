@@ -3,14 +3,22 @@
  *
  * Handles submission of mining proofs to Bitcoin network via Charms protocol.
  *
- * BRO-style Flow (v10):
+ * TWO FLOWS SUPPORTED:
+ *
+ * V9 Flow (PoW Direct - Recommended):
+ * 1. Mine PoW → find valid hash
+ * 2. Create V9 spell with pow_challenge, pow_nonce, pow_difficulty
+ * 3. Submit to prover → get commit + spell TXs
+ * 4. Sign and broadcast
+ *
+ * V10 Flow (With Merkle Proofs - Legacy):
  * 1. Mine PoW → create mining TX with OP_RETURN
  * 2. Broadcast mining TX and wait for confirmation
  * 3. Get Merkle proof of inclusion
  * 4. Create mint spell V10 with private_inputs
  * 5. Cast spell via Charms proving service
  *
- * Updated for Charms Protocol v10 (January 2026)
+ * Updated for Charms Protocol v9/v10 (March 2026)
  */
 
 import { CharmsService, createCharmsService } from "../scrolls";
@@ -38,10 +46,15 @@ import {
   assertValid,
 } from "../validation";
 import {
+  createBABTCMintSpellV9,
   createBABTCMintSpellV10,
   BABTC_CONFIG,
+  calculateMiningReward,
+  type TokenMintParamsV9,
   type TokenMintParamsV10,
 } from "../charms/token";
+import { CharmsProverClient, createCharmsProverClient } from "../charms/prover";
+import type { SpellV9 } from "../charms/types";
 import { BABTC_TESTNET4 as BABTC_DEPLOYED } from "../config/deployment";
 
 export interface MiningSubmitterOptions {
@@ -81,10 +94,11 @@ function scrollsToBitcoinNetwork(network: ScrollsNetwork): BitcoinNetwork {
  * Mining Submitter Service
  *
  * Connects mining proof-of-work with Charms protocol for token minting.
- * Now with REAL transaction building and broadcasting.
+ * Supports both V9 (PoW direct) and V10 (Merkle proof) flows.
  */
 export class MiningSubmitter {
   private charmsService: CharmsService;
+  private proverClient: CharmsProverClient;
   private mempoolClient: MempoolClient;
   private txBuilder: TransactionBuilder;
   private minerAddress: string;
@@ -100,6 +114,10 @@ export class MiningSubmitter {
     this.charmsService = createCharmsService({
       network: this.network,
       tokenTicker: options.tokenTicker ?? "BABY",
+    });
+
+    this.proverClient = createCharmsProverClient({
+      debug: false,
     });
 
     this.mempoolClient = createMempoolClient({
@@ -504,7 +522,104 @@ export class MiningSubmitter {
   }
 
   // ==========================================================================
-  // V10 BRO-STYLE MINING FLOW
+  // V9 POW DIRECT FLOW (Recommended)
+  // ==========================================================================
+
+  /**
+   * Submit proof using V9 PoW direct flow (Recommended)
+   *
+   * SIMPLIFIED FLOW:
+   * 1. Mine finds valid PoW (challenge:nonce -> hash with D bits)
+   * 2. Create V9 spell with pow_challenge, pow_nonce, pow_difficulty
+   * 3. Submit to prover -> get commit + spell TXs
+   * 4. Return TXs for signing and broadcast
+   *
+   * No mining TX or Merkle proofs needed!
+   */
+  async submitProofV9(
+    proof: MiningProof,
+    inputUtxo: { txid: string; vout: number },
+    options: {
+      /** App ID for BABTC token */
+      appId?: string;
+      /** Verification key */
+      appVk?: string;
+    } = {},
+  ): Promise<SubmissionResultV9> {
+    // Validate proof inputs
+    assertValid(validateHash(proof.hash), "hash", "INVALID_HASH");
+    assertValid(validateNonce(proof.nonce), "nonce", "INVALID_NONCE");
+    assertValid(
+      validateDifficulty(proof.difficulty),
+      "difficulty",
+      "INVALID_DIFFICULTY",
+    );
+
+    const submissionId = `v9-${proof.hash.substring(0, 16)}-${proof.nonce}`;
+
+    try {
+      // Build challenge string from blockData or use default
+      const challenge =
+        proof.blockData || `${proof.timestamp}:${this.minerAddress}`;
+
+      // Create V9 spell
+      const spell = createBABTCMintSpellV9({
+        appId: options.appId ?? BABTC_DEPLOYED.appId,
+        appVk: options.appVk ?? BABTC_DEPLOYED.appVk,
+        minerAddress: this.minerAddress,
+        devAddress: BABTC_CONFIG.addresses.devFund,
+        stakingAddress: BABTC_CONFIG.addresses.stakingPool,
+        challenge,
+        nonce: String(proof.nonce),
+        difficulty: proof.difficulty,
+        inputUtxo,
+      });
+
+      // Submit to prover
+      const proverResponse = await this.proverClient.provePoW(spell);
+
+      // Calculate reward
+      const reward = calculateMiningReward(proof.difficulty);
+
+      return {
+        success: true,
+        phase: "ready_to_broadcast",
+        submissionId,
+        spell,
+        commitTxHex: proverResponse.commitTx,
+        spellTxHex: proverResponse.spellTx,
+        reward: reward.minerShare,
+        message: "Sign and broadcast commit + spell TXs to claim your reward",
+      };
+    } catch (error) {
+      return {
+        success: false,
+        phase: "failed",
+        submissionId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Get available UTXOs for V9 minting
+   */
+  async getAvailableUtxosForV9(): Promise<
+    Array<{ txid: string; vout: number; value: number }>
+  > {
+    const utxos = await this.mempoolClient.getUTXOs(this.minerAddress);
+    return utxos
+      .filter((u) => u.value >= 2000) // Min 2000 sats for V9
+      .sort((a, b) => b.value - a.value) // Largest first
+      .map((u) => ({
+        txid: u.txid,
+        vout: u.vout,
+        value: u.value,
+      }));
+  }
+
+  // ==========================================================================
+  // V10 BRO-STYLE MINING FLOW (Legacy - with Merkle proofs)
   // ==========================================================================
 
   /**
@@ -603,7 +718,7 @@ export class MiningSubmitter {
         minerAddress: this.minerAddress,
         devAddress: BABTC_CONFIG.addresses.devFund,
         stakingAddress: BABTC_CONFIG.addresses.stakingPool,
-        blockHeight: merkleResult.merkleProof!.blockHeight,
+        leadingZeros: proof.difficulty, // BRO-style: difficulty determines reward
         miningTxHex,
         merkleProofHex: merkleResult.merkleProofHex!,
         miningUtxo: {
@@ -938,7 +1053,31 @@ export class MiningSubmitter {
 }
 
 // =============================================================================
-// V10 TYPES
+// V9 TYPES (PoW Direct)
+// =============================================================================
+
+/**
+ * Result from V9 submission flow (simplified)
+ */
+export interface SubmissionResultV9 {
+  success: boolean;
+  phase: "ready_to_broadcast" | "failed";
+  submissionId: string;
+  error?: string;
+  message?: string;
+
+  /** V9 spell with PoW private_inputs */
+  spell?: SpellV9;
+  /** Commit TX hex from prover (needs signing) */
+  commitTxHex?: string;
+  /** Spell TX hex from prover (needs signing) */
+  spellTxHex?: string;
+  /** Calculated miner reward */
+  reward?: bigint;
+}
+
+// =============================================================================
+// V10 TYPES (With Merkle Proofs)
 // =============================================================================
 
 /**
