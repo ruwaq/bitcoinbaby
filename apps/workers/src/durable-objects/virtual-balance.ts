@@ -671,48 +671,22 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     const baseReward = proofValidation.calculatedReward!;
 
     // =========================================================================
-    // CRITICAL: Store proof LOCALLY FIRST with UNIQUE constraint
-    // This prevents the race condition where global marking succeeds but
-    // local insert fails, causing the proof to be "burned" permanently.
+    // CRITICAL: Mark proof globally FIRST (prevents cross-address double-spend)
     //
-    // Order: SQLite INSERT → KV PUT (with retry)
-    // Risk mitigation:
-    //   - If SQLite fails first: No harm done, user can retry
-    //   - If KV fails after SQLite: User credited, small cross-address risk
-    //     (acceptable because KV retries and expires after 24h anyway)
-    // =========================================================================
-    const proofId = crypto.randomUUID();
-
-    try {
-      this.sql.exec(
-        `INSERT INTO mining_proofs
-         (id, hash, nonce, difficulty, block_data, reward, credited, address, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
-        proofId,
-        proofWithNonce.hash,
-        proofWithNonce.nonce,
-        proofWithNonce.difficulty,
-        proofWithNonce.blockData,
-        boostedReward.toString(),
-        this.address,
-        now,
-      );
-    } catch (e) {
-      if (e instanceof Error && e.message.includes("UNIQUE")) {
-        // Proof already credited to this address
-        return this.errorResponse("Proof already credited", 409);
-      }
-      // Other SQLite errors - safe to fail here, nothing committed yet
-      balanceLogger.error("SQLite insert failed", e);
-      return this.errorResponse("Database error. Please retry.", 500);
-    }
-
-    // =========================================================================
-    // Mark proof globally in KV with retry (best effort)
-    // If this fails, the proof is still credited locally. The small risk of
-    // cross-address double-spend is acceptable (proofs expire in 24h anyway).
+    // Order: KV MARK → SQLite INSERT
+    // Security trade-off:
+    //   - If KV mark fails: Reject request, user can retry
+    //   - If SQLite fails after KV mark: Proof is "burned" but no double credit
+    //     (better to lose one proof than allow exploitation)
+    //
+    // This order prevents the race condition where:
+    //   1. User A submits proof, SQLite insert succeeds, KV mark pending
+    //   2. User B submits same proof, KV check passes (not marked yet)
+    //   3. User B's SQLite insert succeeds too → double credit
     // =========================================================================
     const currentAddress = this.address!; // Safe: validated earlier in flow
+
+    // BLOCKING: Mark in KV first with retry
     const markGloballyWithRetry = async (retries = 3): Promise<boolean> => {
       for (let attempt = 1; attempt <= retries; attempt++) {
         try {
@@ -735,17 +709,58 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       return false;
     };
 
-    // Non-blocking global mark - user is already credited locally
-    markGloballyWithRetry().then((success) => {
-      if (!success) {
-        balanceLogger.error(
-          "CRITICAL: Failed to mark proof globally after retries",
-          undefined,
-          { hash: proofWithNonce.hash, address: currentAddress },
-        );
-        // TODO: Add to dead-letter queue for manual review
+    // Mark globally FIRST (blocking)
+    const kvMarkSuccess = await markGloballyWithRetry();
+    if (!kvMarkSuccess) {
+      balanceLogger.error(
+        "Failed to mark proof globally after retries",
+        undefined,
+        {
+          hash: proofWithNonce.hash,
+          address: currentAddress,
+        },
+      );
+      // Fail the request - better to reject than risk double credit
+      return this.errorResponse(
+        "Unable to process proof. Please retry in a moment.",
+        503,
+      );
+    }
+
+    // =========================================================================
+    // Store proof locally (now safe - KV is already marked)
+    // =========================================================================
+    const proofId = crypto.randomUUID();
+
+    try {
+      this.sql.exec(
+        `INSERT INTO mining_proofs
+         (id, hash, nonce, difficulty, block_data, reward, credited, address, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+        proofId,
+        proofWithNonce.hash,
+        proofWithNonce.nonce,
+        proofWithNonce.difficulty,
+        proofWithNonce.blockData,
+        boostedReward.toString(),
+        this.address,
+        now,
+      );
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("UNIQUE")) {
+        // Proof already credited to this address
+        return this.errorResponse("Proof already credited", 409);
       }
-    });
+      // SQLite failed after KV mark - proof is "burned" but no double credit
+      // This is acceptable because:
+      // 1. It's extremely rare (SQLite in DO is reliable)
+      // 2. Better to lose one proof than allow exploitation
+      balanceLogger.error("SQLite insert failed after KV mark", e, {
+        hash: proofWithNonce.hash,
+        address: currentAddress,
+      });
+      return this.errorResponse("Database error. Please retry.", 500);
+    }
 
     // =========================================================================
     // Update balance
