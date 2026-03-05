@@ -109,6 +109,8 @@ export {
   getCurrentEpoch,
   calculateBlockReward,
   calculateMiningReward,
+  calculateRewardForDifficulty,
+  getRewardTable,
   formatTokenAmount,
   parseTokenAmount,
   createTokenMintSpell,

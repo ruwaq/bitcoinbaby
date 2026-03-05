@@ -186,8 +186,8 @@ function ResetConfirmationModal({
 // Lazy load sections for better performance
 import dynamic from "next/dynamic";
 
-const BabySection = dynamic(
-  () => import("../sections/BabySection").then((m) => m.BabySection),
+const TokenSection = dynamic(
+  () => import("../sections/TokenSection").then((m) => m.TokenSection),
   { ssr: false },
 );
 const MiningSection = dynamic(
@@ -223,9 +223,9 @@ function AppShellInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Get tab from URL or default to "baby"
+  // Get tab from URL or default to "token"
   const urlTab = searchParams.get("tab") as TabType | null;
-  const [activeTab, setActiveTab] = useState<TabType>(urlTab || "baby");
+  const [activeTab, setActiveTab] = useState<TabType>(urlTab || "token");
 
   // Reset confirmation modal state
   const [showResetModal, setShowResetModal] = useState(false);
@@ -240,7 +240,7 @@ function AppShellInner() {
     (tab: TabType) => {
       setActiveTab(tab);
       // Update URL without full navigation
-      const url = tab === "baby" ? "/" : `/?tab=${tab}`;
+      const url = tab === "token" ? "/" : `/?tab=${tab}`;
       router.push(url, { scroll: false });
     },
     [router],
@@ -250,8 +250,8 @@ function AppShellInner() {
   useEffect(() => {
     if (urlTab && urlTab !== activeTab) {
       startTransition(() => setActiveTab(urlTab));
-    } else if (!urlTab && activeTab !== "baby") {
-      startTransition(() => setActiveTab("baby"));
+    } else if (!urlTab && activeTab !== "token") {
+      startTransition(() => setActiveTab("token"));
     }
   }, [urlTab, activeTab]);
 
@@ -276,9 +276,7 @@ function AppShellInner() {
       {/* Content Area */}
       <main className="flex-1 overflow-auto">
         <Suspense fallback={<SectionLoader />}>
-          {activeTab === "baby" && (
-            <BabySection setActiveTab={handleTabChange} />
-          )}
+          {activeTab === "token" && <TokenSection />}
           {activeTab === "mining" && <MiningSection />}
           {activeTab === "nfts" && <NFTsSection />}
           {activeTab === "wallet" && <WalletSection />}

@@ -6,4 +6,3 @@
 
 export { CreateBabyForm } from "./CreateBabyForm";
 export { BabyDisplay } from "./BabyDisplay";
-export { BabySidebar } from "./BabySidebar";

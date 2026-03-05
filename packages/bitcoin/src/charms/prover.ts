@@ -40,7 +40,7 @@ export interface ProverRequest {
  * Prover client configuration
  */
 export interface CharmsProverClientOptions {
-  /** Prover base URL (default: https://v7.charms.dev) */
+  /** Prover base URL (default: https://v11.charms.dev) */
   proverUrl?: string;
   /** Request timeout in ms (default: 120000 = 2 minutes) */
   timeout?: number;
@@ -67,13 +67,13 @@ interface RetryConfig {
 /**
  * Charms Prover API URLs
  *
- * The Charms hosted prover is available at v7.charms.dev.
+ * The Charms hosted prover is available at v11.charms.dev (latest).
  * This is the same prover used by BRO token (bro.charms.dev).
  *
  * Options:
  *
  * 1. HOSTED PROVER (recommended for production):
- *    - URL: https://v7.charms.dev/spells/prove
+ *    - URL: https://v11.charms.dev/spells/prove
  *    - Used by BRO token: https://bro.charms.dev
  *    - Reliable and maintained by Charms Inc.
  *
@@ -87,8 +87,8 @@ interface RetryConfig {
  *    - charms spell cast (proves + signs + broadcasts)
  */
 
-/** Charms hosted prover base URL (used by BRO token) */
-const CHARMS_HOSTED_PROVER_BASE = "https://v7.charms.dev";
+/** Charms hosted prover base URL (latest version) */
+const CHARMS_HOSTED_PROVER_BASE = "https://v11.charms.dev";
 
 /** Local prover URL (for development) */
 const LOCAL_PROVER_URL = "http://localhost:17784";
@@ -104,11 +104,11 @@ const CONFIGURED_PROVER_URL =
 
 /**
  * Get the prove endpoint for a given base URL
- * - Hosted prover (v7.charms.dev): /spells/prove
+ * - Hosted prover (v11.charms.dev): /spells/prove
  * - Local prover (localhost:17784): /prove
  */
 function getProveEndpoint(baseUrl: string): string {
-  if (baseUrl.includes("v7.charms.dev") || baseUrl.includes("charms.dev")) {
+  if (baseUrl.includes("charms.dev")) {
     return `${baseUrl}/spells/prove`;
   }
   // Local prover uses /prove

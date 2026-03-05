@@ -26,7 +26,7 @@ t/87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681b/acf2ec0b7245e
 
 | Entorno | URL | Endpoint |
 |---------|-----|----------|
-| **Producción (Hosted)** | `https://v7.charms.dev` | `/spells/prove` |
+| **Producción (Hosted)** | `https://v11.charms.dev` | `/spells/prove` |
 | **Desarrollo (Local)** | `http://localhost:17784` | `/prove` |
 
 ### Prover Hosted de Charms
@@ -40,7 +40,7 @@ El prover hosted en `v7.charms.dev` es el mismo usado por BRO token (bro.charms.
 
 ```bash
 # Override prover URL (opcional - por defecto usa hosted)
-NEXT_PUBLIC_PROVER_URL=https://v7.charms.dev
+NEXT_PUBLIC_PROVER_URL=https://v11.charms.dev
 # o para desarrollo local:
 NEXT_PUBLIC_PROVER_URL=http://localhost:17784
 ```

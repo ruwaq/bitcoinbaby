@@ -1,4 +1,4 @@
-export { BabySection } from "./BabySection";
+export { TokenSection } from "./TokenSection";
 export { MiningSection } from "./MiningSection";
 export { NFTsSection } from "./NFTsSection";
 export { WalletSection } from "./WalletSection";

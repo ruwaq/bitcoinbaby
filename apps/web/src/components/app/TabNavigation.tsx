@@ -9,7 +9,7 @@
 
 import { clsx } from "clsx";
 
-export type TabType = "baby" | "mining" | "nfts" | "wallet" | "more";
+export type TabType = "token" | "mining" | "nfts" | "wallet" | "more";
 
 interface Tab {
   id: TabType;
@@ -19,10 +19,10 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
-  { id: "baby", label: "Baby", icon: "👶", activeIcon: "👶" },
+  { id: "token", label: "$BABTC", icon: "🪙", activeIcon: "💰" },
   { id: "mining", label: "Mining", icon: "⛏️", activeIcon: "⛏️" },
   { id: "nfts", label: "NFTs", icon: "🎨", activeIcon: "🖼️" },
-  { id: "wallet", label: "Wallet", icon: "💰", activeIcon: "💵" },
+  { id: "wallet", label: "Wallet", icon: "👛", activeIcon: "💵" },
   { id: "more", label: "More", icon: "⚙️", activeIcon: "⚙️" },
 ];
 

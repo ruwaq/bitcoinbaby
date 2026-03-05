@@ -16,6 +16,7 @@ import {
   useSettingsStore,
   useNetworkStore,
   useWalletStore,
+  useBabyStore,
   type MiningDifficulty,
   type MinerTypePreference,
   type AutoLockTimeout,
@@ -24,7 +25,7 @@ import {
   useRecoveryPhraseModal,
   useChangePasswordModal,
 } from "@bitcoinbaby/core";
-import { NetworkSwitcher } from "@bitcoinbaby/ui";
+import { NetworkSwitcher, LevelSprite } from "@bitcoinbaby/ui";
 import {
   SettingsCard,
   Toggle,
@@ -60,6 +61,9 @@ export default function SettingsPage() {
 
   // Wallet store (for backend reset)
   const walletAddress = useWalletStore((s) => s.wallet?.address);
+
+  // Baby store
+  const baby = useBabyStore((s) => s.baby);
 
   // Overlay modal hooks
   const { open: openRecoveryModal } = useRecoveryPhraseModal();
@@ -217,6 +221,34 @@ export default function SettingsPage() {
               onChange={setNotificationsEnabled}
             />
           </SettingsCard>
+
+          {/* My Baby Section */}
+          {baby && (
+            <SettingsCard title="MY BABY">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 flex-shrink-0">
+                  <LevelSprite level={baby.level} state="idle" size={64} />
+                </div>
+                <div className="flex-1">
+                  <p className="font-pixel text-sm text-pixel-primary">
+                    {baby.name}
+                  </p>
+                  <p className="font-pixel text-[10px] text-pixel-text-muted mt-1">
+                    Level {baby.level} &bull; {baby.experience} XP
+                  </p>
+                  <p className="font-pixel text-[8px] text-pixel-text-muted mt-1 uppercase">
+                    State: {baby.state}
+                  </p>
+                </div>
+                <Link
+                  href="/?tab=nfts"
+                  className="px-3 py-2 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text border-4 border-black hover:bg-pixel-primary hover:text-black transition-colors"
+                >
+                  VIEW
+                </Link>
+              </div>
+            </SettingsCard>
+          )}
 
           {/* Security Settings */}
           <SettingsCard title="SECURITY">
