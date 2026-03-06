@@ -366,22 +366,16 @@ export default function LeaderboardPage() {
           </p>
           <div className="flex gap-4">
             <Link
-              href="#"
+              href="/help"
               className="font-pixel text-[8px] text-pixel-text-muted hover:text-pixel-primary"
             >
-              DOCS
+              HELP
             </Link>
             <Link
-              href="#"
+              href="/technology"
               className="font-pixel text-[8px] text-pixel-text-muted hover:text-pixel-primary"
             >
-              GITHUB
-            </Link>
-            <Link
-              href="#"
-              className="font-pixel text-[8px] text-pixel-text-muted hover:text-pixel-primary"
-            >
-              DISCORD
+              TECHNOLOGY
             </Link>
           </div>
         </div>

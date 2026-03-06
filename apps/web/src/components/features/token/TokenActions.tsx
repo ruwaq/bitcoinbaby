@@ -4,10 +4,10 @@
  * TokenActions - Acciones para interactuar con el token
  *
  * Muestra:
- * - Withdraw (virtual -> on-chain)
- * - Transfer (send tokens)
+ * - Claim (virtual -> on-chain via user-paid minting)
  * - Start Mining (link a mining section)
  * - Buy NFT (link a NFT section)
+ * - Leaderboard
  */
 
 import { useRouter } from "next/navigation";
@@ -15,22 +15,22 @@ import { pixelBorders } from "@bitcoinbaby/ui";
 
 interface TokenActionsProps {
   virtualBalance: bigint;
-  canWithdraw: boolean;
-  isWithdrawing?: boolean;
-  onWithdraw?: () => void;
-  minWithdraw?: bigint;
+  canClaim: boolean;
+  isClaiming?: boolean;
+  onClaim?: () => void;
+  minClaim?: bigint;
 }
 
 export function TokenActions({
   virtualBalance,
-  canWithdraw,
-  isWithdrawing = false,
-  onWithdraw,
-  minWithdraw = 10_000n,
+  canClaim,
+  isClaiming = false,
+  onClaim,
+  minClaim = 10_000n,
 }: TokenActionsProps) {
   const router = useRouter();
 
-  const hasEnoughToWithdraw = virtualBalance >= minWithdraw;
+  const hasEnoughToClaim = virtualBalance >= minClaim;
 
   return (
     <div
@@ -41,23 +41,23 @@ export function TokenActions({
       </h2>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {/* Withdraw Button */}
+        {/* Claim Button */}
         <button
-          onClick={onWithdraw}
-          disabled={!canWithdraw || !hasEnoughToWithdraw || isWithdrawing}
+          onClick={onClaim}
+          disabled={!canClaim || !hasEnoughToClaim || isClaiming}
           className={`flex flex-col items-center justify-center p-4 transition-all ${
-            canWithdraw && hasEnoughToWithdraw && !isWithdrawing
+            canClaim && hasEnoughToClaim && !isClaiming
               ? `bg-pixel-success/20 ${pixelBorders.thin} border-pixel-success hover:bg-pixel-success/30 cursor-pointer`
               : `bg-pixel-bg-dark ${pixelBorders.thin} border-pixel-text-muted/30 cursor-not-allowed opacity-50`
           }`}
         >
-          <span className="text-2xl mb-2">{isWithdrawing ? "..." : "💰"}</span>
+          <span className="text-2xl mb-2">{isClaiming ? "..." : "💰"}</span>
           <span className="font-pixel text-pixel-2xs text-pixel-text">
-            {isWithdrawing ? "PROCESSING" : "WITHDRAW"}
+            {isClaiming ? "PROCESSING" : "CLAIM"}
           </span>
-          {!hasEnoughToWithdraw && (
+          {!hasEnoughToClaim && (
             <span className="font-pixel text-pixel-2xs text-pixel-text-muted mt-1">
-              Min: {minWithdraw.toLocaleString()}
+              Min: {minClaim.toLocaleString()}
             </span>
           )}
         </button>
@@ -96,12 +96,13 @@ export function TokenActions({
         </button>
       </div>
 
-      {/* Withdraw Info */}
+      {/* Claim Info */}
       {virtualBalance > 0n && (
         <div className="mt-4 pt-4 border-t border-pixel-text-muted/20">
           <p className="font-pixel-body text-pixel-xs text-pixel-text-muted">
-            Withdraw converts your virtual $BABY to on-chain BABTC tokens on
-            Bitcoin. Minimum withdrawal: {minWithdraw.toLocaleString()} $BABY.
+            Claim converts your virtual $BABY to on-chain BABTC tokens on
+            Bitcoin. You pay a small network fee (~1000 sats). Minimum:{" "}
+            {minClaim.toLocaleString()} $BABY.
           </p>
         </div>
       )}

@@ -395,26 +395,26 @@ export const GLOSSARY: GlossaryItem[] = [
   },
 ];
 
-// Social links configuration
+// External links configuration
 export const SOCIAL_LINKS = [
   {
-    href: "https://discord.gg/bitcoinbaby",
-    label: "DISCORD",
-    icon: "💬",
-    bgColor: "bg-[#5865F2]",
-    textColor: "text-white",
+    href: "https://explorer.charms.dev",
+    label: "EXPLORER",
+    icon: "🔍",
+    bgColor: "bg-pixel-primary",
+    textColor: "text-black",
   },
   {
-    href: "https://twitter.com/bitcoinbabyapp",
-    label: "TWITTER",
-    icon: "🐦",
+    href: "https://mempool.space/testnet4",
+    label: "MEMPOOL",
+    icon: "📊",
     bgColor: "bg-pixel-bg-light",
     textColor: "text-pixel-text",
   },
   {
-    href: "https://github.com/bitcoinbaby",
-    label: "GITHUB",
-    icon: "📁",
+    href: "https://charms.dev",
+    label: "CHARMS",
+    icon: "🔮",
     bgColor: "bg-pixel-bg-light",
     textColor: "text-pixel-text",
   },

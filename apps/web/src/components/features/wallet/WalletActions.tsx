@@ -4,7 +4,8 @@
  * WalletActions - Wallet action buttons
  *
  * Primary and secondary wallet actions:
- * - Send, Withdraw, History (navigate to dedicated pages)
+ * - Send, Claim, History (navigate to dedicated pages)
+ * - Legacy Withdraw (deprecated, redirects to old system)
  * - Lock, Delete
  * - Get testnet BTC link
  */
@@ -36,12 +37,12 @@ export function WalletActions({
           </Button>
         </Link>
         <Link
-          href="/wallet/withdraw"
+          href="/wallet/claim"
           className="flex-1"
-          aria-label="Withdraw BABY tokens"
+          aria-label="Claim BABTC tokens"
         >
           <Button variant="success" className="w-full">
-            WITHDRAW
+            CLAIM
           </Button>
         </Link>
         <Link

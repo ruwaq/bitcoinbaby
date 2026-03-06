@@ -22,7 +22,19 @@ import type {
   MiningProof,
   ApiResponse,
   BalanceResponse,
+  ClaimableBalance,
+  ClaimPrepareResponse,
+  ClaimConfirmResponse,
+  ClaimRequest,
+  ClaimStatus,
 } from "../lib/types";
+import { CLAIM_EXPIRATION_MS, MIN_CLAIM_WORK } from "../lib/types";
+import {
+  getProofAggregator,
+  calculateWorkFromDifficulty,
+  calculateTokensFromWork,
+  estimateClaimFee,
+} from "../services/proof-aggregator";
 import {
   validateMiningProof,
   checkRateLimit,
@@ -140,6 +152,58 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     this.sql.exec(`
       CREATE INDEX IF NOT EXISTS idx_proofs_address
       ON mining_proofs(address)
+    `);
+
+    // Add claimed column for tracking which proofs have been claimed
+    try {
+      this.sql.exec(
+        `ALTER TABLE mining_proofs ADD COLUMN claimed INTEGER NOT NULL DEFAULT 0`,
+      );
+    } catch {
+      // Column already exists
+    }
+
+    try {
+      this.sql.exec(`ALTER TABLE mining_proofs ADD COLUMN claim_id TEXT`);
+    } catch {
+      // Column already exists
+    }
+
+    // Claims table - tracks user claim requests
+    this.sql.exec(`
+      CREATE TABLE IF NOT EXISTS claims (
+        id TEXT PRIMARY KEY,
+        address TEXT NOT NULL,
+        amount TEXT NOT NULL,
+        proof_count INTEGER NOT NULL,
+        total_work TEXT NOT NULL,
+        merkle_root TEXT,
+        server_signature TEXT,
+        op_return_data TEXT,
+        claim_txid TEXT,
+        mint_txid TEXT,
+        status TEXT NOT NULL DEFAULT 'prepared',
+        error TEXT,
+        prepared_at INTEGER NOT NULL,
+        confirmed_at INTEGER,
+        minted_at INTEGER,
+        expires_at INTEGER NOT NULL
+      )
+    `);
+
+    this.sql.exec(`
+      CREATE INDEX IF NOT EXISTS idx_claims_address
+      ON claims(address)
+    `);
+
+    this.sql.exec(`
+      CREATE INDEX IF NOT EXISTS idx_claims_status
+      ON claims(status)
+    `);
+
+    this.sql.exec(`
+      CREATE INDEX IF NOT EXISTS idx_proofs_claimed
+      ON mining_proofs(claimed)
     `);
   }
 
@@ -273,6 +337,20 @@ export class VirtualBalanceDO extends DurableObject<Env> {
             const limit = limitParam ? parseInt(limitParam, 10) : 100;
             return this.handleGetHistory(limit);
           }
+          // Claim system endpoints
+          if (action === "claimable") {
+            return this.handleGetClaimableBalance();
+          }
+          if (action === "claim-history") {
+            return this.handleGetClaimHistory();
+          }
+          if (action === "claim-status") {
+            const claimId = pathParts[3];
+            if (!claimId) {
+              return this.errorResponse("Claim ID required", 400);
+            }
+            return this.handleGetClaimStatus(claimId);
+          }
           break;
 
         case "POST":
@@ -294,11 +372,24 @@ export class VirtualBalanceDO extends DurableObject<Env> {
           if (action === "deduct") {
             return this.handleDeductBalance(request);
           }
+          // Claim system endpoints
+          if (action === "prepare-claim") {
+            return this.handlePrepareClaim();
+          }
+          if (action === "confirm-claim") {
+            return this.handleConfirmClaim(request);
+          }
+          if (action === "update-claim-status") {
+            return this.handleUpdateClaimStatus(request);
+          }
           break;
 
         case "DELETE":
           if (action === "reset") {
             return this.handleReset();
+          }
+          if (action === "full-reset") {
+            return this.handleFullReset();
           }
           break;
       }
@@ -1124,6 +1215,607 @@ export class VirtualBalanceDO extends DurableObject<Env> {
 
     return Response.json(response);
   }
+
+  /**
+   * DELETE /balance/full-reset - Full system reset (admin only)
+   * Drops and recreates all tables. Use with caution!
+   */
+  private handleFullReset(): Response {
+    // Drop all tables
+    this.sql.exec("DROP TABLE IF EXISTS mining_proofs");
+    this.sql.exec("DROP TABLE IF EXISTS balance");
+    this.sql.exec("DROP TABLE IF EXISTS claims");
+
+    // Recreate tables
+    this.initializeSchema();
+
+    // Clear all caches
+    this.cachedBalance = null;
+    this.cacheLoadedAt = 0;
+    this.difficultyState = null;
+    this.sharesThisHourCache = 0;
+    this.sharesHourStartedAt = 0;
+
+    balanceLogger.info("Full reset complete - all tables recreated");
+
+    const response: ApiResponse<{ fullReset: boolean }> = {
+      success: true,
+      data: { fullReset: true },
+      timestamp: Date.now(),
+    };
+
+    return Response.json(response);
+  }
+
+  // ===========================================================================
+  // CLAIM SYSTEM HANDLERS
+  // ===========================================================================
+
+  /**
+   * GET /balance/{address}/claimable - Get claimable balance
+   *
+   * Returns the sum of unclaimed work (D²) from all mining proofs.
+   */
+  private handleGetClaimableBalance(): Response {
+    if (!this.address) {
+      return this.errorResponse("Address required", 400);
+    }
+
+    // Get all unclaimed proofs (credited but not claimed)
+    const rows = this.sql
+      .exec(
+        `SELECT difficulty, created_at FROM mining_proofs
+         WHERE address = ? AND credited = 1 AND claimed = 0
+         ORDER BY created_at DESC`,
+        this.address,
+      )
+      .toArray();
+
+    // Calculate total work
+    let unclaimedWork = 0n;
+    let lastProofAt = 0;
+    for (const row of rows) {
+      const difficulty = row.difficulty as number;
+      unclaimedWork += calculateWorkFromDifficulty(difficulty);
+      if (lastProofAt === 0) {
+        lastProofAt = row.created_at as number;
+      }
+    }
+
+    // Calculate claimable tokens
+    const claimableTokens = calculateTokensFromWork(unclaimedWork);
+
+    // Get total claimed (from completed claims)
+    const claimedRows = this.sql
+      .exec(
+        `SELECT SUM(CAST(amount AS INTEGER)) as total FROM claims
+         WHERE address = ? AND status = 'completed'`,
+        this.address,
+      )
+      .toArray();
+    const totalClaimed = BigInt((claimedRows[0]?.total as number) || 0);
+
+    // Count completed claims
+    const countRows = this.sql
+      .exec(
+        `SELECT COUNT(*) as count FROM claims
+         WHERE address = ? AND status = 'completed'`,
+        this.address,
+      )
+      .toArray();
+    const claimCount = (countRows[0]?.count as number) || 0;
+
+    const data: ClaimableBalance = {
+      address: this.address,
+      unclaimedWork,
+      unclaimedProofs: rows.length,
+      claimableTokens,
+      lastProofAt,
+      totalClaimed,
+      claimCount,
+    };
+
+    const response: ApiResponse<{
+      address: string;
+      unclaimedWork: string;
+      unclaimedProofs: number;
+      claimableTokens: string;
+      lastProofAt: number;
+      totalClaimed: string;
+      claimCount: number;
+    }> = {
+      success: true,
+      data: {
+        address: data.address,
+        unclaimedWork: data.unclaimedWork.toString(),
+        unclaimedProofs: data.unclaimedProofs,
+        claimableTokens: data.claimableTokens.toString(),
+        lastProofAt: data.lastProofAt,
+        totalClaimed: data.totalClaimed.toString(),
+        claimCount: data.claimCount,
+      },
+      timestamp: Date.now(),
+    };
+
+    return Response.json(response);
+  }
+
+  /**
+   * POST /balance/{address}/prepare-claim - Prepare a claim
+   *
+   * Aggregates all unclaimed proofs, creates a signed claim,
+   * and returns data for the user's Bitcoin TX.
+   */
+  private async handlePrepareClaim(): Promise<Response> {
+    if (!this.address) {
+      return this.errorResponse("Address required", 400);
+    }
+
+    // Check for pending claims
+    const pendingClaims = this.sql
+      .exec(
+        `SELECT id FROM claims
+         WHERE address = ? AND status IN ('prepared', 'broadcast')
+         AND expires_at > ?`,
+        this.address,
+        Date.now(),
+      )
+      .toArray();
+
+    if (pendingClaims.length > 0) {
+      return this.errorResponse(
+        "You have a pending claim. Complete or wait for it to expire.",
+        409,
+      );
+    }
+
+    // Get all unclaimed proofs
+    const rows = this.sql
+      .exec(
+        `SELECT id, hash, difficulty FROM mining_proofs
+         WHERE address = ? AND credited = 1 AND claimed = 0`,
+        this.address,
+      )
+      .toArray();
+
+    if (rows.length === 0) {
+      return this.errorResponse("No unclaimed proofs to claim", 400);
+    }
+
+    // Calculate total work
+    let totalWork = 0n;
+    const proofHashes: string[] = [];
+    for (const row of rows) {
+      const difficulty = row.difficulty as number;
+      totalWork += calculateWorkFromDifficulty(difficulty);
+      proofHashes.push(row.hash as string);
+    }
+
+    // Check minimum work requirement
+    if (totalWork < MIN_CLAIM_WORK) {
+      return this.errorResponse(
+        `Minimum work required: ${MIN_CLAIM_WORK}. Current: ${totalWork}`,
+        400,
+      );
+    }
+
+    // Get proof aggregator
+    const serverSecret = this.env.ADMIN_KEY;
+    if (!serverSecret) {
+      return this.errorResponse("Server not configured for claims", 500);
+    }
+
+    const aggregator = getProofAggregator(serverSecret);
+
+    // Create mining proofs array for aggregation
+    const miningProofs = rows.map((row) => ({
+      hash: row.hash as string,
+      difficulty: row.difficulty as number,
+      nonce: 0,
+      blockData: "",
+    }));
+
+    // Aggregate proofs
+    const aggregatedProof = aggregator.aggregateProofs(
+      this.address,
+      miningProofs,
+    );
+
+    // Estimate fee
+    const feeRate = 5; // Conservative default
+    const estimatedFee = estimateClaimFee(feeRate);
+
+    // Create claim data with ASYNC signature (real HMAC-SHA256)
+    const claimData = await aggregator.createClaimDataAsync(
+      aggregatedProof,
+      estimatedFee,
+    );
+
+    // Calculate expiration
+    const now = Date.now();
+    const expiresAt = now + CLAIM_EXPIRATION_MS;
+
+    // Save claim to database with full data
+    const claimId = aggregatedProof.nonce;
+    this.sql.exec(
+      `INSERT INTO claims
+       (id, address, amount, proof_count, total_work, merkle_root, server_signature, op_return_data, status, prepared_at, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'prepared', ?, ?)`,
+      claimId,
+      this.address,
+      aggregatedProof.tokenAmount.toString(),
+      rows.length,
+      aggregatedProof.totalWork.toString(),
+      aggregatedProof.merkleRoot,
+      claimData.serverSignature,
+      claimData.opReturnData,
+      now,
+      expiresAt,
+    );
+
+    // Mark proofs as being claimed (but not yet confirmed)
+    const proofIds = rows.map((r) => r.id as string);
+    for (const proofId of proofIds) {
+      this.sql.exec(
+        `UPDATE mining_proofs SET claim_id = ? WHERE id = ?`,
+        claimId,
+        proofId,
+      );
+    }
+
+    balanceLogger.info("Claim prepared", {
+      address: this.address,
+      claimId,
+      proofCount: rows.length,
+      tokenAmount: aggregatedProof.tokenAmount.toString(),
+    });
+
+    const responseData: ClaimPrepareResponse = {
+      claimData,
+      totalWork: aggregatedProof.totalWork.toString(),
+      proofCount: rows.length,
+      tokenAmount: aggregatedProof.tokenAmount.toString(),
+      estimatedFee,
+      expiresAt,
+    };
+
+    const response: ApiResponse<ClaimPrepareResponse> = {
+      success: true,
+      data: responseData,
+      timestamp: now,
+    };
+
+    return Response.json(response);
+  }
+
+  /**
+   * POST /balance/{address}/confirm-claim - Confirm claim TX broadcast
+   *
+   * User calls this after broadcasting their Bitcoin TX.
+   */
+  private async handleConfirmClaim(request: Request): Promise<Response> {
+    if (!this.address) {
+      return this.errorResponse("Address required", 400);
+    }
+
+    const body = (await request.json()) as {
+      claimId: string;
+      claimTxid: string;
+    };
+
+    if (!body.claimId || !body.claimTxid) {
+      return this.errorResponse("claimId and claimTxid are required", 400);
+    }
+
+    // Get the claim
+    const claimRows = this.sql
+      .exec(
+        `SELECT * FROM claims WHERE id = ? AND address = ?`,
+        body.claimId,
+        this.address,
+      )
+      .toArray();
+
+    if (claimRows.length === 0) {
+      return this.errorResponse("Claim not found", 404);
+    }
+
+    const claim = claimRows[0];
+    const status = claim.status as ClaimStatus;
+
+    // Validate status
+    if (status !== "prepared") {
+      return this.errorResponse(
+        `Claim already in status: ${status}. Cannot confirm.`,
+        400,
+      );
+    }
+
+    // Check expiration
+    const expiresAt = claim.expires_at as number;
+    if (Date.now() > expiresAt) {
+      // Mark as expired
+      this.sql.exec(
+        `UPDATE claims SET status = 'expired' WHERE id = ?`,
+        body.claimId,
+      );
+      // Release proofs
+      this.sql.exec(
+        `UPDATE mining_proofs SET claim_id = NULL WHERE claim_id = ?`,
+        body.claimId,
+      );
+      return this.errorResponse("Claim has expired", 410);
+    }
+
+    const now = Date.now();
+
+    // Update claim with txid and status
+    this.sql.exec(
+      `UPDATE claims SET
+         claim_txid = ?,
+         status = 'broadcast',
+         confirmed_at = ?
+       WHERE id = ?`,
+      body.claimTxid,
+      now,
+      body.claimId,
+    );
+
+    // Mark proofs as claimed
+    this.sql.exec(
+      `UPDATE mining_proofs SET claimed = 1 WHERE claim_id = ?`,
+      body.claimId,
+    );
+
+    balanceLogger.info("Claim confirmed", {
+      address: this.address,
+      claimId: body.claimId,
+      claimTxid: body.claimTxid,
+    });
+
+    const responseData: ClaimConfirmResponse = {
+      status: "broadcast",
+      mintTxid: null,
+      tokensMinted: null,
+      nextStep:
+        "Wait for TX confirmation (6 blocks), then call /api/claim/mint",
+    };
+
+    const response: ApiResponse<ClaimConfirmResponse> = {
+      success: true,
+      data: responseData,
+      timestamp: now,
+    };
+
+    return Response.json(response);
+  }
+
+  /**
+   * GET /balance/{address}/claim-status/{claimId} - Get claim status
+   */
+  private handleGetClaimStatus(claimId: string): Response {
+    if (!this.address) {
+      return this.errorResponse("Address required", 400);
+    }
+
+    const rows = this.sql
+      .exec(
+        `SELECT * FROM claims WHERE id = ? AND address = ?`,
+        claimId,
+        this.address,
+      )
+      .toArray();
+
+    if (rows.length === 0) {
+      return this.errorResponse("Claim not found", 404);
+    }
+
+    const claim = rows[0];
+
+    const data: ClaimRequest = {
+      id: claim.id as string,
+      address: claim.address as string,
+      amount: BigInt(claim.amount as string),
+      proofCount: claim.proof_count as number,
+      totalWork: BigInt(claim.total_work as string),
+      claimTxid: (claim.claim_txid as string) || null,
+      mintTxid: (claim.mint_txid as string) || null,
+      status: claim.status as ClaimStatus,
+      error: (claim.error as string) || null,
+      preparedAt: claim.prepared_at as number,
+      confirmedAt: (claim.confirmed_at as number) || null,
+      mintedAt: (claim.minted_at as number) || null,
+    };
+
+    const response: ApiResponse<{
+      id: string;
+      address: string;
+      amount: string;
+      proofCount: number;
+      totalWork: string;
+      merkleRoot: string | null;
+      serverSignature: string | null;
+      opReturnData: string | null;
+      claimTxid: string | null;
+      mintTxid: string | null;
+      status: ClaimStatus;
+      error: string | null;
+      preparedAt: number;
+      confirmedAt: number | null;
+      mintedAt: number | null;
+    }> = {
+      success: true,
+      data: {
+        id: data.id,
+        address: data.address,
+        amount: data.amount.toString(),
+        proofCount: data.proofCount,
+        totalWork: data.totalWork.toString(),
+        merkleRoot: (claim.merkle_root as string) || null,
+        serverSignature: (claim.server_signature as string) || null,
+        opReturnData: (claim.op_return_data as string) || null,
+        claimTxid: data.claimTxid,
+        mintTxid: data.mintTxid,
+        status: data.status,
+        error: data.error,
+        preparedAt: data.preparedAt,
+        confirmedAt: data.confirmedAt,
+        mintedAt: data.mintedAt,
+      },
+      timestamp: Date.now(),
+    };
+
+    return Response.json(response);
+  }
+
+  /**
+   * GET /balance/{address}/claim-history - Get claim history
+   */
+  private handleGetClaimHistory(): Response {
+    if (!this.address) {
+      return this.errorResponse("Address required", 400);
+    }
+
+    const rows = this.sql
+      .exec(
+        `SELECT * FROM claims WHERE address = ? ORDER BY prepared_at DESC LIMIT 50`,
+        this.address,
+      )
+      .toArray();
+
+    const claims = rows.map((row) => ({
+      id: row.id as string,
+      amount: row.amount as string,
+      proofCount: row.proof_count as number,
+      status: row.status as ClaimStatus,
+      claimTxid: (row.claim_txid as string) || null,
+      mintTxid: (row.mint_txid as string) || null,
+      preparedAt: row.prepared_at as number,
+      confirmedAt: (row.confirmed_at as number) || null,
+      mintedAt: (row.minted_at as number) || null,
+    }));
+
+    const response: ApiResponse<{
+      claims: Array<{
+        id: string;
+        amount: string;
+        proofCount: number;
+        status: ClaimStatus;
+        claimTxid: string | null;
+        mintTxid: string | null;
+        preparedAt: number;
+        confirmedAt: number | null;
+        mintedAt: number | null;
+      }>;
+    }> = {
+      success: true,
+      data: { claims },
+      timestamp: Date.now(),
+    };
+
+    return Response.json(response);
+  }
+
+  /**
+   * POST /balance/{address}/update-claim-status - Update claim status
+   *
+   * Used by the mint endpoint to update claim status during minting lifecycle.
+   */
+  private async handleUpdateClaimStatus(request: Request): Promise<Response> {
+    if (!this.address) {
+      return this.errorResponse("Address required", 400);
+    }
+
+    const body = (await request.json()) as {
+      claimId: string;
+      status: ClaimStatus;
+      mintTxid?: string;
+      error?: string;
+    };
+
+    if (!body.claimId || !body.status) {
+      return this.errorResponse("claimId and status required", 400);
+    }
+
+    // Validate status transition
+    const validStatuses: ClaimStatus[] = [
+      "prepared",
+      "broadcast",
+      "confirmed",
+      "minting",
+      "completed",
+      "failed",
+      "expired",
+    ];
+
+    if (!validStatuses.includes(body.status)) {
+      return this.errorResponse("Invalid status", 400);
+    }
+
+    // Check claim exists
+    const existing = this.sql
+      .exec(
+        `SELECT status FROM claims WHERE id = ? AND address = ?`,
+        body.claimId,
+        this.address,
+      )
+      .toArray();
+
+    if (existing.length === 0) {
+      return this.errorResponse("Claim not found", 404);
+    }
+
+    const now = Date.now();
+
+    // Build update query based on new status
+    if (body.status === "completed" && body.mintTxid) {
+      this.sql.exec(
+        `UPDATE claims
+         SET status = ?, mint_txid = ?, minted_at = ?
+         WHERE id = ? AND address = ?`,
+        body.status,
+        body.mintTxid,
+        now,
+        body.claimId,
+        this.address,
+      );
+    } else if (body.status === "failed" && body.error) {
+      this.sql.exec(
+        `UPDATE claims
+         SET status = ?, error = ?
+         WHERE id = ? AND address = ?`,
+        body.status,
+        body.error,
+        body.claimId,
+        this.address,
+      );
+    } else {
+      this.sql.exec(
+        `UPDATE claims SET status = ? WHERE id = ? AND address = ?`,
+        body.status,
+        body.claimId,
+        this.address,
+      );
+    }
+
+    balanceLogger.info("Claim status updated", {
+      address: this.address,
+      claimId: body.claimId,
+      status: body.status,
+    });
+
+    const response: ApiResponse<{ status: ClaimStatus }> = {
+      success: true,
+      data: { status: body.status },
+      timestamp: now,
+    };
+
+    return Response.json(response);
+  }
+
+  // ===========================================================================
+  // END CLAIM SYSTEM HANDLERS
+  // ===========================================================================
 
   /**
    * Helper to create error response

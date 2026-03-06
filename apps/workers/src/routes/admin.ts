@@ -145,6 +145,92 @@ adminRouter.delete("/reset-all", async (c) => {
 });
 
 /**
+ * DELETE /api/admin/full-system-reset - Complete system reset
+ * Resets Redis AND triggers full reset on a VirtualBalance DO
+ * This effectively clears all mining data, claims, and NFT records
+ */
+adminRouter.delete("/full-system-reset", async (c) => {
+  try {
+    const results: Record<string, boolean> = {};
+
+    // 1. Reset Redis (leaderboards, NFT data, caches)
+    try {
+      const redis = getRedis(c.env);
+      await resetDailyLeaderboard(redis);
+      await resetWeeklyLeaderboard(redis);
+      await redis.flushdb();
+      results.redis = true;
+      adminLogger.info("Redis flushed");
+    } catch (redisError) {
+      adminLogger.error("Redis reset failed", redisError);
+      results.redis = false;
+    }
+
+    // 2. Reset KV cache
+    try {
+      // List and delete all keys in CACHE namespace
+      const listResult = await c.env.CACHE.list();
+      for (const key of listResult.keys) {
+        await c.env.CACHE.delete(key.name);
+      }
+      results.kvCache = true;
+      adminLogger.info("KV cache cleared", {
+        keysDeleted: listResult.keys.length,
+      });
+    } catch (kvError) {
+      adminLogger.error("KV reset failed", kvError);
+      results.kvCache = false;
+    }
+
+    // 3. Trigger full reset on system DO (uses a special system address)
+    try {
+      const systemId = c.env.VIRTUAL_BALANCE.idFromName("__system__");
+      const systemStub = c.env.VIRTUAL_BALANCE.get(systemId);
+      await systemStub.fetch(
+        new Request("http://internal/balance/__system__/full-reset", {
+          method: "DELETE",
+        }),
+      );
+      results.virtualBalanceDO = true;
+      adminLogger.info("VirtualBalance DO tables reset");
+    } catch (doError) {
+      adminLogger.error("DO reset failed", doError);
+      results.virtualBalanceDO = false;
+    }
+
+    // 4. Reset WithdrawPool DOs
+    try {
+      const poolTypes = ["weekly", "monthly", "low_fee", "immediate"];
+      for (const poolType of poolTypes) {
+        const poolId = c.env.WITHDRAW_POOL.idFromName(poolType);
+        const poolStub = c.env.WITHDRAW_POOL.get(poolId);
+        await poolStub.fetch(
+          new Request(`http://internal/pool/${poolType}/reset`, {
+            method: "DELETE",
+          }),
+        );
+      }
+      results.withdrawPoolDO = true;
+      adminLogger.info("WithdrawPool DOs reset");
+    } catch (poolError) {
+      adminLogger.error("WithdrawPool reset failed", poolError);
+      results.withdrawPoolDO = false;
+    }
+
+    adminLogger.info("Full system reset complete", results);
+
+    return successResponse(c, {
+      message: "Full system reset complete",
+      results,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    adminLogger.error("Full system reset error", error);
+    return errorResponse(c, "Full system reset failed", 500);
+  }
+});
+
+/**
  * POST /api/admin/nft/sync - Sync NFT counter with on-chain data
  */
 adminRouter.post("/nft/sync", validateBody(nftSyncSchema), async (c) => {

@@ -1,0 +1,48 @@
+# BABTC V2 Claim Spell
+# User-paid settlement for aggregated mining claims
+#
+# This spell is created by the user after mining and preparing a claim.
+# The user pays ~1000 sats to claim their earned tokens.
+#
+# Flow:
+# 1. User mines off-chain, accumulates work
+# 2. User calls /api/claim/prepare to get signed claim data
+# 3. User creates this spell with claim data
+# 4. User broadcasts Bitcoin TX with OP_RETURN
+# 5. Tokens are minted to user's address
+#
+# Environment Variables:
+#   CLAIM_UTXO - User's funding UTXO (txid:vout)
+#   USER_ADDRESS - User's Bitcoin address for token receipt
+#   TOKEN_AMOUNT - Amount of tokens to mint
+#   TOTAL_WORK - Sum of D² from all proofs
+#   PROOF_COUNT - Number of proofs aggregated
+#   MERKLE_ROOT - Merkle root of proof hashes
+#   TIMESTAMP - When claim was prepared
+#   NONCE - Unique claim nonce (UUID)
+#   SERVER_SIGNATURE - HMAC-SHA256 signature from server
+
+version: 9
+apps:
+  $01: t/${BABTC_V2_APP_ID}/${BABTC_V2_APP_VK}
+
+ins:
+  - utxo_id: ${CLAIM_UTXO}
+
+outs:
+  # All tokens go to the user (100% - no splits in V2)
+  - address: ${USER_ADDRESS}
+    charms:
+      $01: ${TOKEN_AMOUNT}
+    sats: 546
+
+private_inputs:
+  $01:
+    address: "${USER_ADDRESS}"
+    total_work: ${TOTAL_WORK}
+    proof_count: ${PROOF_COUNT}
+    merkle_root: "${MERKLE_ROOT}"
+    token_amount: ${TOKEN_AMOUNT}
+    timestamp: ${TIMESTAMP}
+    nonce: "${NONCE}"
+    server_signature: "${SERVER_SIGNATURE}"

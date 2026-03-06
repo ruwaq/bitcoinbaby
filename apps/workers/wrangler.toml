@@ -69,11 +69,16 @@ CHARMS_PROVER_URL = "http://localhost:17784"
 # Scrolls API for token balances
 SCROLLS_API_URL = "https://scrolls.charms.dev"
 # BABTC Token configuration
+# APP_ID = SHA256 of genesis UTXO - update after V2 contract deployment
+BABTC_APP_ID = "87b5ecfb4c8e2d5f3a6e9b1c7d4f2a8e5b3c6d9f1a4e7b2c5d8f3a6e9b1c7d4f"
 BABTC_APP_VK = "ab70796e62562b5245cf746d7ecf4b95b86df582921ae42ec2ceea25612807c6"
 BABTC_GENESIS = "b3deba0743aeffd0e455ce442b1693107090341381e3d8bcc5f586667c3e8a81:0"
-# Treasury address - holds BABTC for batch withdrawals
-# Must be funded with tokens before batch processing works
+# Treasury address - holds BABTC tokens
 TREASURY_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8"
+# Foundation address - receives 20% platform fee from claims
+FOUNDATION_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8"
+# Platform fee percentage for claims (20% = extra output to foundation)
+PLATFORM_FEE_PERCENT = "20"
 
 # Production environment
 [env.production]
@@ -108,10 +113,16 @@ CHARMS_PROVER_URL = "https://prover.charms.dev"
 # Scrolls API for token balances
 SCROLLS_API_URL = "https://scrolls.charms.dev"
 # BABTC Token configuration
+# APP_ID = SHA256 of genesis UTXO - update after V2 contract deployment
+BABTC_APP_ID = "87b5ecfb4c8e2d5f3a6e9b1c7d4f2a8e5b3c6d9f1a4e7b2c5d8f3a6e9b1c7d4f"
 BABTC_APP_VK = "ab70796e62562b5245cf746d7ecf4b95b86df582921ae42ec2ceea25612807c6"
 BABTC_GENESIS = "b3deba0743aeffd0e455ce442b1693107090341381e3d8bcc5f586667c3e8a81:0"
 # Treasury address for testnet4
 TREASURY_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8"
+# Foundation address - receives 20% platform fee from claims
+FOUNDATION_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8"
+# Platform fee percentage for claims (20% = extra output to foundation)
+PLATFORM_FEE_PERCENT = "20"
 
 # Production KV namespace (shared with development - same dedup across all envs)
 [[env.production.kv_namespaces]]

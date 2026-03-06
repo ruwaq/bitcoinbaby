@@ -286,3 +286,6 @@ export const redisLogger = new Logger("Redis");
 
 /** Logger for treasury signer operations */
 export const signerLogger = new Logger("Signer");
+
+/** Logger for claim operations */
+export const claimLogger = new Logger("Claim");

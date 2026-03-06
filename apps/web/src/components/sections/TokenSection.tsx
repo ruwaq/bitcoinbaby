@@ -8,7 +8,7 @@
  * - Stats: supply, balance, etc.
  * - Tokenomics: distribucion, formula
  * - Reward table
- * - Actions: withdraw, mining, NFT
+ * - Actions: claim, mining, NFT
  * - Links: explorers, docs
  */
 
@@ -32,14 +32,14 @@ export function TokenSection() {
     address,
   });
 
-  // Check if user can withdraw (min 10,000 $BABY)
-  const minWithdraw = 10_000n;
-  const canWithdraw = address && virtual.balance >= minWithdraw && !isLoading;
-  const isWithdrawing = false; // Actual withdrawal goes through wallet page
+  // Check if user can claim (min 10,000 $BABY)
+  const minClaim = 10_000n;
+  const canClaim = address && virtual.balance >= minClaim && !isLoading;
+  const isClaiming = false; // Actual claim goes through wallet page
 
-  const handleWithdraw = async () => {
-    // Navigate to wallet withdraw page for actual withdrawal
-    window.location.href = "/wallet/withdraw";
+  const handleClaim = async () => {
+    // Navigate to wallet claim page for on-chain minting
+    window.location.href = "/wallet/claim";
   };
 
   return (
@@ -57,10 +57,10 @@ export function TokenSection() {
       {/* Actions */}
       <TokenActions
         virtualBalance={virtual.balance}
-        canWithdraw={!!canWithdraw}
-        isWithdrawing={isWithdrawing}
-        onWithdraw={handleWithdraw}
-        minWithdraw={minWithdraw}
+        canClaim={!!canClaim}
+        isClaiming={isClaiming}
+        onClaim={handleClaim}
+        minClaim={minClaim}
       />
 
       {/* Tokenomics */}

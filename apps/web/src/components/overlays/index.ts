@@ -2,7 +2,7 @@
  * Overlay Components
  *
  * Modal dialogs for wallet operations.
- * Navigation (send, withdraw, history) uses dedicated pages.
+ * Navigation (send, claim, history) uses dedicated pages.
  */
 
 export { ModalManager } from "./ModalManager";

@@ -1,0 +1,20 @@
+[package]
+name = "babtc-v2-contract"
+version = "2.0.0"
+edition = "2021"
+description = "BABTC V2 Token Contract - Server-Signed Claims"
+license = "MIT"
+
+[dependencies]
+charms-sdk = { version = "11.0.1" }
+serde = { version = "1.0", features = ["derive"] }
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+overflow-checks = true
+
+# Empty [workspace] section to make this a "top-level" project
+[workspace]

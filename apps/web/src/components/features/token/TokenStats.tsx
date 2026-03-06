@@ -7,7 +7,7 @@
  * - Max Supply
  * - Circulating Supply (estimado)
  * - Your Balance (virtual + on-chain)
- * - Pending Withdrawals
+ * - On-chain balance
  */
 
 import { BABTC_CONFIG } from "@bitcoinbaby/bitcoin";
@@ -100,7 +100,7 @@ export function TokenStats({
             Virtual
           </span>
           <HelpTooltip
-            content="Tokens earned from mining, stored in your virtual account. Available for withdrawal."
+            content="Tokens earned from mining, stored in your virtual account. Available to claim."
             title="Virtual Balance"
             size="sm"
           />
@@ -109,7 +109,7 @@ export function TokenStats({
           {isLoading ? "---" : virtualBalance.toLocaleString()}
         </div>
         <div className="font-pixel text-pixel-2xs text-pixel-text-muted truncate">
-          Available to withdraw
+          Available to claim
         </div>
       </div>
 
@@ -120,7 +120,7 @@ export function TokenStats({
             On-Chain
           </span>
           <HelpTooltip
-            content="Tokens withdrawn to your Bitcoin wallet. These are Charms tokens on the Bitcoin blockchain."
+            content="Tokens claimed to your Bitcoin wallet. These are Charms tokens on the Bitcoin blockchain."
             title="On-Chain Balance"
             size="sm"
           />

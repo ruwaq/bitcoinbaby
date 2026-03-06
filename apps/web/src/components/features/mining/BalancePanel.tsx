@@ -77,7 +77,7 @@ export function BalancePanel({
             $BABY Balance
           </span>
           <HelpTooltip
-            content="Tokens earned from mining, stored in your virtual account. You can withdraw these to your Bitcoin wallet anytime."
+            content="Tokens earned from mining, stored in your virtual account. You can claim these to your Bitcoin wallet anytime."
             title="Virtual Balance"
             size="sm"
           />
@@ -99,7 +99,7 @@ export function BalancePanel({
           />
         )}
         <div className="font-pixel text-pixel-2xs text-pixel-text-muted mt-1 truncate">
-          {virtualBalanceError ? "Last known balance" : "Available to withdraw"}
+          {virtualBalanceError ? "Last known balance" : "Available to claim"}
         </div>
       </div>
 
@@ -173,7 +173,7 @@ export function BalancePanel({
             On-Chain $BABY
           </span>
           <HelpTooltip
-            content="Tokens you've withdrawn to your Bitcoin wallet. These are stored on the blockchain as Charms tokens."
+            content="Tokens you've claimed to your Bitcoin wallet. These are stored on the blockchain as Charms tokens."
             title="On-Chain Balance"
             size="sm"
           />
@@ -182,7 +182,7 @@ export function BalancePanel({
           {onChainBalance.toLocaleString()}
         </div>
         <div className="font-pixel text-pixel-2xs text-pixel-text-muted truncate">
-          Withdrawn to Bitcoin
+          Claimed to Bitcoin
         </div>
       </div>
     </div>

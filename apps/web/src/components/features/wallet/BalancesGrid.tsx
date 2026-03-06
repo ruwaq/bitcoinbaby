@@ -91,7 +91,7 @@ export function BalancesGrid({
               $BABY BALANCE
             </label>
             <HelpTooltip
-              content="Tokens earned from mining. You can withdraw these to your Bitcoin wallet as Charms tokens."
+              content="Tokens earned from mining. You can claim these to your Bitcoin wallet as Charms tokens."
               title="Mining Rewards"
               size="sm"
             />
@@ -118,7 +118,7 @@ export function BalancesGrid({
               BABTC (CHARMS)
             </label>
             <HelpTooltip
-              content="BABTC tokens stored on Bitcoin as Charms. These are $BABY tokens that have been withdrawn to the blockchain."
+              content="BABTC tokens stored on Bitcoin as Charms. These are $BABY tokens that have been claimed to the blockchain."
               title="On-Chain Tokens"
               size="sm"
             />

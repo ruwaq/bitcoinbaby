@@ -11,7 +11,6 @@
  * - Share submission and notifications
  */
 
-import { WithdrawButton } from "@/components/withdraw";
 import {
   MiningStatsGrid,
   NFTBoostPanel,
@@ -137,18 +136,6 @@ export function MiningSection() {
             onForceSync={shares.resetAndSync}
             recentReward={recentReward}
           />
-        )}
-
-        {/* Withdraw Button - Shows when user has virtual balance */}
-        {wallet && balance.virtual > 0n && (
-          <div className="mb-6 flex justify-center">
-            <WithdrawButton
-              virtualBalance={balance.virtual}
-              isLoading={balance.isLoading}
-              size="md"
-              showBalance={true}
-            />
-          </div>
         )}
 
         {/* Recent Notifications */}

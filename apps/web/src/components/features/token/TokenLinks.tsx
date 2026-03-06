@@ -6,10 +6,19 @@
  * Links externos a explorers, documentacion, etc.
  */
 
+import Link from "next/link";
 import { BABTC_TESTNET4 } from "@bitcoinbaby/bitcoin";
 import { pixelBorders } from "@bitcoinbaby/ui";
 
-const LINKS = [
+interface TokenLink {
+  label: string;
+  url: string;
+  icon: string;
+  description: string;
+  internal?: boolean;
+}
+
+const LINKS: TokenLink[] = [
   {
     label: "Charms Explorer",
     url: "https://explorer.charms.dev",
@@ -23,18 +32,21 @@ const LINKS = [
     description: "Bitcoin Testnet4 Explorer",
   },
   {
-    label: "Contract Code",
-    url: "https://github.com/Sobek-lab/bitcoinbaby/tree/main/packages/bitcoin/contracts/babtc",
-    icon: "📝",
-    description: "Smart contract source code",
+    label: "Charms Protocol",
+    url: "https://charms.dev",
+    icon: "🔮",
+    description: "Bitcoin smart contracts",
   },
   {
-    label: "Documentation",
-    url: "https://bitcoinbaby.dev",
-    icon: "📚",
+    label: "Help",
+    url: "/help",
+    icon: "❓",
     description: "Learn about BitcoinBaby",
+    internal: true,
   },
 ];
+
+const linkStyles = `flex flex-col items-center justify-center p-4 bg-pixel-bg-dark ${pixelBorders.thin} hover:border-pixel-primary hover:bg-pixel-primary/10 transition-all group`;
 
 export function TokenLinks() {
   const appId = BABTC_TESTNET4.appId;
@@ -46,22 +58,33 @@ export function TokenLinks() {
       </h2>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {LINKS.map((link) => (
-          <a
-            key={link.label}
-            href={link.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`flex flex-col items-center justify-center p-4 bg-pixel-bg-dark ${pixelBorders.thin} hover:border-pixel-primary hover:bg-pixel-primary/10 transition-all group`}
-          >
-            <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">
-              {link.icon}
-            </span>
-            <span className="font-pixel text-pixel-2xs text-pixel-text group-hover:text-pixel-primary text-center">
-              {link.label.toUpperCase()}
-            </span>
-          </a>
-        ))}
+        {LINKS.map((link) =>
+          link.internal ? (
+            <Link key={link.label} href={link.url} className={linkStyles}>
+              <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">
+                {link.icon}
+              </span>
+              <span className="font-pixel text-pixel-2xs text-pixel-text group-hover:text-pixel-primary text-center">
+                {link.label.toUpperCase()}
+              </span>
+            </Link>
+          ) : (
+            <a
+              key={link.label}
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={linkStyles}
+            >
+              <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">
+                {link.icon}
+              </span>
+              <span className="font-pixel text-pixel-2xs text-pixel-text group-hover:text-pixel-primary text-center">
+                {link.label.toUpperCase()}
+              </span>
+            </a>
+          ),
+        )}
       </div>
 
       {/* Quick Copy Section */}

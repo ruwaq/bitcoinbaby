@@ -2,7 +2,7 @@
  * ModalManager
  *
  * Centralized manager for modal dialogs only.
- * Navigation (send, withdraw, history, settings) uses dedicated pages.
+ * Navigation (send, claim, history, settings) uses dedicated pages.
  *
  * Modals handled:
  * - Unlock wallet

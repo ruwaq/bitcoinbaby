@@ -1,0 +1,1 @@
+/Users/munay/dev/bitcoinbaby/packages/bitcoin/contracts/babtc-v2/target/wasm32-wasip1/release/babtc-v2-contract.wasm: /Users/munay/dev/bitcoinbaby/packages/bitcoin/contracts/babtc-v2/src/lib.rs /Users/munay/dev/bitcoinbaby/packages/bitcoin/contracts/babtc-v2/src/main.rs

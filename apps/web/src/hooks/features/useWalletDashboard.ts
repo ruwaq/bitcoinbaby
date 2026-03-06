@@ -23,7 +23,7 @@ import { getDeploymentConfig } from "@bitcoinbaby/bitcoin";
  * - NFT mining boost
  * - Modal actions (unlock/delete)
  *
- * Navigation to send/withdraw/history uses dedicated pages (no overlays).
+ * Navigation to send/claim/history uses dedicated pages (no overlays).
  *
  * @example
  * const { wallet, balances, actions, overlays, isLoading } = useWalletDashboard();

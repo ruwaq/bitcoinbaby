@@ -37,7 +37,12 @@ export interface Env {
   CHARMS_PROVER_URL?: string;
   TREASURY_ADDRESS?: string;
 
+  // Platform fee configuration
+  FOUNDATION_ADDRESS?: string;
+  PLATFORM_FEE_PERCENT?: string;
+
   // BABTC Token configuration
+  BABTC_APP_ID?: string;
   BABTC_APP_VK?: string;
   BABTC_GENESIS?: string;
   SCROLLS_API_URL?: string;
@@ -321,3 +326,164 @@ export interface UserStats {
   cosmicBonus: number;
   lastActive: number;
 }
+
+// =============================================================================
+// CLAIM SYSTEM V2 - User-Paid Settlement
+// =============================================================================
+
+/**
+ * Aggregated proof for claiming tokens
+ *
+ * This represents the sum of all mining work done by a user.
+ * The user submits this in a Bitcoin TX to claim their tokens.
+ */
+export interface AggregatedProof {
+  /** User's Bitcoin address */
+  address: string;
+  /** Sum of difficulty² from all proofs */
+  totalWork: bigint;
+  /** Number of mining shares included */
+  proofCount: number;
+  /** Merkle root of all proof hashes */
+  merkleRoot: string;
+  /** Calculated token amount to mint */
+  tokenAmount: bigint;
+  /** When this aggregation was created */
+  timestamp: number;
+  /** Unique claim nonce (prevents replay) */
+  nonce: string;
+}
+
+/**
+ * Server-signed claim data
+ *
+ * This is what the user puts in their Bitcoin TX OP_RETURN.
+ * The smart contract verifies the server signature.
+ */
+export interface ClaimData {
+  /** The aggregated proof */
+  proof: AggregatedProof;
+  /** Server's signature over the proof */
+  serverSignature: string;
+  /** Hex-encoded data for OP_RETURN */
+  opReturnData: string;
+  /** Estimated Bitcoin fee in sats */
+  estimatedFee: number;
+}
+
+/**
+ * Claim request status
+ */
+export interface ClaimRequest {
+  /** Unique claim ID (same as nonce) */
+  id: string;
+  /** User's address */
+  address: string;
+  /** Token amount claimed */
+  amount: bigint;
+  /** Number of proofs included */
+  proofCount: number;
+  /** Total work claimed */
+  totalWork: bigint;
+  /** Claim TX id (Bitcoin) */
+  claimTxid: string | null;
+  /** Mint TX id (Charms) */
+  mintTxid: string | null;
+  /** Status */
+  status: ClaimStatus;
+  /** Error if failed */
+  error: string | null;
+  /** When claim was prepared */
+  preparedAt: number;
+  /** When claim TX was confirmed */
+  confirmedAt: number | null;
+  /** When tokens were minted */
+  mintedAt: number | null;
+}
+
+export type ClaimStatus =
+  | "prepared" // Claim data generated, waiting for user TX
+  | "broadcast" // User TX broadcast, waiting confirmation
+  | "confirmed" // User TX confirmed, ready for minting
+  | "minting" // Submitting to Charms prover
+  | "completed" // Tokens minted successfully
+  | "failed" // Failed at any step
+  | "expired"; // User never submitted TX (24h timeout)
+
+/**
+ * User's claimable balance
+ */
+export interface ClaimableBalance {
+  /** User's address */
+  address: string;
+  /** Unclaimed work (sum of D²) */
+  unclaimedWork: bigint;
+  /** Unclaimed proof count */
+  unclaimedProofs: number;
+  /** Calculated claimable tokens */
+  claimableTokens: bigint;
+  /** Last proof timestamp */
+  lastProofAt: number;
+  /** Total ever claimed */
+  totalClaimed: bigint;
+  /** Number of successful claims */
+  claimCount: number;
+}
+
+/**
+ * Claim preparation response
+ */
+export interface ClaimPrepareResponse {
+  /** Claim data for the TX */
+  claimData: ClaimData;
+  /** Work being claimed */
+  totalWork: string;
+  /** Proofs being claimed */
+  proofCount: number;
+  /** Tokens to receive */
+  tokenAmount: string;
+  /** Estimated fee in sats */
+  estimatedFee: number;
+  /** Claim expires at */
+  expiresAt: number;
+}
+
+/**
+ * Claim confirmation request
+ */
+export interface ClaimConfirmRequest {
+  /** The claim nonce/id */
+  claimId: string;
+  /** Bitcoin TX id with claim data */
+  claimTxid: string;
+}
+
+/**
+ * Claim confirmation response
+ */
+export interface ClaimConfirmResponse {
+  /** Claim status */
+  status: ClaimStatus;
+  /** Mint TX id if completed */
+  mintTxid: string | null;
+  /** Tokens minted */
+  tokensMinted: string | null;
+  /** Next step for user */
+  nextStep: string;
+}
+
+// =============================================================================
+// CLAIM CONSTANTS
+// =============================================================================
+
+/** Work to token conversion factor: tokens = totalWork / WORK_FACTOR */
+export const WORK_FACTOR = 100n;
+
+/** Minimum work required to claim (prevents dust claims) */
+export const MIN_CLAIM_WORK = 1000n; // ~10 shares at D10
+
+/** Claim expiration time (24 hours) */
+export const CLAIM_EXPIRATION_MS = 24 * 60 * 60 * 1000;
+
+/** Server public key for signature verification (set in env) */
+export const SERVER_PUBKEY_ENV = "CLAIM_SERVER_PUBKEY";

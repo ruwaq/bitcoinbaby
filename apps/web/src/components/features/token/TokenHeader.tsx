@@ -20,7 +20,7 @@ import { pixelBorders } from "@bitcoinbaby/ui";
 const EXPLORER_LINKS = {
   charms: "https://explorer.charms.dev",
   mempool: "https://mempool.space/testnet4",
-  github: "https://github.com/Sobek-lab/bitcoinbaby",
+  charmsProtocol: "https://charms.dev",
 };
 
 export function TokenHeader() {
@@ -82,12 +82,12 @@ export function TokenHeader() {
             EXPLORER
           </a>
           <a
-            href={EXPLORER_LINKS.github}
+            href={EXPLORER_LINKS.charmsProtocol}
             target="_blank"
             rel="noopener noreferrer"
             className={`font-pixel text-pixel-2xs px-3 py-2 bg-pixel-bg-dark ${pixelBorders.thin} hover:border-pixel-primary hover:text-pixel-primary transition-colors`}
           >
-            CONTRACT
+            CHARMS
           </a>
           <a
             href={EXPLORER_LINKS.mempool}

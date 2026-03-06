@@ -343,28 +343,26 @@ export default function SettingsPage() {
             <div className="pt-4 border-t-2 border-pixel-border">
               <div className="flex flex-wrap gap-3">
                 <a
-                  href="https://github.com/bitcoinbaby/bitcoinbaby"
+                  href="https://explorer.charms.dev"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-2 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text border-4 border-black hover:bg-pixel-primary hover:text-black transition-colors"
                 >
-                  GITHUB
+                  CHARMS EXPLORER
                 </a>
                 <a
-                  href="https://docs.bitcoinbaby.io"
+                  href="https://mempool.space/testnet4"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-2 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text border-4 border-black hover:bg-pixel-secondary hover:text-black transition-colors"
                 >
-                  DOCS
+                  MEMPOOL
                 </a>
                 <a
-                  href="https://discord.gg/bitcoinbaby"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text border-4 border-black hover:bg-[#5865F2] hover:text-white transition-colors"
+                  href="/help"
+                  className="px-4 py-2 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text border-4 border-black hover:bg-pixel-accent hover:text-black transition-colors"
                 >
-                  DISCORD
+                  HELP
                 </a>
               </div>
             </div>

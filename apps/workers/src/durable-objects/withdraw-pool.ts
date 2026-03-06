@@ -312,6 +312,12 @@ export class WithdrawPoolDO extends DurableObject<Env> {
             return this.handleProcessPool(poolType);
           }
           break;
+
+        case "DELETE":
+          if (action === "reset") {
+            return this.handleFullReset();
+          }
+          break;
       }
 
       return this.errorResponse("Not found", 404);
@@ -433,11 +439,12 @@ export class WithdrawPoolDO extends DurableObject<Env> {
       )
       .toArray();
 
-    const requests: WithdrawRequest[] = rows.map((row) => ({
+    // Map to API response format (amount as string for JSON serialization)
+    const requests = rows.map((row) => ({
       id: row.id as string,
       fromAddress: row.from_address as string,
       toAddress: row.to_address as string,
-      amount: BigInt(row.amount as string),
+      amount: row.amount as string, // Keep as string for JSON
       poolType: row.pool_type as PoolType,
       maxFeeRate: row.max_fee_rate as number | null,
       status: row.status as WithdrawStatus,
@@ -447,13 +454,11 @@ export class WithdrawPoolDO extends DurableObject<Env> {
       updatedAt: row.updated_at as number,
     }));
 
-    const response: ApiResponse<{ requests: WithdrawRequest[] }> = {
+    return Response.json({
       success: true,
-      data: { requests },
+      data: requests,
       timestamp: Date.now(),
-    };
-
-    return Response.json(response);
+    });
   }
 
   /**
@@ -1048,6 +1053,33 @@ export class WithdrawPoolDO extends DurableObject<Env> {
     const perOutputSize = 34;
     const totalSize = baseTxSize + perOutputSize * userCount;
     return totalSize * feeRate;
+  }
+
+  /**
+   * DELETE /pool/{poolType}/reset - Full reset of pool data
+   * Drops and recreates all tables. Use with caution!
+   */
+  private handleFullReset(): Response {
+    // Drop all tables
+    this.sql.exec("DROP TABLE IF EXISTS withdraw_requests");
+    this.sql.exec("DROP TABLE IF EXISTS batch_transactions");
+
+    // Recreate tables
+    this.initializeSchema();
+
+    // Clear caches
+    this.poolStatsCache.clear();
+    this.feeRateCache = null;
+
+    poolLogger.info("Full reset complete - all tables recreated");
+
+    const response: ApiResponse<{ fullReset: boolean }> = {
+      success: true,
+      data: { fullReset: true },
+      timestamp: Date.now(),
+    };
+
+    return Response.json(response);
   }
 
   /**

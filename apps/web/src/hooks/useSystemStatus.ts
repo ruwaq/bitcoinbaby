@@ -2,7 +2,7 @@
  * useSystemStatus Hook
  *
  * Fetches the Treasury/Signer system status from the Workers API.
- * Used to show users if withdrawals are fully operational.
+ * Used to show users if the claim system is fully operational.
  */
 
 import { useState, useEffect, useCallback } from "react";
