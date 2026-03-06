@@ -8,6 +8,7 @@
 
 import { useState, useCallback } from "react";
 import { pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
+import { satsToBtc } from "@/utils/format";
 
 interface SendConfirmationProps {
   status: "success" | "error";
@@ -47,9 +48,6 @@ export function SendConfirmation({
       setTimeout(() => setCopyStatus("idle"), 2000);
     }
   }, [txid]);
-  const formatBtc = (sats: number): string => {
-    return (sats / 100_000_000).toFixed(8);
-  };
 
   if (status === "success" && txid) {
     return (
@@ -79,7 +77,7 @@ export function SendConfirmation({
               AMOUNT SENT
             </label>
             <p className="font-pixel text-lg text-pixel-primary">
-              {formatBtc(amountSatoshis)} BTC
+              {satsToBtc(amountSatoshis)} BTC
             </p>
           </div>
 

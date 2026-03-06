@@ -13,6 +13,7 @@ import { useState } from "react";
 import type { FeeLevel } from "./FeeSelector";
 import type { BitcoinNetwork } from "@bitcoinbaby/bitcoin";
 import { pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
+import { satsToBtc, formatSats } from "@/utils/format";
 
 interface TransactionReviewProps {
   recipient: string;
@@ -29,6 +30,8 @@ interface TransactionReviewProps {
   inputCount?: number;
   outputCount?: number;
   virtualSize?: number;
+  // Optional: Total balance for large transaction warning
+  totalBalance?: number;
 }
 
 export function TransactionReview({
@@ -45,19 +48,17 @@ export function TransactionReview({
   inputCount,
   outputCount,
   virtualSize,
+  totalBalance,
 }: TransactionReviewProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Format helpers
-  const formatBtc = (sats: number): string => {
-    return (sats / 100_000_000).toFixed(8);
-  };
-
-  const formatSats = (sats: number): string => {
-    return sats.toLocaleString();
-  };
-
   const totalSatoshis = amountSatoshis + feeSatoshis;
+
+  // Check if this is a large transaction (>50% of balance)
+  const isLargeTransaction = totalBalance && totalSatoshis > totalBalance * 0.5;
+  const percentageOfBalance = totalBalance
+    ? Math.round((totalSatoshis / totalBalance) * 100)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -77,6 +78,23 @@ export function TransactionReview({
           REVIEW CAREFULLY - THIS ACTION CANNOT BE UNDONE
         </p>
       </div>
+
+      {/* Large Transaction Warning */}
+      {isLargeTransaction && (
+        <div className="bg-pixel-error/20 border-2 border-pixel-error p-3">
+          <div className="flex items-center justify-center gap-2">
+            <span className="font-pixel text-lg text-pixel-error">!!</span>
+            <div className="text-center">
+              <p className="font-pixel text-[10px] text-pixel-error">
+                LARGE TRANSACTION WARNING
+              </p>
+              <p className="font-pixel text-[8px] text-pixel-text-muted mt-1">
+                This is {percentageOfBalance}% of your total balance
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Transaction details */}
       <div className={`bg-pixel-bg-dark ${pixelBorders.medium} p-4 space-y-4`}>
@@ -115,7 +133,7 @@ export function TransactionReview({
           </span>
           <div className="text-right">
             <span className="font-pixel text-lg text-pixel-text">
-              {formatBtc(amountSatoshis)} BTC
+              {satsToBtc(amountSatoshis)} BTC
             </span>
             <p className="font-pixel text-[8px] text-pixel-text-muted">
               {formatSats(amountSatoshis)} sats
@@ -130,7 +148,7 @@ export function TransactionReview({
           </span>
           <div className="text-right">
             <span className="font-pixel text-sm text-pixel-secondary">
-              {formatBtc(feeSatoshis)} BTC
+              {satsToBtc(feeSatoshis)} BTC
             </span>
             <p className="font-pixel text-[8px] text-pixel-text-muted">
               {feeRate} sat/vB
@@ -146,7 +164,7 @@ export function TransactionReview({
             </span>
             <div className="text-right">
               <span className="font-pixel text-xl text-pixel-primary">
-                {formatBtc(totalSatoshis)} BTC
+                {satsToBtc(totalSatoshis)} BTC
               </span>
               <p className="font-pixel text-[8px] text-pixel-text-muted">
                 {formatSats(totalSatoshis)} sats

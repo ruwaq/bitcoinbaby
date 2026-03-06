@@ -13,6 +13,7 @@ import {
   type TrackedTransaction,
   type TxStatus,
 } from "../utils/tx-tracker";
+import { useNetworkStore } from "./network-store";
 
 // =============================================================================
 // TYPES
@@ -75,8 +76,20 @@ type PendingTxStore = PendingTxState & PendingTxActions;
 // Singleton tracker instance
 let trackerInstance: TxTracker | null = null;
 
+/**
+ * Get explorer URL using current network configuration
+ */
 const getExplorerUrl = (txid: string): string => {
-  return `https://mempool.space/testnet4/tx/${txid}`;
+  const config = useNetworkStore.getState().config;
+  return `${config.explorerUrl}/tx/${txid}`;
+};
+
+/**
+ * Get mempool API endpoint using current network configuration
+ */
+const getMempoolApiEndpoint = (): string => {
+  const config = useNetworkStore.getState().config;
+  return config.mempoolApi;
 };
 
 export const usePendingTxStore = create<PendingTxStore>()(
@@ -130,7 +143,7 @@ export const usePendingTxStore = create<PendingTxStore>()(
         trackerInstance = createTxTracker({
           pollInterval: 10000, // 10 seconds for responsive UX
           targetConfirmations: 1, // Consider confirmed after 1 confirmation for UX
-          apiEndpoint: "https://mempool.space/testnet4/api",
+          apiEndpoint: getMempoolApiEndpoint(),
           events: {
             onStatusChange: (tx) => {
               set((state) => ({

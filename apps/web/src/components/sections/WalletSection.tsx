@@ -159,9 +159,6 @@ export function WalletSection() {
 
               {/* Actions */}
               <WalletActions
-                onSend={() => overlays.openSend()}
-                onWithdraw={overlays.openWithdraw}
-                onHistory={overlays.openHistory}
                 onLock={actions.lock}
                 onDelete={overlays.openDelete}
                 showTestnetFaucet={network.current === "testnet4"}

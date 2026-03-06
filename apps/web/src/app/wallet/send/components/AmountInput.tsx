@@ -7,6 +7,12 @@
  */
 
 import { useState, useCallback, useMemo } from "react";
+import {
+  SATOSHIS_PER_BTC,
+  DUST_THRESHOLD,
+  btcToSats,
+  satsToBtc,
+} from "@/utils/format";
 
 interface AmountInputProps {
   value: string;
@@ -15,10 +21,6 @@ interface AmountInputProps {
   estimatedFee: number;
   disabled?: boolean;
 }
-
-// Constants
-const SATOSHIS_PER_BTC = 100_000_000;
-const DUST_THRESHOLD = 546;
 
 export function AmountInput({
   value,
@@ -35,19 +37,6 @@ export function AmountInput({
   const availableBalance = useMemo(() => {
     return Math.max(0, maxSatoshis - estimatedFee);
   }, [maxSatoshis, estimatedFee]);
-
-  // Parse BTC string to satoshis
-  const btcToSats = (btcString: string): number => {
-    const cleaned = btcString.replace(/[^\d.]/g, "");
-    const btc = parseFloat(cleaned);
-    if (isNaN(btc)) return 0;
-    return Math.round(btc * SATOSHIS_PER_BTC);
-  };
-
-  // Format satoshis as BTC string
-  const satsToBtc = (sats: number): string => {
-    return (sats / SATOSHIS_PER_BTC).toFixed(8);
-  };
 
   // Validate and handle change
   const handleChange = useCallback(
@@ -113,6 +102,11 @@ export function AmountInput({
 
   // Current value in satoshis
   const currentSatoshis = btcToSats(value);
+
+  // Warning threshold for small amounts (expensive to spend later)
+  const SMALL_AMOUNT_WARNING = 5000; // 5000 sats
+  const isSmallAmount =
+    currentSatoshis > DUST_THRESHOLD && currentSatoshis < SMALL_AMOUNT_WARNING;
 
   // Format display values
   const displaySatoshis = currentSatoshis.toLocaleString();
@@ -186,6 +180,17 @@ export function AmountInput({
       {/* Error message */}
       {error && (
         <p className="font-pixel text-[8px] text-pixel-error">{error}</p>
+      )}
+
+      {/* Small amount warning */}
+      {!error && isSmallAmount && (
+        <div className="flex items-start gap-2 p-2 bg-pixel-warning/10 border border-pixel-warning/30">
+          <span className="font-pixel text-[10px] text-pixel-warning">!</span>
+          <p className="font-pixel text-[7px] text-pixel-warning">
+            Small amounts may be expensive for the recipient to spend later due
+            to network fees.
+          </p>
+        </div>
       )}
 
       {/* Available balance */}

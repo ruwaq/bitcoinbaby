@@ -7,13 +7,15 @@
  * Displays virtual balance, withdrawal pools, and pending requests.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { PixelCard, PixelButton } from "@bitcoinbaby/ui";
 import type { PoolType, WithdrawRequest } from "@bitcoinbaby/core";
-import { useWalletStore } from "@bitcoinbaby/core";
+import { useWalletStore, useNetworkStore } from "@bitcoinbaby/core";
+import { validateAddress } from "@bitcoinbaby/bitcoin";
 import { useVirtualBalance } from "../../hooks/useVirtualBalance";
 import { useWithdrawPool, formatPoolType } from "../../hooks/useWithdrawPool";
 import { WithdrawPoolCard } from "./WithdrawPoolCard";
+import { formatBalance, formatDate } from "@/utils/format";
 
 /**
  * Success notification for withdrawal
@@ -22,20 +24,6 @@ interface WithdrawSuccess {
   amount: bigint;
   poolType: PoolType;
   timestamp: number;
-}
-
-/**
- * Format bigint for display
- */
-function formatBalance(balance: bigint): string {
-  return balance.toLocaleString();
-}
-
-/**
- * Format timestamp
- */
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleString();
 }
 
 /**
@@ -64,11 +52,38 @@ export function WithdrawSection() {
   // Use wallet store directly for consistent state across app
   const wallet = useWalletStore((s) => s.wallet);
   const address = wallet?.address ?? null;
+  const { config, network } = useNetworkStore();
 
   const [destinationAddress, setDestinationAddress] = useState("");
+  const [addressValidation, setAddressValidation] = useState<{
+    valid: boolean;
+    error?: string;
+  } | null>(null);
   const [activeTab, setActiveTab] = useState<"pools" | "requests">("pools");
   const [successNotification, setSuccessNotification] =
     useState<WithdrawSuccess | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Validate destination address on change
+  const handleAddressChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value.trim();
+      setDestinationAddress(value);
+
+      if (value === "") {
+        setAddressValidation(null);
+        return;
+      }
+
+      const result = validateAddress(value, network);
+      setAddressValidation(result);
+    },
+    [network],
+  );
+
+  // Check if destination is valid (empty = use wallet address, or valid custom address)
+  const isDestinationValid =
+    destinationAddress === "" || (addressValidation?.valid ?? false);
 
   // Virtual balance from Workers API
   const {
@@ -100,6 +115,14 @@ export function WithdrawSection() {
     poolType: PoolType,
     amount: bigint,
   ): Promise<{ success: boolean; error?: string }> => {
+    // Validate destination address
+    if (!isDestinationValid) {
+      return {
+        success: false,
+        error: addressValidation?.error || "Invalid destination address",
+      };
+    }
+
     const toAddress = destinationAddress || address;
 
     if (!toAddress) {
@@ -147,9 +170,14 @@ export function WithdrawSection() {
     }
   }, [successNotification]);
 
-  // Refresh all
+  // Refresh all with loading state
   const handleRefresh = async () => {
-    await Promise.all([refreshBalance(), refreshPools()]);
+    setIsRefreshing(true);
+    try {
+      await Promise.all([refreshBalance(), refreshPools()]);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   if (!address) {
@@ -202,8 +230,20 @@ export function WithdrawSection() {
         <div className="p-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-pixel text-lg">$BABY Balance</h2>
-            <PixelButton onClick={handleRefresh} size="sm" variant="secondary">
-              Refresh
+            <PixelButton
+              onClick={handleRefresh}
+              size="sm"
+              variant="secondary"
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? (
+                <span className="flex items-center gap-1">
+                  <span className="animate-spin">↻</span>
+                  <span>Loading...</span>
+                </span>
+              ) : (
+                "Refresh"
+              )}
             </PixelButton>
           </div>
 
@@ -282,13 +322,43 @@ export function WithdrawSection() {
           <label className="block text-sm font-pixel mb-2">
             Destination Address (optional)
           </label>
-          <input
-            type="text"
-            value={destinationAddress}
-            onChange={(e) => setDestinationAddress(e.target.value)}
-            placeholder={address ?? ""}
-            className="w-full px-3 py-2 bg-pixel-bg-dark border border-pixel-primary/30 rounded font-mono text-sm focus:border-pixel-primary outline-none"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={destinationAddress}
+              onChange={handleAddressChange}
+              placeholder={address ?? ""}
+              aria-label="Bitcoin destination address"
+              aria-invalid={
+                addressValidation && !addressValidation.valid ? "true" : "false"
+              }
+              className={`w-full px-3 py-2 pr-10 bg-pixel-bg-dark border-2 rounded font-mono text-sm outline-none transition-colors ${
+                destinationAddress === ""
+                  ? "border-pixel-primary/30 focus:border-pixel-primary"
+                  : addressValidation?.valid
+                    ? "border-pixel-success"
+                    : "border-pixel-error"
+              }`}
+            />
+            {/* Validation indicator */}
+            {destinationAddress && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                {addressValidation?.valid ? (
+                  <span className="font-pixel text-pixel-success text-xs">
+                    OK
+                  </span>
+                ) : (
+                  <span className="font-pixel text-pixel-error text-xs">X</span>
+                )}
+              </div>
+            )}
+          </div>
+          {/* Error message */}
+          {addressValidation && !addressValidation.valid && (
+            <p className="text-xs text-pixel-error mt-1">
+              {addressValidation.error || "Invalid address"}
+            </p>
+          )}
           <p className="text-xs text-gray-400 mt-1">
             Leave empty to withdraw to your wallet address
           </p>
@@ -364,7 +434,7 @@ export function WithdrawSection() {
                       </div>
                       {request.txid && (
                         <a
-                          href={`https://mempool.space/testnet4/tx/${request.txid}`}
+                          href={`${config.explorerUrl}/tx/${request.txid}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-xs text-pixel-secondary hover:underline"

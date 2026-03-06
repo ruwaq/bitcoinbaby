@@ -19,7 +19,7 @@ import { MiningProvider } from "./MiningProvider";
 import { QueryProvider } from "./QueryProvider";
 import { AppInitializer } from "./AppInitializer";
 import { usePendingTxStore, cleanupStuckTransactions } from "@bitcoinbaby/core";
-import { OverlayManager } from "@/components/overlays/OverlayManager";
+import { ModalManager } from "@/components/overlays/ModalManager";
 
 interface RootProviderProps {
   children: ReactNode;
@@ -117,7 +117,7 @@ export function RootProvider({ children }: RootProviderProps) {
       <AppInitializer />
       <MiningProvider>
         {children}
-        <OverlayManager />
+        <ModalManager />
       </MiningProvider>
     </QueryProvider>
   );

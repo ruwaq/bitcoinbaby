@@ -92,6 +92,10 @@ interface UseTokenBalanceOptions {
   cacheDuration?: number;
 }
 
+// Cache configuration
+const CACHE_MAX_SIZE = 50; // Maximum entries in cache
+const CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes max age for any entry
+
 // Global cache for token balances to avoid excessive API calls
 const balanceCache = new Map<
   string,
@@ -110,6 +114,32 @@ function getCacheKey(
   ticker: string,
 ): string {
   return `${network}:${address}:${ticker}`;
+}
+
+/**
+ * Clean up expired and excess cache entries (LRU-style)
+ */
+function cleanupCache(): void {
+  const now = Date.now();
+
+  // Remove expired entries
+  for (const [key, value] of balanceCache.entries()) {
+    if (now - value.timestamp > CACHE_MAX_AGE) {
+      balanceCache.delete(key);
+    }
+  }
+
+  // If still over max size, remove oldest entries
+  if (balanceCache.size > CACHE_MAX_SIZE) {
+    const entries = Array.from(balanceCache.entries()).sort(
+      (a, b) => a[1].timestamp - b[1].timestamp,
+    );
+
+    const toRemove = entries.slice(0, balanceCache.size - CACHE_MAX_SIZE);
+    for (const [key] of toRemove) {
+      balanceCache.delete(key);
+    }
+  }
 }
 
 /**
@@ -212,11 +242,12 @@ export function useTokenBalance(
           tokenTicker,
         );
 
-        // Update cache
+        // Update cache and cleanup old entries
         balanceCache.set(cacheKey, {
           balance,
           timestamp: Date.now(),
         });
+        cleanupCache();
 
         return balance;
       } catch (error) {

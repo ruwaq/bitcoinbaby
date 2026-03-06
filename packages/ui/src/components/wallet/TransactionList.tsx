@@ -45,6 +45,8 @@ interface TransactionListProps {
   hasMore: boolean;
   /** Callback to load more transactions */
   onLoadMore?: () => void;
+  /** Callback to retry/refresh when error occurs */
+  onRetry?: () => void;
   /** Block explorer base URL */
   explorerUrl: string;
   /** Current block height for confirmation calculation */
@@ -291,6 +293,7 @@ export function TransactionList({
   error,
   hasMore,
   onLoadMore,
+  onRetry,
   explorerUrl,
   className,
 }: TransactionListProps) {
@@ -305,7 +308,7 @@ export function TransactionList({
     );
   }
 
-  // Show error state
+  // Show error state (no transactions)
   if (error && transactions.length === 0) {
     return (
       <div
@@ -314,7 +317,7 @@ export function TransactionList({
           className,
         )}
       >
-        <ErrorState message={error} onRetry={onLoadMore} />
+        <ErrorState message={error} onRetry={onRetry ?? onLoadMore} />
       </div>
     );
   }
@@ -335,6 +338,29 @@ export function TransactionList({
 
   return (
     <div className={clsx("space-y-2", className)}>
+      {/* Error banner when we have cached transactions but refresh failed */}
+      {error && transactions.length > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-pixel-error/10 border-2 border-pixel-error">
+          <span className="font-pixel text-sm text-pixel-error">!</span>
+          <div className="flex-1 min-w-0">
+            <p className="font-pixel text-[10px] text-pixel-error">
+              REFRESH FAILED
+            </p>
+            <p className="font-pixel text-[8px] text-pixel-text-muted truncate">
+              {error}
+            </p>
+          </div>
+          {(onRetry ?? onLoadMore) && (
+            <button
+              onClick={onRetry ?? onLoadMore}
+              className="px-2 py-1 font-pixel text-[8px] text-pixel-error border border-pixel-error hover:bg-pixel-error/20"
+            >
+              RETRY
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Transaction List */}
       {transactions.map((tx) => (
         <TransactionRow key={tx.txid} tx={tx} explorerUrl={explorerUrl} />

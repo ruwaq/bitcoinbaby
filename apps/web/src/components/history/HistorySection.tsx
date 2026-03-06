@@ -21,6 +21,7 @@ import {
   type TransactionDisplay,
 } from "@bitcoinbaby/ui";
 import { useNetworkStore } from "@bitcoinbaby/core";
+import { satsToBtc } from "@/utils/format";
 
 /**
  * Filter options for transaction list
@@ -150,11 +151,6 @@ export function HistorySection() {
     }
   }, [transactions, filter]);
 
-  // Format BTC value
-  const formatBtc = (sats: number): string => {
-    return (sats / 100_000_000).toFixed(8);
-  };
-
   // No wallet state
   if (!hasStoredWallet) {
     return (
@@ -214,13 +210,13 @@ export function HistorySection() {
       <div className="grid grid-cols-2 gap-2">
         <StatCard
           label="RECEIVED"
-          value={`${formatBtc(stats.totalReceived)}`}
+          value={`${satsToBtc(stats.totalReceived)}`}
           subValue={`${stats.incomingCount} txs`}
           color="text-pixel-success"
         />
         <StatCard
           label="SENT"
-          value={`${formatBtc(stats.totalSent)}`}
+          value={`${satsToBtc(stats.totalSent)}`}
           subValue={`${stats.outgoingCount} txs`}
           color="text-pixel-error"
         />

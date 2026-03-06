@@ -9,8 +9,34 @@
 
 import { useMemo } from "react";
 import type { FeeEstimates } from "@bitcoinbaby/bitcoin";
+import { satsToBtc, formatSats } from "@/utils/format";
 
 export type FeeLevel = "slow" | "medium" | "fast";
+
+/**
+ * Static color class mapping for Tailwind CSS
+ * Tailwind requires static class names at build time - dynamic interpolation doesn't work.
+ */
+const colorClasses: Record<
+  string,
+  { bg: string; border: string; text: string }
+> = {
+  "pixel-success": {
+    bg: "bg-pixel-success/20",
+    border: "border-pixel-success",
+    text: "text-pixel-success",
+  },
+  "pixel-secondary": {
+    bg: "bg-pixel-secondary/20",
+    border: "border-pixel-secondary",
+    text: "text-pixel-secondary",
+  },
+  "pixel-primary": {
+    bg: "bg-pixel-primary/20",
+    border: "border-pixel-primary",
+    text: "text-pixel-primary",
+  },
+};
 
 interface FeeSelectorProps {
   feeEstimates: FeeEstimates | null;
@@ -96,16 +122,6 @@ export function FeeSelector({
     return Math.ceil(vsize * feeRate);
   };
 
-  // Format satoshis
-  const formatSats = (sats: number): string => {
-    return sats.toLocaleString();
-  };
-
-  // Format as BTC
-  const formatBtc = (sats: number): string => {
-    return (sats / 100_000_000).toFixed(8);
-  };
-
   if (isLoading) {
     return (
       <div className="space-y-2">
@@ -129,11 +145,18 @@ export function FeeSelector({
 
   return (
     <div className="space-y-2">
-      <label className="font-pixel text-[10px] text-pixel-text-muted block">
+      <label
+        id="fee-selector-label"
+        className="font-pixel text-[10px] text-pixel-text-muted block"
+      >
         NETWORK FEE
       </label>
 
-      <div className="flex gap-2">
+      <div
+        className="flex gap-2"
+        role="radiogroup"
+        aria-labelledby="fee-selector-label"
+      >
         {feeOptions.map((option) => {
           const totalFee = calculateTotalFee(option.feeRate);
           const isSelected = selectedLevel === option.level;
@@ -142,6 +165,9 @@ export function FeeSelector({
             <button
               key={option.level}
               type="button"
+              role="radio"
+              aria-checked={isSelected}
+              aria-label={`${option.label} fee: ${option.feeRate} satoshis per virtual byte, ${option.description}`}
               onClick={() => onSelect(option.level, option.feeRate)}
               disabled={disabled}
               className={`
@@ -150,7 +176,7 @@ export function FeeSelector({
                 disabled:opacity-50 disabled:cursor-not-allowed
                 ${
                   isSelected
-                    ? `bg-${option.color}/20 border-${option.color} shadow-[4px_4px_0_0_#000]`
+                    ? `${colorClasses[option.color].bg} ${colorClasses[option.color].border} shadow-[4px_4px_0_0_#000]`
                     : "bg-pixel-bg-dark border-pixel-border hover:border-pixel-text-muted"
                 }
               `}
@@ -158,7 +184,9 @@ export function FeeSelector({
               <div className="flex items-center justify-between mb-1">
                 <span
                   className={`font-pixel text-[10px] ${
-                    isSelected ? `text-${option.color}` : "text-pixel-text"
+                    isSelected
+                      ? colorClasses[option.color].text
+                      : "text-pixel-text"
                   }`}
                 >
                   {option.label}
@@ -195,7 +223,7 @@ export function FeeSelector({
               TOTAL FEE:
             </span>
             <span className="font-pixel text-xs text-pixel-text">
-              {formatBtc(
+              {satsToBtc(
                 calculateTotalFee(
                   feeOptions.find((o) => o.level === selectedLevel)?.feeRate ||
                     10,

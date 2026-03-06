@@ -7,7 +7,7 @@
  * Part of the batched withdrawal system for minimizing Bitcoin fees.
  */
 
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   PixelCard,
   PixelButton,
@@ -16,6 +16,25 @@ import {
 } from "@bitcoinbaby/ui";
 import type { PoolType, PoolStatusResponse } from "@bitcoinbaby/core";
 import { formatPoolType } from "../../hooks/useWithdrawPool";
+
+/**
+ * Safely parse string to BigInt (handles decimals and invalid input)
+ */
+function safeParseBigInt(value: string): bigint | null {
+  if (!value || value.trim() === "") return null;
+
+  // Remove whitespace
+  const cleaned = value.trim();
+
+  // Check if it's a valid integer (no decimals, no letters)
+  if (!/^\d+$/.test(cleaned)) return null;
+
+  try {
+    return BigInt(cleaned);
+  } catch {
+    return null;
+  }
+}
 
 interface WithdrawPoolCardProps {
   poolType: PoolType;
@@ -49,24 +68,64 @@ export function WithdrawPoolCard({
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingAmount, setPendingAmount] = useState<bigint>(0n);
 
-  // Validate and show confirmation modal
-  const handleWithdraw = () => {
-    setError(null);
-
-    const withdrawAmount = BigInt(amount || "0");
-
-    if (withdrawAmount < minAmount) {
-      setError(`Minimum withdrawal: ${minAmount} tokens`);
-      return;
+  // Live validation of amount input
+  const validation = useMemo(() => {
+    if (!amount || amount.trim() === "") {
+      return { valid: false, error: null, amount: 0n };
     }
 
-    if (withdrawAmount > availableBalance) {
-      setError("Insufficient balance");
+    // Check for decimals
+    if (amount.includes(".") || amount.includes(",")) {
+      return { valid: false, error: "Only whole numbers allowed", amount: 0n };
+    }
+
+    const parsed = safeParseBigInt(amount);
+
+    if (parsed === null) {
+      return { valid: false, error: "Invalid number", amount: 0n };
+    }
+
+    if (parsed < minAmount) {
+      return {
+        valid: false,
+        error: `Minimum: ${minAmount.toLocaleString()} tokens`,
+        amount: parsed,
+      };
+    }
+
+    if (parsed > availableBalance) {
+      return {
+        valid: false,
+        error: `Max: ${availableBalance.toLocaleString()} tokens`,
+        amount: parsed,
+      };
+    }
+
+    return { valid: true, error: null, amount: parsed };
+  }, [amount, minAmount, availableBalance]);
+
+  // Handle input change - only allow digits
+  const handleAmountChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      // Only allow digits (no decimals, no negative)
+      if (value === "" || /^\d+$/.test(value)) {
+        setAmount(value);
+        setError(null); // Clear submit error on change
+      }
+    },
+    [],
+  );
+
+  // Validate and show confirmation modal
+  const handleWithdraw = () => {
+    if (!validation.valid) {
+      setError(validation.error || "Invalid amount");
       return;
     }
 
     // Store pending amount and show confirmation modal
-    setPendingAmount(withdrawAmount);
+    setPendingAmount(validation.amount);
     setShowConfirmModal(true);
   };
 
@@ -218,11 +277,19 @@ export function WithdrawPoolCard({
         <div className="space-y-2">
           <div className="flex gap-2">
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Amount"
-              className="flex-1 px-3 py-2 bg-pixel-bg-dark border border-pixel-primary/30 rounded font-pixel text-sm focus:border-pixel-primary outline-none"
+              onChange={handleAmountChange}
+              placeholder="Amount (whole numbers)"
+              className={`flex-1 px-3 py-2 bg-pixel-bg-dark border rounded font-pixel text-sm outline-none transition-colors ${
+                amount && !validation.valid
+                  ? "border-red-500"
+                  : amount && validation.valid
+                    ? "border-green-500"
+                    : "border-pixel-primary/30 focus:border-pixel-primary"
+              }`}
               disabled={isSubmitting}
             />
             <button
@@ -234,11 +301,26 @@ export function WithdrawPoolCard({
             </button>
           </div>
 
-          {error && <p className="text-xs text-red-400">{error}</p>}
+          {/* Live validation error */}
+          {amount && validation.error && (
+            <p className="text-xs text-red-400">{validation.error}</p>
+          )}
+
+          {/* Submit error (from API) */}
+          {error && !validation.error && (
+            <p className="text-xs text-red-400">{error}</p>
+          )}
+
+          {/* Valid amount indicator */}
+          {amount && validation.valid && (
+            <p className="text-xs text-green-400">
+              {validation.amount.toLocaleString()} tokens ready
+            </p>
+          )}
 
           <PixelButton
             onClick={handleWithdraw}
-            disabled={isSubmitting || !amount || BigInt(amount || "0") === 0n}
+            disabled={isSubmitting || !amount || !validation.valid}
             className="w-full"
             size="sm"
           >

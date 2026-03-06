@@ -4,44 +4,56 @@
  * WalletActions - Wallet action buttons
  *
  * Primary and secondary wallet actions:
- * - Send, Withdraw, History
+ * - Send, Withdraw, History (navigate to dedicated pages)
  * - Lock, Delete
  * - Get testnet BTC link
  */
 
+import Link from "next/link";
 import { Button, pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
 
 interface WalletActionsProps {
-  onSend: () => void;
-  onWithdraw: () => void;
-  onHistory: () => void;
   onLock: () => void;
   onDelete: () => void;
   showTestnetFaucet: boolean;
 }
 
 export function WalletActions({
-  onSend,
-  onWithdraw,
-  onHistory,
   onLock,
   onDelete,
   showTestnetFaucet,
 }: WalletActionsProps) {
   return (
     <>
-      {/* Primary Actions */}
-      <div className="flex gap-2 sm:gap-3 pt-4 border-t-2 border-pixel-border">
-        <Button onClick={onSend} variant="default" className="flex-1">
-          SEND
-        </Button>
-        <Button onClick={onWithdraw} variant="success" className="flex-1">
-          WITHDRAW
-        </Button>
-        <Button onClick={onHistory} variant="outline" className="flex-1">
-          HISTORY
-        </Button>
-      </div>
+      {/* Primary Actions - Navigate to dedicated pages */}
+      <nav
+        className="flex gap-2 sm:gap-3 pt-4 border-t-2 border-pixel-border"
+        aria-label="Wallet actions"
+      >
+        <Link href="/wallet/send" className="flex-1" aria-label="Send Bitcoin">
+          <Button variant="default" className="w-full">
+            SEND
+          </Button>
+        </Link>
+        <Link
+          href="/wallet/withdraw"
+          className="flex-1"
+          aria-label="Withdraw BABY tokens"
+        >
+          <Button variant="success" className="w-full">
+            WITHDRAW
+          </Button>
+        </Link>
+        <Link
+          href="/wallet/history"
+          className="flex-1"
+          aria-label="View transaction history"
+        >
+          <Button variant="outline" className="w-full">
+            HISTORY
+          </Button>
+        </Link>
+      </nav>
 
       {/* Get Testnet BTC */}
       {showTestnetFaucet && (
@@ -49,6 +61,7 @@ export function WalletActions({
           href="https://mempool.space/testnet4/faucet"
           target="_blank"
           rel="noopener noreferrer"
+          aria-label="Get free testnet Bitcoin from faucet (opens in new tab)"
           className={`block w-full py-3 min-h-[44px] font-pixel text-pixel-xs text-center bg-pixel-secondary text-black ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all active:scale-95`}
         >
           GET TESTNET BTC
@@ -56,11 +69,24 @@ export function WalletActions({
       )}
 
       {/* Secondary Actions */}
-      <div className="flex gap-2 sm:gap-3 pt-3">
-        <Button onClick={onLock} variant="ghost" className="flex-1">
+      <div
+        className="flex gap-2 sm:gap-3 pt-3"
+        role="group"
+        aria-label="Wallet security actions"
+      >
+        <Button
+          onClick={onLock}
+          variant="ghost"
+          className="flex-1"
+          aria-label="Lock wallet"
+        >
           LOCK
         </Button>
-        <Button onClick={onDelete} variant="destructive">
+        <Button
+          onClick={onDelete}
+          variant="destructive"
+          aria-label="Delete wallet permanently"
+        >
           DELETE
         </Button>
       </div>

@@ -36,7 +36,7 @@ import {
 // Steps in the send flow
 type SendStep = "input" | "review" | "result";
 
-// Send state
+// Send state (feeRate is derived from feeLevel + feeEstimates, not stored)
 interface SendState {
   recipient: string;
   isRecipientValid: boolean;
@@ -44,7 +44,6 @@ interface SendState {
   amountSatoshis: number;
   isAmountValid: boolean;
   feeLevel: FeeLevel;
-  feeRate: number;
 }
 
 // Default vsize estimate for a simple P2TR transfer (1 input, 2 outputs)
@@ -90,8 +89,12 @@ export default function SendPage() {
     amountSatoshis: 0,
     isAmountValid: false,
     feeLevel: "medium",
-    feeRate: 10,
   });
+
+  // Derive feeRate from feeLevel and feeEstimates to avoid race conditions
+  const currentFeeRate = useMemo(() => {
+    return getFeeRateForLevel(sendState.feeLevel, feeEstimates);
+  }, [sendState.feeLevel, feeEstimates]);
 
   // Transaction state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -103,9 +106,8 @@ export default function SendPage() {
 
   // Calculate estimated fee based on vsize and fee rate
   const estimatedFee = useMemo(() => {
-    const feeRate = getFeeRateForLevel(sendState.feeLevel, feeEstimates);
-    return Math.ceil(DEFAULT_VSIZE * feeRate);
-  }, [sendState.feeLevel, feeEstimates]);
+    return Math.ceil(DEFAULT_VSIZE * currentFeeRate);
+  }, [currentFeeRate]);
 
   // Available balance in satoshis
   const availableBalance = balance?.total ?? 0;
@@ -119,12 +121,6 @@ export default function SendPage() {
       sendState.amountSatoshis + estimatedFee <= availableBalance
     );
   }, [sendState, estimatedFee, availableBalance]);
-
-  // Update fee rate when level or estimates change
-  useEffect(() => {
-    const newFeeRate = getFeeRateForLevel(sendState.feeLevel, feeEstimates);
-    setSendState((prev) => ({ ...prev, feeRate: newFeeRate }));
-  }, [sendState.feeLevel, feeEstimates]);
 
   // Handle address change
   const handleAddressChange = useCallback((value: string, isValid: boolean) => {
@@ -148,12 +144,11 @@ export default function SendPage() {
     [],
   );
 
-  // Handle fee selection
-  const handleFeeSelect = useCallback((level: FeeLevel, feeRate: number) => {
+  // Handle fee selection (feeRate param is ignored, derived from feeLevel)
+  const handleFeeSelect = useCallback((level: FeeLevel, _feeRate: number) => {
     setSendState((prev) => ({
       ...prev,
       feeLevel: level,
-      feeRate: feeRate,
     }));
   }, []);
 
@@ -191,7 +186,7 @@ export default function SendPage() {
       // Create transaction builder
       const builder = new TransactionBuilder({
         network,
-        feeRate: sendState.feeRate,
+        feeRate: currentFeeRate,
         enableRBF: true,
       });
 
@@ -258,7 +253,7 @@ export default function SendPage() {
     } catch (error) {
       console.error("Transaction failed:", error);
 
-      // Classify error for better UX
+      // Classify error for better UX with helpful details
       let errorMessage: string;
       if (error instanceof Error) {
         if (error.message === "BROADCAST_TIMEOUT") {
@@ -271,9 +266,13 @@ export default function SendPage() {
           errorMessage =
             "Network error. Please check your connection and try again.";
         } else if (error.message.includes("insufficient")) {
-          errorMessage = "Insufficient funds for this transaction.";
+          // Provide detailed info about the shortfall
+          const totalNeeded = sendState.amountSatoshis + estimatedFee;
+          const shortfall = totalNeeded - availableBalance;
+          errorMessage = `Insufficient funds. Need ${(totalNeeded / 100_000_000).toFixed(8)} BTC (amount + fee), have ${(availableBalance / 100_000_000).toFixed(8)} BTC. Short by ${(shortfall / 100_000_000).toFixed(8)} BTC.`;
         } else if (error.message.includes("dust")) {
-          errorMessage = "Amount too small. Minimum is 546 satoshis.";
+          errorMessage =
+            "Amount too small. Minimum is 546 satoshis (0.00000546 BTC).";
         } else {
           errorMessage = error.message;
         }
@@ -308,12 +307,11 @@ export default function SendPage() {
       amountSatoshis: 0,
       isAmountValid: false,
       feeLevel: "medium",
-      feeRate: getFeeRateForLevel("medium", feeEstimates),
     });
     setTxResult(null);
     setStep("input");
     refreshBalance();
-  }, [feeEstimates, refreshBalance]);
+  }, [refreshBalance]);
 
   // Navigate to wallet
   const handleViewWallet = useCallback(() => {
@@ -486,13 +484,14 @@ export default function SendPage() {
               recipient={sendState.recipient}
               amountSatoshis={sendState.amountSatoshis}
               feeLevel={sendState.feeLevel}
-              feeRate={sendState.feeRate}
+              feeRate={currentFeeRate}
               feeSatoshis={estimatedFee}
               senderAddress={address}
               network={network}
               onConfirm={handleSend}
               onBack={handleBack}
               isLoading={isProcessing}
+              totalBalance={availableBalance}
             />
           </div>
         )}

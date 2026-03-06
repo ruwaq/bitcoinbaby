@@ -4,10 +4,10 @@
  * MoreSection - Menu with additional options
  *
  * Links to: Settings, Help, Leaderboard, Cosmic Events, Characters, About
+ * All links navigate to dedicated pages (no overlays).
  */
 
 import { HelpTooltip } from "@bitcoinbaby/ui";
-import { useSettingsOverlay } from "@bitcoinbaby/core";
 import {
   MenuButton,
   SocialCard,
@@ -17,12 +17,8 @@ import {
 } from "./more";
 
 export function MoreSection() {
-  const { open: openSettings } = useSettingsOverlay();
-
-  // Modify menu items to use overlays where appropriate
-  const menuItems = MENU_ITEMS.map((item) =>
-    item.id === "settings" ? { ...item, onClick: openSettings } : item,
-  );
+  // All menu items navigate to dedicated pages
+  const menuItems = MENU_ITEMS;
 
   return (
     <div className="p-4 md:p-8 bg-pixel-bg-dark">

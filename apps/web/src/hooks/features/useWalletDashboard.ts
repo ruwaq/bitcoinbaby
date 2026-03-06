@@ -7,9 +7,6 @@ import {
   useNetworkStore,
   useTokenBalance as useCharmsTokenBalance,
   useMiningBoost,
-  useSendOverlay,
-  useWithdrawOverlay,
-  useHistoryOverlay,
   useUnlockModal,
   useDeleteWalletModal,
 } from "@bitcoinbaby/core";
@@ -24,7 +21,9 @@ import { getDeploymentConfig } from "@bitcoinbaby/bitcoin";
  * - Virtual $BABY balance
  * - On-chain BABTC token balance
  * - NFT mining boost
- * - Overlay actions (send/withdraw/history)
+ * - Modal actions (unlock/delete)
+ *
+ * Navigation to send/withdraw/history uses dedicated pages (no overlays).
  *
  * @example
  * const { wallet, balances, actions, overlays, isLoading } = useWalletDashboard();
@@ -91,11 +90,8 @@ export interface UseWalletDashboardReturn {
     refreshBalances: () => Promise<void>;
   };
 
-  // Overlay openers
+  // Modal openers (unlock/delete only - navigation uses dedicated pages)
   overlays: {
-    openSend: (data?: { recipientAddress?: string; amount?: string }) => void;
-    openWithdraw: () => void;
-    openHistory: () => void;
     openUnlock: () => void;
     openDelete: () => void;
   };
@@ -109,10 +105,7 @@ export function useWalletDashboard(): UseWalletDashboardReturn {
   const { appId: BABTC_APP_ID } = getDeploymentConfig(network);
   const NFT_APP_ID = `genesis_babies_${network}`;
 
-  // Overlay hooks
-  const { open: openSend } = useSendOverlay();
-  const { open: openWithdraw } = useWithdrawOverlay();
-  const { open: openHistory } = useHistoryOverlay();
+  // Modal hooks (unlock/delete only)
   const { open: openUnlockModal } = useUnlockModal();
   const { open: openDeleteModal } = useDeleteWalletModal();
 
@@ -245,9 +238,6 @@ export function useWalletDashboard(): UseWalletDashboardReturn {
     },
 
     overlays: {
-      openSend,
-      openWithdraw,
-      openHistory,
       openUnlock: handleOpenUnlock,
       openDelete: handleDelete,
     },

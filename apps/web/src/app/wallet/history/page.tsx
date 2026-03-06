@@ -23,6 +23,7 @@ import {
   type TransactionDisplay,
 } from "@bitcoinbaby/ui";
 import { useNetworkStore } from "@bitcoinbaby/core";
+import { satsToBtc } from "@/utils/format";
 
 /**
  * Filter options for transaction list
@@ -46,6 +47,9 @@ function FilterButton({
   return (
     <button
       onClick={onClick}
+      role="radio"
+      aria-checked={isActive}
+      aria-label={`Filter by ${label.toLowerCase()}: ${count} transactions`}
       className={`
         px-3 py-1.5
         font-pixel text-[8px] uppercase
@@ -156,11 +160,6 @@ export default function TransactionHistoryPage() {
     }
   }, [transactions, filter]);
 
-  // Format BTC value
-  const formatBtc = (sats: number): string => {
-    return (sats / 100_000_000).toFixed(8);
-  };
-
   // Wallet not connected state
   if (!hasStoredWallet) {
     return (
@@ -261,13 +260,13 @@ export default function TransactionHistoryPage() {
           />
           <StatCard
             label="RECEIVED"
-            value={`${formatBtc(stats.totalReceived)}`}
+            value={`${satsToBtc(stats.totalReceived)}`}
             subValue={`${stats.incomingCount} txs`}
             color="text-pixel-success"
           />
           <StatCard
             label="SENT"
-            value={`${formatBtc(stats.totalSent)}`}
+            value={`${satsToBtc(stats.totalSent)}`}
             subValue={`${stats.outgoingCount} txs`}
             color="text-pixel-error"
           />
@@ -280,7 +279,11 @@ export default function TransactionHistoryPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div
+          className="flex flex-wrap gap-2 mb-4"
+          role="radiogroup"
+          aria-label="Transaction filters"
+        >
           <FilterButton
             label="ALL"
             isActive={filter === "all"}
@@ -316,6 +319,7 @@ export default function TransactionHistoryPage() {
           <button
             onClick={refresh}
             disabled={isLoading}
+            aria-label="Refresh transaction list"
             className="ml-auto px-3 py-1.5 font-pixel text-[8px] text-pixel-text-muted hover:text-pixel-primary disabled:opacity-50"
           >
             {isLoading ? "..." : "REFRESH"}
@@ -329,6 +333,7 @@ export default function TransactionHistoryPage() {
           error={error}
           hasMore={hasMore && filter === "all"} // Only show load more for unfiltered
           onLoadMore={loadMore}
+          onRetry={refresh}
           explorerUrl={config.explorerUrl}
           currentBlockHeight={currentBlockHeight ?? undefined}
         />

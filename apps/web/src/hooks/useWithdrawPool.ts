@@ -73,27 +73,14 @@ interface UseWithdrawPoolOptions {
   address?: string;
   /** Auto-refresh interval in ms (default: 120000 = 2 minutes) */
   refreshInterval?: number;
-  /** Use production API (default: auto-detect) */
-  useProductionApi?: boolean;
 }
 
-// API client singleton
-let apiClient: ReturnType<typeof getApiClient> | null = null;
-
-function getClient(useProduction?: boolean) {
-  if (!apiClient) {
-    const env =
-      useProduction !== undefined
-        ? useProduction
-          ? "production"
-          : "development"
-        : typeof window !== "undefined" &&
-            window.location.hostname !== "localhost"
-          ? "production"
-          : "development";
-    apiClient = getApiClient(env);
-  }
-  return apiClient;
+/**
+ * Get API client - uses singleton from @bitcoinbaby/core
+ * Environment is auto-detected by getApiClient()
+ */
+function getClient() {
+  return getApiClient();
 }
 
 /**
@@ -123,7 +110,7 @@ function getClient(useProduction?: boolean) {
 export function useWithdrawPool(
   options: UseWithdrawPoolOptions = {},
 ): UseWithdrawPoolReturn {
-  const { address, refreshInterval = 120000, useProductionApi } = options;
+  const { address, refreshInterval = 120000 } = options;
 
   // State
   const [state, setState] = useState<WithdrawPoolState>({
@@ -145,7 +132,7 @@ export function useWithdrawPool(
    */
   const fetchPoolStatuses = useCallback(async (): Promise<void> => {
     try {
-      const client = getClient(useProductionApi);
+      const client = getClient();
       const poolTypes: PoolType[] = [
         "weekly",
         "monthly",
@@ -180,7 +167,7 @@ export function useWithdrawPool(
     } catch (error) {
       console.error("[WithdrawPool] Failed to fetch pool statuses:", error);
     }
-  }, [useProductionApi]);
+  }, []);
 
   /**
    * Fetch user's withdrawal requests
@@ -189,7 +176,7 @@ export function useWithdrawPool(
     if (!address) return;
 
     try {
-      const client = getClient(useProductionApi);
+      const client = getClient();
       const poolTypes: PoolType[] = [
         "weekly",
         "monthly",
@@ -222,7 +209,7 @@ export function useWithdrawPool(
     } catch (error) {
       console.error("[WithdrawPool] Failed to fetch user requests:", error);
     }
-  }, [address, useProductionApi]);
+  }, [address]);
 
   /**
    * Refresh all data
@@ -252,7 +239,7 @@ export function useWithdrawPool(
       setState((prev) => ({ ...prev, isSubmitting: true, error: null }));
 
       try {
-        const client = getClient(useProductionApi);
+        const client = getClient();
         const response = await client.createWithdrawRequest(
           poolType,
           address,
@@ -296,7 +283,7 @@ export function useWithdrawPool(
         return { success: false, error: errorMessage };
       }
     },
-    [address, useProductionApi, refresh],
+    [address, refresh],
   );
 
   /**
@@ -314,7 +301,7 @@ export function useWithdrawPool(
       setState((prev) => ({ ...prev, isSubmitting: true, error: null }));
 
       try {
-        const client = getClient(useProductionApi);
+        const client = getClient();
         const response = await client.cancelWithdrawRequest(
           poolType,
           requestId,
@@ -356,7 +343,7 @@ export function useWithdrawPool(
         return { success: false, error: errorMessage };
       }
     },
-    [address, useProductionApi, refresh],
+    [address, refresh],
   );
 
   /**

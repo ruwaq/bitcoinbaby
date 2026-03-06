@@ -161,37 +161,57 @@ export function NetworkSwitcher({
 }
 
 /**
- * NetworkBadge - Simple network indicator badge
+ * NetworkBadge - Network indicator badge
+ *
+ * More prominent styling for mainnet to warn users they're using real BTC.
  */
 export function NetworkBadge({
   network,
   className,
+  size = "default",
 }: {
   network: BitcoinNetwork;
   className?: string;
+  /** Badge size - "default" or "prominent" (for mainnet warnings) */
+  size?: "default" | "prominent";
 }) {
   const isMainnet = network === "mainnet";
+
+  // Auto-prominent for mainnet
+  const isProminent = size === "prominent" || isMainnet;
 
   return (
     <span
       className={clsx(
         "inline-flex items-center gap-1",
-        "px-2 py-1",
-        "font-pixel text-[8px] uppercase",
+        "font-pixel uppercase",
         "border-2 border-black",
+        // Size variants
+        isProminent ? "px-3 py-1.5 text-[10px]" : "px-2 py-1 text-[8px]",
+        // Color variants
         isMainnet
-          ? "bg-pixel-primary text-pixel-text-dark"
+          ? "bg-pixel-error text-white animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]"
           : "bg-pixel-secondary text-pixel-text-dark",
         className,
       )}
     >
       <span
         className={clsx(
-          "w-2 h-2 rounded-full",
-          isMainnet ? "bg-green-500" : "bg-blue-400",
+          "rounded-full",
+          isProminent ? "w-2.5 h-2.5" : "w-2 h-2",
+          isMainnet ? "bg-yellow-400 animate-ping" : "bg-blue-400",
         )}
       />
-      {network}
+      <span
+        className={clsx(
+          "rounded-full absolute",
+          isProminent ? "w-2.5 h-2.5" : "w-2 h-2",
+          isMainnet ? "bg-yellow-400" : "bg-blue-400",
+        )}
+        style={{ position: "relative" }}
+      />
+      {isMainnet ? "MAINNET" : "TESTNET4"}
+      {isMainnet && <span className="ml-1 text-yellow-400">!</span>}
     </span>
   );
 }
