@@ -9,8 +9,12 @@ export {
   MiningSubmitter,
   createMiningSubmitter,
   type MiningSubmitterOptions,
-  // V10 Types
+  // V9 Types (PoW Direct)
+  type SubmissionResultV9,
+  // V10 Types (Merkle Proofs)
   type SubmissionResultV10,
+  // V11 Types (CLI v11.0.1 - Current)
+  type SubmissionResultV11,
 } from "./submitter";
 
 export type {

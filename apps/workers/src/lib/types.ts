@@ -34,7 +34,13 @@ export interface Env {
 
   // Charms/Prover configuration
   PROVER_URL?: string;
+  CHARMS_PROVER_URL?: string;
   TREASURY_ADDRESS?: string;
+
+  // BABTC Token configuration
+  BABTC_APP_VK?: string;
+  BABTC_GENESIS?: string;
+  SCROLLS_API_URL?: string;
 }
 
 // =============================================================================

@@ -9,7 +9,11 @@
     "typecheck": "turbo typecheck",
     "test": "turbo test",
     "clean": "turbo clean && rm -rf node_modules",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "signer": "pnpm --filter @bitcoinbaby/signer start",
+    "signer:once": "pnpm --filter @bitcoinbaby/signer start:once",
+    "signer:test": "pnpm --filter @bitcoinbaby/signer test:e2e",
+    "signer:wallet": "pnpm --filter @bitcoinbaby/signer generate-wallet"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^3.0.0",

@@ -22,32 +22,11 @@ export function AppInitializer() {
   const isLocked = useWalletStore((s) => s.isLocked);
 
   // Get NFT store state
-  const { bestBoost, totalNFTs } = useNFTStore();
+  const totalNFTs = useNFTStore((s) => s.totalNFTs);
 
   // Sync NFTs when wallet is connected and unlocked
   // This hook fetches NFTs from the server and updates the store
-  const { nfts, isLoading, refresh } = useNFTSync();
-
-  // Log NFT sync status for debugging
-  useEffect(() => {
-    if (isConnected && !isLocked && wallet?.address) {
-      console.log("[AppInitializer] Wallet connected, NFT sync active", {
-        address: wallet.address.slice(0, 10) + "...",
-        nftCount: nfts.length,
-        bestBoost,
-        totalNFTs,
-        isLoading,
-      });
-    }
-  }, [
-    isConnected,
-    isLocked,
-    wallet?.address,
-    nfts.length,
-    bestBoost,
-    totalNFTs,
-    isLoading,
-  ]);
+  const { isLoading, refresh } = useNFTSync();
 
   // Force refresh NFTs when wallet unlocks (if we have stale data)
   useEffect(() => {
@@ -59,7 +38,6 @@ export function AppInitializer() {
       !isLoading
     ) {
       // If store shows 0 NFTs but we're connected, try to fetch
-      console.log("[AppInitializer] No NFTs in store, triggering refresh");
       refresh();
     }
   }, [isConnected, isLocked, wallet?.address, totalNFTs, isLoading, refresh]);

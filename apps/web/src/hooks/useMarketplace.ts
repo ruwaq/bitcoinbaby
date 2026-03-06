@@ -176,7 +176,6 @@ export function useMarketplace(): UseMarketplaceReturn {
         const apiClient = getApiClient();
 
         // 1. Get NFT UTXO from Charms extraction
-        console.log(`[Marketplace] Finding NFT UTXO for token #${tokenId}`);
         const charms = await charmsClient.extractCharmsForWallet(
           wallet.address,
           GENESIS_BABIES_TESTNET4.appId,
@@ -204,9 +203,6 @@ export function useMarketplace(): UseMarketplaceReturn {
           vout: nftCharm.vout,
           value: DUST_VALUE,
         };
-        console.log(
-          `[Marketplace] Found NFT UTXO: ${nftUtxo.txid}:${nftUtxo.vout}`,
-        );
 
         // 2. Create listing PSBT
         const priceSats = BigInt(price);

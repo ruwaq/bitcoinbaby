@@ -65,9 +65,15 @@ MAX_FEE_RATE_SAT_VB = "10"
 # For local development, run: charms server (localhost:17784)
 # For production, contact Charms Inc. for hosted prover access
 PROVER_URL = "http://localhost:17784"
+CHARMS_PROVER_URL = "http://localhost:17784"
+# Scrolls API for token balances
+SCROLLS_API_URL = "https://scrolls.charms.dev"
+# BABTC Token configuration
+BABTC_APP_VK = "ab70796e62562b5245cf746d7ecf4b95b86df582921ae42ec2ceea25612807c6"
+BABTC_GENESIS = "b3deba0743aeffd0e455ce442b1693107090341381e3d8bcc5f586667c3e8a81:0"
 # Treasury address - holds BABTC for batch withdrawals
 # Must be funded with tokens before batch processing works
-TREASURY_ADDRESS = ""
+TREASURY_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8"
 
 # Production environment
 [env.production]
@@ -98,9 +104,14 @@ POOL_PERIOD_DAYS = "7"
 MAX_FEE_RATE_SAT_VB = "5"
 # Charms Prover API
 PROVER_URL = "https://prover.charms.dev"
-# Treasury address - Set via secret for production:
-# wrangler secret put TREASURY_ADDRESS --env production
-TREASURY_ADDRESS = ""
+CHARMS_PROVER_URL = "https://prover.charms.dev"
+# Scrolls API for token balances
+SCROLLS_API_URL = "https://scrolls.charms.dev"
+# BABTC Token configuration
+BABTC_APP_VK = "ab70796e62562b5245cf746d7ecf4b95b86df582921ae42ec2ceea25612807c6"
+BABTC_GENESIS = "b3deba0743aeffd0e455ce442b1693107090341381e3d8bcc5f586667c3e8a81:0"
+# Treasury address for testnet4
+TREASURY_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8"
 
 # Production KV namespace (shared with development - same dedup across all envs)
 [[env.production.kv_namespaces]]

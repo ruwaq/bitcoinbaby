@@ -8,11 +8,18 @@
  * @see https://github.com/CharmsDev/bro
  */
 
-import type { SpellV9, SpellV10, PoWPrivateInputs } from "./types";
+import type {
+  SpellV9,
+  SpellV10,
+  SpellV11,
+  PoWPrivateInputs,
+  PoWPrivateInputsV11,
+  ProverRequestV11,
+} from "./types";
 import { ApiError } from "../errors";
 
 /** Union type for spells accepted by the prover */
-type SpellInput = SpellV9 | SpellV10;
+type SpellInput = SpellV9 | SpellV10 | SpellV11;
 
 // =============================================================================
 // TYPES
@@ -183,7 +190,12 @@ export class CharmsProverClient {
    * @throws ProverError on failure
    */
   async prove(spell: SpellInput): Promise<ProverResponse> {
-    this.log("Submitting spell for proof generation...", spell.apps);
+    // Log appropriate field based on spell version
+    const logInfo =
+      "version" in spell && spell.version === 11
+        ? spell.app_public_inputs
+        : (spell as SpellV9 | SpellV10).apps;
+    this.log("Submitting spell for proof generation...", logInfo);
 
     // Validate spell has required fields
     this.validateSpell(spell);
@@ -219,6 +231,202 @@ export class CharmsProverClient {
     this.validatePoWSpell(spell);
 
     return this.prove(spell);
+  }
+
+  /**
+   * Submit V11 spell for proof generation (current format)
+   *
+   * V11 format separates private_inputs from the spell.
+   * This is the recommended method for CLI v11.0.1+.
+   *
+   * @param request - ProverRequestV11 with spell, private_inputs, and funding info
+   * @returns Commit and spell transaction hexes
+   */
+  async proveV11(request: ProverRequestV11): Promise<ProverResponse> {
+    this.log("Submitting V11 spell for proof generation...", {
+      version: request.spell.version,
+      hasPrivateInputs: !!request.app_private_inputs,
+      hasFundingUtxo: !!request.funding_utxo,
+    });
+
+    // Validate V11-specific fields
+    this.validateSpellV11(request);
+
+    // Submit with retry logic
+    const response = await this.submitWithRetryV11(request);
+
+    this.log("V11 proof generated successfully", {
+      commitTxLength: response.commitTx.length,
+      spellTxLength: response.spellTx.length,
+    });
+
+    return response;
+  }
+
+  /**
+   * Submit V11 request with exponential backoff retry
+   */
+  private async submitWithRetryV11(
+    request: ProverRequestV11,
+  ): Promise<ProverResponse> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= this.retryConfig.maxAttempts; attempt++) {
+      try {
+        return await this.submitOnceV11(request);
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        // Don't retry on client errors (4xx)
+        if (
+          error instanceof ProverError &&
+          error.statusCode &&
+          error.statusCode < 500
+        ) {
+          throw error;
+        }
+
+        // Calculate delay with jitter
+        const delay = this.calculateBackoff(attempt);
+
+        this.log(
+          `V11 Attempt ${attempt}/${this.retryConfig.maxAttempts} failed: ${lastError.message}. Retrying in ${delay}ms...`,
+        );
+
+        // Wait before retry
+        await this.sleep(delay);
+      }
+    }
+
+    throw new ProverError(
+      `Failed after ${this.retryConfig.maxAttempts} attempts: ${lastError?.message}`,
+      undefined,
+      lastError || undefined,
+    );
+  }
+
+  /**
+   * Submit single V11 request to prover
+   */
+  private async submitOnceV11(
+    request: ProverRequestV11,
+  ): Promise<ProverResponse> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+    try {
+      const proveEndpoint = getProveEndpoint(this.proverUrl);
+      const response = await fetch(proveEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "BitcoinBaby/1.0",
+        },
+        // V11 request format: spell + app_private_inputs + funding info
+        body: JSON.stringify(request),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "Unknown error");
+        throw new ProverError(
+          `Prover API error: ${response.status} - ${errorText}`,
+          response.status,
+        );
+      }
+
+      const data = (await response.json()) as ProverResponse;
+
+      // Validate response
+      if (!data.commitTx || !data.spellTx) {
+        throw new ProverError("Invalid prover response: missing transactions");
+      }
+
+      return data;
+    } catch (error) {
+      clearTimeout(timeoutId);
+
+      if (error instanceof ProverError) {
+        throw error;
+      }
+
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new ProverError(`Request timeout after ${this.timeout}ms`);
+      }
+
+      throw new ProverError(
+        `Network error: ${error instanceof Error ? error.message : "Unknown"}`,
+        undefined,
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * Validate V11 spell has required fields
+   */
+  private validateSpellV11(request: ProverRequestV11): void {
+    const { spell, app_private_inputs } = request;
+
+    // Check version
+    if (spell.version !== 11) {
+      throw new ProverError(`Expected version 11, got ${spell.version}`);
+    }
+
+    // Check for app_public_inputs
+    if (
+      !spell.app_public_inputs ||
+      Object.keys(spell.app_public_inputs).length === 0
+    ) {
+      throw new ProverError(
+        "Spell must have at least one app in app_public_inputs",
+      );
+    }
+
+    // Check for transaction data
+    if (!spell.tx) {
+      throw new ProverError("Spell must have tx field");
+    }
+
+    // Check for inputs
+    if (!spell.tx.ins || spell.tx.ins.length === 0) {
+      throw new ProverError("Spell must have at least one input in tx.ins");
+    }
+
+    // Check for outputs
+    if (!spell.tx.outs || spell.tx.outs.length === 0) {
+      throw new ProverError("Spell must have at least one output in tx.outs");
+    }
+
+    // Check for private_inputs
+    if (!app_private_inputs || Object.keys(app_private_inputs).length === 0) {
+      throw new ProverError("Request must have app_private_inputs");
+    }
+
+    // Validate PoW private inputs
+    for (const [appKey, inputs] of Object.entries(app_private_inputs)) {
+      if (!inputs.pow_challenge) {
+        throw new ProverError(`Missing pow_challenge for app ${appKey}`);
+      }
+
+      if (!inputs.pow_nonce) {
+        throw new ProverError(`Missing pow_nonce for app ${appKey}`);
+      }
+
+      if (typeof inputs.pow_difficulty !== "number") {
+        throw new ProverError(
+          `Missing or invalid pow_difficulty for app ${appKey}`,
+        );
+      }
+
+      if (inputs.pow_difficulty < 16) {
+        throw new ProverError(
+          `pow_difficulty must be at least 16, got ${inputs.pow_difficulty}`,
+        );
+      }
+    }
   }
 
   /**
@@ -285,33 +493,44 @@ export class CharmsProverClient {
 
   /**
    * Validate spell has required fields for proving
-   * Supports both SpellV9 (PoW) and SpellV10 (Merkle proof)
+   * Supports SpellV9 (PoW) and SpellV10 (Merkle proof)
+   * NOTE: SpellV11 uses validateSpellV11() instead
    */
   private validateSpell(spell: SpellInput): void {
+    // V11 spells should use proveV11() with validateSpellV11()
+    if ("version" in spell && spell.version === 11) {
+      throw new ProverError(
+        "SpellV11 should use proveV11() method with ProverRequestV11",
+      );
+    }
+
+    // Cast to V9/V10 type for validation
+    const legacySpell = spell as SpellV9 | SpellV10;
+
     // Check for apps
-    if (!spell.apps || Object.keys(spell.apps).length === 0) {
+    if (!legacySpell.apps || Object.keys(legacySpell.apps).length === 0) {
       throw new ProverError("Spell must have at least one app");
     }
 
     // Check for outputs
-    if (!spell.outs || spell.outs.length === 0) {
+    if (!legacySpell.outs || legacySpell.outs.length === 0) {
       throw new ProverError("Spell must have at least one output");
     }
 
     // Check for inputs
-    if (!spell.ins || spell.ins.length === 0) {
+    if (!legacySpell.ins || legacySpell.ins.length === 0) {
       throw new ProverError("Spell must have at least one input");
     }
 
     // Check for private_inputs
-    if (!spell.private_inputs) {
+    if (!legacySpell.private_inputs) {
       throw new ProverError("Spell must have private_inputs");
     }
 
     // Determine spell type and validate accordingly
-    if ("version" in spell && spell.version === 10) {
+    if ("version" in legacySpell && legacySpell.version === 10) {
       // SpellV10 - validate Merkle proof inputs
-      const hasValidInputs = Object.values(spell.private_inputs).some(
+      const hasValidInputs = Object.values(legacySpell.private_inputs).some(
         (inputs) => {
           const v10Inputs = inputs as { tx?: string; tx_block_proof?: string };
           return v10Inputs.tx && v10Inputs.tx_block_proof;
@@ -325,7 +544,7 @@ export class CharmsProverClient {
       }
     } else {
       // SpellV9 - validate PoW inputs
-      const hasValidInputs = Object.values(spell.private_inputs).some(
+      const hasValidInputs = Object.values(legacySpell.private_inputs).some(
         (inputs) => {
           const powInputs = inputs as PoWPrivateInputs;
           return (

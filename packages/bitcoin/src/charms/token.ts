@@ -20,6 +20,10 @@ import type {
   SpellV2,
   SpellV9,
   SpellV10,
+  SpellV11,
+  SpellV11Output,
+  PoWPrivateInputsV11,
+  ProverRequestV11,
   AppType,
   MiningMintSpellParams,
   PoWMintSpellParams,
@@ -617,4 +621,179 @@ export function createBABTCMintSpellV9WithRewards(
     devReward: params.devReward,
     stakingReward: params.stakingReward,
   });
+}
+
+// =============================================================================
+// SPELL GENERATION V11 (CLI v11.0.1 - Current)
+// =============================================================================
+
+/** Dust limit for spell outputs */
+const MIN_OUTPUT_SATS = 546;
+
+/**
+ * PoW mint spell parameters for V11 (CLI v11.0.1)
+ *
+ * V11 changes from V9/V10:
+ * - version: 11 required
+ * - tx field contains ins/outs
+ * - app_public_inputs replaces apps
+ * - private_inputs passed separately via API
+ */
+export interface TokenMintParamsV11 {
+  /** BABTC app ID (SHA256 of genesis UTXO) */
+  appId: string;
+  /** Verification key (SHA256 of WASM binary) */
+  appVk: string;
+  /** Miner's Bitcoin address (receives 90%) */
+  minerAddress: string;
+  /** Dev fund address (receives 5%) */
+  devAddress: string;
+  /** Staking pool address (receives 5%) */
+  stakingAddress: string;
+  /** PoW challenge (format: "timestamp:address") */
+  challenge: string;
+  /** Nonce that produces valid hash (hex string) */
+  nonce: string;
+  /** Difficulty level (leading zero bits in hash) */
+  difficulty: number;
+  /** UTXO to consume for the spell */
+  inputUtxo: {
+    txid: string;
+    vout: number;
+  };
+  /** Funding UTXO for transaction fees */
+  fundingUtxo?: {
+    txid: string;
+    vout: number;
+    value: number;
+  };
+  /** Change address for remaining funds */
+  changeAddress?: string;
+}
+
+/**
+ * Generate a PoW mint spell (V11 format for CLI v11.0.1)
+ *
+ * This is the current format for creating mint spells.
+ * Uses BRO-style reward calculation based on difficulty.
+ *
+ * NOTE: Private inputs (pow_challenge, pow_nonce, pow_difficulty)
+ * are NOT included in the spell - they're passed separately to the prover.
+ *
+ * @example
+ * ```typescript
+ * const { spell, privateInputs } = createBABTCMintSpellV11({
+ *   appId: '87b5ecfb...',
+ *   appVk: 'acf2ec0b...',
+ *   minerAddress: 'tb1p...',
+ *   devAddress: 'tb1p...',
+ *   stakingAddress: 'tb1p...',
+ *   challenge: '1709654321:tb1pxyz...',
+ *   nonce: 'abc123',
+ *   difficulty: 16,
+ *   inputUtxo: { txid: '...', vout: 0 },
+ * });
+ * ```
+ */
+export function createBABTCMintSpellV11(params: TokenMintParamsV11): {
+  spell: SpellV11;
+  privateInputs: PoWPrivateInputsV11;
+  proverRequest: ProverRequestV11;
+} {
+  // Calculate reward based on difficulty
+  const reward = calculateMiningReward(params.difficulty);
+
+  // Validate amounts are safe for spell encoding
+  validateAmountForSpell(reward.minerShare);
+  validateAmountForSpell(reward.devShare);
+  validateAmountForSpell(reward.stakingShare);
+
+  // App reference key (t = token)
+  const appKey = `t/${params.appId}/${params.appVk}`;
+
+  // Create V11 spell (without private_inputs)
+  const spell: SpellV11 = {
+    version: 11,
+    tx: {
+      ins: [`${params.inputUtxo.txid}:${params.inputUtxo.vout}`],
+      outs: [
+        // Output 0: Miner share (90%)
+        { "0": Number(reward.minerShare) } as SpellV11Output,
+        // Output 1: Dev fund (5%)
+        { "0": Number(reward.devShare) } as SpellV11Output,
+        // Output 2: Staking pool (5%)
+        { "0": Number(reward.stakingShare) } as SpellV11Output,
+      ],
+    },
+    app_public_inputs: {
+      [appKey]: null, // null for simple mints
+    },
+  };
+
+  // Create private inputs (passed separately to prover)
+  const privateInputs: PoWPrivateInputsV11 = {
+    pow_challenge: params.challenge,
+    pow_nonce: params.nonce,
+    pow_difficulty: params.difficulty,
+  };
+
+  // Create full prover request
+  const proverRequest: ProverRequestV11 = {
+    spell,
+    app_private_inputs: {
+      [appKey]: privateInputs,
+    },
+    funding_utxo: params.fundingUtxo
+      ? `${params.fundingUtxo.txid}:${params.fundingUtxo.vout}`
+      : undefined,
+    funding_utxo_value: params.fundingUtxo?.value,
+    change_address: params.changeAddress,
+  };
+
+  return {
+    spell,
+    privateInputs,
+    proverRequest,
+  };
+}
+
+/**
+ * Generate a token transfer spell (V11 format)
+ */
+export interface TokenTransferParamsV11 {
+  appId: string;
+  appVk: string;
+  fromUtxo: { txid: string; vout: number };
+  fromAmount: bigint;
+  toAddress: string;
+  toAmount: bigint;
+  changeAddress?: string;
+}
+
+export function createBABTCTransferSpellV11(
+  params: TokenTransferParamsV11,
+): SpellV11 {
+  const appKey = `t/${params.appId}/${params.appVk}`;
+  const changeAmount = params.fromAmount - params.toAmount;
+
+  const outs: SpellV11Output[] = [
+    // Output 0: Transfer to recipient
+    { "0": Number(params.toAmount) } as SpellV11Output,
+  ];
+
+  if (changeAmount > 0n && params.changeAddress) {
+    // Output 1: Change back to sender
+    outs.push({ "0": Number(changeAmount) } as SpellV11Output);
+  }
+
+  return {
+    version: 11,
+    tx: {
+      ins: [`${params.fromUtxo.txid}:${params.fromUtxo.vout}`],
+      outs,
+    },
+    app_public_inputs: {
+      [appKey]: null,
+    },
+  };
 }

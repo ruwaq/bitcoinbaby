@@ -27,9 +27,8 @@ export function DangerZone({
       try {
         const apiClient = getApiClient();
         await apiClient.resetBalance(walletAddress);
-        console.log("[Settings] Backend balance reset successful");
-      } catch (err) {
-        console.warn("[Settings] Backend reset failed (continuing):", err);
+      } catch {
+        // Continue with local reset even if backend fails
       }
     }
 
@@ -57,17 +56,14 @@ export function DangerZone({
     ];
     for (const dbName of dbsToDelete) {
       try {
-        await new Promise<void>((resolve, reject) => {
+        await new Promise<void>((resolve) => {
           const request = indexedDB.deleteDatabase(dbName);
           request.onsuccess = () => resolve();
-          request.onerror = () => reject(request.error);
-          request.onblocked = () => {
-            console.warn(`IndexedDB ${dbName} blocked, forcing close`);
-            resolve();
-          };
+          request.onerror = () => resolve(); // Continue even on error
+          request.onblocked = () => resolve(); // Continue even if blocked
         });
-      } catch (err) {
-        console.warn(`Failed to delete IndexedDB ${dbName}:`, err);
+      } catch {
+        // Continue with other databases even if one fails
       }
     }
 

@@ -143,3 +143,19 @@ export {
   type EnergyMultipliers,
   type EnergyStatus,
 } from "./cosmic";
+
+// Feedback Components (Loading, Skeletons)
+export {
+  Skeleton,
+  SkeletonText,
+  SkeletonTitle,
+  SkeletonAvatar,
+  SkeletonButton,
+  SkeletonCard,
+  SkeletonStats,
+  SkeletonBalance,
+  SkeletonListItem,
+  SkeletonLeaderboard,
+  SkeletonNFTGrid,
+  SkeletonTransactions,
+} from "./feedback";

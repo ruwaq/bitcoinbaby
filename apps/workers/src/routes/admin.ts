@@ -23,6 +23,7 @@ import {
 } from "../lib/redis";
 import { errorResponse, successResponse } from "../lib/helpers";
 import { adminLogger } from "../lib/logger";
+import { createTreasurySigner } from "../services/treasury-signer";
 import {
   validateBody,
   validateParams,
@@ -227,6 +228,78 @@ adminRouter.post(
     }
   },
 );
+
+// =============================================================================
+// TREASURY SIGNER ENDPOINTS
+// =============================================================================
+
+/**
+ * GET /api/admin/signer/health - Check signer service health
+ */
+adminRouter.get("/signer/health", async (c) => {
+  try {
+    const signer = createTreasurySigner(c.env);
+    const health = await signer.healthCheck();
+
+    return successResponse(c, health);
+  } catch (error) {
+    adminLogger.error("Signer health check error", error);
+    return errorResponse(c, "Health check failed", 500);
+  }
+});
+
+/**
+ * POST /api/admin/signer/process - Manually trigger batch processing
+ */
+adminRouter.post("/signer/process", async (c) => {
+  try {
+    adminLogger.info("Manual signer processing triggered");
+
+    const signer = createTreasurySigner(c.env);
+    const results = await signer.processAllBatches();
+
+    const successful = results.filter((r) => r.success).length;
+    const failed = results.filter((r) => !r.success).length;
+
+    adminLogger.info("Manual processing complete", {
+      total: results.length,
+      successful,
+      failed,
+    });
+
+    return successResponse(c, {
+      processed: results.length,
+      successful,
+      failed,
+      results,
+    });
+  } catch (error) {
+    adminLogger.error("Manual signer processing error", error);
+    return errorResponse(c, "Processing failed", 500);
+  }
+});
+
+/**
+ * GET /api/admin/treasury/balance - Get treasury token balance
+ */
+adminRouter.get("/treasury/balance", async (c) => {
+  try {
+    const signer = createTreasurySigner(c.env);
+    await signer.initialize();
+
+    const address = signer.getTreasuryAddress();
+    const balance = await signer.getTreasuryTokenBalance();
+
+    return successResponse(c, {
+      address,
+      balance: balance.toString(),
+      balanceFormatted: `${Number(balance) / 100_000_000} BABTC`,
+    });
+  } catch (error) {
+    adminLogger.error("Treasury balance check error", error);
+    return errorResponse(c, "Balance check failed", 500);
+  }
+});
 
 // =============================================================================
 // HISTORY ENDPOINT

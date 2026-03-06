@@ -1,0 +1,23 @@
+{
+  "name": "@bitcoinbaby/signer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx treasury-signer.ts",
+    "start:once": "RUN_ONCE=true tsx treasury-signer.ts",
+    "generate-wallet": "tsx generate-wallet.ts",
+    "test:e2e": "tsx test-e2e.ts"
+  },
+  "dependencies": {
+    "@bitcoinbaby/bitcoin": "workspace:*",
+    "bip32": "^4.0.0",
+    "bip39": "^3.1.0",
+    "bitcoinjs-lib": "^6.1.0",
+    "tiny-secp256k1": "^2.2.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.0.0"
+  }
+}

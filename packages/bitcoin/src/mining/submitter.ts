@@ -48,13 +48,15 @@ import {
 import {
   createBABTCMintSpellV9,
   createBABTCMintSpellV10,
+  createBABTCMintSpellV11,
   BABTC_CONFIG,
   calculateMiningReward,
   type TokenMintParamsV9,
   type TokenMintParamsV10,
+  type TokenMintParamsV11,
 } from "../charms/token";
 import { CharmsProverClient, createCharmsProverClient } from "../charms/prover";
-import type { SpellV9 } from "../charms/types";
+import type { SpellV9, SpellV11, ProverRequestV11 } from "../charms/types";
 import { BABTC_TESTNET4 as BABTC_DEPLOYED } from "../config/deployment";
 
 export interface MiningSubmitterOptions {
@@ -619,6 +621,110 @@ export class MiningSubmitter {
   }
 
   // ==========================================================================
+  // V11 POW DIRECT FLOW (CLI v11.0.1 - Current)
+  // ==========================================================================
+
+  /**
+   * Submit proof using V11 PoW direct flow (Current - Recommended)
+   *
+   * FLOW:
+   * 1. Mine finds valid PoW (challenge:nonce -> hash with D bits)
+   * 2. Create V11 spell (private_inputs passed separately)
+   * 3. Submit to prover -> get commit + spell TXs
+   * 4. Return TXs for signing and broadcast
+   *
+   * This is the current format for CLI v11.0.1+.
+   */
+  async submitProofV11(
+    proof: MiningProof,
+    inputUtxo: { txid: string; vout: number },
+    options: {
+      /** App ID for BABTC token */
+      appId?: string;
+      /** Verification key */
+      appVk?: string;
+      /** Funding UTXO for fees (optional, will use inputUtxo if not provided) */
+      fundingUtxo?: { txid: string; vout: number; value: number };
+      /** Change address (defaults to minerAddress) */
+      changeAddress?: string;
+    } = {},
+  ): Promise<SubmissionResultV11> {
+    // Validate proof inputs
+    assertValid(validateHash(proof.hash), "hash", "INVALID_HASH");
+    assertValid(validateNonce(proof.nonce), "nonce", "INVALID_NONCE");
+    assertValid(
+      validateDifficulty(proof.difficulty),
+      "difficulty",
+      "INVALID_DIFFICULTY",
+    );
+
+    const submissionId = `v11-${proof.hash.substring(0, 16)}-${proof.nonce}`;
+
+    try {
+      // Build challenge string from blockData or use default
+      const challenge =
+        proof.blockData || `${proof.timestamp}:${this.minerAddress}`;
+
+      // Create V11 spell with separate private_inputs
+      const { spell, proverRequest } = createBABTCMintSpellV11({
+        appId: options.appId ?? BABTC_DEPLOYED.appId,
+        appVk: options.appVk ?? BABTC_DEPLOYED.appVk,
+        minerAddress: this.minerAddress,
+        devAddress: BABTC_CONFIG.addresses.devFund,
+        stakingAddress: BABTC_CONFIG.addresses.stakingPool,
+        challenge,
+        nonce: String(proof.nonce),
+        difficulty: proof.difficulty,
+        inputUtxo,
+        fundingUtxo: options.fundingUtxo,
+        changeAddress: options.changeAddress || this.minerAddress,
+      });
+
+      // Submit to prover using V11 format
+      const proverResponse = await this.proverClient.proveV11(proverRequest);
+
+      // Calculate reward
+      const reward = calculateMiningReward(proof.difficulty);
+
+      return {
+        success: true,
+        phase: "ready_to_broadcast",
+        submissionId,
+        spell,
+        proverRequest,
+        commitTxHex: proverResponse.commitTx,
+        spellTxHex: proverResponse.spellTx,
+        reward: reward.minerShare,
+        message: "Sign and broadcast commit + spell TXs to claim your reward",
+      };
+    } catch (error) {
+      return {
+        success: false,
+        phase: "failed",
+        submissionId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Get available UTXOs for V11 minting
+   */
+  async getAvailableUtxosForV11(): Promise<
+    Array<{ txid: string; vout: number; value: number }>
+  > {
+    const utxos = await this.mempoolClient.getUTXOs(this.minerAddress);
+    return utxos
+      .filter((u) => u.value >= 2000) // Min 2000 sats
+      .sort((a, b) => b.value - a.value) // Largest first
+      .map((u) => ({
+        txid: u.txid,
+        vout: u.vout,
+        value: u.value,
+      }));
+  }
+
+  // ==========================================================================
   // V10 BRO-STYLE MINING FLOW (Legacy - with Merkle proofs)
   // ==========================================================================
 
@@ -1108,6 +1214,32 @@ export interface SubmissionResultV10 {
   reward?: bigint;
 
   submissionId?: string;
+}
+
+// =============================================================================
+// V11 TYPES (CLI v11.0.1 - Current)
+// =============================================================================
+
+/**
+ * Result from V11 submission flow
+ */
+export interface SubmissionResultV11 {
+  success: boolean;
+  phase: "ready_to_broadcast" | "failed";
+  submissionId: string;
+  error?: string;
+  message?: string;
+
+  /** V11 spell (without private_inputs) */
+  spell?: SpellV11;
+  /** Full prover request (includes private_inputs) */
+  proverRequest?: ProverRequestV11;
+  /** Commit TX hex from prover (needs signing) */
+  commitTxHex?: string;
+  /** Spell TX hex from prover (needs signing) */
+  spellTxHex?: string;
+  /** Calculated miner reward */
+  reward?: bigint;
 }
 
 // BABTC deployment config imported from ../config/deployment.ts

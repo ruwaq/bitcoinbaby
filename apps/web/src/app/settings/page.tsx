@@ -11,7 +11,21 @@
  * - About section (version, links)
  */
 
+import { useCallback } from "react";
 import Link from "next/link";
+
+/**
+ * Validate URL format (must be https:// or http://)
+ */
+function isValidUrl(url: string): boolean {
+  if (!url || url.trim() === "") return true; // Empty is valid (clears the setting)
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
 import {
   useSettingsStore,
   useNetworkStore,
@@ -68,6 +82,25 @@ export default function SettingsPage() {
   // Overlay modal hooks
   const { open: openRecoveryModal } = useRecoveryPhraseModal();
   const { open: openPasswordModal } = useChangePasswordModal();
+
+  // URL setters with validation
+  const handleSetCustomRpcUrl = useCallback(
+    (url: string) => {
+      if (isValidUrl(url)) {
+        setCustomRpcUrl(url || null);
+      }
+    },
+    [setCustomRpcUrl],
+  );
+
+  const handleSetCustomExplorerUrl = useCallback(
+    (url: string) => {
+      if (isValidUrl(url)) {
+        setCustomExplorerUrl(url || null);
+      }
+    },
+    [setCustomExplorerUrl],
+  );
 
   return (
     <main className="min-h-screen p-4 md:p-8 bg-pixel-bg-dark">
@@ -177,8 +210,8 @@ export default function SettingsPage() {
                 label="CUSTOM EXPLORER URL"
                 description="Enter your preferred block explorer URL"
                 value={networkSettings.customExplorerUrl || ""}
-                onChange={setCustomExplorerUrl}
-                placeholder="https://..."
+                onChange={handleSetCustomExplorerUrl}
+                placeholder="https://mempool.space"
               />
             )}
 
@@ -186,8 +219,8 @@ export default function SettingsPage() {
               label="CUSTOM RPC ENDPOINT"
               description="Advanced: Override the default RPC endpoint"
               value={networkSettings.customRpcUrl || ""}
-              onChange={setCustomRpcUrl}
-              placeholder="https://..."
+              onChange={handleSetCustomRpcUrl}
+              placeholder="https://rpc.example.com"
             />
           </SettingsCard>
 
@@ -195,30 +228,28 @@ export default function SettingsPage() {
           <SettingsCard title="DISPLAY">
             <Select
               label="THEME"
-              description="Visual theme (more coming soon)"
-              value={display.theme}
-              options={[
-                { value: "dark", label: "Dark" },
-                { value: "light", label: "Light (coming soon)" },
-                { value: "system", label: "System (coming soon)" },
-              ]}
+              description="Visual theme (only dark mode supported)"
+              value="dark"
+              options={[{ value: "dark", label: "Dark" }]}
               onChange={() => {
-                // Only dark is supported for now
+                // Only dark theme is supported
               }}
             />
 
             <Toggle
               label="SOUND EFFECTS"
-              description="Play sounds for mining events and achievements"
+              description="Play sounds for mining events (coming soon)"
               checked={display.soundEnabled}
               onChange={setSoundEnabled}
+              disabled={true}
             />
 
             <Toggle
               label="NOTIFICATIONS"
-              description="Show browser notifications for important events"
+              description="Browser notifications (coming soon)"
               checked={display.notificationsEnabled}
               onChange={setNotificationsEnabled}
+              disabled={true}
             />
           </SettingsCard>
 
@@ -290,15 +321,21 @@ export default function SettingsPage() {
                   VERSION
                 </span>
                 <span className="font-pixel-mono text-xs text-pixel-text">
-                  0.1.0-alpha
+                  0.1.0
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="font-pixel text-xs text-pixel-text-muted">
-                  BUILD
+                  NETWORK
                 </span>
-                <span className="font-pixel-mono text-xs text-pixel-text">
-                  {new Date().toISOString().slice(0, 10)}
+                <span
+                  className={`font-pixel-mono text-xs ${
+                    network === "mainnet"
+                      ? "text-pixel-success"
+                      : "text-pixel-warning"
+                  }`}
+                >
+                  {network === "mainnet" ? "MAINNET" : "TESTNET4"}
                 </span>
               </div>
             </div>

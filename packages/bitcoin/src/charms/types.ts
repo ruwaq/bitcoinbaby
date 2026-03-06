@@ -144,6 +144,78 @@ export interface SpellV10Output {
   sats?: number; // Optional, defaults to DUST_LIMIT (546)
 }
 
+// =============================================================================
+// SPELL FORMAT (v11 - CLI v11.0.1, Current)
+// =============================================================================
+
+/**
+ * Charms Spell v11 format (CLI v11.0.1)
+ * Reference: https://docs.charms.dev/references/spell-json/
+ *
+ * Major changes from V9/V10:
+ * - version: 11 required
+ * - tx field contains ins/outs/refs/coins
+ * - app_public_inputs replaces apps
+ * - private_inputs passed separately via CLI/API
+ */
+export interface SpellV11 {
+  version: 11;
+  tx: SpellV11Transaction;
+  app_public_inputs: Record<string, unknown | null>;
+  mock?: boolean;
+}
+
+export interface SpellV11Transaction {
+  /** Input UTXOs in "txid:vout" format */
+  ins: string[];
+  /** Reference UTXOs (optional) */
+  refs?: string[];
+  /** Output charms mapped by app index */
+  outs: SpellV11Output[];
+  /** Beaming destinations (optional) */
+  beamed_outs?: Record<string, string>;
+  /** Native coin outputs (optional) */
+  coins?: SpellV11CoinOutput[];
+}
+
+/**
+ * V11 output format
+ * Keys are app indexes ("0", "1", etc.) from app_public_inputs
+ * Values are amounts (number) for tokens or state objects for NFTs
+ */
+export type SpellV11Output = Record<string, number | Record<string, unknown>>;
+
+export interface SpellV11CoinOutput {
+  /** Amount in satoshis */
+  amt: number;
+  /** Destination hash */
+  dest_hash: string;
+}
+
+/**
+ * V11 PoW private inputs (passed separately from spell)
+ * Used with Charms CLI: --private-inputs=./private-inputs.yaml
+ * Or via Prover API: app_private_inputs field
+ */
+export interface PoWPrivateInputsV11 {
+  pow_challenge: string; // "timestamp:address"
+  pow_nonce: string; // Hex nonce
+  pow_difficulty: number; // Leading zero bits
+}
+
+/**
+ * V11 Prover request format
+ * Private inputs are passed separately from the spell
+ */
+export interface ProverRequestV11 {
+  spell: SpellV11;
+  app_private_inputs?: Record<string, PoWPrivateInputsV11>;
+  funding_utxo?: string; // "txid:vout"
+  funding_utxo_value?: number; // In satoshis
+  prev_txs?: string[]; // Previous transaction hexes
+  change_address?: string;
+}
+
 /**
  * Mining private inputs for token minting (Merkle proof style)
  * Required to prove the mining transaction was included in a block
@@ -214,12 +286,12 @@ export interface MiningMintSpellParams {
 /**
  * Current spell type alias
  *
- * SpellV9 is the default for BABTC mining (direct PoW validation)
- * SpellV10 is used when Merkle proofs are needed
+ * SpellV11 is the current format (CLI v11.0.1)
+ * SpellV9 and SpellV10 are legacy formats
  */
-export type Spell = SpellV9 | SpellV10;
-export type SpellInput = SpellV9Input | SpellV10Input;
-export type SpellOutput = SpellV9Output | SpellV10Output;
+export type Spell = SpellV9 | SpellV10 | SpellV11;
+export type SpellInput = SpellV9Input | SpellV10Input | string; // V11 uses plain strings
+export type SpellOutput = SpellV9Output | SpellV10Output | SpellV11Output;
 
 /**
  * App type prefix
