@@ -545,6 +545,63 @@ export class BitcoinBabyClient {
   }
 
   /**
+   * Submit NFT to Charms prover for proof generation
+   *
+   * Returns commit + spell transaction hexes that need to be signed.
+   * After signing, broadcast commitTx first, then spellTx.
+   *
+   * Flow:
+   * 1. Reserve tokenId via reserveNFT()
+   * 2. Generate NFT traits locally
+   * 3. Call proveNFT() to get transactions
+   * 4. Sign both transactions with wallet
+   * 5. Broadcast commitTx, then spellTx
+   * 6. Confirm via confirmNFTMint()
+   */
+  async proveNFT(params: {
+    tokenId: number;
+    address: string;
+    nftState: {
+      dna: string;
+      bloodline: "royal" | "warrior" | "rogue" | "mystic";
+      baseType: "human" | "animal" | "robot" | "mystic" | "alien";
+      genesisBlock: number;
+      rarityTier:
+        | "common"
+        | "uncommon"
+        | "rare"
+        | "epic"
+        | "legendary"
+        | "mythic";
+      tokenId: number;
+      level?: number;
+      xp?: number;
+      totalXp?: number;
+      workCount?: number;
+      lastWorkBlock?: number;
+      evolutionCount?: number;
+      tokensEarned?: string;
+    };
+    fundingUtxo: {
+      txid: string;
+      vout: number;
+      value: number;
+    };
+  }): Promise<ApiResponse<NFTProveResult>> {
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/nft/prove`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      },
+      0, // No retries - prover takes time
+      120_000, // 2 minute timeout for proof generation
+    );
+    return response.json() as Promise<ApiResponse<NFTProveResult>>;
+  }
+
+  /**
    * Claim an NFT by providing the mint transaction ID
    * Verifies the transaction on blockchain and registers the NFT
    * Used to claim NFTs minted before the indexing system
@@ -737,6 +794,24 @@ export class BitcoinBabyClient {
     );
     return response.json() as Promise<ApiResponse<EvolutionConfirmResult>>;
   }
+}
+
+/**
+ * Result from NFT prover submission
+ */
+export interface NFTProveResult {
+  /** Reserved token ID */
+  tokenId: number;
+  /** Commit transaction hex (needs signing) */
+  commitTxHex: string;
+  /** Spell transaction hex (needs signing) */
+  spellTxHex: string;
+  /** Commit transaction ID */
+  commitTxid: string;
+  /** Spell transaction ID (final NFT location) */
+  spellTxid: string;
+  /** Instructions for next steps */
+  nextSteps: string[];
 }
 
 /**

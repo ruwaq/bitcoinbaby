@@ -61,9 +61,9 @@ MIN_WITHDRAW_AMOUNT = "100"
 POOL_PERIOD_DAYS = "7"
 MAX_FEE_RATE_SAT_VB = "10"
 # Charms Prover API
-# NOTE: Public prover.charms.dev may not be accessible
+# Hosted prover: https://v11.charms.dev (latest version)
 # For local development, run: charms server (localhost:17784)
-# For production, contact Charms Inc. for hosted prover access
+# Documentation: https://docs.charms.dev/guides/wallet-integration/transactions/prover-api/
 PROVER_URL = "http://localhost:17784"
 CHARMS_PROVER_URL = "http://localhost:17784"
 # Scrolls API for token balances
@@ -79,6 +79,10 @@ TREASURY_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjyw
 FOUNDATION_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8"
 # Platform fee percentage for claims (20% = extra output to foundation)
 PLATFORM_FEE_PERCENT = "20"
+# Genesis Babies NFT configuration
+# NOTE: These are placeholder values - update after NFT contract deployment
+NFT_APP_ID = "pending_nft_app_id"
+NFT_APP_VK = "pending_nft_app_vk"
 
 # Production environment
 [env.production]
@@ -107,9 +111,9 @@ ENVIRONMENT = "production"
 MIN_WITHDRAW_AMOUNT = "100"
 POOL_PERIOD_DAYS = "7"
 MAX_FEE_RATE_SAT_VB = "5"
-# Charms Prover API
-PROVER_URL = "https://prover.charms.dev"
-CHARMS_PROVER_URL = "https://prover.charms.dev"
+# Charms Prover API (v11 - hosted prover)
+PROVER_URL = "https://v11.charms.dev"
+CHARMS_PROVER_URL = "https://v11.charms.dev"
 # Scrolls API for token balances
 SCROLLS_API_URL = "https://scrolls.charms.dev"
 # BABTC Token configuration
@@ -123,6 +127,10 @@ TREASURY_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjyw
 FOUNDATION_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8"
 # Platform fee percentage for claims (20% = extra output to foundation)
 PLATFORM_FEE_PERCENT = "20"
+# Genesis Babies NFT configuration
+# NOTE: These are placeholder values - update after NFT contract deployment
+NFT_APP_ID = "pending_nft_app_id"
+NFT_APP_VK = "pending_nft_app_vk"
 
 # Production KV namespace (shared with development - same dedup across all envs)
 [[env.production.kv_namespaces]]
@@ -149,7 +157,7 @@ crons = ["0 */6 * * *"]
 #
 # Optional:
 #   ADMIN_KEY - Admin API key for reset endpoints
-#   PROVER_URL - Custom Prover API URL (default: https://prover.charms.dev)
+#   PROVER_URL - Custom Prover API URL (default: https://v11.charms.dev)
 #
 # =============================================================================
 # BABTC Token Configuration (Testnet4)

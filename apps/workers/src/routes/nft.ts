@@ -34,6 +34,7 @@ import {
   bitcoinAddressSchema,
 } from "../lib/middleware";
 import { nftLogger } from "../lib/logger";
+import { getNFTMintingService } from "../services/nft-minting-service";
 
 export const nftRouter = new Hono<{ Bindings: Env }>();
 
@@ -137,6 +138,48 @@ const workProofSchema = z.object({
   difficulty: z.number().int().min(1),
   /** Timestamp when share was found */
   timestamp: z.number().int().positive(),
+});
+
+const proveNftSchema = z.object({
+  /** Reserved token ID */
+  tokenId: z.number().int().positive(),
+  /** Owner's Bitcoin address */
+  address: bitcoinAddressSchema,
+  /** NFT initial state */
+  nftState: z.object({
+    dna: z
+      .string()
+      .length(64)
+      .regex(/^[a-fA-F0-9]+$/),
+    bloodline: z.enum(["royal", "warrior", "rogue", "mystic"]),
+    baseType: z.enum(["human", "animal", "robot", "mystic", "alien"]),
+    genesisBlock: z.number().int().min(0),
+    rarityTier: z.enum([
+      "common",
+      "uncommon",
+      "rare",
+      "epic",
+      "legendary",
+      "mythic",
+    ]),
+    tokenId: z.number().int().positive(),
+    level: z.number().int().min(1).max(10).default(1),
+    xp: z.number().int().min(0).default(0),
+    totalXp: z.number().int().min(0).default(0),
+    workCount: z.number().int().min(0).default(0),
+    lastWorkBlock: z.number().int().min(0).default(0),
+    evolutionCount: z.number().int().min(0).default(0),
+    tokensEarned: z.string().default("0"),
+  }),
+  /** Funding UTXO */
+  fundingUtxo: z.object({
+    txid: z
+      .string()
+      .length(64)
+      .regex(/^[a-fA-F0-9]+$/),
+    vout: z.number().int().min(0),
+    value: z.number().int().positive(),
+  }),
 });
 
 // =============================================================================
@@ -275,6 +318,119 @@ nftRouter.post("/reserve", async (c) => {
   } catch (error) {
     nftLogger.error("[NFT] Reserve error:", error);
     return errorResponse(c, "Failed to reserve NFT ID", 500);
+  }
+});
+
+/**
+ * POST /api/nft/prove - Submit NFT to Charms prover
+ *
+ * After reserving a tokenId and generating traits, the client calls this
+ * endpoint to get the commit + spell transactions from the Charms prover.
+ *
+ * Returns raw transaction hexes that the client must sign and broadcast.
+ *
+ * Flow:
+ * 1. Client reserves tokenId via POST /api/nft/reserve
+ * 2. Client generates traits (DNA, bloodline, rarity) locally
+ * 3. Client calls this endpoint with NFT state + funding UTXO
+ * 4. Server builds V11 spell and submits to Charms prover
+ * 5. Server returns commitTx + spellTx for signing
+ * 6. Client signs both transactions with wallet
+ * 7. Client broadcasts commitTx first, then spellTx
+ * 8. Client confirms via POST /api/nft/confirm/:tokenId
+ */
+nftRouter.post("/prove", validateBody(proveNftSchema), async (c) => {
+  const { tokenId, address, nftState, fundingUtxo } = c.get("validatedBody");
+
+  try {
+    // Validate tokenId matches nftState
+    if (tokenId !== nftState.tokenId) {
+      return errorResponse(
+        c,
+        "tokenId in request does not match nftState.tokenId",
+        400,
+      );
+    }
+
+    // Get NFT app configuration
+    const nftAppId = c.env.NFT_APP_ID;
+    const nftAppVk = c.env.NFT_APP_VK;
+
+    if (!nftAppId || !nftAppVk) {
+      nftLogger.error("NFT app not configured", {
+        hasAppId: Boolean(nftAppId),
+        hasAppVk: Boolean(nftAppVk),
+      });
+      return errorResponse(
+        c,
+        "NFT minting not available: app not configured",
+        503,
+      );
+    }
+
+    // Get prover URL
+    const proverUrl = c.env.CHARMS_PROVER_URL || "https://v11.charms.dev";
+
+    // Get minting service
+    const mintingService = getNFTMintingService({
+      proverUrl,
+      appId: nftAppId,
+      appVk: nftAppVk,
+      network: "testnet4",
+    });
+
+    nftLogger.info("Submitting NFT to prover", {
+      tokenId,
+      address,
+      rarity: nftState.rarityTier,
+      bloodline: nftState.bloodline,
+    });
+
+    // Process the mint request
+    const result = await mintingService.processMint({
+      tokenId,
+      ownerAddress: address,
+      nftState: {
+        ...nftState,
+        // Ensure tokensEarned is a string
+        tokensEarned: nftState.tokensEarned || "0",
+      },
+      fundingUtxo,
+    });
+
+    if (!result.success) {
+      nftLogger.error("Prover failed", { tokenId, error: result.error });
+      return errorResponse(
+        c,
+        result.error || "Failed to generate NFT proof",
+        500,
+      );
+    }
+
+    nftLogger.info("NFT proof generated", {
+      tokenId,
+      commitTxid: result.commitTxid,
+      spellTxid: result.spellTxid,
+    });
+
+    return successResponse(c, {
+      tokenId,
+      commitTxHex: result.commitTxHex,
+      spellTxHex: result.spellTxHex,
+      commitTxid: result.commitTxid,
+      spellTxid: result.spellTxid,
+      // Instructions for client
+      nextSteps: [
+        "1. Sign commitTx with your wallet",
+        "2. Sign spellTx with your wallet",
+        "3. Broadcast commitTx and wait for confirmation",
+        "4. Broadcast spellTx",
+        "5. Call POST /api/nft/confirm/:tokenId with the spellTxid",
+      ],
+    });
+  } catch (error) {
+    nftLogger.error("[NFT] Prove error:", error);
+    return errorResponse(c, "Failed to prove NFT mint", 500);
   }
 });
 
