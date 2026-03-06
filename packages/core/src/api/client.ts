@@ -714,6 +714,29 @@ export class BitcoinBabyClient {
     const response = await fetchWithRetry(`${this.baseUrl}/api/nft/stats`);
     return response.json() as Promise<ApiResponse<NFTGlobalStats>>;
   }
+
+  /**
+   * Confirm on-chain evolution transaction
+   *
+   * Called after a client broadcasts an evolution transaction to the blockchain.
+   * Updates the server state to reflect the new level.
+   */
+  async confirmEvolution(
+    tokenId: number,
+    txid: string,
+    newLevel: number,
+    address: string,
+  ): Promise<ApiResponse<EvolutionConfirmResult>> {
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/nft/confirm-evolution`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tokenId, txid, newLevel, address }),
+      },
+    );
+    return response.json() as Promise<ApiResponse<EvolutionConfirmResult>>;
+  }
 }
 
 /**
@@ -798,6 +821,17 @@ export interface WorkProofResult {
   multiplier: number;
   canEvolve: boolean;
   xpToNextLevel: number;
+}
+
+/**
+ * Evolution confirmation result
+ */
+export interface EvolutionConfirmResult {
+  confirmed: boolean;
+  nft: NFTRecord;
+  txid: string;
+  previousLevel: number;
+  newLevel: number;
 }
 
 /**

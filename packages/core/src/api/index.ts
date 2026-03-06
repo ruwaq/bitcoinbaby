@@ -14,6 +14,7 @@ export {
   type NFTListingWithNFT,
   type NFTSale,
   type WorkProofResult,
+  type EvolutionConfirmResult,
   type NFTExplorerQuery,
   type NFTExplorerResponse,
   type NFTGlobalStats,

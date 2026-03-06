@@ -115,6 +115,16 @@ const evolveNftSchema = z.object({
   address: bitcoinAddressSchema,
 });
 
+const confirmEvolutionSchema = z.object({
+  tokenId: z.number().int().positive(),
+  txid: z
+    .string()
+    .length(64)
+    .regex(/^[a-fA-F0-9]+$/),
+  newLevel: z.number().int().min(2).max(10),
+  address: bitcoinAddressSchema,
+});
+
 const workProofSchema = z.object({
   /** Owner's Bitcoin address */
   ownerAddress: bitcoinAddressSchema,
@@ -1333,6 +1343,102 @@ nftRouter.post("/evolve", validateBody(evolveNftSchema), async (c) => {
     return errorResponse(c, "Failed to evolve NFT", 500);
   }
 });
+
+/**
+ * POST /api/nft/confirm-evolution - Confirm on-chain evolution transaction
+ *
+ * Called after a client broadcasts an evolution transaction to the blockchain.
+ * Updates the server state to reflect the new level.
+ *
+ * Note: This is different from /evolve which uses virtual balance.
+ * This endpoint is for on-chain evolution with real BABTC burn.
+ */
+nftRouter.post(
+  "/confirm-evolution",
+  validateBody(confirmEvolutionSchema),
+  async (c) => {
+    const { tokenId, txid, newLevel, address } = c.get("validatedBody");
+
+    try {
+      const redis = getRedis(c.env);
+
+      // Check NFT exists
+      const nftData = await redis.hgetall(`nft:minted:${tokenId}`);
+      if (!nftData || Object.keys(nftData).length === 0) {
+        return errorResponse(c, "NFT not found", 404);
+      }
+
+      // Check ownership
+      const isOwned = await redis.sismember(
+        `nft:owned:${address}`,
+        tokenId.toString(),
+      );
+      if (!isOwned) {
+        return errorResponse(c, "You do not own this NFT", 403);
+      }
+
+      const currentLevel = parseInt(nftData.level as string, 10) || 1;
+      const currentEvolutionCount =
+        parseInt(nftData.evolutionCount as string, 10) || 0;
+
+      // Validate new level is exactly current + 1
+      if (newLevel !== currentLevel + 1) {
+        return errorResponse(
+          c,
+          `Invalid level transition: ${currentLevel} -> ${newLevel}`,
+          400,
+        );
+      }
+
+      // Verify transaction exists on blockchain
+      const txResponse = await fetchWithTimeout(
+        `${EXTERNAL_API.MEMPOOL_TESTNET4}/tx/${txid}`,
+        {},
+        10000,
+      );
+
+      if (!txResponse.ok) {
+        return errorResponse(
+          c,
+          "Transaction not found on blockchain. Please wait for confirmation.",
+          400,
+        );
+      }
+
+      // Update NFT state
+      const updatedNft = {
+        ...nftData,
+        level: newLevel.toString(),
+        xp: "0", // Reset XP after evolution
+        evolutionCount: (currentEvolutionCount + 1).toString(),
+        lastEvolutionTxid: txid,
+      };
+
+      await redis.hset(`nft:minted:${tokenId}`, updatedNft);
+
+      nftLogger.info("Confirmed on-chain evolution", {
+        tokenId,
+        txid: txid.slice(0, 8),
+        previousLevel: currentLevel,
+        newLevel,
+        address: address.slice(0, 10),
+      });
+
+      const responseNft = parseNFTData(updatedNft, tokenId);
+
+      return successResponse(c, {
+        confirmed: true,
+        nft: responseNft,
+        txid,
+        previousLevel: currentLevel,
+        newLevel,
+      });
+    } catch (error) {
+      nftLogger.error("[NFT] Confirm evolution error:", error);
+      return errorResponse(c, "Failed to confirm evolution", 500);
+    }
+  },
+);
 
 // =============================================================================
 // NFT WORK PROOF (XP FROM MINING)

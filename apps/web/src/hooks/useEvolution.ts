@@ -31,6 +31,7 @@ import {
   useWalletStore,
   usePendingTxStore,
   useNFTMinting,
+  getApiClient,
 } from "@bitcoinbaby/core";
 
 // =============================================================================
@@ -250,8 +251,20 @@ export function useEvolution(): UseEvolutionReturn {
           `Genesis Baby #${nft.tokenId} evolved to level ${nft.level + 1}`,
         );
 
-        // 7. Notify server (non-blocking) - TODO: Add confirmEvolution to API when ready
-        // For now, the server will sync from blockchain on next refresh
+        // 7. Notify server of evolution (non-blocking)
+        const newLevel = nft.level + 1;
+        getApiClient()
+          .confirmEvolution(nft.tokenId, txid, newLevel, wallet.address)
+          .then((result) => {
+            if (result.success) {
+              console.log(`[Evolution] Server confirmed level ${newLevel}`);
+            } else {
+              console.warn(`[Evolution] Server confirm failed:`, result.error);
+            }
+          })
+          .catch((err) => {
+            console.warn(`[Evolution] Server notification failed:`, err);
+          });
 
         console.log(`[Evolution] Success! TXID: ${txid}`);
         return {

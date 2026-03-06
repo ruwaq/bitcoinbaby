@@ -27,6 +27,7 @@ import {
   GENESIS_BABIES_TESTNET4,
   Psbt,
 } from "@bitcoinbaby/bitcoin";
+import { useFeeEstimate } from "./useFeeEstimate";
 
 // =============================================================================
 // TYPES
@@ -123,6 +124,9 @@ export function useMarketplace(): UseMarketplaceReturn {
     () => createCharmsClient({ network: "testnet4" }),
     [],
   );
+
+  // Fee estimates for dynamic fee rate
+  const { getFeeRate } = useFeeEstimate();
 
   // Query for listings
   const {
@@ -345,12 +349,13 @@ export function useMarketplace(): UseMarketplaceReturn {
           throw new Error("No UTXOs found for payment");
         }
 
-        // 3. Complete PSBT with buyer's payment
+        // 3. Complete PSBT with buyer's payment (use dynamic fee rate)
+        const currentFeeRate = getFeeRate("fast"); // ~30 min confirmation
         const purchaseResult = listingService.completePurchasePSBT({
           listingPsbt: listing.sellerPsbt,
           buyerAddress: wallet.address,
           buyerUtxos: utxos,
-          feeRate: 10, // TODO: Get dynamic fee rate
+          feeRate: currentFeeRate,
         });
 
         if (!purchaseResult.success || !purchaseResult.psbt) {
@@ -390,7 +395,15 @@ export function useMarketplace(): UseMarketplaceReturn {
         setIsProcessing(false);
       }
     },
-    [wallet, signPsbt, queryClient, listings, listingService, mempoolClient],
+    [
+      wallet,
+      signPsbt,
+      queryClient,
+      listings,
+      listingService,
+      mempoolClient,
+      getFeeRate,
+    ],
   );
 
   return {
