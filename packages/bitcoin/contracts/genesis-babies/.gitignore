@@ -1,0 +1,6 @@
+# Rust build output
+target/
+
+# Cargo lock is not needed for libraries
+# but we keep it for reproducible builds
+# Cargo.lock

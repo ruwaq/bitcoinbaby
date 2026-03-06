@@ -98,8 +98,9 @@ const MAX_PROVER_RETRIES = 3;
 /** Retry delay base (exponential backoff) */
 const RETRY_DELAY_BASE_MS = 5000;
 
-/** Minimum output sats for NFT (used in spell building) */
-// const MIN_OUTPUT_SATS = 546;
+/** Zero appId indicates genesis mint - will calculate from funding UTXO */
+const ZERO_APP_ID =
+  "0000000000000000000000000000000000000000000000000000000000000000";
 
 // =============================================================================
 // NFT MINTING SERVICE
@@ -119,15 +120,52 @@ export class NFTMintingService {
     this.proverUrl = config.proverUrl || DEFAULT_CHARMS_PROVER_URL;
     this.appId = config.appId;
     this.appVk = config.appVk;
-    // Network stored for future use (e.g., different prover endpoints)
+  }
+
+  /**
+   * Calculate app ID from funding UTXO (for genesis mint)
+   * appId = SHA256(txid:vout)
+   */
+  private async calculateAppId(fundingUtxo: {
+    txid: string;
+    vout: number;
+  }): Promise<string> {
+    const utxoStr = `${fundingUtxo.txid}:${fundingUtxo.vout}`;
+    const encoder = new TextEncoder();
+    const data = encoder.encode(utxoStr);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = new Uint8Array(hashBuffer);
+    return Array.from(hashArray)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  /**
+   * Get the effective app ID
+   * If configured appId is all zeros, calculate from funding UTXO
+   */
+  private async getEffectiveAppId(fundingUtxo: {
+    txid: string;
+    vout: number;
+  }): Promise<string> {
+    if (this.appId === ZERO_APP_ID) {
+      const calculatedId = await this.calculateAppId(fundingUtxo);
+      nftLogger.info("Genesis mint - calculated appId from funding UTXO", {
+        fundingUtxo: `${fundingUtxo.txid}:${fundingUtxo.vout}`,
+        appId: calculatedId,
+      });
+      return calculatedId;
+    }
+    return this.appId;
   }
 
   /**
    * Process an NFT mint request
    *
-   * 1. Build V11 spell with NFT state
-   * 2. Submit to Charms prover
-   * 3. Return transactions for signing
+   * 1. Calculate effective appId (from funding UTXO for genesis)
+   * 2. Build V11 spell with NFT state
+   * 3. Submit to Charms prover
+   * 4. Return transactions for signing
    */
   async processMint(request: NFTMintRequest): Promise<NFTMintResult> {
     nftLogger.info("Processing NFT mint request", {
@@ -137,8 +175,11 @@ export class NFTMintingService {
     });
 
     try {
-      // Build the mint spell
-      const proverRequest = this.buildMintSpell(request);
+      // Get effective appId (calculate from UTXO for genesis)
+      const effectiveAppId = await this.getEffectiveAppId(request.fundingUtxo);
+
+      // Build the mint spell with effective appId
+      const proverRequest = this.buildMintSpell(request, effectiveAppId);
 
       // Submit to prover with retries
       const proverResult = await this.submitToProver(proverRequest);
@@ -185,9 +226,12 @@ export class NFTMintingService {
    *
    * NFTs use "n/" prefix and store state objects instead of amounts.
    */
-  private buildMintSpell(request: NFTMintRequest): object {
+  private buildMintSpell(
+    request: NFTMintRequest,
+    effectiveAppId: string,
+  ): object {
     // NFT app reference: n/<appId>/<appVk>
-    const appKey = `n/${this.appId}/${this.appVk}`;
+    const appKey = `n/${effectiveAppId}/${this.appVk}`;
 
     // V11 spell format for NFT genesis (mint)
     const spell = {
