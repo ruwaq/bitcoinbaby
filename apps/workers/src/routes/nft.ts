@@ -520,6 +520,252 @@ async function checkUtxoExists(txid: string, vout: number): Promise<boolean> {
   }
 }
 
+// =============================================================================
+// NFT EXPLORER - Get all minted NFTs
+// =============================================================================
+
+const explorerQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  sort: z.enum(["newest", "oldest", "rarest", "level", "xp"]).default("newest"),
+  bloodline: z
+    .enum(["royal", "warrior", "rogue", "mystic", "all"])
+    .default("all"),
+  rarity: z
+    .enum(["common", "uncommon", "rare", "epic", "legendary", "mythic", "all"])
+    .default("all"),
+  forSale: z.enum(["true", "false", "all"]).default("all"),
+});
+
+/**
+ * GET /api/nft/all - Get all minted NFTs with filtering and pagination
+ *
+ * Query params:
+ * - page: Page number (default 1)
+ * - limit: Items per page (default 20, max 100)
+ * - sort: newest | oldest | rarest | level | xp
+ * - bloodline: royal | warrior | rogue | mystic | all
+ * - rarity: common | uncommon | rare | epic | legendary | mythic | all
+ * - forSale: true | false | all
+ *
+ * Returns NFTs with owner info, listing status, and blockchain links
+ */
+nftRouter.get("/all", async (c) => {
+  try {
+    // Parse query params
+    const queryResult = explorerQuerySchema.safeParse(c.req.query());
+    if (!queryResult.success) {
+      return errorResponse(c, "Invalid query parameters", 400);
+    }
+    const { page, limit, sort, bloodline, rarity, forSale } = queryResult.data;
+
+    if (!c.env.UPSTASH_REDIS_REST_URL || !c.env.UPSTASH_REDIS_REST_TOKEN) {
+      return successResponse(c, {
+        nfts: [],
+        total: 0,
+        page,
+        limit,
+        totalPages: 0,
+        stats: { total: 0, forSale: 0, byRarity: {}, byBloodline: {} },
+      });
+    }
+
+    const redis = getRedis(c.env);
+
+    // Get total minted count
+    const mintedCount = await redis.get<number>("nft:minted:count");
+    if (!mintedCount || mintedCount === 0) {
+      return successResponse(c, {
+        nfts: [],
+        total: 0,
+        page,
+        limit,
+        totalPages: 0,
+        stats: { total: 0, forSale: 0, byRarity: {}, byBloodline: {} },
+      });
+    }
+
+    // Get all active listings for cross-reference
+    const activeListings = await redis.smembers("nft:active-listings");
+    const listingsSet = new Set(activeListings || []);
+
+    // Get listing details for prices
+    const listingPrices: Record<number, { price: number; listedAt: number }> =
+      {};
+    for (const id of activeListings || []) {
+      const listing = await redis.hgetall(`nft:listing:${id}`);
+      if (listing && listing.price) {
+        listingPrices[parseInt(id, 10)] = {
+          price: parseInt(listing.price as string, 10),
+          listedAt: parseInt(listing.listedAt as string, 10) || 0,
+        };
+      }
+    }
+
+    // Fetch all NFTs (we need all for filtering/sorting, then paginate)
+    const allNFTs: Array<
+      NFTRecord & {
+        isListed: boolean;
+        listingPrice?: number;
+        listedAt?: number;
+        blockchainUrl: string;
+      }
+    > = [];
+
+    // Rarity order for sorting
+    const rarityOrder: Record<string, number> = {
+      mythic: 6,
+      legendary: 5,
+      epic: 4,
+      rare: 3,
+      uncommon: 2,
+      common: 1,
+    };
+
+    // Fetch NFTs
+    for (let i = 1; i <= mintedCount; i++) {
+      const nftData = await redis.hgetall(`nft:minted:${i}`);
+      if (!nftData || Object.keys(nftData).length === 0) continue;
+
+      const nft = parseNFTData(nftData, i);
+      const isListed = listingsSet.has(i.toString());
+      const listingInfo = listingPrices[i];
+
+      // Apply filters
+      if (bloodline !== "all" && nft.bloodline !== bloodline) continue;
+      if (rarity !== "all" && nft.rarityTier !== rarity) continue;
+      if (forSale === "true" && !isListed) continue;
+      if (forSale === "false" && isListed) continue;
+
+      allNFTs.push({
+        ...nft,
+        isListed,
+        listingPrice: listingInfo?.price,
+        listedAt: listingInfo?.listedAt,
+        blockchainUrl: `https://mempool.space/testnet4/tx/${nft.txid}`,
+      });
+    }
+
+    // Sort NFTs
+    switch (sort) {
+      case "newest":
+        allNFTs.sort((a, b) => b.mintedAt - a.mintedAt);
+        break;
+      case "oldest":
+        allNFTs.sort((a, b) => a.mintedAt - b.mintedAt);
+        break;
+      case "rarest":
+        allNFTs.sort(
+          (a, b) =>
+            (rarityOrder[b.rarityTier] || 0) - (rarityOrder[a.rarityTier] || 0),
+        );
+        break;
+      case "level":
+        allNFTs.sort((a, b) => b.level - a.level || b.xp - a.xp);
+        break;
+      case "xp":
+        allNFTs.sort((a, b) => b.totalXp - a.totalXp);
+        break;
+    }
+
+    // Calculate stats
+    const stats = {
+      total: mintedCount,
+      forSale: listingsSet.size,
+      byRarity: {} as Record<string, number>,
+      byBloodline: {} as Record<string, number>,
+    };
+
+    for (const nft of allNFTs) {
+      stats.byRarity[nft.rarityTier] =
+        (stats.byRarity[nft.rarityTier] || 0) + 1;
+      stats.byBloodline[nft.bloodline] =
+        (stats.byBloodline[nft.bloodline] || 0) + 1;
+    }
+
+    // Paginate
+    const total = allNFTs.length;
+    const totalPages = Math.ceil(total / limit);
+    const offset = (page - 1) * limit;
+    const paginatedNFTs = allNFTs.slice(offset, offset + limit);
+
+    return successResponse(c, {
+      nfts: paginatedNFTs,
+      total,
+      page,
+      limit,
+      totalPages,
+      stats,
+    });
+  } catch (error) {
+    nftLogger.error("[NFT] Get all error:", error);
+    return errorResponse(c, "Failed to get NFTs", 500);
+  }
+});
+
+/**
+ * GET /api/nft/stats - Get global NFT statistics
+ */
+nftRouter.get("/stats", async (c) => {
+  try {
+    if (!c.env.UPSTASH_REDIS_REST_URL || !c.env.UPSTASH_REDIS_REST_TOKEN) {
+      return successResponse(c, {
+        totalMinted: 0,
+        totalForSale: 0,
+        maxSupply: MAX_SUPPLY,
+        byRarity: {},
+        byBloodline: {},
+        recentSales: [],
+      });
+    }
+
+    const redis = getRedis(c.env);
+
+    // Get counts
+    const mintedCount = (await redis.get<number>("nft:minted:count")) || 0;
+    const activeListings = await redis.smembers("nft:active-listings");
+    const forSaleCount = activeListings?.length || 0;
+
+    // Get distribution stats (sample first 100 for performance)
+    const byRarity: Record<string, number> = {};
+    const byBloodline: Record<string, number> = {};
+    const sampleSize = Math.min(mintedCount, 100);
+
+    for (let i = 1; i <= sampleSize; i++) {
+      const nftData = await redis.hgetall(`nft:minted:${i}`);
+      if (nftData) {
+        const rarity = nftData.rarityTier as string;
+        const blood = nftData.bloodline as string;
+        if (rarity) byRarity[rarity] = (byRarity[rarity] || 0) + 1;
+        if (blood) byBloodline[blood] = (byBloodline[blood] || 0) + 1;
+      }
+    }
+
+    // Scale up to total if sampled
+    if (sampleSize < mintedCount) {
+      const scale = mintedCount / sampleSize;
+      for (const key in byRarity) {
+        byRarity[key] = Math.round(byRarity[key] * scale);
+      }
+      for (const key in byBloodline) {
+        byBloodline[key] = Math.round(byBloodline[key] * scale);
+      }
+    }
+
+    return successResponse(c, {
+      totalMinted: mintedCount,
+      totalForSale: forSaleCount,
+      maxSupply: MAX_SUPPLY,
+      mintProgress: Math.round((mintedCount / MAX_SUPPLY) * 100 * 100) / 100,
+      byRarity,
+      byBloodline,
+    });
+  } catch (error) {
+    nftLogger.error("[NFT] Get stats error:", error);
+    return errorResponse(c, "Failed to get stats", 500);
+  }
+});
+
 /**
  * GET /api/nft/listings - Get all active marketplace listings
  * Must be defined BEFORE /:tokenId to avoid route conflict

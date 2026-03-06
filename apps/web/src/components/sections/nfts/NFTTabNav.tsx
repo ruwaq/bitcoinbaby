@@ -2,10 +2,16 @@
 
 import { TabButton } from "@bitcoinbaby/ui";
 
-type SubTab = "collection" | "mint" | "claim" | "marketplace";
+export type SubTab =
+  | "explorer"
+  | "collection"
+  | "mint"
+  | "claim"
+  | "marketplace";
 
 interface NFTTabNavProps {
   activeTab: SubTab;
+  explorerCount: number;
   collectionCount: number;
   marketplaceCount: number;
   onTabChange: (tab: SubTab) => void;
@@ -15,6 +21,7 @@ interface NFTTabNavProps {
 
 export function NFTTabNav({
   activeTab,
+  explorerCount,
   collectionCount,
   marketplaceCount,
   onTabChange,
@@ -24,11 +31,18 @@ export function NFTTabNav({
   return (
     <div className="flex gap-2 mb-6 flex-wrap">
       <TabButton
+        active={activeTab === "explorer"}
+        onClick={() => onTabChange("explorer")}
+        variant="secondary"
+      >
+        Explorer ({explorerCount})
+      </TabButton>
+      <TabButton
         active={activeTab === "collection"}
         onClick={() => onTabChange("collection")}
         variant="primary"
       >
-        My Collection ({collectionCount})
+        My NFTs ({collectionCount})
       </TabButton>
       <TabButton
         active={activeTab === "mint"}
@@ -49,7 +63,7 @@ export function NFTTabNav({
         onClick={() => onTabChange("marketplace")}
         variant="warning"
       >
-        Marketplace ({marketplaceCount})
+        For Sale ({marketplaceCount})
       </TabButton>
     </div>
   );

@@ -17,6 +17,7 @@ import {
   NFTClaimFlow,
   NFTCollectionView,
   NFTMarketplaceView,
+  NFTExplorerView,
 } from "@/components/features/nft";
 import { SyncStatus, NFTTabNav, MintTabContent, useNFTsSection } from "./nfts";
 
@@ -39,6 +40,7 @@ export function NFTsSection() {
     minting,
     claiming,
     marketplace,
+    explorer,
     balances,
     pendingTransactions,
     refreshTransactions,
@@ -89,6 +91,7 @@ export function NFTsSection() {
         {/* Tab Navigation */}
         <NFTTabNav
           activeTab={activeTab}
+          explorerCount={explorer.total}
           collectionCount={collection.nfts.length}
           marketplaceCount={marketplace.listings.length}
           onTabChange={setActiveTab}
@@ -110,6 +113,24 @@ export function NFTsSection() {
         )}
 
         {/* Tab Content */}
+        {activeTab === "explorer" && (
+          <NFTExplorerView
+            nfts={explorer.nfts}
+            total={explorer.total}
+            page={explorer.page}
+            totalPages={explorer.totalPages}
+            isLoading={explorer.isLoading}
+            error={explorer.error}
+            filters={explorer.filters}
+            stats={explorer.stats}
+            currentUserAddress={walletAddress}
+            isProcessing={marketplace.isProcessing}
+            onFiltersChange={explorer.setFilters}
+            onPageChange={explorer.setPage}
+            onBuy={marketplace.buyNFT}
+          />
+        )}
+
         {activeTab === "collection" && (
           <NFTCollectionView
             nfts={collection.nfts}

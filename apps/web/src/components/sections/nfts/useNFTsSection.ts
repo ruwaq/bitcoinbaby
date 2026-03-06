@@ -2,8 +2,9 @@ import { useState, useCallback } from "react";
 import { type BabyNFTState } from "@bitcoinbaby/ui";
 import { type BabyNFTState as CoreBabyNFTState } from "@bitcoinbaby/bitcoin";
 import { useNFTs } from "@/hooks/features";
+import { useNFTExplorer } from "@/hooks/useNFTExplorer";
+import type { SubTab } from "./NFTTabNav";
 
-type SubTab = "collection" | "mint" | "claim" | "marketplace";
 type MintState = "info" | "confirming" | "minting" | "revealing" | "success";
 
 export interface ListFeedback {
@@ -16,7 +17,7 @@ export interface ListFeedback {
  */
 export function useNFTsSection() {
   // UI state
-  const [activeTab, setActiveTab] = useState<SubTab>("collection");
+  const [activeTab, setActiveTab] = useState<SubTab>("explorer");
   const [mintState, setMintState] = useState<MintState>("info");
   const [evolvingIds, setEvolvingIds] = useState<Set<number>>(new Set());
   const [listingIds, setListingIds] = useState<Set<number>>(new Set());
@@ -24,8 +25,9 @@ export function useNFTsSection() {
   const [selectedNFT, setSelectedNFT] = useState<BabyNFTState | null>(null);
   const [listFeedback, setListFeedback] = useState<ListFeedback | null>(null);
 
-  // Data hook
+  // Data hooks
   const nfts = useNFTs();
+  const explorer = useNFTExplorer();
 
   // Handlers
   const handleMintClick = useCallback(() => {
@@ -175,6 +177,7 @@ export function useNFTsSection() {
 
     // Data
     ...nfts,
+    explorer,
 
     // Handlers
     handleMintClick,

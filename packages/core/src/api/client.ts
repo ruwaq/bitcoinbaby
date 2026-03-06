@@ -679,6 +679,41 @@ export class BitcoinBabyClient {
     );
     return response.json() as Promise<ApiResponse<WorkProofResult>>;
   }
+
+  // ===========================================================================
+  // NFT EXPLORER
+  // ===========================================================================
+
+  /**
+   * Get all minted NFTs with filtering and pagination
+   *
+   * Used for the Explorer tab to browse all NFTs in the collection.
+   */
+  async getAllNFTs(
+    query: NFTExplorerQuery = {},
+  ): Promise<ApiResponse<NFTExplorerResponse>> {
+    const params = new URLSearchParams();
+    if (query.page) params.set("page", query.page.toString());
+    if (query.limit) params.set("limit", query.limit.toString());
+    if (query.sort) params.set("sort", query.sort);
+    if (query.bloodline) params.set("bloodline", query.bloodline);
+    if (query.rarity) params.set("rarity", query.rarity);
+    if (query.forSale) params.set("forSale", query.forSale);
+
+    const url = `${this.baseUrl}/api/nft/all${params.toString() ? `?${params.toString()}` : ""}`;
+    const response = await fetchWithRetry(url);
+    return response.json() as Promise<ApiResponse<NFTExplorerResponse>>;
+  }
+
+  /**
+   * Get global NFT statistics
+   *
+   * Returns total minted, for sale count, distribution by rarity/bloodline.
+   */
+  async getNFTStats(): Promise<ApiResponse<NFTGlobalStats>> {
+    const response = await fetchWithRetry(`${this.baseUrl}/api/nft/stats`);
+    return response.json() as Promise<ApiResponse<NFTGlobalStats>>;
+  }
 }
 
 /**
@@ -763,6 +798,70 @@ export interface WorkProofResult {
   multiplier: number;
   canEvolve: boolean;
   xpToNextLevel: number;
+}
+
+/**
+ * Extended NFT record with listing and blockchain info
+ */
+export interface NFTRecordWithListing extends NFTRecord {
+  /** Owner's Bitcoin address */
+  address: string;
+  /** Is currently listed for sale */
+  isListed: boolean;
+  /** Listing price in satoshis (if listed) */
+  listingPrice?: number;
+  /** When listed (timestamp, if listed) */
+  listedAt?: number;
+  /** URL to view on blockchain explorer */
+  blockchainUrl: string;
+}
+
+/**
+ * NFT explorer query parameters
+ */
+export interface NFTExplorerQuery {
+  page?: number;
+  limit?: number;
+  sort?: "newest" | "oldest" | "rarest" | "level" | "xp";
+  bloodline?: "royal" | "warrior" | "rogue" | "mystic" | "all";
+  rarity?:
+    | "common"
+    | "uncommon"
+    | "rare"
+    | "epic"
+    | "legendary"
+    | "mythic"
+    | "all";
+  forSale?: "true" | "false" | "all";
+}
+
+/**
+ * NFT explorer response
+ */
+export interface NFTExplorerResponse {
+  nfts: NFTRecordWithListing[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  stats: {
+    total: number;
+    forSale: number;
+    byRarity: Record<string, number>;
+    byBloodline: Record<string, number>;
+  };
+}
+
+/**
+ * Global NFT statistics
+ */
+export interface NFTGlobalStats {
+  totalMinted: number;
+  totalForSale: number;
+  maxSupply: number;
+  mintProgress: number;
+  byRarity: Record<string, number>;
+  byBloodline: Record<string, number>;
 }
 
 // =============================================================================

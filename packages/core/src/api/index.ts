@@ -9,10 +9,14 @@ export {
   getApiClient,
   resetApiClient,
   type NFTRecord,
+  type NFTRecordWithListing,
   type NFTListing,
   type NFTListingWithNFT,
   type NFTSale,
   type WorkProofResult,
+  type NFTExplorerQuery,
+  type NFTExplorerResponse,
+  type NFTGlobalStats,
 } from "./client";
 export type {
   ApiResponse,

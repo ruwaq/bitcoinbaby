@@ -110,6 +110,12 @@ export {
   type UseWorkProofReturn,
   type WorkProofParams,
 } from "./useWorkProof";
+export {
+  useNFTExplorer,
+  type NFTExplorerState,
+  type NFTExplorerActions,
+  type UseNFTExplorerReturn,
+} from "./useNFTExplorer";
 
 // Platform hooks
 export { useCapacitor, type UseCapacitorReturn } from "./useCapacitor";
