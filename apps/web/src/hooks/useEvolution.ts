@@ -23,6 +23,8 @@ import {
   XP_REQUIREMENTS,
   canLevelUp,
   formatTokenAmount,
+  GENESIS_BABIES_TESTNET4,
+  BABTC_TESTNET4,
   type BabyNFTState,
 } from "@bitcoinbaby/bitcoin";
 import {
@@ -58,22 +60,6 @@ export interface UseEvolutionReturn {
   /** Clear error state */
   clearError: () => void;
 }
-
-// =============================================================================
-// CONFIG (Testnet4)
-// =============================================================================
-
-// Genesis Babies NFT app config (testnet4)
-const GENESIS_BABIES_TESTNET4 = {
-  appId: "genesis-babies-testnet4",
-  appVk: "", // Verification key - empty for now
-};
-
-// BABTC Token app config (testnet4)
-const BABTC_TESTNET4 = {
-  appId: "babtc-testnet4",
-  appVk: "", // Verification key - empty for now
-};
 
 // =============================================================================
 // HOOK
@@ -248,7 +234,7 @@ export function useEvolution(): UseEvolutionReturn {
 
         // 5. Extract and broadcast
         console.log(`[Evolution] Broadcasting transaction...`);
-        const signedPsbt = Psbt.fromHex(signedPsbtHex);
+        const signedPsbt = Psbt.fromBase64(signedPsbtHex);
         const rawTxHex = signedPsbt.extractTransaction().toHex();
         const txid = await mempoolClient.broadcastTransaction(rawTxHex);
 

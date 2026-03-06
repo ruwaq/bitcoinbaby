@@ -288,16 +288,6 @@ export {
 // Re-export bitcoinjs-lib Psbt for PSBT handling
 export { Psbt } from "bitcoinjs-lib";
 
-// NFT Minting Service
-export {
-  NFTMintService,
-  createNFTMintService,
-  type MintServiceOptions,
-  type MintRequest,
-  type MintResult,
-  type PreviewResult,
-} from "./nft";
-
 // NFT Config
 export {
   GENESIS_BABIES_TESTNET4,

@@ -21,8 +21,10 @@ import {
 import {
   createListingService,
   createMempoolClient,
+  createCharmsClient,
   getRoyaltyAddress,
   MARKETPLACE_CONFIG,
+  GENESIS_BABIES_TESTNET4,
   Psbt,
 } from "@bitcoinbaby/bitcoin";
 
@@ -117,6 +119,10 @@ export function useMarketplace(): UseMarketplaceReturn {
     () => createMempoolClient({ network: "testnet4" }),
     [],
   );
+  const charmsClient = useMemo(
+    () => createCharmsClient({ network: "testnet4" }),
+    [],
+  );
 
   // Query for listings
   const {
@@ -163,31 +169,40 @@ export function useMarketplace(): UseMarketplaceReturn {
       setProcessingError(null);
 
       try {
-        // 1. Get NFT UTXO from server/blockchain
-        // For now, we'll get it from the API client
         const apiClient = getApiClient();
 
-        // Get the NFT's current UTXO location
-        // TODO: This should query Scrolls/Charms for the actual UTXO
-        const nftResponse = await apiClient.getNFT(tokenId);
-        if (!nftResponse.success || !nftResponse.data) {
-          throw new Error("Failed to get NFT data");
+        // 1. Get NFT UTXO from Charms extraction
+        console.log(`[Marketplace] Finding NFT UTXO for token #${tokenId}`);
+        const charms = await charmsClient.extractCharmsForWallet(
+          wallet.address,
+          GENESIS_BABIES_TESTNET4.appId,
+        );
+
+        const nftCharm = charms.find(
+          (c) =>
+            c.appType === "n" &&
+            c.state &&
+            typeof c.state === "object" &&
+            "tokenId" in c.state &&
+            c.state.tokenId === tokenId,
+        );
+
+        if (!nftCharm) {
+          throw new Error(
+            `NFT #${tokenId} not found in your wallet. Make sure you own this NFT.`,
+          );
         }
 
-        // Get UTXOs for the wallet to find the NFT
-        const utxos = await mempoolClient.getUTXOs(wallet.address);
-        if (utxos.length === 0) {
-          throw new Error("No UTXOs found for wallet");
-        }
-
-        // For now, use a placeholder UTXO - in production, this would
-        // query Scrolls API to find the specific Charm UTXO
-        // TODO: Integrate with Scrolls API to get exact NFT UTXO
+        // NFT Charms are stored in dust-value UTXOs (546 sats for P2TR)
+        const DUST_VALUE = 546;
         const nftUtxo = {
-          txid: utxos[0].txid,
-          vout: utxos[0].vout,
-          value: utxos[0].value,
+          txid: nftCharm.txid,
+          vout: nftCharm.vout,
+          value: DUST_VALUE,
         };
+        console.log(
+          `[Marketplace] Found NFT UTXO: ${nftUtxo.txid}:${nftUtxo.vout}`,
+        );
 
         // 2. Create listing PSBT
         const priceSats = BigInt(price);
@@ -239,7 +254,7 @@ export function useMarketplace(): UseMarketplaceReturn {
         setIsProcessing(false);
       }
     },
-    [wallet, signPsbt, queryClient, listingService, mempoolClient],
+    [wallet, signPsbt, queryClient, listingService, charmsClient],
   );
 
   /**

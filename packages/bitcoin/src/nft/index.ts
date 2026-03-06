@@ -2,16 +2,10 @@
  * NFT Module
  *
  * Complete NFT minting and management for Genesis Babies.
+ *
+ * NOTE: For minting, use `useNFTMinting` from `@bitcoinbaby/core` which
+ * uses the correct Charms witness data format.
  */
-
-export {
-  NFTMintService,
-  createNFTMintService,
-  type MintServiceOptions,
-  type MintRequest,
-  type MintResult,
-  type PreviewResult,
-} from "./mint-service";
 
 // Re-export NFT types from charms
 export type {
