@@ -6,7 +6,7 @@
  * Success/error feedback after broadcast with txid link.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
 import { satsToBtc } from "@/utils/format";
 
@@ -34,18 +34,34 @@ export function SendConfirmation({
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">(
     "idle",
   );
+  // Track timeout for cleanup
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleCopyTxid = useCallback(async () => {
     if (!txid) return;
 
+    // Clear any existing timeout
+    if (copyTimeoutRef.current) {
+      clearTimeout(copyTimeoutRef.current);
+    }
+
     try {
       await navigator.clipboard.writeText(txid);
       setCopyStatus("copied");
-      setTimeout(() => setCopyStatus("idle"), 2000);
+      copyTimeoutRef.current = setTimeout(() => setCopyStatus("idle"), 2000);
     } catch (error) {
       console.error("Failed to copy TXID:", error);
       setCopyStatus("error");
-      setTimeout(() => setCopyStatus("idle"), 2000);
+      copyTimeoutRef.current = setTimeout(() => setCopyStatus("idle"), 2000);
     }
   }, [txid]);
 

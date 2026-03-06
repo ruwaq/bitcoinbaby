@@ -133,6 +133,17 @@ export function useVirtualBalance(
   // Debounce timer ref for sync events
   const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Mounted flag to prevent setState on unmounted component
+  const isMountedRef = useRef(true);
+
+  // Track mounted state to prevent setState on unmounted component
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Initialize Scrolls client
   useEffect(() => {
     scrollsClientRef.current = createScrollsClient({
@@ -202,6 +213,9 @@ export function useVirtualBalance(
   const refresh = useCallback(async (): Promise<void> => {
     if (!address) return;
 
+    // Check if still mounted before setState
+    if (!isMountedRef.current) return;
+
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
@@ -210,6 +224,9 @@ export function useVirtualBalance(
         fetchVirtualBalance(),
         fetchOnChainBalance(),
       ]);
+
+      // Check if still mounted after async operations
+      if (!isMountedRef.current) return;
 
       // Extract results - use null/0n if fetch failed
       const virtualResult = results[0];
@@ -261,6 +278,9 @@ export function useVirtualBalance(
         scrollsApiAvailable: onChainResult.status === "fulfilled",
       });
     } catch (error) {
+      // Check if still mounted after async operations
+      if (!isMountedRef.current) return;
+
       setState((prev) => ({
         ...prev,
         isLoading: false,
@@ -304,6 +324,11 @@ export function useVirtualBalance(
         };
 
         const response = await client.creditMining(address, apiProof);
+
+        // Check if still mounted after async operation
+        if (!isMountedRef.current) {
+          return { success: true, credited: response.data?.credited };
+        }
 
         if (response.success && response.data) {
           // Update local state optimistically

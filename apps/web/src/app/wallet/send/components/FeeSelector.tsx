@@ -117,9 +117,20 @@ export function FeeSelector({
     ];
   }, [feeEstimates]);
 
-  // Calculate total fee for each option
+  // Calculate total fee for each option with validation
   const calculateTotalFee = (feeRate: number): number => {
-    return Math.ceil(vsize * feeRate);
+    // Validate inputs to prevent NaN/Infinity
+    if (
+      !Number.isFinite(feeRate) ||
+      !Number.isFinite(vsize) ||
+      feeRate < 0 ||
+      vsize < 0
+    ) {
+      return 0;
+    }
+    const fee = Math.ceil(vsize * feeRate);
+    // Ensure result is also finite
+    return Number.isFinite(fee) ? fee : 0;
   };
 
   if (isLoading) {
@@ -265,30 +276,46 @@ export function FeeSelector({
   );
 }
 
+/** Default fee rates when estimates unavailable */
+const DEFAULT_FEE_RATES: Record<FeeLevel, number> = {
+  slow: 5,
+  medium: 10,
+  fast: 20,
+};
+
 /**
- * Get fee rate for a level from estimates
+ * Get fee rate for a level from estimates with validation
  */
 export function getFeeRateForLevel(
   level: FeeLevel,
   estimates: FeeEstimates | null,
 ): number {
+  const defaultRate = DEFAULT_FEE_RATES[level] ?? 10;
+
   if (!estimates) {
-    switch (level) {
-      case "slow":
-        return 5;
-      case "medium":
-        return 10;
-      case "fast":
-        return 20;
-    }
+    return defaultRate;
   }
 
+  let rate: number;
   switch (level) {
     case "slow":
-      return estimates.hourFee;
+      rate = estimates.hourFee;
+      break;
     case "medium":
-      return estimates.halfHourFee;
+      rate = estimates.halfHourFee;
+      break;
     case "fast":
-      return estimates.fastestFee;
+      rate = estimates.fastestFee;
+      break;
+    default:
+      rate = defaultRate;
   }
+
+  // Validate the rate - return default if invalid
+  if (!Number.isFinite(rate) || rate <= 0) {
+    console.warn(`[FeeSelector] Invalid fee rate for ${level}: ${rate}`);
+    return defaultRate;
+  }
+
+  return rate;
 }

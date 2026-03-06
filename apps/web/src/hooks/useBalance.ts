@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   MempoolClient,
   createMempoolClient,
@@ -8,7 +8,7 @@ import {
   type UTXO,
   type FeeEstimates,
   type BitcoinNetwork,
-} from '@bitcoinbaby/bitcoin';
+} from "@bitcoinbaby/bitcoin";
 
 interface BalanceState {
   balance: AddressBalance | null;
@@ -29,12 +29,15 @@ interface UseBalanceOptions {
 export function useBalance(options: UseBalanceOptions = {}) {
   const {
     address,
-    network = 'testnet4',
+    network = "testnet4",
     autoRefresh = false,
     refreshInterval = 30000,
   } = options;
 
   const clientRef = useRef<MempoolClient | null>(null);
+  // Track mounted state to prevent setState on unmounted component
+  const isMountedRef = useRef(true);
+
   const [state, setState] = useState<BalanceState>({
     balance: null,
     utxos: [],
@@ -43,6 +46,14 @@ export function useBalance(options: UseBalanceOptions = {}) {
     error: null,
     lastUpdated: null,
   });
+
+  // Track mounted state
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Initialize client
   useEffect(() => {
@@ -56,6 +67,9 @@ export function useBalance(options: UseBalanceOptions = {}) {
   const fetchBalance = useCallback(async () => {
     if (!address || !clientRef.current) return;
 
+    // Check if mounted before setState
+    if (!isMountedRef.current) return;
+
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
@@ -64,6 +78,9 @@ export function useBalance(options: UseBalanceOptions = {}) {
         clientRef.current.getUTXOs(address),
         clientRef.current.getFeeEstimates(),
       ]);
+
+      // Check if still mounted after async operation
+      if (!isMountedRef.current) return;
 
       setState({
         balance,
@@ -74,10 +91,13 @@ export function useBalance(options: UseBalanceOptions = {}) {
         lastUpdated: Date.now(),
       });
     } catch (err) {
+      // Check if still mounted after async operation
+      if (!isMountedRef.current) return;
+
       setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: err instanceof Error ? err.message : 'Failed to fetch balance',
+        error: err instanceof Error ? err.message : "Failed to fetch balance",
       }));
     }
   }, [address]);
@@ -100,7 +120,7 @@ export function useBalance(options: UseBalanceOptions = {}) {
   // Format balance as BTC
   const btcBalance = state.balance
     ? (state.balance.total / 100_000_000).toFixed(8)
-    : '0.00000000';
+    : "0.00000000";
 
   // Get confirmed vs unconfirmed
   const confirmed = state.balance?.confirmed ?? 0;

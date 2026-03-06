@@ -55,10 +55,19 @@ export function TransactionReview({
   const totalSatoshis = amountSatoshis + feeSatoshis;
 
   // Check if this is a large transaction (>50% of balance)
-  const isLargeTransaction = totalBalance && totalSatoshis > totalBalance * 0.5;
-  const percentageOfBalance = totalBalance
-    ? Math.round((totalSatoshis / totalBalance) * 100)
+  // Guard against division by zero and invalid values
+  const hasValidBalance = totalBalance && totalBalance > 0;
+  const isLargeTransaction =
+    hasValidBalance && totalSatoshis > totalBalance * 0.5;
+
+  // Calculate percentage with bounds checking (0-100%)
+  const rawPercentage = hasValidBalance
+    ? (totalSatoshis / totalBalance) * 100
     : 0;
+  const percentageOfBalance = Math.min(
+    100,
+    Math.max(0, Math.round(rawPercentage)),
+  );
 
   return (
     <div className="space-y-6">

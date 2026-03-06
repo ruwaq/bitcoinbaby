@@ -12,11 +12,17 @@
 /** Satoshis per Bitcoin (100 million) */
 export const SATOSHIS_PER_BTC = 100_000_000;
 
+/** Satoshis per Bitcoin as BigInt for precise calculations */
+export const SATOSHIS_PER_BTC_BIGINT = BigInt(SATOSHIS_PER_BTC);
+
 /** Minimum output value (dust threshold for P2TR) */
 export const DUST_THRESHOLD = 546;
 
 /** Token decimal places (same as sats) */
 export const TOKEN_DECIMALS = 8;
+
+/** Maximum safe integer for Number type */
+const MAX_SAFE_SATS = BigInt(Number.MAX_SAFE_INTEGER);
 
 // =============================================================================
 // BTC / SATOSHI FORMATTING
@@ -24,28 +30,107 @@ export const TOKEN_DECIMALS = 8;
 
 /**
  * Convert satoshis to BTC string with 8 decimal places
+ * Uses BigInt arithmetic to avoid floating point precision issues
  *
  * @example
  * satsToBtc(100000000) // "1.00000000"
  * satsToBtc(12345)     // "0.00012345"
+ * satsToBtc(BigInt("9007199254740993")) // "90071992.54740993" (handles large values)
  */
 export function satsToBtc(sats: number | bigint): string {
-  const value = typeof sats === "bigint" ? Number(sats) : sats;
-  return (value / SATOSHIS_PER_BTC).toFixed(8);
+  // Convert to BigInt for precise calculation
+  const satsBigInt = typeof sats === "bigint" ? sats : BigInt(Math.floor(sats));
+
+  // Handle negative values (shouldn't happen but be safe)
+  if (satsBigInt < 0n) return "0.00000000";
+
+  // Split into whole BTC and fractional sats
+  const wholeBtc = satsBigInt / SATOSHIS_PER_BTC_BIGINT;
+  const fractionalSats = satsBigInt % SATOSHIS_PER_BTC_BIGINT;
+
+  // Pad fractional part to 8 digits
+  const fractionalStr = fractionalSats.toString().padStart(8, "0");
+
+  return `${wholeBtc}.${fractionalStr}`;
 }
 
 /**
- * Convert BTC string to satoshis
+ * Convert BTC string to satoshis with precise decimal handling
+ * Avoids floating point errors by parsing decimals as integers
  *
  * @example
- * btcToSats("1.0")       // 100000000
+ * btcToSats("1.0")        // 100000000
  * btcToSats("0.00012345") // 12345
+ * btcToSats("0.00000001") // 1 (1 satoshi, precise)
+ * btcToSats("invalid")    // 0
  */
 export function btcToSats(btcString: string): number {
-  const cleaned = btcString.replace(/[^\d.]/g, "");
-  const btc = parseFloat(cleaned);
-  if (isNaN(btc)) return 0;
-  return Math.round(btc * SATOSHIS_PER_BTC);
+  if (!btcString || typeof btcString !== "string") return 0;
+
+  // Clean input: remove non-numeric except decimal point
+  const cleaned = btcString.trim().replace(/[^\d.]/g, "");
+  if (!cleaned || cleaned === ".") return 0;
+
+  // Split by decimal point
+  const parts = cleaned.split(".");
+
+  // Handle multiple decimal points
+  if (parts.length > 2) return 0;
+
+  const wholePart = parts[0] || "0";
+  let fractionalPart = parts[1] || "";
+
+  // Validate parts are numeric
+  if (!/^\d*$/.test(wholePart) || !/^\d*$/.test(fractionalPart)) return 0;
+
+  // Pad or truncate fractional part to exactly 8 digits
+  fractionalPart = fractionalPart.padEnd(8, "0").slice(0, 8);
+
+  // Combine as integer string and parse
+  const satsString = wholePart + fractionalPart;
+
+  // Remove leading zeros and parse
+  const sats = parseInt(satsString, 10);
+
+  // Validate result
+  if (!Number.isFinite(sats) || sats < 0) return 0;
+
+  // Check for overflow (shouldn't happen with BTC amounts but be safe)
+  if (sats > Number.MAX_SAFE_INTEGER) {
+    console.warn("[btcToSats] Value exceeds safe integer range:", btcString);
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  return sats;
+}
+
+/**
+ * Convert BTC string to satoshis as BigInt (for large values)
+ *
+ * @example
+ * btcToSatsBigInt("21000000") // 2100000000000000n (all BTC ever)
+ */
+export function btcToSatsBigInt(btcString: string): bigint {
+  if (!btcString || typeof btcString !== "string") return 0n;
+
+  const cleaned = btcString.trim().replace(/[^\d.]/g, "");
+  if (!cleaned || cleaned === ".") return 0n;
+
+  const parts = cleaned.split(".");
+  if (parts.length > 2) return 0n;
+
+  const wholePart = parts[0] || "0";
+  let fractionalPart = parts[1] || "";
+
+  if (!/^\d*$/.test(wholePart) || !/^\d*$/.test(fractionalPart)) return 0n;
+
+  fractionalPart = fractionalPart.padEnd(8, "0").slice(0, 8);
+
+  try {
+    return BigInt(wholePart + fractionalPart);
+  } catch {
+    return 0n;
+  }
 }
 
 /**

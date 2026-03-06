@@ -267,7 +267,10 @@ export function WithdrawPoolCard({
               )}
             </ul>
             <p className="mt-2 text-gray-400">
-              Total in pool: {BigInt(poolInfo.totalAmount).toLocaleString()}{" "}
+              Total in pool:{" "}
+              {(
+                safeParseBigInt(String(poolInfo.totalAmount)) ?? 0n
+              ).toLocaleString()}{" "}
               tokens
             </p>
           </div>
