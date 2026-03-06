@@ -273,6 +273,57 @@ nftRouter.post("/reserve", async (c) => {
 // =============================================================================
 
 /**
+ * POST /api/nft/release/:tokenId - Release a reserved NFT ID (if mint failed)
+ *
+ * This endpoint is called when a mint fails after reserving an ID.
+ * It decrements the counter only if the tokenId is the current max.
+ * This prevents "lost" token IDs from failed mints.
+ */
+nftRouter.post(
+  "/release/:tokenId",
+  validateParams(tokenIdParamSchema),
+  async (c) => {
+    const { tokenId } = c.get("validatedParams");
+
+    try {
+      const redis = getRedis(c.env);
+
+      // Get current count
+      const currentCount = await redis.get<number>("nft:minted:count");
+
+      // Only decrement if this is the last reserved ID and it's not confirmed
+      if (currentCount === tokenId) {
+        // Check if this ID was already confirmed (has NFT data)
+        const nftData = await redis.hgetall(`nft:minted:${tokenId}`);
+        if (nftData && Object.keys(nftData).length > 0) {
+          // Already confirmed, don't release
+          return successResponse(c, {
+            released: false,
+            reason: "already_confirmed",
+          });
+        }
+
+        // Safe to release - decrement counter
+        await redis.decr("nft:minted:count");
+        nftLogger.info("Released token ID", { tokenId });
+        return successResponse(c, { released: true });
+      }
+
+      // Not the last ID - can't release safely (would create gaps)
+      // This is OK - gaps are acceptable, we just try to avoid them
+      nftLogger.info("Cannot release token ID (not last)", {
+        tokenId,
+        currentCount,
+      });
+      return successResponse(c, { released: false, reason: "not_last_id" });
+    } catch (error) {
+      nftLogger.error("[NFT] Release error:", error);
+      return errorResponse(c, "Failed to release NFT ID", 500);
+    }
+  },
+);
+
+/**
  * POST /api/nft/confirm/:tokenId - Confirm NFT was minted successfully
  */
 nftRouter.post(

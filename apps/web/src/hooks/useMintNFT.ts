@@ -2,23 +2,28 @@
  * useMintNFT Hook
  *
  * NFT minting hook for testnet4 production.
+ * Uses useNFTMinting from core for correct Charms protocol integration.
  * Requires connected wallet - no demo mode.
  */
 
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
-  createNFTMintService,
-  createMempoolClient,
-  Psbt,
-  type BabyNFTState,
-} from "@bitcoinbaby/bitcoin";
-import {
+  useNFTMinting,
   useWalletStore,
   usePendingTxStore,
   getApiClient,
 } from "@bitcoinbaby/core";
+import {
+  Psbt,
+  createMempoolClient,
+  GENESIS_BABIES_TESTNET4,
+  BABTC_TESTNET4,
+  type BabyNFTState,
+  type Bloodline,
+  type BaseType,
+} from "@bitcoinbaby/bitcoin";
 
 // =============================================================================
 // TYPES
@@ -45,6 +50,27 @@ export interface UseMintNFTReturn {
 }
 
 // =============================================================================
+// BLOODLINE HELPERS
+// =============================================================================
+
+const BLOODLINES: Bloodline[] = ["royal", "warrior", "rogue", "mystic"];
+const BASE_TYPES: BaseType[] = ["human", "animal", "robot", "mystic", "alien"];
+
+function rollBloodline(dna: string): Bloodline {
+  const roll = parseInt(dna.substring(4, 6), 16) % 4;
+  return BLOODLINES[roll];
+}
+
+function rollBaseType(dna: string): BaseType {
+  const roll = parseInt(dna.substring(6, 10), 16) % 100;
+  if (roll < 1) return "alien"; // 1%
+  if (roll < 6) return "robot"; // 5%
+  if (roll < 15) return "mystic"; // 9%
+  if (roll < 30) return "animal"; // 15%
+  return "human"; // 70%
+}
+
+// =============================================================================
 // HOOK
 // =============================================================================
 
@@ -63,16 +89,22 @@ export function useMintNFT(): UseMintNFTReturn {
   const addTransaction = usePendingTxStore((s) => s.addTransaction);
   const startTracking = usePendingTxStore((s) => s.startTracking);
 
-  // Services - testnet4 production
-  const mintService = useMemo(
-    () => createNFTMintService({ network: "testnet4" }),
-    [],
-  );
-
+  // Mempool client for broadcasting
   const mempoolClient = useMemo(
     () => createMempoolClient({ network: "testnet4" }),
     [],
   );
+
+  // Core NFT minting hook (uses correct Charms witness data)
+  const nftMinting = useNFTMinting({
+    network: "testnet4",
+    ownerAddress: wallet?.address ?? "",
+    ownerPublicKey: wallet?.publicKey ?? "",
+    nftAppId: GENESIS_BABIES_TESTNET4.appId,
+    nftAppVk: GENESIS_BABIES_TESTNET4.appVk,
+    tokenAppId: BABTC_TESTNET4.appId,
+    tokenAppVk: BABTC_TESTNET4.appVk,
+  });
 
   // Wallet connection check
   const isWalletConnected = Boolean(wallet?.address && signPsbt);
@@ -98,7 +130,6 @@ export function useMintNFT(): UseMintNFTReturn {
 
     try {
       // Reserve next NFT ID from server (atomic counter)
-      // Uses centralized API client for proper environment handling
       const reserveResult = await apiClient.reserveNFT();
 
       if (!reserveResult.success || !reserveResult.data) {
@@ -113,37 +144,33 @@ export function useMintNFT(): UseMintNFTReturn {
         `[MintNFT] Reserved token ID: ${reservedTokenId} (total minted: ${reserveResult.data.totalMinted})`,
       );
 
-      // Set the minted count so the service creates the correct tokenId
-      mintService.setMintedCount(reservedTokenId - 1);
+      // Generate NFT traits
+      const dna = await nftMinting.generateDNA();
+      const bloodline = rollBloodline(dna);
+      const baseType = rollBaseType(dna);
+      const rarityTier = nftMinting.rollRarity();
 
-      // Get UTXOs for the transaction
-      const utxos = await mempoolClient.getUTXOs(wallet.address);
-
-      if (!utxos || utxos.length === 0) {
-        throw new Error(
-          "No tBTC available. Get testnet coins from the faucet first.",
-        );
-      }
-
-      // Create mint transaction
-      const mintResult = await mintService.createMintPSBT({
-        buyerAddress: wallet.address,
-        utxos,
-        feeRate: 10,
+      // Create PSBT using core hook (uses witness data, not OP_RETURN)
+      const mintResult = await nftMinting.mintGenesis({
+        tokenId: reservedTokenId,
+        dna,
+        bloodline,
+        baseType,
+        rarityTier,
       });
 
-      if (!mintResult.success || !mintResult.psbtHex) {
+      if (!mintResult.success || !mintResult.psbt) {
         throw new Error(mintResult.error || "Failed to create transaction");
       }
 
       // Sign PSBT with wallet
-      const signedPsbtHex = await signPsbt(mintResult.psbtHex);
+      const signedPsbtHex = await signPsbt(mintResult.psbt);
       if (!signedPsbtHex) {
         throw new Error("Transaction was cancelled or failed to sign");
       }
 
       // Extract raw transaction from finalized PSBT
-      const signedPsbt = Psbt.fromHex(signedPsbtHex);
+      const signedPsbt = Psbt.fromBase64(signedPsbtHex);
       const rawTxHex = signedPsbt.extractTransaction().toHex();
 
       // Broadcast to network
@@ -157,22 +184,21 @@ export function useMintNFT(): UseMintNFTReturn {
       addTransaction(
         broadcastTxid,
         "nft_mint",
-        `Genesis Baby #${mintResult.nft?.tokenId ?? "?"} mint`,
+        `Genesis Baby #${mintResult.nftState?.tokenId ?? "?"} mint`,
       );
 
       // Confirm the mint with server (non-blocking)
-      // Send full NFT data for server-side indexing
-      const nftData = mintResult.nft
+      const nftData = mintResult.nftState
         ? {
-            dna: mintResult.nft.dna,
-            bloodline: mintResult.nft.bloodline,
-            baseType: mintResult.nft.baseType,
-            rarityTier: mintResult.nft.rarityTier,
-            level: mintResult.nft.level,
-            xp: mintResult.nft.xp,
-            totalXp: mintResult.nft.totalXp,
-            workCount: mintResult.nft.workCount,
-            evolutionCount: mintResult.nft.evolutionCount,
+            dna: mintResult.nftState.dna,
+            bloodline: mintResult.nftState.bloodline,
+            baseType: mintResult.nftState.baseType,
+            rarityTier: mintResult.nftState.rarityTier,
+            level: mintResult.nftState.level,
+            xp: mintResult.nftState.xp,
+            totalXp: mintResult.nftState.totalXp,
+            workCount: mintResult.nftState.workCount,
+            evolutionCount: mintResult.nftState.evolutionCount,
           }
         : undefined;
 
@@ -183,10 +209,10 @@ export function useMintNFT(): UseMintNFTReturn {
       // Clear reservedTokenId on success (no cleanup needed)
       reservedTokenId = null;
 
-      setLastMinted(mintResult.nft!);
+      setLastMinted(mintResult.nftState!);
       setTxid(broadcastTxid);
 
-      return { success: true, nft: mintResult.nft, txid: broadcastTxid };
+      return { success: true, nft: mintResult.nftState, txid: broadcastTxid };
     } catch (err) {
       const message = err instanceof Error ? err.message : "Mint failed";
       setError(message);
@@ -213,7 +239,7 @@ export function useMintNFT(): UseMintNFTReturn {
   }, [
     wallet,
     signPsbt,
-    mintService,
+    nftMinting,
     mempoolClient,
     addTransaction,
     startTracking,

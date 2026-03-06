@@ -1,6 +1,10 @@
 /**
  * NFT Mint Service
  *
+ * @deprecated This service uses OP_RETURN for spell data which is limited to 80 bytes.
+ * NFT spells exceed this limit. Use `useNFTMinting` from `@bitcoinbaby/core` instead,
+ * which uses witness data (like inscriptions) for the spell.
+ *
  * Complete service for minting Genesis Babies NFTs.
  * Handles PSBT creation, spell encoding, and transaction building.
  *
@@ -55,6 +59,8 @@ export interface MintServiceOptions {
 export interface MintRequest {
   /** Buyer's address */
   buyerAddress: string;
+  /** Buyer's public key (hex, required for P2TR signing) */
+  buyerPublicKey?: string;
   /** Buyer's UTXOs for payment */
   utxos: UTXO[];
   /** Optional: specific DNA (otherwise random) */
@@ -192,16 +198,54 @@ export class NFTMintService {
       // Create PSBT
       const psbt = new bitcoin.Psbt({ network: this.network });
 
+      // Check if P2TR address (Taproot)
+      const isP2TR =
+        request.buyerAddress.startsWith("bc1p") ||
+        request.buyerAddress.startsWith("tb1p");
+
+      // Derive tapInternalKey for P2TR
+      let tapInternalKey: Buffer | undefined;
+      if (isP2TR && request.buyerPublicKey) {
+        // Convert hex public key to x-only (32 bytes)
+        // Public key can be 33 bytes (compressed) or 65 bytes (uncompressed)
+        const pubKeyHex = request.buyerPublicKey;
+        const pubKeyBytes = hexToBytes(pubKeyHex);
+
+        if (pubKeyBytes.length === 33) {
+          // Compressed: remove prefix byte (02 or 03), take x-coordinate
+          tapInternalKey = Buffer.from(pubKeyBytes.slice(1));
+        } else if (pubKeyBytes.length === 32) {
+          // Already x-only
+          tapInternalKey = Buffer.from(pubKeyBytes);
+        } else if (pubKeyBytes.length === 65) {
+          // Uncompressed: skip prefix (04), take first 32 bytes (x-coordinate)
+          tapInternalKey = Buffer.from(pubKeyBytes.slice(1, 33));
+        }
+      }
+
       // Add inputs
       for (const utxo of request.utxos) {
-        psbt.addInput({
+        // Build input data with optional tapInternalKey for P2TR
+        const inputData: {
+          hash: string;
+          index: number;
+          witnessUtxo: { script: Buffer; value: number };
+          tapInternalKey?: Buffer;
+        } = {
           hash: utxo.txid,
           index: utxo.vout,
           witnessUtxo: {
             script: this.addressToScript(request.buyerAddress),
             value: Number(utxo.value),
           },
-        });
+        };
+
+        // Add tapInternalKey for P2TR addresses
+        if (isP2TR && tapInternalKey) {
+          inputData.tapInternalKey = tapInternalKey;
+        }
+
+        psbt.addInput(inputData);
       }
 
       // Output 0: Payment to treasury
