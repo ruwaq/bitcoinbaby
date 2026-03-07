@@ -86,24 +86,27 @@ export function RewardInfoPanel({
 
   return (
     <div className={`bg-pixel-bg-medium ${pixelBorders.medium} p-3`}>
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between"
-      >
+      {/* Header row - button and tooltip side by side to avoid nesting */}
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="font-pixel text-pixel-2xs text-pixel-primary uppercase">
-            Reward Info
-          </span>
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-2"
+          >
+            <span className="font-pixel text-pixel-2xs text-pixel-primary uppercase">
+              Reward Info
+            </span>
+            <span className="font-pixel text-pixel-2xs text-pixel-text-muted">
+              {expanded ? "▲" : "▼"}
+            </span>
+          </button>
           <HelpTooltip
             content="Rewards are based on mining difficulty (leading zeros). Harder work = more reward. No halving schedule."
             title="BRO-style Rewards"
             size="sm"
           />
         </div>
-        <span className="font-pixel text-pixel-2xs text-pixel-text-muted">
-          {expanded ? "▲" : "▼"}
-        </span>
-      </button>
+      </div>
 
       {/* Summary row - always visible */}
       <div className="flex items-center justify-between mt-2 text-pixel-xs">

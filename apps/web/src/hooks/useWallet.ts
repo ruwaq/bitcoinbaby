@@ -66,7 +66,7 @@ function setWalletSingleton(wallet: BitcoinWallet, info: WalletInfo): void {
 }
 
 /**
- * Clear wallet singleton (called when locking)
+ * Clear wallet singleton completely (called when deleting wallet)
  */
 function clearWalletSingleton(): void {
   if (walletSingleton.instance) {
@@ -77,10 +77,39 @@ function clearWalletSingleton(): void {
 }
 
 /**
+ * Clear wallet instance but keep info (called when locking)
+ * This allows the wallet to be unlocked again without losing address info
+ */
+function lockWalletSingleton(): void {
+  if (walletSingleton.instance) {
+    walletSingleton.instance.clear();
+  }
+  walletSingleton.instance = null;
+  // Keep walletSingleton.info so we can show "locked" state with address
+}
+
+/**
  * Get wallet from singleton (called on component mount)
  */
 function getWalletSingleton(): WalletSingleton {
   return walletSingleton;
+}
+
+/**
+ * Check if wallet singleton has wallet info (for external sync)
+ * Returns true if we have wallet info (even if locked - instance may be null)
+ * This allows other components to check if wallet should be shown as connected
+ */
+export function isWalletSingletonActive(): boolean {
+  return walletSingleton.info !== null;
+}
+
+/**
+ * Get wallet info from singleton (for sync purposes)
+ * Returns null if no wallet is active
+ */
+export function getWalletSingletonInfo(): WalletInfo | null {
+  return walletSingleton.info;
 }
 
 /**
@@ -177,6 +206,7 @@ export function useWallet(): UseWalletReturn {
   const {
     setWallet: setStoreWallet,
     disconnect: disconnectStore,
+    setLocked: setStoreLocked,
     setSigningFunctions: storeSetSigningFunctions,
   } = useWalletStore();
 
@@ -236,6 +266,8 @@ export function useWallet(): UseWalletReturn {
 
         // Check if wallet singleton has a valid wallet (survives component remount)
         const singleton = getWalletSingleton();
+
+        // Case 1: Full wallet in singleton (unlocked, navigated between tabs)
         if (singleton.instance && singleton.info) {
           // Restore walletRef from singleton
           walletRef.current = singleton.instance;
@@ -257,6 +289,28 @@ export function useWallet(): UseWalletReturn {
           // Re-setup signing functions
           setupSigningFunctions();
           // Mark as initialized AFTER restore
+          isInitializedRef.current = true;
+          return;
+        }
+
+        // Case 2: Only info in singleton (was locked, navigated between tabs)
+        // Show as connected but locked so user can see their address
+        if (singleton.info && metadata.exists) {
+          setState({
+            wallet: singleton.info,
+            isLoaded: true,
+            hasStoredWallet: true,
+            metadata,
+            isLoading: false,
+            error: null,
+            isLocked: true,
+          });
+
+          // Sync to store as connected but locked
+          setStoreWallet(toStoreWalletInfo(singleton.info));
+          setStoreLocked(true);
+
+          // Mark as initialized
           isInitializedRef.current = true;
           return;
         }
@@ -481,33 +535,57 @@ export function useWallet(): UseWalletReturn {
   );
 
   /**
-   * Lock wallet (clear from memory)
+   * Lock wallet (clear private keys from memory, keep address info)
+   *
+   * This performs a "soft lock" that:
+   * 1. Clears private key material from memory (security)
+   * 2. Keeps wallet address/pubkey in store (UX - shows locked state)
+   * 3. Marks wallet as locked (requires password to unlock)
+   * 4. KEEPS singleton info so unlock can work on remount
+   *
+   * For full disconnect (clear everything), use disconnect() instead.
    */
   const lock = useCallback((): void => {
-    // Clear wallet instance and singleton
+    // Clear wallet instance (contains private keys) but keep address info
+    if (walletRef.current) {
+      walletRef.current.clear();
+    }
     walletRef.current = null;
-    clearWalletSingleton();
+
+    // Clear instance from singleton but keep info for display
+    lockWalletSingleton();
 
     setState((prev) => ({
       ...prev,
-      wallet: null,
-      isLoaded: false,
+      // Keep wallet info for display but mark as locked
       isLocked: true,
     }));
 
-    // Update global store
-    disconnectStore();
-  }, [disconnectStore]);
+    // Soft lock in store - just mark as locked, don't disconnect
+    // This keeps the wallet address visible and shows "Wallet Locked" state
+    setStoreLocked(true);
+  }, [setStoreLocked]);
 
   /**
    * Delete wallet from storage
+   * This performs a FULL cleanup unlike lock() which keeps address info
    */
   const deleteWallet = useCallback(async (): Promise<void> => {
-    // First lock the wallet
-    lock();
+    // Clear wallet instance
+    if (walletRef.current) {
+      walletRef.current.clear();
+    }
+    walletRef.current = null;
+
+    // CRITICAL: Clear singleton completely (not just lock)
+    // This prevents AppInitializer from re-syncing the deleted wallet
+    clearWalletSingleton();
 
     // Clear secure storage
     await SecureStorage.clear();
+
+    // Disconnect from global store completely
+    disconnectStore();
 
     setState({
       wallet: null,
@@ -518,7 +596,7 @@ export function useWallet(): UseWalletReturn {
       error: null,
       isLocked: true,
     });
-  }, [lock]);
+  }, [disconnectStore]);
 
   /**
    * Change wallet password
