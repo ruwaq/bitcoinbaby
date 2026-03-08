@@ -5,6 +5,9 @@
  * All packages should import network types and utilities from here.
  */
 
+// Safe process.env access that works in all environments
+declare const process: { env?: Record<string, string | undefined> } | undefined;
+
 // =============================================================================
 // NETWORK TYPES
 // =============================================================================
@@ -82,10 +85,12 @@ export function normalizeNetwork(network: BitcoinNetwork): SupportedNetwork {
     case "testnet4":
     case "regtest":
       return "testnet4";
-    default:
+    default: {
       // Type guard for exhaustiveness
       const _exhaustive: never = network;
+      void _exhaustive;
       return "testnet4";
+    }
   }
 }
 
@@ -185,7 +190,7 @@ export const DEFAULT_NETWORK: SupportedNetwork = "testnet4";
 export function getDefaultNetwork(): SupportedNetwork {
   // Check environment variable
   const envNetwork =
-    typeof process !== "undefined"
+    typeof process !== "undefined" && process?.env
       ? process.env.NEXT_PUBLIC_NETWORK || process.env.BITCOIN_NETWORK
       : undefined;
 

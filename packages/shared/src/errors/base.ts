@@ -49,8 +49,11 @@ export abstract class AppError extends Error {
     this.metadata = options?.metadata ?? {};
 
     // Maintain proper stack trace in V8
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, this.constructor);
+    const ErrorWithStackCapture = Error as typeof Error & {
+      captureStackTrace?: (target: object, constructor: unknown) => void;
+    };
+    if (typeof ErrorWithStackCapture.captureStackTrace === "function") {
+      ErrorWithStackCapture.captureStackTrace(this, this.constructor);
     }
   }
 

@@ -9,6 +9,18 @@
  * - Subscription helpers
  */
 
+// Safe globals for cross-environment compatibility
+declare const process: { env?: Record<string, string | undefined> } | undefined;
+
+// Storage interface for cross-environment compatibility
+interface StorageLike {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+declare const window: { localStorage?: StorageLike } | undefined;
+
 import { create, type StateCreator, type StoreApi } from "zustand";
 import {
   persist,
@@ -151,12 +163,15 @@ export function createStore<
   options: CreateStoreOptions<TState>,
   initializer: StoreInitializer<TState, TActions>,
 ) {
+  const isDev =
+    typeof process !== "undefined" && process?.env?.NODE_ENV === "development";
+
   const {
     name,
     version,
     persist: enablePersist = false,
-    devtools: enableDevtools = process.env.NODE_ENV === "development",
-    logging: enableLogging = process.env.NODE_ENV === "development",
+    devtools: enableDevtools = isDev,
+    logging: enableLogging = isDev,
     migrate,
     partialize,
   } = options;
@@ -182,7 +197,7 @@ export function createStore<
       version,
       storage: createJSONStorage(() => {
         // Safe localStorage access for SSR
-        if (typeof window !== "undefined") {
+        if (typeof window !== "undefined" && window?.localStorage) {
           return window.localStorage;
         }
         return {
@@ -254,7 +269,7 @@ export function createPersistedStore<T extends object>(
     persist(() => initialState, {
       name: `bitcoinbaby-${name}`,
       storage: createJSONStorage(() => {
-        if (typeof window !== "undefined") {
+        if (typeof window !== "undefined" && window?.localStorage) {
           return window.localStorage;
         }
         return {

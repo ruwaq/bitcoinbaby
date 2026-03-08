@@ -11,25 +11,23 @@
 
 /**
  * SHA-256 returning raw bytes
- * Works in both browser (crypto.subtle) and Node.js (crypto) environments
+ * Uses Web Crypto API (supported in browsers, Cloudflare Workers, and Node.js 15+)
  */
 async function sha256Bytes(data: BufferSource): Promise<Uint8Array> {
-  // Browser environment
+  // Web Crypto API is available in:
+  // - All modern browsers
+  // - Cloudflare Workers
+  // - Node.js 15+ (globalThis.crypto)
+  // - Deno
   if (typeof crypto !== "undefined" && crypto.subtle) {
     const hashBuffer = await crypto.subtle.digest("SHA-256", data);
     return new Uint8Array(hashBuffer);
   }
 
-  // Node.js environment (for workers/server)
-  const nodeCrypto = await import("crypto");
-  const buffer =
-    data instanceof Uint8Array
-      ? data
-      : data instanceof ArrayBuffer
-        ? new Uint8Array(data)
-        : new Uint8Array((data as ArrayBufferView).buffer);
-  const hash = nodeCrypto.createHash("sha256").update(buffer).digest();
-  return new Uint8Array(hash);
+  // Fallback error for environments without Web Crypto
+  throw new Error(
+    "Web Crypto API not available. Please use a modern browser, Node.js 15+, or Cloudflare Workers.",
+  );
 }
 
 /**

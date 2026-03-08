@@ -2,16 +2,26 @@
  * Zod Validation Schemas
  *
  * Centralized validation schemas for all Bitcoin-related types.
+ *
+ * NOTE: These schemas use regex patterns for basic format validation.
+ * For cryptographically correct validation (checksum verification, network
+ * matching), use `validateAddress` from @bitcoinbaby/bitcoin which uses
+ * bitcoinjs-lib's `address.toOutputScript()`.
+ *
+ * @see packages/bitcoin/src/validation.ts for canonical address validation
  */
 
 import { z } from "zod";
 
 // =============================================================================
 // BITCOIN ADDRESS SCHEMAS
+// (For format validation only - use @bitcoinbaby/bitcoin for crypto validation)
 // =============================================================================
 
 /**
  * Bitcoin mainnet address (P2WPKH, P2TR, P2PKH, P2SH)
+ * NOTE: Regex-based, does not verify checksum. Use @bitcoinbaby/bitcoin for
+ * transaction building.
  */
 export const mainnetAddressSchema = z.string().refine(
   (addr) => {
