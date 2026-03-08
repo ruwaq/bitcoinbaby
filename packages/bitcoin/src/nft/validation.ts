@@ -5,14 +5,12 @@
  * All validations are performed before any transaction is created.
  */
 
-import * as bitcoin from "bitcoinjs-lib";
-import * as ecc from "tiny-secp256k1";
 import type { UTXO } from "../blockchain/types";
 import type { BitcoinNetwork } from "../types";
 import { NFT_SALE_CONFIG } from "../charms/nft-sale";
 
-// Initialize ECC for taproot address validation
-bitcoin.initEccLib(ecc);
+// Import canonical address validation from parent module
+import { validateAddress as baseValidateAddress } from "../validation";
 
 // =============================================================================
 // TYPES
@@ -33,72 +31,22 @@ export interface MintValidationParams {
 }
 
 // =============================================================================
-// NETWORK CONFIG
-// =============================================================================
-
-const NETWORKS: Record<BitcoinNetwork, bitcoin.Network> = {
-  mainnet: bitcoin.networks.bitcoin,
-  testnet: bitcoin.networks.testnet,
-  testnet4: bitcoin.networks.testnet,
-  regtest: bitcoin.networks.regtest,
-};
-
-// =============================================================================
-// ADDRESS VALIDATION
+// ADDRESS VALIDATION (Delegated to canonical validator)
 // =============================================================================
 
 /**
  * Validate a Bitcoin address for the given network
+ * @see ../validation.ts for canonical implementation
  */
 export function validateAddress(
   address: string,
   network: BitcoinNetwork,
 ): ValidationResult {
-  if (!address || typeof address !== "string") {
-    return { valid: false, error: "Address is required" };
-  }
-
-  // Trim whitespace
-  const trimmed = address.trim();
-
-  // Basic length check
-  if (trimmed.length < 26 || trimmed.length > 90) {
-    return { valid: false, error: "Invalid address length" };
-  }
-
-  // Network prefix validation
-  const isMainnet = network === "mainnet";
-  const isTestnet =
-    network === "testnet" || network === "testnet4" || network === "regtest";
-
-  // Check address prefix matches network
-  if (isMainnet) {
-    if (
-      !trimmed.startsWith("bc1") &&
-      !trimmed.startsWith("1") &&
-      !trimmed.startsWith("3")
-    ) {
-      return { valid: false, error: "Address does not match mainnet format" };
-    }
-  } else if (isTestnet) {
-    if (
-      !trimmed.startsWith("tb1") &&
-      !trimmed.startsWith("m") &&
-      !trimmed.startsWith("n") &&
-      !trimmed.startsWith("2") &&
-      !trimmed.startsWith("bcrt1")
-    ) {
-      return { valid: false, error: "Address does not match testnet format" };
-    }
-  }
-
-  // Validate using bitcoinjs-lib
-  try {
-    bitcoin.address.toOutputScript(trimmed, NETWORKS[network]);
-    return { valid: true };
-  } catch {
-    return { valid: false, error: "Invalid Bitcoin address format" };
-  }
+  const result = baseValidateAddress(address, network);
+  return {
+    valid: result.valid,
+    error: result.error,
+  };
 }
 
 // =============================================================================

@@ -5,11 +5,21 @@
  * Siguiendo patrones de Charms wallet.
  */
 
+import {
+  type WalletInfo as SharedWalletInfo,
+  type WalletOptions as SharedWalletOptions,
+  type InternalWallet as SharedInternalWallet,
+  type AddressType,
+} from "@bitcoinbaby/shared";
+
+// Re-export shared types
+export type { AddressType } from "@bitcoinbaby/shared";
+
 // =============================================================================
-// NETWORKS (Single Source of Truth)
+// NETWORKS (Extended for Bitcoin module)
 // =============================================================================
 
-/** All supported Bitcoin networks */
+/** All supported Bitcoin networks (includes regtest for local dev) */
 export type BitcoinNetwork = "mainnet" | "testnet" | "testnet4" | "regtest";
 
 /** Networks supported in production (subset) */
@@ -44,27 +54,34 @@ export const NETWORK_ENDPOINTS: Record<SupportedNetwork, NetworkEndpoints> = {
   },
 };
 
-// Wallet public info (safe to expose)
-export interface WalletInfo {
-  address: string;
-  publicKey: string;
+// =============================================================================
+// WALLET TYPES (Extended from @bitcoinbaby/shared)
+// =============================================================================
+
+/**
+ * Bitcoin wallet info with full metadata
+ * Extends SharedWalletInfo with required blockchain fields
+ */
+export interface WalletInfo extends SharedWalletInfo {
   network: BitcoinNetwork;
   derivationPath: string;
-  addressType: "taproot" | "segwit" | "legacy";
+  addressType: AddressType;
 }
 
-// Internal wallet with sensitive data
+/**
+ * Internal wallet with sensitive data
+ * NEVER log, expose to UI, or transmit over network
+ */
 export interface InternalWallet extends WalletInfo {
   privateKey: Uint8Array;
   mnemonic?: string;
 }
 
-// Wallet creation options
-export interface WalletOptions {
+/**
+ * Wallet creation/import options
+ */
+export interface WalletOptions extends SharedWalletOptions {
   network?: BitcoinNetwork;
-  mnemonic?: string;
-  addressIndex?: number;
-  addressType?: "taproot" | "segwit" | "legacy";
 }
 
 // Transaction types

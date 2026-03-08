@@ -36,7 +36,7 @@ describe("NFT Validation", () => {
     it("should reject empty address", () => {
       const result = validateAddress("", "testnet4");
       expect(result.valid).toBe(false);
-      expect(result.error).toContain("required");
+      expect(result.error).toContain("too short");
     });
 
     it("should reject mainnet address on testnet", () => {

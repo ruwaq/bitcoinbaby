@@ -11,22 +11,30 @@
  * 4. Run E2E tests to verify
  */
 
-import type { ScrollsNetwork } from "../scrolls/types";
-import type { BitcoinNetwork } from "../types";
+import {
+  NETWORK_ENDPOINTS,
+  toScrollsNetwork as sharedToScrollsNetwork,
+  MIN_DIFFICULTY,
+  type BitcoinNetwork,
+  type ScrollsNetwork,
+} from "@bitcoinbaby/shared";
 
 // =============================================================================
-// NETWORK ENDPOINTS
+// NETWORK ENDPOINTS (re-exported from shared for convenience)
 // =============================================================================
 
+/**
+ * @deprecated Use NETWORK_ENDPOINTS from @bitcoinbaby/shared instead
+ */
 export const TESTNET4_ENDPOINTS = {
   /** Mempool.space API for testnet4 */
-  mempool: "https://mempool.space/testnet4/api",
+  mempool: NETWORK_ENDPOINTS.testnet4.mempoolApi,
 
   /** Block explorer URL */
-  explorer: "https://mempool.space/testnet4",
+  explorer: NETWORK_ENDPOINTS.testnet4.explorerUrl,
 
   /** Scrolls API for Charms indexing */
-  scrolls: "https://scrolls.charms.dev",
+  scrolls: NETWORK_ENDPOINTS.testnet4.scrollsApi,
 
   /** Charms Explorer */
   charmsExplorer: "https://explorer.charms.dev",
@@ -173,8 +181,8 @@ export function isGenesisBabiesConfigured(): boolean {
 // =============================================================================
 
 export const MINING_CONFIG_TESTNET4 = {
-  /** Minimum PoW difficulty (leading zero bits) */
-  minDifficulty: 16,
+  /** Minimum PoW difficulty (leading zero bits) - from shared */
+  minDifficulty: MIN_DIFFICULTY,
 
   /** Target share time in seconds */
   targetShareTime: 60,
@@ -190,25 +198,14 @@ export const MINING_CONFIG_TESTNET4 = {
 } as const;
 
 // =============================================================================
-// NETWORK HELPERS
+// NETWORK HELPERS (re-exported from shared)
 // =============================================================================
 
 /**
  * Get Scrolls network name from Bitcoin network
+ * @deprecated Use toScrollsNetwork from @bitcoinbaby/shared
  */
-export function toScrollsNetwork(network: BitcoinNetwork): ScrollsNetwork {
-  switch (network) {
-    case "mainnet":
-      return "main";
-    case "testnet":
-    case "testnet4":
-      return "testnet4";
-    case "regtest":
-      return "testnet4"; // No regtest in Scrolls, use testnet4
-    default:
-      return "testnet4";
-  }
-}
+export const toScrollsNetwork = sharedToScrollsNetwork;
 
 /**
  * Get Bitcoin network from Scrolls network
