@@ -7,6 +7,9 @@
 
 import type { Miner, MiningResult } from "./types";
 import { getNavigator } from "./capabilities";
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("WebGPUMiner");
 
 // Workgroup sizes to try, in preference order
 const WORKGROUP_SIZES = [256, 128, 64] as const;
@@ -60,8 +63,10 @@ export class WebGPUMiner implements Miner {
   private lastStatsUpdate = Date.now();
 
   // Recovery state (prevents infinite crash loops)
-  private recoveryAttempts = 0;
-  private maxRecoveryAttempts = 3;
+  private totalRecoveryAttempts = 0; // Lifetime attempts across all sessions
+  private maxLifetimeRecoveries = 10; // Maximum 10 total lifetime attempts
+  private recoveryAttempts = 0; // Per-session attempts
+  private maxRecoveryAttempts = 3; // Per-session limit
   private lastRecoveryTime = 0;
   private shouldRecover = false;
 
@@ -110,29 +115,57 @@ export class WebGPUMiner implements Miner {
     // CRITICAL: Handle GPU device loss (prevents crashes from appearing as malware)
     // This can happen due to: driver crash, GPU timeout (TDR), system sleep, etc.
     this.device.lost.then((info) => {
-      console.warn(
-        `[BitcoinBaby] GPU device lost: ${info.message} (reason: ${info.reason})`,
-      );
-
       const wasRunning = this.running;
       this.running = false;
+
+      log.error("GPU device lost", {
+        reason: info.reason,
+        message: info.message,
+        wasRunning,
+        totalRecoveryAttempts: this.totalRecoveryAttempts,
+        sessionRecoveryAttempts: this.recoveryAttempts,
+      });
+
+      this.cleanupBuffers();
       this.device = null;
       this.pipeline = null;
       this.bindGroup = null;
+      this.onStatusChange?.("stopped");
 
       // If the device was destroyed intentionally, don't try to recover
       if (info.reason === "destroyed") {
         return;
       }
 
-      // Notify the user that mining stopped due to GPU issue
-      this.onStatusChange?.("stopped");
-      this.onError?.(new Error(`GPU device lost: ${info.reason}`));
-
-      // If mining was active, attempt recovery after a delay
       if (wasRunning) {
-        console.log("[BitcoinBaby] Attempting GPU recovery in 3 seconds...");
-        setTimeout(() => this.attemptRecovery(), 3000);
+        this.totalRecoveryAttempts++;
+
+        // Check lifetime limit to prevent infinite recovery loops
+        if (this.totalRecoveryAttempts > this.maxLifetimeRecoveries) {
+          log.error(
+            "Max lifetime GPU recoveries exceeded, falling back to CPU",
+          );
+          this.onError?.(
+            new Error(
+              "GPU permanently unavailable after too many failures. Please use CPU mining.",
+            ),
+          );
+          return;
+        }
+
+        // Exponential backoff: 1s, 2s, 4s, 8s... up to 30s max
+        const backoffMs = Math.min(
+          1000 * Math.pow(2, this.totalRecoveryAttempts - 1),
+          30000,
+        );
+
+        log.info("Attempting GPU recovery", {
+          attempt: this.totalRecoveryAttempts,
+          maxAttempts: this.maxLifetimeRecoveries,
+          backoffMs,
+        });
+
+        setTimeout(() => this.attemptRecovery(), backoffMs);
       }
     });
 
@@ -438,7 +471,7 @@ export class WebGPUMiner implements Miner {
           });
         }
       } catch (err) {
-        console.error("GPU batch error:", err);
+        log.error("GPU batch error", { error: err });
         this.running = false;
         this.onStatusChange?.("stopped");
         // Propagate error to consumer for proper handling (e.g., device lost, OOM)
@@ -518,7 +551,7 @@ export class WebGPUMiner implements Miner {
       // Start mining loop without awaiting (runs in background)
       // Add .catch() to handle any errors that escape the internal try/catch
       this.miningLoop().catch((err) => {
-        console.error("[WebGPU] Unhandled mining loop error:", err);
+        log.error("Unhandled mining loop error", { error: err });
         this.running = false;
         this.onStatusChange?.("stopped");
         this.onError?.(
@@ -526,7 +559,7 @@ export class WebGPUMiner implements Miner {
         );
       });
     } catch (err) {
-      console.error("WebGPU miner start error:", err);
+      log.error("WebGPU miner start error", { error: err });
       this.running = false;
       this.onStatusChange?.("stopped");
       // Propagate initialization/start errors (e.g., WebGPU not supported)
@@ -541,7 +574,16 @@ export class WebGPUMiner implements Miner {
     this.running = false;
     this.paused = false;
     this.hashrate = 0;
+    this.recoveryAttempts = 0; // Reset session attempts on manual stop
     this.onStatusChange?.("stopped");
+  }
+
+  /**
+   * Reset the recovery counter (useful when user manually restarts mining)
+   */
+  resetRecoveryCounter(): void {
+    this.totalRecoveryAttempts = 0;
+    this.recoveryAttempts = 0;
   }
 
   pause(): void {
@@ -605,9 +647,7 @@ export class WebGPUMiner implements Miner {
 
     // Check if we've exceeded max recovery attempts
     if (this.recoveryAttempts >= this.maxRecoveryAttempts) {
-      console.error(
-        "[BitcoinBaby] Max GPU recovery attempts reached. Please restart the app.",
-      );
+      log.error("Max GPU recovery attempts reached. Please restart the app.");
       this.onError?.(
         new Error(
           "GPU recovery failed after multiple attempts. Mining stopped for safety.",
@@ -619,9 +659,10 @@ export class WebGPUMiner implements Miner {
     this.recoveryAttempts++;
     this.lastRecoveryTime = now;
 
-    console.log(
-      `[BitcoinBaby] GPU recovery attempt ${this.recoveryAttempts}/${this.maxRecoveryAttempts}`,
-    );
+    log.info("GPU recovery attempt", {
+      attempt: this.recoveryAttempts,
+      maxAttempts: this.maxRecoveryAttempts,
+    });
 
     try {
       // Clean up any remaining resources
@@ -640,10 +681,7 @@ export class WebGPUMiner implements Miner {
       this.paused = false;
       this.onStatusChange?.("running");
       this.miningLoop().catch((err) => {
-        console.error(
-          "[WebGPU] Unhandled mining loop error after recovery:",
-          err,
-        );
+        log.error("Unhandled mining loop error after recovery", { error: err });
         this.running = false;
         this.onStatusChange?.("stopped");
         this.onError?.(
@@ -653,16 +691,17 @@ export class WebGPUMiner implements Miner {
         );
       });
 
-      console.log("[BitcoinBaby] GPU recovery successful!");
-      // Reset attempts on successful recovery
+      log.info("GPU recovery successful!");
+      // Reset all counters on successful recovery
       this.recoveryAttempts = 0;
+      this.totalRecoveryAttempts = 0; // Reset lifetime counter on success
     } catch (err) {
-      console.error("[BitcoinBaby] GPU recovery failed:", err);
+      log.error("GPU recovery failed", { error: err });
 
       // If we still have attempts left, try again with exponential backoff
       if (this.recoveryAttempts < this.maxRecoveryAttempts) {
         const backoffMs = Math.pow(2, this.recoveryAttempts) * 1000; // 2s, 4s, 8s
-        console.log(`[BitcoinBaby] Retrying in ${backoffMs / 1000} seconds...`);
+        log.debug("Retrying recovery", { backoffSec: backoffMs / 1000 });
         setTimeout(() => this.attemptRecovery(), backoffMs);
       } else {
         this.onError?.(

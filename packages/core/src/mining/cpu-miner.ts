@@ -1,4 +1,7 @@
 import type { Miner, MiningResult } from "./types";
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("CPUMiner");
 
 /**
  * CPUMiner - Mining using CPU via Web Worker
@@ -23,6 +26,11 @@ export class CPUMiner implements Miner {
   // Per-worker hashrates for aggregation
   private workerHashrates: Map<number, number> = new Map();
   private workerTotalHashes: Map<number, number> = new Map();
+
+  // Worker restart tracking
+  private workerRestartAttempts = new Map<number, number>();
+  private maxWorkerRestarts = 3; // Maximum 3 restart attempts per worker
+  private currentBlock?: string; // Current mining block for worker restarts
 
   // Callbacks
   private onHashrateUpdate?: (hashrate: number) => void;
@@ -64,7 +72,7 @@ export class CPUMiner implements Miner {
 
     // Check if we're in a browser environment
     if (typeof window === "undefined" || typeof Worker === "undefined") {
-      console.warn("Web Workers not available, using fallback");
+      log.warn("Web Workers not available, using fallback");
       this.isInitializing = false;
       return;
     }
@@ -83,17 +91,81 @@ export class CPUMiner implements Miner {
         this.workers.push(worker);
       }
 
-      console.log(
-        `[CPUMiner] Initialized ${this.workerCount} workers for parallel mining`,
-      );
+      log.info("Initialized workers for parallel mining", {
+        workerCount: this.workerCount,
+      });
     } catch (error) {
-      console.error("Failed to create mining workers:", error);
+      log.error("Failed to create mining workers", { error });
       // Propagate initialization errors
       const errorObj =
         error instanceof Error ? error : new Error("Failed to create workers");
       this.onError?.(errorObj);
     } finally {
       this.isInitializing = false;
+    }
+  }
+
+  /**
+   * Restart a single worker that has crashed
+   */
+  private restartWorker(workerId: number): void {
+    if (!this.running || !this.workerUrl) {
+      return;
+    }
+
+    const attempts = this.workerRestartAttempts.get(workerId) ?? 0;
+
+    if (attempts >= this.maxWorkerRestarts) {
+      log.error("Worker exceeded max restart attempts", { workerId, attempts });
+
+      // Only stop mining if ALL workers have failed
+      const allFailed = this.workers.every((w, i) => {
+        return (
+          !w ||
+          (this.workerRestartAttempts.get(i) ?? 0) >= this.maxWorkerRestarts
+        );
+      });
+
+      if (allFailed) {
+        log.error("All workers failed, stopping mining");
+        this.running = false;
+        this.terminateWorkers();
+        this.onStatusChange?.("stopped");
+        this.onError?.(new Error("All mining workers failed"));
+      }
+      return;
+    }
+
+    try {
+      const newWorker = new Worker(this.workerUrl);
+      this.setupWorkerHandlers(newWorker, workerId);
+      this.workers[workerId] = newWorker;
+
+      this.workerRestartAttempts.set(workerId, attempts + 1);
+
+      // If there is an active block, restart mining on this worker
+      if (this.currentBlock && this.minerAddress) {
+        const nonceSpacing = Math.floor(
+          Number.MAX_SAFE_INTEGER / this.workerCount,
+        );
+        newWorker.postMessage({
+          type: "start",
+          block: this.currentBlock,
+          address: this.minerAddress,
+          startNonce: workerId * nonceSpacing,
+        });
+      }
+
+      log.info("Worker restarted successfully", {
+        workerId,
+        attempt: attempts + 1,
+      });
+    } catch (err) {
+      log.error("Failed to restart worker", { workerId, error: err });
+      this.workerRestartAttempts.set(workerId, attempts + 1);
+
+      // Retry after a delay
+      setTimeout(() => this.restartWorker(workerId), 1000);
     }
   }
 
@@ -143,13 +215,29 @@ export class CPUMiner implements Miner {
     };
 
     worker.onerror = (error) => {
-      console.error(`Mining worker ${workerId} error:`, error);
-      this.running = false;
-      this.terminateWorkers();
-      this.onStatusChange?.("stopped");
-      // Propagate error to consumer for proper handling
-      const errorObj = new Error(error.message || "Mining worker error");
-      this.onError?.(errorObj);
+      log.error("Mining worker error", {
+        workerId,
+        error: error.message,
+        restartAttempts: this.workerRestartAttempts.get(workerId) ?? 0,
+      });
+
+      // Clean up the failed worker
+      const index = this.workers.indexOf(worker);
+      if (index > -1) {
+        try {
+          worker.terminate();
+        } catch {
+          // Ignore termination errors
+        }
+        // Mark as null temporarily (will be replaced by restartWorker)
+        this.workers[index] = null as unknown as Worker;
+      }
+
+      // Clear hashrate data for this worker
+      this.workerHashrates.delete(workerId);
+
+      // Attempt to restart only this worker (not all workers)
+      this.restartWorker(workerId);
     };
   }
 
@@ -158,12 +246,20 @@ export class CPUMiner implements Miner {
    */
   private terminateWorkers(): void {
     for (const worker of this.workers) {
-      worker.terminate();
+      if (worker) {
+        try {
+          worker.terminate();
+        } catch {
+          // Ignore termination errors
+        }
+      }
     }
     this.workers = [];
     this.workerHashrates.clear();
     this.workerTotalHashes.clear();
+    this.workerRestartAttempts.clear(); // Reset restart attempts
     this.isInitializing = false; // Reset so workers can be re-initialized
+    this.currentBlock = undefined; // Clear current block
 
     if (this.workerUrl) {
       URL.revokeObjectURL(this.workerUrl);
@@ -341,17 +437,20 @@ export class CPUMiner implements Miner {
     if (this.workers.length > 0) {
       // Start each worker with a different nonce range to avoid duplicates
       const blockId = block || Date.now().toString();
+      this.currentBlock = blockId; // Save for worker restarts
       const nonceSpacing = Math.floor(
         Number.MAX_SAFE_INTEGER / this.workerCount,
       );
 
       this.workers.forEach((worker, index) => {
-        worker.postMessage({
-          type: "start",
-          block: blockId,
-          address: this.minerAddress,
-          startNonce: index * nonceSpacing,
-        });
+        if (worker) {
+          worker.postMessage({
+            type: "start",
+            block: blockId,
+            address: this.minerAddress,
+            startNonce: index * nonceSpacing,
+          });
+        }
       });
     } else {
       // Fallback: simulate mining without worker
@@ -362,9 +461,13 @@ export class CPUMiner implements Miner {
   stop(): void {
     this.running = false;
     this.paused = false;
+    this.currentBlock = undefined; // Clear current block
+    this.workerRestartAttempts.clear(); // Reset restart attempts
 
     for (const worker of this.workers) {
-      worker.postMessage({ type: "stop" });
+      if (worker) {
+        worker.postMessage({ type: "stop" });
+      }
     }
 
     this.workerHashrates.clear();
@@ -435,9 +538,8 @@ export class CPUMiner implements Miner {
    * Uses real SHA-256d hashing via crypto.subtle
    */
   private startFallbackMining(): void {
-    console.warn(
-      "[CPUMiner] Running in fallback mode (no Web Workers). " +
-        "Mining will be slower and may affect UI responsiveness.",
+    log.warn(
+      "Running in fallback mode (no Web Workers). Mining will be slower.",
     );
 
     let nonce = 0;
@@ -541,7 +643,7 @@ export class CPUMiner implements Miner {
     };
 
     mine().catch((err) => {
-      console.error("[CPUMiner] Fallback mining error:", err);
+      log.error("Fallback mining error", { error: err });
       this.running = false;
       this.onStatusChange?.("stopped");
       this.onError?.(
