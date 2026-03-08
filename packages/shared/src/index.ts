@@ -16,6 +16,9 @@
  * import * as shared from '@bitcoinbaby/shared';
  */
 
+// Types (Single Source of Truth)
+export * from "./types";
+
 // Errors
 export * from "./errors";
 
@@ -36,3 +39,6 @@ export * from "./utils";
 
 // Validation
 export * from "./validation";
+
+// Configuration
+export * from "./config";
