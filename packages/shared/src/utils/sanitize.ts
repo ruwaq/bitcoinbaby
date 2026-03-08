@@ -14,106 +14,6 @@
 // ============================================================================
 
 /**
- * List of allowed SVG elements for NFT rendering.
- */
-const ALLOWED_SVG_ELEMENTS = new Set([
-  "svg",
-  "g",
-  "path",
-  "rect",
-  "circle",
-  "ellipse",
-  "line",
-  "polyline",
-  "polygon",
-  "text",
-  "tspan",
-  "defs",
-  "linearGradient",
-  "radialGradient",
-  "stop",
-  "clipPath",
-  "mask",
-  "use",
-  "symbol",
-  "title",
-  "desc",
-  "animate",
-  "animateTransform",
-  "animateMotion",
-  "set",
-]);
-
-/**
- * List of allowed SVG attributes.
- */
-const ALLOWED_SVG_ATTRIBUTES = new Set([
-  // Structure
-  "id",
-  "class",
-  "style",
-  "viewBox",
-  "preserveAspectRatio",
-  "xmlns",
-  "xmlns:xlink",
-  // Presentation
-  "fill",
-  "stroke",
-  "stroke-width",
-  "stroke-linecap",
-  "stroke-linejoin",
-  "stroke-dasharray",
-  "stroke-dashoffset",
-  "opacity",
-  "fill-opacity",
-  "stroke-opacity",
-  "transform",
-  "clip-path",
-  "mask",
-  // Geometry
-  "x",
-  "y",
-  "x1",
-  "y1",
-  "x2",
-  "y2",
-  "cx",
-  "cy",
-  "r",
-  "rx",
-  "ry",
-  "width",
-  "height",
-  "d",
-  "points",
-  // Text
-  "font-family",
-  "font-size",
-  "font-weight",
-  "text-anchor",
-  "dominant-baseline",
-  // Gradients
-  "offset",
-  "stop-color",
-  "stop-opacity",
-  "gradientUnits",
-  "gradientTransform",
-  // Animation
-  "dur",
-  "repeatCount",
-  "begin",
-  "from",
-  "to",
-  "attributeName",
-  "values",
-  "keyTimes",
-  "calcMode",
-  // References
-  "href",
-  "xlink:href",
-]);
-
-/**
  * Dangerous patterns that should never appear in SVG.
  */
 const DANGEROUS_PATTERNS = [
@@ -132,6 +32,10 @@ const DANGEROUS_PATTERNS = [
 /**
  * Sanitize SVG content for safe rendering.
  *
+ * Uses regex-based sanitization that works in all environments.
+ * For browser environments with DOM access, consider using DOMPurify
+ * library for more thorough sanitization.
+ *
  * @param svg - Raw SVG string
  * @returns Sanitized SVG string
  * @throws Error if SVG contains dangerous patterns
@@ -146,58 +50,24 @@ export function sanitizeSVG(svg: string): string {
     }
   }
 
-  // Parse and sanitize
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(svg, "image/svg+xml");
+  // Remove script tags and event handlers via regex
+  let sanitized = svg;
+  sanitized = sanitized.replace(/<script[\s\S]*?<\/script>/gi, "");
+  sanitized = sanitized.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, "");
+  sanitized = sanitized.replace(/\s+on\w+\s*=\s*[^\s>]*/gi, "");
 
-  // Check for parse errors
-  const parseError = doc.querySelector("parsererror");
-  if (parseError) {
-    throw new Error("Invalid SVG: parse error");
-  }
+  // Remove javascript: URLs
+  sanitized = sanitized.replace(/href\s*=\s*["']javascript:[^"']*["']/gi, "");
+  sanitized = sanitized.replace(
+    /xlink:href\s*=\s*["']javascript:[^"']*["']/gi,
+    "",
+  );
 
-  const svgElement = doc.querySelector("svg");
-  if (!svgElement) {
-    throw new Error("Invalid SVG: no svg element found");
-  }
+  // Remove data: URLs (can contain scripts)
+  sanitized = sanitized.replace(/href\s*=\s*["']data:[^"']*["']/gi, "");
+  sanitized = sanitized.replace(/xlink:href\s*=\s*["']data:[^"']*["']/gi, "");
 
-  // Recursively sanitize elements
-  sanitizeElement(svgElement);
-
-  return svgElement.outerHTML;
-}
-
-function sanitizeElement(element: Element): void {
-  // Remove disallowed elements
-  const children = Array.from(element.children);
-  for (const child of children) {
-    if (!ALLOWED_SVG_ELEMENTS.has(child.tagName.toLowerCase())) {
-      child.remove();
-      continue;
-    }
-    sanitizeElement(child);
-  }
-
-  // Remove disallowed attributes
-  const attributes = Array.from(element.attributes);
-  for (const attr of attributes) {
-    const attrName = attr.name.toLowerCase();
-
-    // Remove if not in allowlist
-    if (!ALLOWED_SVG_ATTRIBUTES.has(attrName)) {
-      element.removeAttribute(attr.name);
-      continue;
-    }
-
-    // Check attribute value for dangerous content
-    const value = attr.value;
-    for (const pattern of DANGEROUS_PATTERNS) {
-      if (pattern.test(value)) {
-        element.removeAttribute(attr.name);
-        break;
-      }
-    }
-  }
+  return sanitized;
 }
 
 /**
@@ -246,9 +116,13 @@ export function sanitizeURL(url: string | null | undefined): string | null {
  * Validate and sanitize an RPC URL.
  *
  * @param url - RPC URL to validate
+ * @param isProduction - Whether running in production (optional, auto-detected)
  * @returns Sanitized URL or null if invalid
  */
-export function sanitizeRPCUrl(url: string | null | undefined): string | null {
+export function sanitizeRPCUrl(
+  url: string | null | undefined,
+  isProduction?: boolean,
+): string | null {
   const sanitized = sanitizeURL(url);
   if (!sanitized) return null;
 
@@ -260,9 +134,29 @@ export function sanitizeRPCUrl(url: string | null | undefined): string | null {
       return null;
     }
 
+    // Detect production environment (works in Node, browser, and Workers)
+    const isProd =
+      isProduction ??
+      (typeof globalThis !== "undefined" &&
+        (globalThis as Record<string, unknown>).process &&
+        (
+          (globalThis as Record<string, unknown>).process as Record<
+            string,
+            unknown
+          >
+        )?.env &&
+        (
+          (
+            (globalThis as Record<string, unknown>).process as Record<
+              string,
+              unknown
+            >
+          ).env as Record<string, unknown>
+        )?.NODE_ENV === "production");
+
     // Block localhost in production
     if (
-      process.env.NODE_ENV === "production" &&
+      isProd &&
       (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1")
     ) {
       console.warn("[sanitizeRPCUrl] Blocked localhost URL in production");
