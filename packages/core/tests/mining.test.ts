@@ -188,10 +188,8 @@ describe("MiningOrchestrator", () => {
   });
 
   describe("Lifecycle", () => {
-    it("should warn when starting while already running", async () => {
+    it("should handle start when already running gracefully", async () => {
       const { MiningOrchestrator } = await import("../src/mining/orchestrator");
-
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const orchestrator = new MiningOrchestrator();
 
@@ -199,13 +197,11 @@ describe("MiningOrchestrator", () => {
       // @ts-expect-error - accessing private property for testing
       orchestrator.isRunning = true;
 
-      await orchestrator.start();
+      // Should not throw when starting while already running
+      await expect(orchestrator.start()).resolves.not.toThrow();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("already running"),
-      );
-
-      consoleSpy.mockRestore();
+      // Should still be marked as running
+      expect(orchestrator.getIsRunning()).toBe(true);
     });
 
     it("should handle stop when not running gracefully", async () => {

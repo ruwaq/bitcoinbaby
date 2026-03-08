@@ -53,6 +53,9 @@ export interface PersistedSession {
 // =============================================================================
 
 import { MIN_DIFFICULTY } from "../tokenomics/constants";
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("Persistence");
 
 const DB_NAME = "bitcoinbaby-mining";
 const DB_VERSION = 1;
@@ -82,9 +85,7 @@ export class MiningStatePersistence {
 
     // Check if IndexedDB is available
     if (typeof indexedDB === "undefined") {
-      console.warn(
-        "[Persistence] IndexedDB not available, using localStorage fallback",
-      );
+      log.warn("IndexedDB not available, using localStorage fallback");
       this.useLocalStorageFallback = true;
       this.isOpen = true;
       return;
@@ -116,15 +117,14 @@ export class MiningStatePersistence {
         request.onsuccess = (event) => {
           this.db = (event.target as IDBOpenDBRequest).result;
           this.isOpen = true;
-          console.log("[Persistence] IndexedDB opened successfully");
+          log.debug("IndexedDB opened successfully");
           resolve();
         };
 
         request.onerror = () => {
-          console.warn(
-            "[Persistence] IndexedDB failed, using localStorage fallback:",
-            request.error,
-          );
+          log.warn("IndexedDB failed, using localStorage fallback", {
+            error: request.error,
+          });
           this.useLocalStorageFallback = true;
           this.isOpen = true;
           resolve();
@@ -132,19 +132,16 @@ export class MiningStatePersistence {
 
         // Handle blocked scenario (e.g., private browsing)
         request.onblocked = () => {
-          console.warn(
-            "[Persistence] IndexedDB blocked, using localStorage fallback",
-          );
+          log.warn("IndexedDB blocked, using localStorage fallback");
           this.useLocalStorageFallback = true;
           this.isOpen = true;
           resolve();
         };
       } catch (err) {
         // Catch any sync errors (e.g., SecurityError in private mode)
-        console.warn(
-          "[Persistence] IndexedDB exception, using localStorage fallback:",
-          err,
-        );
+        log.warn("IndexedDB exception, using localStorage fallback", {
+          error: err,
+        });
         this.useLocalStorageFallback = true;
         this.isOpen = true;
         resolve();
@@ -175,7 +172,7 @@ export class MiningStatePersistence {
       try {
         localStorage.setItem(LS_STATE_KEY, JSON.stringify(stateToSave));
       } catch (err) {
-        console.warn("[Persistence] localStorage save failed:", err);
+        log.warn("localStorage save failed", { error: err });
       }
       return;
     }
@@ -191,9 +188,7 @@ export class MiningStatePersistence {
         request.onsuccess = () => resolve();
         request.onerror = () => {
           // Fallback to localStorage on IndexedDB error
-          console.warn(
-            "[Persistence] IndexedDB save failed, trying localStorage",
-          );
+          log.warn("IndexedDB save failed, trying localStorage");
           try {
             localStorage.setItem(LS_STATE_KEY, JSON.stringify(stateToSave));
             resolve();
@@ -238,9 +233,7 @@ export class MiningStatePersistence {
           if (!result) {
             const lsState = this.loadStateFromLocalStorage();
             if (lsState) {
-              console.log(
-                "[Persistence] Migrating state from localStorage to IndexedDB",
-              );
+              log.debug("Migrating state from localStorage to IndexedDB");
               this.saveState(lsState);
             }
             resolve(lsState);
@@ -249,16 +242,11 @@ export class MiningStatePersistence {
           }
         };
         request.onerror = () => {
-          console.warn(
-            "[Persistence] IndexedDB load failed, trying localStorage",
-          );
+          log.warn("IndexedDB load failed, trying localStorage");
           resolve(this.loadStateFromLocalStorage());
         };
       } catch (err) {
-        console.warn(
-          "[Persistence] Exception during load, trying localStorage:",
-          err,
-        );
+        log.warn("Exception during load, trying localStorage", { error: err });
         resolve(this.loadStateFromLocalStorage());
       }
     });
@@ -274,7 +262,7 @@ export class MiningStatePersistence {
         return JSON.parse(data) as PersistedMiningState;
       }
     } catch (err) {
-      console.warn("[Persistence] localStorage load failed:", err);
+      log.warn("localStorage load failed", { error: err });
     }
     return null;
   }
@@ -329,13 +317,11 @@ export class MiningStatePersistence {
           lastSavedAt: Date.now(),
         });
       } catch (err) {
-        console.warn("[Persistence] Auto-save failed:", err);
+        log.warn("Auto-save failed", { error: err });
       }
     }, intervalMs);
 
-    console.log(
-      `[Persistence] Auto-save started (every ${intervalMs / 1000}s)`,
-    );
+    log.debug("Auto-save started", { intervalSec: intervalMs / 1000 });
   }
 
   /**
@@ -345,7 +331,7 @@ export class MiningStatePersistence {
     if (this.saveInterval) {
       clearInterval(this.saveInterval);
       this.saveInterval = null;
-      console.log("[Persistence] Auto-save stopped");
+      log.debug("Auto-save stopped");
     }
   }
 
@@ -362,7 +348,7 @@ export class MiningStatePersistence {
         const trimmed = sessions.slice(-100);
         localStorage.setItem(LS_SESSIONS_KEY, JSON.stringify(trimmed));
       } catch (err) {
-        console.warn("[Persistence] localStorage session save failed:", err);
+        log.warn("localStorage session save failed", { error: err });
       }
       return;
     }
@@ -404,7 +390,7 @@ export class MiningStatePersistence {
         return JSON.parse(data) as PersistedSession[];
       }
     } catch (err) {
-      console.warn("[Persistence] localStorage sessions load failed:", err);
+      log.warn("localStorage sessions load failed", { error: err });
     }
     return [];
   }
@@ -450,9 +436,7 @@ export class MiningStatePersistence {
         };
 
         request.onerror = () => {
-          console.warn(
-            "[Persistence] IndexedDB sessions load failed, using localStorage",
-          );
+          log.warn("IndexedDB sessions load failed, using localStorage");
           const lsSessions = this.loadSessionsFromLocalStorage();
           resolve(
             lsSessions
@@ -461,7 +445,7 @@ export class MiningStatePersistence {
           );
         };
       } catch (err) {
-        console.warn("[Persistence] Exception loading sessions:", err);
+        log.warn("Exception loading sessions", { error: err });
         const lsSessions = this.loadSessionsFromLocalStorage();
         resolve(
           lsSessions.sort((a, b) => b.startedAt - a.startedAt).slice(0, limit),

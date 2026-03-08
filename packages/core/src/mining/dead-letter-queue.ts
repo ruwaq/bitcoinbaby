@@ -14,6 +14,9 @@
  */
 
 import type { MiningResult } from "./types";
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("DLQ");
 
 // =============================================================================
 // TYPES
@@ -124,9 +127,7 @@ export class DeadLetterQueue {
     if (this.isOpen) return;
 
     if (typeof indexedDB === "undefined") {
-      console.warn(
-        "[DLQ] IndexedDB not available, using localStorage fallback",
-      );
+      log.warn("IndexedDB not available, using localStorage fallback");
       this.useLocalStorageFallback = true;
       this.isOpen = true;
       return;
@@ -150,28 +151,27 @@ export class DeadLetterQueue {
         request.onsuccess = (event) => {
           this.db = (event.target as IDBOpenDBRequest).result;
           this.isOpen = true;
-          console.log("[DLQ] IndexedDB opened successfully");
+          log.debug("IndexedDB opened successfully");
           resolve();
         };
 
         request.onerror = () => {
-          console.warn("[DLQ] IndexedDB failed, using localStorage fallback");
+          log.warn("IndexedDB failed, using localStorage fallback");
           this.useLocalStorageFallback = true;
           this.isOpen = true;
           resolve();
         };
 
         request.onblocked = () => {
-          console.warn("[DLQ] IndexedDB blocked, using localStorage fallback");
+          log.warn("IndexedDB blocked, using localStorage fallback");
           this.useLocalStorageFallback = true;
           this.isOpen = true;
           resolve();
         };
       } catch (err) {
-        console.warn(
-          "[DLQ] IndexedDB exception, using localStorage fallback:",
-          err,
-        );
+        log.warn("IndexedDB exception, using localStorage fallback", {
+          error: err,
+        });
         this.useLocalStorageFallback = true;
         this.isOpen = true;
         resolve();
@@ -233,9 +233,7 @@ export class DeadLetterQueue {
     await this.saveProof(failedProof);
     await this.enforceQueueSize();
 
-    console.log(
-      `[DLQ] Added failed proof: ${failedProof.id} (${errorMessage})`,
-    );
+    log.info("Added failed proof", { id: failedProof.id, error: errorMessage });
 
     this.events.onProofAdded?.(failedProof);
     this.emitStatsChange();
@@ -266,11 +264,11 @@ export class DeadLetterQueue {
         };
 
         request.onerror = () => {
-          console.warn("[DLQ] IndexedDB getAll failed, using localStorage");
+          log.warn("IndexedDB getAll failed, using localStorage");
           resolve(this.getProofsFromLocalStorage());
         };
       } catch (err) {
-        console.warn("[DLQ] Exception getting proofs:", err);
+        log.warn("Exception getting proofs", { error: err });
         resolve(this.getProofsFromLocalStorage());
       }
     });
@@ -374,9 +372,9 @@ export class DeadLetterQueue {
       this.config.retryCheckIntervalMs,
     );
 
-    console.log(
-      `[DLQ] Retry checks started (every ${this.config.retryCheckIntervalMs / 1000}s)`,
-    );
+    log.debug("Retry checks started", {
+      intervalSec: this.config.retryCheckIntervalMs / 1000,
+    });
 
     // Run immediately
     this.processRetries();
@@ -389,7 +387,7 @@ export class DeadLetterQueue {
     if (this.retryInterval) {
       clearInterval(this.retryInterval);
       this.retryInterval = null;
-      console.log("[DLQ] Retry checks stopped");
+      log.debug("Retry checks stopped");
     }
   }
 
@@ -398,7 +396,7 @@ export class DeadLetterQueue {
    */
   async processRetries(): Promise<void> {
     if (!this.retryFn) {
-      console.warn("[DLQ] No retry function set, skipping retry checks");
+      log.warn("No retry function set, skipping retry checks");
       return;
     }
 
@@ -406,7 +404,7 @@ export class DeadLetterQueue {
 
     if (needingRetry.length === 0) return;
 
-    console.log(`[DLQ] Processing ${needingRetry.length} proof(s) for retry`);
+    log.debug("Processing proofs for retry", { count: needingRetry.length });
 
     for (const proof of needingRetry) {
       await this.retryProof(proof);
@@ -418,7 +416,7 @@ export class DeadLetterQueue {
    */
   async retryProof(proof: FailedProof): Promise<boolean> {
     if (!this.retryFn) {
-      console.error("[DLQ] No retry function set");
+      log.error("No retry function set");
       return false;
     }
 
@@ -433,7 +431,7 @@ export class DeadLetterQueue {
         // Success! Mark as recovered
         proof.status = "recovered";
         await this.saveProof(proof);
-        console.log(`[DLQ] Proof recovered: ${proof.id} -> ${txid}`);
+        log.info("Proof recovered", { id: proof.id, txid });
         this.events.onProofRecovered?.(proof, txid);
         this.emitStatsChange();
         return true;
@@ -461,7 +459,7 @@ export class DeadLetterQueue {
       // Exhausted all retries
       proof.status = "exhausted";
       proof.nextRetryAt = 0;
-      console.warn(`[DLQ] Proof exhausted all retries: ${proof.id}`);
+      log.warn("Proof exhausted all retries", { id: proof.id });
       this.events.onProofExhausted?.(proof);
     } else {
       // Schedule next retry with exponential backoff
@@ -471,9 +469,12 @@ export class DeadLetterQueue {
         this.config.maxRetryDelayMs,
       );
       proof.nextRetryAt = Date.now() + delay;
-      console.log(
-        `[DLQ] Retry ${proof.retryCount}/${this.config.maxRetries} failed for ${proof.id}, next retry in ${delay / 1000}s`,
-      );
+      log.debug("Retry failed, scheduling next", {
+        id: proof.id,
+        attempt: proof.retryCount,
+        maxRetries: this.config.maxRetries,
+        nextRetrySec: delay / 1000,
+      });
     }
 
     await this.saveProof(proof);
@@ -508,7 +509,7 @@ export class DeadLetterQueue {
 
         request.onsuccess = () => resolve();
         request.onerror = () => {
-          console.warn("[DLQ] IndexedDB save failed, trying localStorage");
+          log.warn("IndexedDB save failed, trying localStorage");
           try {
             const proofs = this.getProofsFromLocalStorage();
             const index = proofs.findIndex((p) => p.id === proof.id);
@@ -552,7 +553,7 @@ export class DeadLetterQueue {
 
     for (const proof of toRemove) {
       await this.removeProof(proof.id);
-      console.log(`[DLQ] Removed old proof to enforce queue size: ${proof.id}`);
+      log.debug("Removed old proof to enforce queue size", { id: proof.id });
     }
   }
 
@@ -563,7 +564,7 @@ export class DeadLetterQueue {
         return JSON.parse(data) as FailedProof[];
       }
     } catch (err) {
-      console.warn("[DLQ] localStorage load failed:", err);
+      log.warn("localStorage load failed", { error: err });
     }
     return [];
   }
@@ -574,7 +575,7 @@ export class DeadLetterQueue {
       const trimmed = proofs.slice(-this.config.maxQueueSize);
       localStorage.setItem(LS_FALLBACK_KEY, JSON.stringify(trimmed));
     } catch (err) {
-      console.warn("[DLQ] localStorage save failed:", err);
+      log.warn("localStorage save failed", { error: err });
     }
   }
 

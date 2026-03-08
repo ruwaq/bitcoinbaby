@@ -73,3 +73,15 @@ export {
   formatTime,
   formatBytes,
 } from "./format";
+
+// Wallet Guards
+export {
+  canRead,
+  canSign,
+  canTransact,
+  createWalletGuard,
+  assertCanSign,
+  assertCanTransact,
+  type WalletState as WalletGuardState,
+  type WalletGuardResult,
+} from "./wallet-guards";

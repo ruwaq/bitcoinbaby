@@ -45,8 +45,12 @@ export interface MiningConfig {
   throttleWhenHidden: boolean;
 }
 
+// Re-export canonical types from shared
+export type { WalletInfo as WalletInfoBase } from "@bitcoinbaby/shared";
+
 /**
- * Informacion de wallet
+ * Wallet info with balance (UI-specific extension)
+ * Base type: @bitcoinbaby/shared WalletInfo
  */
 export interface WalletInfo {
   address: string;
@@ -80,14 +84,8 @@ export {
   getTraitsFromDNA,
 } from "@bitcoinbaby/bitcoin";
 
-/**
- * Heritage (cultural origin) for visual diversity
- * (UI extension, not stored on-chain)
- */
-export type Heritage = "americas" | "africa" | "asia" | "europa" | "oceania";
-
-// Max level constant for convenience
-export const MAX_LEVEL = 10;
+// Heritage and MAX_LEVEL re-exported from shared (Single Source of Truth)
+export { type Heritage, MAX_LEVEL, HERITAGES } from "@bitcoinbaby/shared";
 
 /**
  * Get XP required for next level

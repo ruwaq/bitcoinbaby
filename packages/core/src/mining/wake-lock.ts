@@ -16,6 +16,10 @@
 // TYPES
 // =============================================================================
 
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("WakeLock");
+
 export interface WakeLockStatus {
   isActive: boolean;
   isSupported: boolean;
@@ -51,7 +55,7 @@ export class MiningWakeLock {
    */
   async acquire(): Promise<boolean> {
     if (!MiningWakeLock.isSupported()) {
-      console.warn("[WakeLock] API not supported on this device");
+      log.warn("API not supported on this device");
       return false;
     }
 
@@ -60,7 +64,7 @@ export class MiningWakeLock {
       typeof document !== "undefined" &&
       document.visibilityState !== "visible"
     ) {
-      console.warn("[WakeLock] Cannot acquire - document not visible");
+      log.warn("Cannot acquire - document not visible");
       return false;
     }
 
@@ -76,11 +80,11 @@ export class MiningWakeLock {
       // Handle automatic release by browser
       this.wakeLock.addEventListener("release", () => {
         this.lastReleased = Date.now();
-        console.log("[WakeLock] Released by browser");
+        log.debug("Released by browser");
         this.wakeLock = null;
       });
 
-      console.log("[WakeLock] Screen wake lock acquired");
+      log.debug("Screen wake lock acquired");
       return true;
     } catch (err) {
       // Common reasons for failure:
@@ -88,7 +92,7 @@ export class MiningWakeLock {
       // - Low battery mode
       // - User denied permission
       // - System policy
-      console.warn("[WakeLock] Failed to acquire:", err);
+      log.warn("Failed to acquire", { error: err });
       return false;
     }
   }
@@ -102,7 +106,7 @@ export class MiningWakeLock {
         await this.wakeLock.release();
         this.wakeLock = null;
         this.lastReleased = Date.now();
-        console.log("[WakeLock] Released manually");
+        log.debug("Released manually");
       } catch {
         // Already released
       }

@@ -20,6 +20,10 @@ export interface TabCoordinatorEvents {
   onWaitingForLeadership?: () => void;
 }
 
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("TabCoordinator");
+
 export interface TabInfo {
   isLeader: boolean;
   isWaiting: boolean;
@@ -64,7 +68,7 @@ export class MiningTabCoordinator {
    */
   async requestLeadership(): Promise<void> {
     if (!MiningTabCoordinator.isSupported()) {
-      console.warn("[TabCoordinator] Web Locks not supported, assuming leader");
+      log.warn("Web Locks not supported, assuming leader");
       this.isLeader = true;
       this.events.onBecomeLeader?.();
       return;
@@ -76,7 +80,7 @@ export class MiningTabCoordinator {
 
     this.isWaiting = true;
     this.events.onWaitingForLeadership?.();
-    console.log("[TabCoordinator] Requesting mining leadership...");
+    log.debug("Requesting mining leadership...");
 
     try {
       await navigator.locks.request(
@@ -85,7 +89,7 @@ export class MiningTabCoordinator {
         async () => {
           this.isLeader = true;
           this.isWaiting = false;
-          console.log("[TabCoordinator] This tab is now the mining leader");
+          log.info("This tab is now the mining leader");
           this.events.onBecomeLeader?.();
 
           // Notify other tabs
@@ -103,7 +107,7 @@ export class MiningTabCoordinator {
         },
       );
     } catch (err) {
-      console.error("[TabCoordinator] Failed to acquire leadership:", err);
+      log.error("Failed to acquire leadership", { error: err });
       this.isWaiting = false;
     }
   }
@@ -113,7 +117,7 @@ export class MiningTabCoordinator {
    */
   releaseLeadership(): void {
     if (this.releaseLock) {
-      console.log("[TabCoordinator] Releasing leadership");
+      log.debug("Releasing leadership");
       this.releaseLock();
       this.releaseLock = null;
     }
@@ -214,7 +218,7 @@ export class MiningTabCoordinator {
           // Track active tabs
           this.handleHeartbeat(tabId);
         } else if (type === "leader-claimed" && !this.isLeader) {
-          console.log("[TabCoordinator] Another tab claimed leadership");
+          log.debug("Another tab claimed leadership");
         } else if (type === "leader-released" && this.isWaiting) {
           // Leadership is available, try to claim it
           this.requestLeadership();

@@ -323,12 +323,15 @@ export type PremiumFeature = keyof typeof PREMIUM_BURN_COSTS;
 
 /**
  * Maximum shares per hour per address
- * Safety cap to prevent abuse. Actual mining rate at D22:
- * - WebGPU at ~70 MH/s finds ~50 shares/second
- * - This limit allows reasonable mining while preventing spam
- * - Server-side validation is the real limiter
+ * Safety cap to prevent abuse.
+ *
+ * IMPORTANT: Must be >= VarDiff target rate (1 share/3s = 1200/hr)
+ * Set to 1500 to give 25% headroom for burst mining.
+ *
+ * This allows reasonable mining while preventing spam.
+ * Server-side validation enforces this limit.
  */
-export const MAX_SHARES_PER_HOUR = 1000;
+export const MAX_SHARES_PER_HOUR = 1500;
 
 /** Maximum reward per share (cap to prevent exploits) */
 export const MAX_REWARD_PER_SHARE = BigInt(10_000); // 10K max (with all bonuses)

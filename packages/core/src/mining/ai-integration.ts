@@ -31,6 +31,10 @@ interface AIResult {
   verified: boolean;
 }
 
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("AIIntegration");
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -114,7 +118,7 @@ export class AIWorkIntegration {
 
   private async _doInitialize(): Promise<void> {
     try {
-      console.log("[AIIntegration] Loading AI package...");
+      log.debug("Loading AI package...");
 
       // Use dynamic import with variable to prevent webpack from bundling
       // This ensures the AI package is truly optional and loaded at runtime only
@@ -134,11 +138,11 @@ export class AIWorkIntegration {
       });
 
       await this.engine.initialize();
-      console.log("[AIIntegration] AI Engine initialized successfully");
+      log.info("AI Engine initialized successfully");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown AI init error";
-      console.warn("[AIIntegration] Failed to initialize AI:", message);
+      log.warn("Failed to initialize AI", { error: message });
       this.lastError = message;
       this.engine = null;
       // Don't throw - AI is optional
@@ -216,7 +220,7 @@ export class AIWorkIntegration {
       const message =
         error instanceof Error ? error.message : "Task execution failed";
       this.lastError = message;
-      console.warn("[AIIntegration] Task failed:", message);
+      log.warn("Task failed", { error: message });
 
       return {
         success: false,
@@ -337,7 +341,7 @@ export class AIWorkIntegration {
     this.engine = null;
     this.isInitializing = false;
     this.initPromise = null;
-    console.log("[AIIntegration] Terminated");
+    log.debug("Terminated");
   }
 }
 

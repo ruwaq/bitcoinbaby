@@ -211,3 +211,183 @@ export interface WsMessage {
   clientId?: string;
   reset?: boolean;
 }
+
+// =============================================================================
+// NFT
+// =============================================================================
+
+/**
+ * NFT record from server index
+ * Note: tokensEarned is string because BigInt cannot be serialized to JSON
+ */
+export interface NFTRecord {
+  tokenId: number;
+  dna: string;
+  bloodline: string;
+  baseType: string;
+  genesisBlock: number;
+  rarityTier: string;
+  level: number;
+  xp: number;
+  totalXp: number;
+  workCount: number;
+  lastWorkBlock: number;
+  evolutionCount: number;
+  tokensEarned: string;
+  txid: string;
+  mintedAt: number;
+}
+
+/**
+ * NFT marketplace listing
+ */
+export interface NFTListing {
+  tokenId: string;
+  price: string;
+  sellerAddress: string;
+  listedAt: string;
+}
+
+/**
+ * Extended NFT record with listing and blockchain info
+ */
+export interface NFTRecordWithListing extends NFTRecord {
+  /** Owner's Bitcoin address */
+  address: string;
+  /** Is currently listed for sale */
+  isListed: boolean;
+  /** Listing price in satoshis (if listed) */
+  listingPrice?: number;
+  /** When listed (timestamp, if listed) */
+  listedAt?: number;
+  /** URL to view on blockchain explorer */
+  blockchainUrl: string;
+}
+
+/**
+ * NFT global statistics
+ */
+export interface NFTGlobalStats {
+  totalMinted: number;
+  totalOwners: number;
+  averageLevel: number;
+  bloodlineDistribution: Record<string, number>;
+  rarityDistribution: Record<string, number>;
+}
+
+/**
+ * NFT listing with embedded NFT data for display
+ */
+export interface NFTListingWithNFT {
+  tokenId: number;
+  price: number;
+  sellerAddress: string;
+  listedAt: number;
+  /** Seller's partially signed PSBT (SIGHASH_SINGLE|ANYONECANPAY) */
+  sellerPsbt?: string;
+  /** NFT UTXO info for transaction construction */
+  nftUtxo?: {
+    txid: string;
+    vout: number;
+    value: number;
+  };
+  nft: {
+    dna: string;
+    bloodline: string;
+    baseType: string;
+    rarityTier: string;
+    level: number;
+  };
+}
+
+/**
+ * NFT sale record
+ */
+export interface NFTSale {
+  tokenId: string;
+  seller: string;
+  buyer: string;
+  price: string;
+  txid: string;
+  soldAt: string;
+}
+
+/**
+ * Result from NFT prover submission
+ */
+export interface NFTProveResult {
+  /** Reserved token ID */
+  tokenId: number;
+  /** Commit transaction hex (needs signing) */
+  commitTxHex: string;
+  /** Spell transaction hex (needs signing) */
+  spellTxHex: string;
+  /** Commit transaction ID */
+  commitTxid: string;
+  /** Spell transaction ID (final NFT location) */
+  spellTxid: string;
+  /** Instructions for next steps */
+  nextSteps: string[];
+}
+
+/**
+ * Work proof result from submitting mining XP
+ */
+export interface WorkProofResult {
+  tokenId: number;
+  xpGained: number;
+  newXp: number;
+  totalXp: number;
+  workCount: number;
+  bloodline: string;
+  multiplier: number;
+  canEvolve: boolean;
+  xpToNextLevel: number;
+}
+
+/**
+ * Evolution confirmation result
+ */
+export interface EvolutionConfirmResult {
+  confirmed: boolean;
+  nft: NFTRecord;
+  txid: string;
+  previousLevel: number;
+  newLevel: number;
+}
+
+/**
+ * NFT explorer query parameters
+ */
+export interface NFTExplorerQuery {
+  page?: number;
+  limit?: number;
+  sort?: "newest" | "oldest" | "rarest" | "level" | "xp";
+  bloodline?: "royal" | "warrior" | "rogue" | "mystic" | "all";
+  rarity?:
+    | "common"
+    | "uncommon"
+    | "rare"
+    | "epic"
+    | "legendary"
+    | "mythic"
+    | "all";
+  forSale?: "true" | "false" | "all";
+}
+
+/**
+ * NFT explorer response
+ */
+export interface NFTExplorerResponse {
+  nfts: NFTRecordWithListing[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  stats: {
+    total: number;
+    forSale: number;
+    byRarity: Record<string, number>;
+    byBloodline: Record<string, number>;
+  };
+}

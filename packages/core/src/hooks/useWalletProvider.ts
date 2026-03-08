@@ -5,7 +5,7 @@
  * Supports multiple wallet types (internal, Unisat, XVerse, etc.)
  */
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   type WalletProvider,
   type WalletProviderType,
@@ -109,6 +109,15 @@ export function useWalletProvider(): UseWalletProviderReturn {
   // Current provider instance
   const [provider, setProvider] = useState<WalletProvider | null>(null);
 
+  // Store cleanup functions for provider event listeners
+  const listenerCleanupRef = useRef<{
+    accountChange: (() => void) | null;
+    networkChange: (() => void) | null;
+  }>({
+    accountChange: null,
+    networkChange: null,
+  });
+
   // Wallet store sync (for global access to signing functions)
   const storeSetWallet = useWalletStore((s) => s.setWallet);
   const storeDisconnect = useWalletStore((s) => s.disconnect);
@@ -117,6 +126,18 @@ export function useWalletProvider(): UseWalletProviderReturn {
   // Detect available providers on mount
   useEffect(() => {
     refreshProviders();
+  }, []);
+
+  // Cleanup listeners on unmount
+  useEffect(() => {
+    return () => {
+      if (listenerCleanupRef.current.accountChange) {
+        listenerCleanupRef.current.accountChange();
+      }
+      if (listenerCleanupRef.current.networkChange) {
+        listenerCleanupRef.current.networkChange();
+      }
+    };
   }, []);
 
   // Refresh available providers
@@ -178,21 +199,23 @@ export function useWalletProvider(): UseWalletProviderReturn {
           },
         );
 
-        // Set up listeners if available
+        // Set up listeners if available - store cleanup functions for disconnect
         if (walletProvider.onAccountChange) {
-          walletProvider.onAccountChange((newAccount) => {
+          const cleanup = walletProvider.onAccountChange((newAccount) => {
             setAccount(newAccount);
             if (!newAccount) {
               setIsConnected(false);
               setProviderType(null);
             }
           });
+          listenerCleanupRef.current.accountChange = cleanup;
         }
 
         if (walletProvider.onNetworkChange) {
-          walletProvider.onNetworkChange((newNetwork) => {
+          const cleanup = walletProvider.onNetworkChange((newNetwork) => {
             setNetwork(newNetwork);
           });
+          listenerCleanupRef.current.networkChange = cleanup;
         }
       } catch (err) {
         const message =
@@ -217,6 +240,16 @@ export function useWalletProvider(): UseWalletProviderReturn {
 
   // Disconnect
   const disconnect = useCallback(async () => {
+    // Clean up event listeners to prevent memory leaks
+    if (listenerCleanupRef.current.accountChange) {
+      listenerCleanupRef.current.accountChange();
+      listenerCleanupRef.current.accountChange = null;
+    }
+    if (listenerCleanupRef.current.networkChange) {
+      listenerCleanupRef.current.networkChange();
+      listenerCleanupRef.current.networkChange = null;
+    }
+
     if (provider) {
       await provider.disconnect();
     }

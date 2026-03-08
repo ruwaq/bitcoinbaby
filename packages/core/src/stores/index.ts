@@ -1,6 +1,12 @@
 export { useBabyStore } from "./baby-store";
 export { useMiningStore } from "./mining-store";
-export { useWalletStore } from "./wallet-store";
+export {
+  useWalletStore,
+  type SignPsbtFn,
+  type BroadcastTxFn,
+  type CleanupFn,
+  type UnregisterFn,
+} from "./wallet-store";
 export {
   useNFTStore,
   selectBestBoost,
@@ -93,3 +99,56 @@ export {
   selectHasFailedProofs,
   selectTokensAtRisk,
 } from "./dead-letter-store";
+
+// Granular selectors for performance optimization
+export {
+  // Mining selectors
+  selectHashrate,
+  selectIsMining,
+  selectTotalHashes,
+  selectTokensEarned,
+  selectDifficulty,
+  selectUptime,
+  selectMinerType,
+  selectEffectiveHashrate,
+  selectCosmicMultiplier,
+  selectCosmicStatus,
+  selectLifetimeStats,
+  selectStartMining,
+  selectStopMining,
+  selectUpdateStats,
+  // Wallet selectors
+  selectWalletAddress,
+  selectWalletPublicKey,
+  selectIsWalletConnected,
+  selectWalletBalance,
+  selectBabyTokens,
+  selectSignPsbt,
+  selectBroadcastTx,
+  selectSetWallet,
+  selectDisconnect,
+  // NFT selectors (additional)
+  selectOwnedNFTs,
+  selectSelectedNFTState,
+  selectNFTLoading,
+  selectNFTBoost,
+  selectStackedBoost,
+  selectTotalNFTCount,
+  selectNFTError,
+  selectSetOwnedNFTs,
+  selectSelectNFT,
+  // Baby selectors
+  selectBaby,
+  selectBabyLevel,
+  selectBabyXP,
+  selectBabyName,
+  selectBabyState,
+  selectSetBaby,
+  selectAddExperience,
+  selectFeed,
+  selectLevelUp,
+  // Composed selectors
+  selectMiningDisplay,
+  selectWalletDisplay,
+  selectBabyStatus,
+} from "./selectors";

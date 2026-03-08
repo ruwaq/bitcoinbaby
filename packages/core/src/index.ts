@@ -8,6 +8,7 @@ export * from "./utils";
 export * from "./cosmic";
 export * from "./tokenomics";
 export * from "./offline";
+export * from "./rewards";
 
 // Centralized constants
 // See packages/core/src/constants/index.ts for full guide

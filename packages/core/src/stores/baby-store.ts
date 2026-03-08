@@ -10,7 +10,7 @@ import type { Baby, BabyState } from "../types";
  * Persisted baby data uses timestamps instead of Date objects
  * for proper serialization/deserialization
  */
-interface PersistedBaby {
+export interface PersistedBaby {
   id: string;
   name: string;
   state: BabyState;

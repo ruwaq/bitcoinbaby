@@ -9,7 +9,7 @@ import type { MiningSession } from "../types";
 /**
  * Cumulative stats that persist across sessions
  */
-interface PersistedMiningStats {
+export interface PersistedMiningStats {
   lifetimeHashes: number;
   lifetimeTokens: number;
   lifetimeUptime: number; // Total seconds mined

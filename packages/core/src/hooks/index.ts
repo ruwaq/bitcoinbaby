@@ -63,6 +63,9 @@ export {
   type UseWalletProviderReturn,
 } from "./useWalletProvider";
 
+// Wallet signing hook (core access to signing functions)
+export { useWalletSign, type UseWalletSignReturn } from "./useWalletSign";
+
 // Wallet auto-lock hook (security timeout)
 export { useWalletAutoLock } from "./useWalletAutoLock";
 

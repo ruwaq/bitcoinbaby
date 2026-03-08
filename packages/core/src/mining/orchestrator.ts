@@ -15,6 +15,9 @@ import {
   getNavigator,
 } from "./capabilities";
 import { MIN_DIFFICULTY } from "../tokenomics/constants";
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("Orchestrator");
 import {
   AIWorkIntegration,
   type AIStatus,
@@ -55,9 +58,10 @@ export class MiningOrchestrator {
 
     // Enforce MIN_DIFFICULTY on initial config
     if (this.config.initialDifficulty < MIN_DIFFICULTY) {
-      console.warn(
-        `[Orchestrator] Initial difficulty D${this.config.initialDifficulty} below MIN_DIFFICULTY, using D${MIN_DIFFICULTY}`,
-      );
+      log.warn("Initial difficulty below MIN_DIFFICULTY", {
+        requested: this.config.initialDifficulty,
+        enforced: MIN_DIFFICULTY,
+      });
       this.config.initialDifficulty = MIN_DIFFICULTY;
     }
 
@@ -87,12 +91,12 @@ export class MiningOrchestrator {
   async start(blockData?: string): Promise<void> {
     // Prevent concurrent start() calls
     if (this.isStarting) {
-      console.warn("[Orchestrator] Start already in progress");
+      log.warn("Start already in progress");
       return;
     }
 
     if (this.isRunning) {
-      console.warn("[Orchestrator] Mining already running");
+      log.warn("Mining already running");
       return;
     }
 
@@ -108,9 +112,7 @@ export class MiningOrchestrator {
 
       // Check if stop() was called during detectCapabilities()
       if (this.startCancelled) {
-        console.log(
-          "[Orchestrator] Start cancelled during capability detection",
-        );
+        log.debug("Start cancelled during capability detection");
         this.isRunning = false;
         this.isStarting = false;
         return;
@@ -122,7 +124,7 @@ export class MiningOrchestrator {
 
         // Check again after dynamic import
         if (this.startCancelled) {
-          console.log("[Orchestrator] Start cancelled during WebGPU import");
+          log.debug("Start cancelled during WebGPU import");
           this.isRunning = false;
           this.isStarting = false;
           return;
@@ -145,7 +147,7 @@ export class MiningOrchestrator {
 
       // Final check before starting
       if (this.startCancelled) {
-        console.log("[Orchestrator] Start cancelled before miner.start()");
+        log.debug("Start cancelled before miner.start()");
         this.activeMiner?.terminate();
         this.activeMiner = null;
         this.isRunning = false;
@@ -186,7 +188,7 @@ export class MiningOrchestrator {
       onWorkFound: (result) => this.handleWorkFound(result),
       onStatusChange: (status) => this.events.onStatusChange?.(status),
       onError: (error) => {
-        console.error("[Orchestrator] CPU miner error:", error.message);
+        log.error("CPU miner error", { message: error.message });
         this.events.onError?.(error);
         // CPU is the last resort, so just stop mining
         this.isRunning = false;
@@ -225,21 +227,22 @@ export class MiningOrchestrator {
             ...result,
             aiProof: aiResult.proof,
           };
-          console.log(
-            `[Orchestrator] Share with AI proof (task: ${aiResult.taskId}, time: ${aiResult.computeTime?.toFixed(0)}ms)`,
-          );
+          log.debug("Share with AI proof", {
+            taskId: aiResult.taskId,
+            computeTimeMs: aiResult.computeTime?.toFixed(0),
+          });
           this.events.onWorkFound?.(enhancedResult);
         } else {
           // AI failed or skipped, report share without AI proof
           if (aiResult?.error) {
-            console.warn("[Orchestrator] AI task failed:", aiResult.error);
+            log.warn("AI task failed", { error: aiResult.error });
           }
           this.events.onWorkFound?.(result);
         }
       })
       .catch((error) => {
         // AI completely failed, mining continues normally
-        console.warn("[Orchestrator] AI integration error:", error);
+        log.warn("AI integration error", { error });
         this.events.onWorkFound?.(result);
       });
   }
@@ -320,9 +323,10 @@ export class MiningOrchestrator {
   setDifficulty(difficulty: number): void {
     const safeDifficulty = Math.max(difficulty, MIN_DIFFICULTY);
     if (difficulty < MIN_DIFFICULTY) {
-      console.warn(
-        `[Orchestrator] Difficulty D${difficulty} below MIN_DIFFICULTY, using D${safeDifficulty}`,
-      );
+      log.warn("Difficulty below MIN_DIFFICULTY", {
+        requested: difficulty,
+        enforced: safeDifficulty,
+      });
     }
     this.config.initialDifficulty = safeDifficulty;
     this.activeMiner?.setDifficulty(safeDifficulty);
@@ -369,15 +373,13 @@ export class MiningOrchestrator {
   private async handleMinerError(error: Error): Promise<void> {
     // Prevent concurrent error handling and check if still running
     if (this.isHandlingError || !this.isRunning) {
-      console.log(
-        "[Orchestrator] Skipping error handling (not running or already handling)",
-      );
+      log.debug("Skipping error handling (not running or already handling)");
       return;
     }
     this.isHandlingError = true;
 
     try {
-      console.error("[Orchestrator] Miner error:", error.message);
+      log.error("Miner error", { message: error.message });
 
       // Notify listeners of the error
       this.events.onError?.(error);
@@ -388,14 +390,14 @@ export class MiningOrchestrator {
         this.config.fallbackToCPU &&
         this.capabilities?.workers
       ) {
-        console.log("[Orchestrator] Falling back to CPU mining...");
+        log.info("Falling back to CPU mining...");
 
         // Stop the failed GPU miner
         this.activeMiner.terminate();
 
         // Check if stop() was called during terminate
         if (!this.isRunning) {
-          console.log("[Orchestrator] Stop called during fallback, aborting");
+          log.debug("Stop called during fallback, aborting");
           return;
         }
 
@@ -404,7 +406,7 @@ export class MiningOrchestrator {
 
         // Check again before async start
         if (!this.isRunning) {
-          console.log("[Orchestrator] Stop called before CPU start, aborting");
+          log.debug("Stop called before CPU start, aborting");
           this.activeMiner.terminate();
           this.activeMiner = null;
           return;
@@ -415,17 +417,15 @@ export class MiningOrchestrator {
 
           // Check if stop was called during start
           if (!this.isRunning) {
-            console.log(
-              "[Orchestrator] Stop called during CPU start, stopping",
-            );
+            log.debug("Stop called during CPU start, stopping");
             this.activeMiner.stop();
             return;
           }
 
           this.events.onStatusChange?.("running");
-          console.log("[Orchestrator] CPU fallback successful");
+          log.info("CPU fallback successful");
         } catch (cpuError) {
-          console.error("[Orchestrator] CPU fallback failed:", cpuError);
+          log.error("CPU fallback failed", { error: cpuError });
           this.isRunning = false;
           this.activeMiner = null;
           this.events.onStatusChange?.("stopped");

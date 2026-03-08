@@ -27,6 +27,9 @@ import type {
   XPGainedEvent,
 } from "./types";
 import { MIN_DIFFICULTY } from "../tokenomics/constants";
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("MiningManager");
 import {
   type ClientVarDiffState,
   createInitialClientVarDiffState,
@@ -227,12 +230,12 @@ class MiningManager {
           // difficulty is intentionally NOT restored - use config value
         });
 
-        console.log("[MiningManager] Persistence initialized", {
+        log.info("Persistence initialized", {
           canResume: savedState !== null,
           lifetimeHashes: stats.totalHashes,
         });
       } catch (err) {
-        console.warn("[MiningManager] Persistence init failed:", err);
+        log.warn("Persistence init failed", { error: err });
       }
     }
 
@@ -244,13 +247,13 @@ class MiningManager {
       this.tabCoordinator = new MiningTabCoordinator({
         onBecomeLeader: () => {
           this.updateState({ isLeader: true, isWaitingForLeadership: false });
-          console.log("[MiningManager] This tab is now the mining leader");
+          log.info("This tab is now the mining leader");
         },
         onLostLeadership: () => {
           this.updateState({ isLeader: false });
           // Stop mining if we lose leadership
           if (this.state.isRunning) {
-            console.log("[MiningManager] Lost leadership, stopping mining");
+            log.info("Lost leadership, stopping mining");
             this.stop();
           }
         },
@@ -307,7 +310,7 @@ class MiningManager {
     }
 
     if (this.state.isRunning) {
-      console.warn("[MiningManager] Mining already running");
+      log.warn("Mining already running");
       return;
     }
 
@@ -315,9 +318,7 @@ class MiningManager {
     if (this.tabCoordinator && !this.state.isLeader) {
       const isAnotherMining = await this.tabCoordinator.isAnotherTabMining();
       if (isAnotherMining) {
-        console.log(
-          "[MiningManager] Another tab is mining, requesting leadership...",
-        );
+        log.info("Another tab is mining, requesting leadership...");
         this.updateState({ isWaitingForLeadership: true });
         await this.tabCoordinator.requestLeadership();
       } else {
@@ -384,9 +385,9 @@ class MiningManager {
           sessionUptime: this.getUptime(),
           tokensEarned: 0,
         });
-        console.log("[MiningManager] State saved before stop");
+        log.info("State saved before stop");
       } catch (err) {
-        console.warn("[MiningManager] Failed to save state:", err);
+        log.warn("Failed to save state", { error: err });
       }
     }
 
@@ -459,9 +460,10 @@ class MiningManager {
     const safeDifficulty = Math.max(difficulty, MIN_DIFFICULTY);
 
     if (difficulty < MIN_DIFFICULTY) {
-      console.warn(
-        `[MiningManager] Attempted to set D${difficulty}, enforcing MIN_DIFFICULTY (D${MIN_DIFFICULTY})`,
-      );
+      log.warn("Difficulty below minimum, enforcing MIN_DIFFICULTY", {
+        requested: difficulty,
+        enforced: MIN_DIFFICULTY,
+      });
     }
 
     this.orchestrator?.setDifficulty(safeDifficulty);
@@ -494,9 +496,11 @@ class MiningManager {
       sharesSinceRetarget: 0,
     };
 
-    console.log(
-      `[MiningManager] VarDiff adjustment: D${oldDiff} -> D${safeDifficulty}${newDifficulty < MIN_DIFFICULTY ? ` (clamped from D${newDifficulty})` : ""}`,
-    );
+    log.info("VarDiff adjustment", {
+      oldDiff,
+      newDiff: safeDifficulty,
+      clamped: newDifficulty < MIN_DIFFICULTY ? newDifficulty : undefined,
+    });
 
     return true;
   }
@@ -544,11 +548,13 @@ class MiningManager {
       if (finalDiff !== this.state.difficulty) {
         const oldDiff = this.state.difficulty;
         this.setDifficulty(finalDiff);
-        console.log(
-          `[MiningManager] Client VarDiff: D${oldDiff} -> D${finalDiff} ` +
-            `(hashrate: ${(hashrate / 1_000_000).toFixed(2)} MH/s, ` +
-            `optimal: D${result.newDifficulty}, safe: D${safeDiff})`,
-        );
+        log.info("Client VarDiff adjustment", {
+          oldDiff,
+          newDiff: finalDiff,
+          hashrateMH: (hashrate / 1_000_000).toFixed(2),
+          optimalDiff: result.newDifficulty,
+          safeDiff,
+        });
       }
     }
   }
@@ -576,10 +582,11 @@ class MiningManager {
       if (diff >= 1) {
         const oldDiff = this.state.difficulty;
         this.setDifficulty(result.adjustment.newDifficulty);
-        console.log(
-          `[MiningManager] Client VarDiff timing adjustment: D${oldDiff} -> D${result.adjustment.newDifficulty} ` +
-            `(${result.adjustment.reason})`,
-        );
+        log.info("Client VarDiff timing adjustment", {
+          oldDiff,
+          newDiff: result.adjustment.newDifficulty,
+          reason: result.adjustment.reason,
+        });
       }
     }
   }
@@ -672,7 +679,7 @@ class MiningManager {
    * Does NOT clear: share queue (use SyncManager for that)
    */
   async resetAllMiningData(): Promise<void> {
-    console.log("[MiningManager] Resetting all mining data...");
+    log.info("Resetting all mining data...");
 
     // Stop mining first
     this.orchestrator?.stop();
@@ -693,7 +700,7 @@ class MiningManager {
       lifetimeShares: 0,
     });
 
-    console.log("[MiningManager] All mining data reset complete");
+    log.info("All mining data reset complete");
   }
 
   /**
@@ -718,12 +725,12 @@ class MiningManager {
 
       // Fire-and-forget save - can't await in beforeunload
       this.persistence.saveState(stateToSave).catch((err) => {
-        console.warn("[MiningManager] Force save failed:", err);
+        log.warn("Force save failed", { error: err });
       });
 
-      console.log("[MiningManager] Force save triggered");
+      log.debug("Force save triggered");
     } catch (err) {
-      console.warn("[MiningManager] Force save error:", err);
+      log.warn("Force save error", { error: err });
     }
   }
 
