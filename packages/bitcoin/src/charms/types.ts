@@ -1,5 +1,5 @@
 /**
- * Charms Protocol Types (v10)
+ * Charms Protocol Types
  *
  * Core types for Charms protocol integration.
  * Based on official Charms documentation and BRO reference implementation.
@@ -7,7 +7,17 @@
  * Protocol Version History:
  * - v2: Initial implementation
  * - v7: BRO token launch
- * - v10: Current (January 2026, SP1 v4.0.1)
+ * - v9: PoW Direct (CLI 0.11.1)
+ * - v10: Merkle Proofs
+ * - v11: Current (CLI v11.0.1)
+ *
+ * NEW: Version-specific types are now available in ./versions/
+ * @see ./versions/v9 - Direct PoW validation
+ * @see ./versions/v10 - Merkle proof validation
+ * @see ./versions/v11 - Current format
+ *
+ * This file maintains backwards compatibility. New code should prefer
+ * importing from the versioned modules for cleaner organization.
  */
 
 import {
