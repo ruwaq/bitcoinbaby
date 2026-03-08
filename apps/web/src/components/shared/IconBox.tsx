@@ -5,10 +5,13 @@
  *
  * Provides consistent sizing and styling for emoji icons.
  * Supports both emoji strings and HTML entity codes.
+ *
+ * SECURITY: Uses decodeHTMLEntities instead of dangerouslySetInnerHTML
+ * to prevent XSS vulnerabilities while still supporting HTML entities.
  */
 
 export interface IconBoxProps {
-  /** The icon/emoji to display */
+  /** The icon/emoji to display (emoji character or HTML entity like &#9935;) */
   icon: string;
   /** Size variant */
   size?: "xs" | "sm" | "md" | "lg" | "xl" | "2xl";
@@ -35,6 +38,27 @@ const animationClasses = {
   none: "",
 } as const;
 
+/**
+ * Decode HTML numeric entities to their character equivalents.
+ * Only supports numeric entities (&#NNN; or &#xHHH;) for safety.
+ *
+ * @example
+ * decodeHTMLEntities("&#9935;") // "⛏" (pickaxe)
+ * decodeHTMLEntities("&#128165;") // "💥" (explosion)
+ * decodeHTMLEntities("🔥") // "🔥" (unchanged)
+ */
+function decodeHTMLEntities(text: string): string {
+  // Match decimal entities like &#9935; or hex entities like &#x26CF;
+  return text.replace(/&#(\d+);|&#x([0-9a-fA-F]+);/g, (_, dec, hex) => {
+    const codePoint = dec ? parseInt(dec, 10) : parseInt(hex, 16);
+    // Only decode valid Unicode code points
+    if (codePoint > 0 && codePoint <= 0x10ffff) {
+      return String.fromCodePoint(codePoint);
+    }
+    return ""; // Invalid code point, return empty
+  });
+}
+
 export function IconBox({
   icon,
   size = "md",
@@ -50,12 +74,13 @@ export function IconBox({
     .filter(Boolean)
     .join(" ");
 
+  // Decode HTML entities to actual characters (safe operation)
+  const decodedIcon = decodeHTMLEntities(icon);
+
   return (
-    <div
-      className={classes}
-      dangerouslySetInnerHTML={{ __html: icon }}
-      aria-hidden="true"
-    />
+    <div className={classes} aria-hidden="true">
+      {decodedIcon}
+    </div>
   );
 }
 

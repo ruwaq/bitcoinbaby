@@ -65,20 +65,20 @@ export function ConfirmActionModal() {
   };
 
   // Get icon based on overlay type
+  // Using actual Unicode characters instead of HTML entities for security
   const getIcon = () => {
-    if (activeOverlay === "confirm-reset") return "&#128165;"; // explosion
-    if (activeOverlay === "delete-wallet") return "&#128679;"; // warning
-    if (destructive) return "&#9888;"; // warning sign
-    return "&#10067;"; // question mark
+    if (activeOverlay === "confirm-reset") return "💥"; // explosion
+    if (activeOverlay === "delete-wallet") return "🚧"; // warning
+    if (destructive) return "⚠"; // warning sign
+    return "❓"; // question mark
   };
 
   return (
     <div className="p-6 max-w-sm w-full">
       <div className="text-center mb-6">
-        <div
-          className="text-4xl mb-3"
-          dangerouslySetInnerHTML={{ __html: getIcon() }}
-        />
+        <div className="text-4xl mb-3" aria-hidden="true">
+          {getIcon()}
+        </div>
         <h2
           className={`font-pixel text-lg ${destructive ? "text-pixel-error" : "text-pixel-primary"}`}
         >
