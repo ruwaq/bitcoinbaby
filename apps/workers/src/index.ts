@@ -31,6 +31,7 @@ import {
   historyRouter,
   gameRouter,
   claimRouter,
+  engagementRouter,
 } from "./routes";
 
 // Re-export Durable Objects
@@ -149,6 +150,9 @@ app.route("/api/history", historyRouter);
 
 // Claim system (user-paid settlement)
 app.route("/api/claim", claimRouter);
+
+// Engagement tracking (daily login, baby care, play time)
+app.route("/api/engagement", engagementRouter);
 
 // =============================================================================
 // SCHEDULED TASKS (Cron)

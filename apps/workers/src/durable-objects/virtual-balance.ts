@@ -38,7 +38,6 @@ import {
 import {
   validateMiningProof,
   checkRateLimit,
-  calculateRewardWithStreak,
   getStreakMultiplier,
   isProofUsedGlobally,
   markProofUsedGlobally,
@@ -55,6 +54,13 @@ import {
   VARDIFF_CONFIG,
 } from "../lib/vardiff";
 import { getRedis, updateAllPeriods, updateUserStats } from "../lib/redis";
+import { getNFTBoostData, getNFTMultiplier } from "../lib/nft-boost";
+import {
+  getEngagementBoostData,
+  getEngagementMultiplier,
+} from "../lib/engagement-boost";
+import { getCosmicBoostData, getCosmicMultiplier } from "../lib/cosmic-boost";
+import { MULTIPLIER_CONFIG } from "../lib/reward-multipliers";
 
 // Minimum withdraw amount (from env)
 const DEFAULT_MIN_WITHDRAW = 100n;
@@ -753,13 +759,109 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     const streakMultiplier = getStreakMultiplier(consecutiveShares);
 
     // =========================================================================
-    // SECURITY: Calculate reward SERVER-SIDE (never trust client)
+    // Calculate NFT boost (server-side, from Redis)
     // =========================================================================
-    const boostedReward = calculateRewardWithStreak(
-      proofWithNonce.difficulty,
-      consecutiveShares,
-    );
+    let nftMultiplier = 1.0;
+    let nftBoostPercent = 0;
+    let userBabyType = "human"; // Default fallback
+
+    if (MULTIPLIER_CONFIG.enabled.nft) {
+      try {
+        const redis = getRedis(this.env);
+        const nftData = await getNFTBoostData(redis, this.address!);
+        nftBoostPercent = nftData.totalBoostPercent;
+        nftMultiplier = getNFTMultiplier(nftBoostPercent);
+        userBabyType = nftData.bestNFTBaseType;
+
+        if (nftBoostPercent > 0) {
+          balanceLogger.debug("NFT boost applied", {
+            address: this.address!.slice(0, 10),
+            nftCount: nftData.nftCount,
+            boostPercent: nftBoostPercent.toFixed(2),
+            multiplier: nftMultiplier.toFixed(3),
+            babyType: userBabyType,
+          });
+        }
+      } catch (error) {
+        // NFT boost is non-critical - continue without it
+        balanceLogger.warn("NFT boost fetch failed", { error });
+      }
+    }
+
+    // =========================================================================
+    // Calculate Engagement boost (server-side, from Redis)
+    // =========================================================================
+    let engagementMultiplier = 1.0;
+    let engagementBoostPercent = 0;
+
+    if (MULTIPLIER_CONFIG.enabled.engagement) {
+      try {
+        const redis = getRedis(this.env);
+        const engagementData = await getEngagementBoostData(
+          redis,
+          this.address!,
+        );
+        engagementBoostPercent = engagementData.totalBoostPercent;
+        engagementMultiplier = getEngagementMultiplier(engagementBoostPercent);
+
+        if (engagementBoostPercent > 0) {
+          balanceLogger.debug("Engagement boost applied", {
+            address: this.address!.slice(0, 10),
+            boostPercent: engagementBoostPercent.toFixed(2),
+            breakdown: engagementData.breakdown,
+          });
+        }
+      } catch (error) {
+        // Engagement boost is non-critical - continue without it
+        balanceLogger.warn("Engagement boost fetch failed", { error });
+      }
+    }
+
+    // =========================================================================
+    // Calculate Cosmic boost (server-side, pure math calculations)
+    // =========================================================================
+    let cosmicMultiplier = 1.0;
+    let cosmicBoostPercent = 0;
+    let cosmicStatus = "normal";
+
+    if (MULTIPLIER_CONFIG.enabled.cosmic) {
+      try {
+        // Baby type comes from user's best NFT (fetched above)
+        const cosmicData = getCosmicBoostData(userBabyType);
+        cosmicBoostPercent = cosmicData.totalBoostPercent;
+        cosmicMultiplier = getCosmicMultiplier(cosmicBoostPercent);
+        cosmicStatus = cosmicData.status;
+
+        if (cosmicBoostPercent !== 0) {
+          balanceLogger.debug("Cosmic boost applied", {
+            address: this.address!.slice(0, 10),
+            boostPercent: cosmicBoostPercent.toFixed(2),
+            moonPhase: cosmicData.state.moonPhase,
+            season: cosmicData.state.season,
+            status: cosmicStatus,
+          });
+        }
+      } catch (error) {
+        // Cosmic boost is non-critical - continue without it
+        balanceLogger.warn("Cosmic boost calc failed", { error });
+      }
+    }
+
+    // =========================================================================
+    // SECURITY: Calculate reward SERVER-SIDE (never trust client)
+    // Combines: base × streak × nft × engagement × cosmic (with safety cap)
+    // =========================================================================
     const baseReward = proofValidation.calculatedReward!;
+    const combinedMultiplier = Math.min(
+      streakMultiplier *
+        nftMultiplier *
+        engagementMultiplier *
+        cosmicMultiplier,
+      MULTIPLIER_CONFIG.maxTotalMultiplier,
+    );
+    const boostedReward = BigInt(
+      Math.floor(Number(baseReward) * combinedMultiplier),
+    );
 
     // =========================================================================
     // CRITICAL: Mark proof globally FIRST (prevents cross-address double-spend)
@@ -878,7 +980,11 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       reward: boostedReward.toString(),
       difficulty: proofWithNonce.difficulty,
       streak: balance.streakCount,
-      multiplier: streakMultiplier.toFixed(2),
+      streakMultiplier: streakMultiplier.toFixed(2),
+      nftBoost: nftBoostPercent.toFixed(2),
+      engagementBoost: engagementBoostPercent.toFixed(2),
+      cosmicBoost: cosmicBoostPercent.toFixed(2),
+      totalMultiplier: combinedMultiplier.toFixed(3),
     });
 
     // =========================================================================
@@ -887,7 +993,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     this.updateLeaderboardAsync(this.address, balance.totalMined);
 
     // =========================================================================
-    // Response (includes VarDiff suggested difficulty)
+    // Response (includes VarDiff, NFT boost, and Engagement boost)
     // =========================================================================
     const response: ApiResponse<{
       credited: string;
@@ -899,6 +1005,22 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         baseReward: string;
         boostedReward: string;
         nextTierAt: number;
+      };
+      nftBoost: {
+        multiplier: number;
+        boostPercent: number;
+        enabled: boolean;
+      };
+      engagementBoost: {
+        multiplier: number;
+        boostPercent: number;
+        enabled: boolean;
+      };
+      cosmicBoost: {
+        multiplier: number;
+        boostPercent: number;
+        status: string;
+        enabled: boolean;
       };
       varDiff: {
         suggestedDifficulty: number;
@@ -917,6 +1039,22 @@ export class VirtualBalanceDO extends DurableObject<Env> {
           baseReward: baseReward.toString(),
           boostedReward: boostedReward.toString(),
           nextTierAt: this.getNextStreakTier(balance.streakCount),
+        },
+        nftBoost: {
+          multiplier: nftMultiplier,
+          boostPercent: nftBoostPercent,
+          enabled: MULTIPLIER_CONFIG.enabled.nft,
+        },
+        engagementBoost: {
+          multiplier: engagementMultiplier,
+          boostPercent: engagementBoostPercent,
+          enabled: MULTIPLIER_CONFIG.enabled.engagement,
+        },
+        cosmicBoost: {
+          multiplier: cosmicMultiplier,
+          boostPercent: cosmicBoostPercent,
+          status: cosmicStatus,
+          enabled: MULTIPLIER_CONFIG.enabled.cosmic,
         },
         varDiff: {
           suggestedDifficulty: this.difficultyState!.currentDiff,

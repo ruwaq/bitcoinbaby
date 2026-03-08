@@ -10,3 +10,4 @@ export { nftRouter } from "./nft";
 export { adminRouter, historyRouter } from "./admin";
 export { gameRouter } from "./game";
 export { claimRouter } from "./claim";
+export { engagementRouter } from "./engagement";

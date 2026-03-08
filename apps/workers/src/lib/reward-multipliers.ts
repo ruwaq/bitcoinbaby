@@ -50,9 +50,9 @@ export interface MultiplierConfig {
 export const MULTIPLIER_CONFIG: MultiplierConfig = {
   enabled: {
     streak: true, // ✅ Works server-side
-    nft: false, // ⏳ Disabled - needs blockchain validation
-    engagement: false, // ⏳ Disabled - needs server state
-    cosmic: false, // ⏳ Disabled - needs server state + astronomical API
+    nft: true, // ✅ Works server-side - queries Redis for NFT ownership
+    engagement: true, // ✅ Works server-side - tracks daily login, play time, baby care
+    cosmic: true, // ✅ Works server-side - pure math moon/season calculations
   },
   maxTotalMultiplier: 2.5, // Safety cap
 };
