@@ -412,6 +412,23 @@ export interface BuildStats {
 
 /**
  * Build the sprite library for inscription
+ *
+ * STATUS: PLACEHOLDER - Not production-ready
+ *
+ * This function creates placeholder entries for the sprite library
+ * inscription system. Full implementation requires:
+ *
+ * 1. Extract actual SVG path data from React components
+ *    (packages/ui/src/components/sprites/genesis/)
+ * 2. Optimize SVG for on-chain storage
+ * 3. Create recursive inscription structure
+ *
+ * The placeholder data is used for:
+ * - Cost estimation
+ * - Structure validation
+ * - Development testing
+ *
+ * @see packages/ui/src/components/sprites/genesis/ for actual sprites
  */
 export async function buildSpriteLibrary(): Promise<BuildResult> {
   const components = new Map<string, string>();
@@ -419,8 +436,8 @@ export async function buildSpriteLibrary(): Promise<BuildResult> {
   let largest = { name: "", size: 0 };
   let smallest = { name: "", size: Infinity };
 
-  // Note: In production, this would extract SVG components from the React sprites
-  // For now, we'll create placeholder entries
+  // PLACEHOLDER: These are estimated sizes, not actual SVG data
+  // TODO: Implement SVG extraction from React sprite components
 
   const componentDefs: Array<{ id: string; category: string; size: number }> = [
     // Base types

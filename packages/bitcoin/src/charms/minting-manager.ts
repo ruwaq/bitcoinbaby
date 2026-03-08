@@ -48,6 +48,9 @@ import {
 import { TransactionBuilder, createTransactionBuilder } from "../transactions";
 import type { BitcoinNetwork } from "../types";
 import { BABTC_TESTNET4 } from "../config/deployment";
+import { createLogger } from "@bitcoinbaby/shared";
+
+const mintingLog = createLogger("MintingManager");
 
 // =============================================================================
 // TYPES
@@ -838,11 +841,11 @@ export class MintingManager {
   }
 
   /**
-   * Debug logging
+   * Debug logging (uses centralized logger)
    */
   private log(message: string, data?: unknown): void {
     if (this.debug) {
-      console.log(`[MintingManager] ${message}`, data || "");
+      mintingLog.debug(message, data as Record<string, unknown>);
     }
   }
 }

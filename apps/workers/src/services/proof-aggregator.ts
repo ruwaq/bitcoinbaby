@@ -187,11 +187,19 @@ export class ProofAggregator {
   }
 
   /**
-   * Create claim data for Bitcoin TX (sync wrapper - generates opReturn data only)
+   * Create claim data for Bitcoin TX (sync wrapper)
+   *
+   * @deprecated Use createClaimDataAsync() instead.
+   * This sync version generates a PLACEHOLDER signature that is NOT valid
+   * for on-chain verification. It should only be used for:
+   * 1. Preview/estimation purposes
+   * 2. Generating unsigned data structure
+   *
+   * For production claims, ALWAYS use createClaimDataAsync().
    */
   createClaimData(proof: AggregatedProof, estimatedFee: number): ClaimData {
-    // For sync operation, we'll generate a placeholder signature
-    // The actual signing should be done async
+    // WARNING: This generates a placeholder signature that is NOT VALID
+    // for on-chain verification. Use createClaimDataAsync() for real claims.
     const signatureMessage = this.createSignatureMessage(proof);
     const placeholderSignature = `pending:${signatureMessage.slice(0, 32)}`;
     const opReturnData = this.encodeOpReturnSync(proof, placeholderSignature);
@@ -201,6 +209,8 @@ export class ProofAggregator {
       serverSignature: placeholderSignature,
       opReturnData,
       estimatedFee,
+      // @ts-expect-error - Flag indicating this needs async finalization
+      _requiresAsyncFinalization: true,
     };
   }
 

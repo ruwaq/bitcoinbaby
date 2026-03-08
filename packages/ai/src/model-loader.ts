@@ -1,7 +1,21 @@
 /**
  * Model Loader - Carga y cache de modelos ML
  *
- * Maneja la descarga y cache de modelos quantizados para browser.
+ * @deprecated Use AIEngine from './engine' instead.
+ * AIEngine provides real Transformers.js integration with WebGPU support.
+ * This module is kept for backwards compatibility only.
+ *
+ * Migration:
+ * ```typescript
+ * // Old (deprecated):
+ * const loader = new ModelLoader();
+ * await loader.load('model-name');
+ *
+ * // New (recommended):
+ * import { AIEngine } from '@bitcoinbaby/ai';
+ * const engine = new AIEngine();
+ * await engine.initialize();
+ * ```
  */
 
 interface ModelInfo {
@@ -14,8 +28,8 @@ interface ModelInfo {
 interface LoadProgress {
   model: string;
   progress: number; // 0-100
-  loaded: number;   // bytes
-  total: number;    // bytes
+  loaded: number; // bytes
+  total: number; // bytes
 }
 
 type ProgressCallback = (progress: LoadProgress) => void;
@@ -25,20 +39,20 @@ type ProgressCallback = (progress: LoadProgress) => void;
  */
 export const RECOMMENDED_MODELS: ModelInfo[] = [
   {
-    name: 'Xenova/all-MiniLM-L6-v2',
-    task: 'feature-extraction',
+    name: "Xenova/all-MiniLM-L6-v2",
+    task: "feature-extraction",
     size: 25_000_000, // ~25MB
     quantized: true,
   },
   {
-    name: 'Xenova/distilbert-base-uncased',
-    task: 'text-classification',
+    name: "Xenova/distilbert-base-uncased",
+    task: "text-classification",
     size: 65_000_000, // ~65MB
     quantized: true,
   },
   {
-    name: 'Xenova/whisper-tiny',
-    task: 'automatic-speech-recognition',
+    name: "Xenova/whisper-tiny",
+    task: "automatic-speech-recognition",
     size: 40_000_000, // ~40MB
     quantized: true,
   },
@@ -46,6 +60,9 @@ export const RECOMMENDED_MODELS: ModelInfo[] = [
 
 /**
  * Cargador de modelos con soporte de progreso y cache
+ *
+ * @deprecated Use AIEngine instead. This class simulates model loading
+ * but does not actually load real ML models. See module docs for migration.
  */
 export class ModelLoader {
   private loadedModels: Map<string, any> = new Map();
@@ -54,10 +71,7 @@ export class ModelLoader {
   /**
    * Carga un modelo con reporte de progreso
    */
-  async load(
-    modelName: string,
-    onProgress?: ProgressCallback
-  ): Promise<any> {
+  async load(modelName: string, onProgress?: ProgressCallback): Promise<any> {
     // Si ya esta cargado, retornar
     if (this.loadedModels.has(modelName)) {
       return this.loadedModels.get(modelName);
@@ -86,7 +100,7 @@ export class ModelLoader {
    */
   private async loadModel(
     modelName: string,
-    onProgress?: ProgressCallback
+    onProgress?: ProgressCallback,
   ): Promise<any> {
     // TODO: Implementar carga real con Transformers.js
     // import { pipeline } from '@huggingface/transformers';

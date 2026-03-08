@@ -11,6 +11,9 @@ import type { BitcoinNetwork } from "../types";
 import type { UTXO } from "../blockchain/types";
 import type { SpellConfig } from "../scrolls/types";
 import type { SpellV2, SpellV10 } from "../charms/types";
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("TxBuilder");
 
 // Spell type union - supports v1, v2, and v10 formats
 type Spell = SpellConfig | SpellV2 | SpellV10;
@@ -532,9 +535,7 @@ export class TransactionBuilder {
       } else if (input.nonWitnessUtxo) {
         // For non-witness inputs, parse the previous tx to get the value
         // This is more complex and rarely needed for our use case
-        console.warn(
-          "Non-witness UTXO found, fee calculation may be inaccurate",
-        );
+        log.warn("Non-witness UTXO found, fee calculation may be inaccurate");
       }
     }
 

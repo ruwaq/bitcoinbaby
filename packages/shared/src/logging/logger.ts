@@ -204,6 +204,73 @@ class LoggerService {
 export const logger = new LoggerService();
 
 /**
+ * Detect if running in production environment.
+ * Works in Node.js, browsers, and Cloudflare Workers.
+ *
+ * Detection order:
+ * 1. globalThis.process.env.NODE_ENV (Node.js)
+ * 2. Default to development (safer for debugging)
+ *
+ * In production deployments, call initLogger({ env: 'production' })
+ * explicitly or set NODE_ENV before importing.
+ */
+function isProduction(): boolean {
+  try {
+    // Check globalThis for universal access
+    const g = globalThis as Record<string, unknown>;
+
+    // Node.js / bundler with process shim
+    if (typeof g.process === "object" && g.process !== null) {
+      const proc = g.process as { env?: { NODE_ENV?: string } };
+      if (proc.env?.NODE_ENV === "production") return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Initialize logger based on environment.
+ *
+ * Call this once at app startup:
+ * - Production: Only ERROR and WARN
+ * - Development: All levels including DEBUG
+ *
+ * @example
+ * // In app initialization
+ * import { initLogger } from '@bitcoinbaby/shared';
+ * initLogger();
+ */
+export function initLogger(options?: {
+  /** Force a specific log level */
+  level?: LogLevel;
+  /** Environment override (default: auto-detect) */
+  env?: "production" | "development";
+}): void {
+  const env = options?.env ?? (isProduction() ? "production" : "development");
+
+  if (options?.level !== undefined) {
+    logger.setLevel(options.level);
+  } else if (env === "production") {
+    // Production: Only warnings and errors
+    logger.setLevel(LogLevel.WARN);
+  } else {
+    // Development: All logs including debug
+    logger.setLevel(LogLevel.DEBUG);
+  }
+}
+
+/**
+ * Check if debug logging is enabled
+ * Useful for expensive debug computations
+ */
+export function isDebugEnabled(): boolean {
+  return logger.getLevel() <= LogLevel.DEBUG;
+}
+
+/**
  * Create a module-specific logger
  *
  * @example

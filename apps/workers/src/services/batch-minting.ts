@@ -394,15 +394,30 @@ export interface DirectMintResult {
 /**
  * Create a direct mint transaction for a user
  *
+ * STATUS: NOT IMPLEMENTED
+ *
  * This is an alternative flow where each user's mining proof
- * is converted to on-chain tokens individually (like BRO).
+ * is converted to on-chain tokens individually (like BRO token).
  *
- * Requires:
- * 1. User has UTXOs for transaction fees
- * 2. Mining proof is valid and not already minted
+ * The implementation exists in `packages/bitcoin/src/charms/minting-manager.ts`
+ * but is not yet integrated into Cloudflare Workers due to:
+ * 1. WASM/bitcoinjs-lib compatibility with Workers runtime
+ * 2. Signing flow requires client-side wallet interaction
  *
- * Returns a PSBT that user needs to sign and broadcast.
- * After confirmation, the spell TX can be created.
+ * CURRENT WORKAROUND:
+ * Use batch minting via WithdrawPool instead:
+ * 1. User mines and accumulates virtual balance
+ * 2. User requests withdrawal to BTC address
+ * 3. System batches withdrawals and mints on-chain
+ *
+ * FUTURE IMPLEMENTATION:
+ * Integrate MintingManager.createMintV9() flow:
+ * 1. Build mining TX with OP_RETURN
+ * 2. Return PSBT for client signing
+ * 3. Broadcast and wait for confirmation
+ * 4. Generate Merkle proof and submit to Prover
+ *
+ * @see packages/bitcoin/src/charms/minting-manager.ts
  */
 export async function createDirectMintTransaction(
   _proof: MiningProofForMint,
@@ -410,13 +425,12 @@ export async function createDirectMintTransaction(
   _minerPublicKey: string,
   _utxos: Array<{ txid: string; vout: number; value: number }>,
 ): Promise<DirectMintResult> {
-  // This is a placeholder for the direct mint flow
-  // The actual implementation would use MintingManager from packages/bitcoin
-
-  // For now, return a not-implemented error
+  // Direct mint not yet available in Workers environment
+  // Use batch minting via WithdrawPool API instead
   return {
     success: false,
     error:
-      "Direct mint flow not yet integrated. Use batch minting via WithdrawPool.",
+      "Direct mint not available. Use POST /api/withdraw to queue withdrawal, " +
+      "then batch minting will process your tokens automatically.",
   };
 }

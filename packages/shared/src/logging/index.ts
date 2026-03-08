@@ -2,9 +2,12 @@
  * Logging Module
  *
  * @example
- * import { createLogger, LogLevel, logger } from '@bitcoinbaby/shared/logging';
+ * import { createLogger, LogLevel, logger, initLogger } from '@bitcoinbaby/shared/logging';
  *
- * // Set global log level
+ * // Initialize logger for environment (call once at app start)
+ * initLogger(); // Auto-detects prod/dev
+ *
+ * // Or set global log level manually
  * logger.setLevel(LogLevel.DEBUG);
  *
  * // Create module logger
@@ -15,6 +18,8 @@
 export {
   logger,
   createLogger,
+  initLogger,
+  isDebugEnabled,
   LogLevel,
   type LogEntry,
   type LogHandler,

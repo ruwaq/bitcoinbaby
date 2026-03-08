@@ -32,6 +32,31 @@ import {
   paginationSchema,
 } from "../lib/middleware";
 
+// =============================================================================
+// DETERMINISTIC RANDOM (for NFT trait generation)
+// =============================================================================
+
+/**
+ * Create a seeded random number generator based on txid.
+ * Ensures NFT traits are deterministic and verifiable.
+ */
+function createSeededRandom(seed: string): () => number {
+  const bytes: number[] = [];
+  for (let i = 0; i < seed.length; i += 2) {
+    bytes.push(parseInt(seed.slice(i, i + 2), 16) || 0);
+  }
+  let index = 0;
+  let state = bytes.reduce((a, b) => (a * 31 + b) >>> 0, 0);
+  return () => {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    state = state >>> 0;
+    if (index < bytes.length) state = (state + bytes[index++]) >>> 0;
+    return state / 0xffffffff;
+  };
+}
+
 export const adminRouter = new Hono<{ Bindings: Env }>();
 export const historyRouter = new Hono<{ Bindings: Env }>();
 
@@ -263,11 +288,12 @@ adminRouter.post(
       const redis = getRedis(c.env);
       const mintedAt = Date.now();
 
-      // Generate random NFT data if not provided
+      // Generate deterministic NFT data based on txid (if not provided)
+      const seededRandom = createSeededRandom(txid);
       const randomDna =
         body.dna ||
         Array.from({ length: 64 }, () =>
-          Math.floor(Math.random() * 16).toString(16),
+          Math.floor(seededRandom() * 16).toString(16),
         ).join("");
 
       const bloodlines = ["royal", "warrior", "rogue", "mystic"] as const;
@@ -287,10 +313,10 @@ adminRouter.post(
         dna: randomDna,
         bloodline:
           body.bloodline ||
-          bloodlines[Math.floor(Math.random() * bloodlines.length)],
+          bloodlines[Math.floor(seededRandom() * bloodlines.length)],
         baseType:
           body.baseType ||
-          baseTypes[Math.floor(Math.random() * baseTypes.length)],
+          baseTypes[Math.floor(seededRandom() * baseTypes.length)],
         rarityTier: body.rarityTier || "common",
         level: 1,
         xp: 0,

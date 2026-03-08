@@ -53,7 +53,13 @@ interface GenesisBabySpriteProps {
 }
 
 /**
- * Genera traits aleatorios para un nuevo NFT
+ * Genera traits aleatorios para PREVIEW/DEMO solamente.
+ *
+ * WARNING: NOT for production minting!
+ * Real NFT traits are generated server-side using deterministic
+ * randomness based on txid (see apps/workers/src/routes/nft.ts).
+ *
+ * Use traitsFromHash() for deterministic trait generation from DNA/hash.
  */
 export function generateRandomTraits(): GenesisBabyTraits {
   const baseTypes: BaseType[] = [

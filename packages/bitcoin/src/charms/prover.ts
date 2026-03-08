@@ -76,7 +76,10 @@ import {
   PROVER_API,
   getProverUrl as getConfiguredProverUrl,
   HTTP_TIMEOUTS,
+  createLogger,
 } from "@bitcoinbaby/shared";
+
+const proverLog = createLogger("CharmsProver");
 
 /**
  * Charms Prover API URLs
@@ -883,11 +886,11 @@ export class CharmsProverClient {
   }
 
   /**
-   * Debug logging
+   * Debug logging (uses centralized logger)
    */
   private log(message: string, data?: unknown): void {
     if (this.debug) {
-      console.log(`[CharmsProver] ${message}`, data || "");
+      proverLog.debug(message, data as Record<string, unknown>);
     }
   }
 }

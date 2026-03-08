@@ -130,26 +130,29 @@ export class BABTCBalanceService {
   /**
    * Get pending mining rewards for an address
    *
-   * Checks for unconfirmed transactions that contain mining spells.
-   * This is an estimate based on mempool data.
+   * STATUS: NOT IMPLEMENTED - Returns 0n
    *
-   * Note: Full pending reward tracking requires parsing spell data
-   * from transaction witnesses, which is not yet implemented.
-   * For now, we return 0 and rely on confirmed balances.
+   * Full pending reward tracking requires parsing spell data from
+   * transaction witnesses, which depends on charms-wallet-js SDK
+   * supporting spell witness parsing.
    *
-   * TODO: Implement full pending reward tracking when charms-wallet-js
-   * provides spell parsing utilities.
+   * Current behavior:
+   * - Always returns 0n (no pending rewards shown)
+   * - Confirmed balances from Scrolls API are authoritative
+   * - Users see balance updates after transaction confirms
+   *
+   * Future implementation (when SDK support available):
+   * 1. Get unconfirmed transactions for the address
+   * 2. Parse spell witness data from each TX
+   * 3. Extract pending mint amounts
+   * 4. Sum and return pending rewards
+   *
+   * Tracking issue: Consider using virtual balance from workers API
+   * as a workaround for pending rewards until SDK support.
    */
   async getPendingRewards(_address: string): Promise<bigint> {
-    // Currently returns 0 as full pending reward tracking requires
-    // parsing spell data from transaction witnesses.
-    // The Scrolls API provides confirmed balances which are authoritative.
-    //
-    // Future implementation will:
-    // 1. Get unconfirmed transactions for the address
-    // 2. Parse spell witness data from each TX
-    // 3. Extract pending mint amounts
-    // 4. Sum and return pending rewards
+    // Returns 0n - pending rewards not tracked yet
+    // Confirmed balances from getBalance() are authoritative
     return 0n;
   }
 

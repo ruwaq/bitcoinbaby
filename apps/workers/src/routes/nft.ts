@@ -36,6 +36,45 @@ import {
 import { nftLogger } from "../lib/logger";
 import { getNFTMintingService } from "../services/nft-minting-service";
 
+// =============================================================================
+// DETERMINISTIC RANDOM (from txid seed)
+// =============================================================================
+
+/**
+ * Create a seeded random number generator based on txid.
+ * This ensures NFT traits are deterministic and verifiable.
+ *
+ * Uses a simple but effective hash-based approach:
+ * 1. Convert txid to numbers
+ * 2. Use those as seed for deterministic sequence
+ */
+function createSeededRandom(txid: string): () => number {
+  // Convert txid hex to array of numbers
+  const bytes: number[] = [];
+  for (let i = 0; i < txid.length; i += 2) {
+    bytes.push(parseInt(txid.slice(i, i + 2), 16) || 0);
+  }
+
+  let index = 0;
+  let state = bytes.reduce((a, b) => (a * 31 + b) >>> 0, 0);
+
+  return () => {
+    // Xorshift algorithm - fast and good quality
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    state = state >>> 0; // Keep as unsigned 32-bit
+
+    // Mix in next byte from txid for more entropy
+    if (index < bytes.length) {
+      state = (state + bytes[index++]) >>> 0;
+    }
+
+    // Return as 0-1 range
+    return state / 0xffffffff;
+  };
+}
+
 export const nftRouter = new Hono<{ Bindings: Env }>();
 
 // Create marketplace logger
@@ -659,15 +698,17 @@ nftRouter.post("/claim", validateBody(claimNftSchema), async (c) => {
     const tokenId = claimCount;
     const mintedAt = Date.now();
 
-    // Generate random traits for legacy mint
+    // Generate deterministic traits based on txid (verifiable and fair)
+    const seededRandom = createSeededRandom(txid);
+
     const randomDna = Array.from({ length: 64 }, () =>
-      Math.floor(Math.random() * 16).toString(16),
+      Math.floor(seededRandom() * 16).toString(16),
     ).join("");
 
     const bloodlines = ["royal", "warrior", "rogue", "mystic"];
     const baseTypes = ["human", "animal", "robot", "mystic", "alien"];
 
-    const rarityRoll = Math.random() * 100;
+    const rarityRoll = seededRandom() * 100;
     let rarityTier: string;
     if (rarityRoll < 50) rarityTier = "common";
     else if (rarityRoll < 75) rarityTier = "uncommon";
@@ -682,8 +723,8 @@ nftRouter.post("/claim", validateBody(claimNftSchema), async (c) => {
       address,
       mintedAt,
       dna: randomDna,
-      bloodline: bloodlines[Math.floor(Math.random() * bloodlines.length)],
-      baseType: baseTypes[Math.floor(Math.random() * baseTypes.length)],
+      bloodline: bloodlines[Math.floor(seededRandom() * bloodlines.length)],
+      baseType: baseTypes[Math.floor(seededRandom() * baseTypes.length)],
       rarityTier,
       level: 1,
       xp: 0,

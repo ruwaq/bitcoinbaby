@@ -27,6 +27,9 @@ import {
   extractCharmsForWallet as charmsJsExtract,
   type CharmObj,
 } from "charms-js";
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("CharmsClient");
 
 // =============================================================================
 // CLIENT OPTIONS
@@ -374,9 +377,11 @@ export class CharmsClient {
         errorCount++;
         // Log first few errors for debugging (not all to avoid spam)
         if (errorCount <= 3) {
-          console.warn(
-            `[CharmsClient] Failed to extract charm from tx ${txInfo.txid.slice(0, 8)}:`,
-            error instanceof Error ? error.message : error,
+          log.warn(
+            `Failed to extract charm from tx ${txInfo.txid.slice(0, 8)}`,
+            {
+              error: error instanceof Error ? error.message : String(error),
+            },
           );
         }
         // Continue to next tx - this one may not contain charms
@@ -384,9 +389,11 @@ export class CharmsClient {
       }
     }
 
-    console.log(
-      `[CharmsClient] Extracted ${charms.length} charms from ${processedCount} txs (${errorCount} errors)`,
-    );
+    log.debug(`Extracted charms`, {
+      count: charms.length,
+      processed: processedCount,
+      errors: errorCount,
+    });
 
     return charms;
   }
