@@ -57,12 +57,26 @@ const walletSingleton: WalletSingleton = {
   info: null,
 };
 
+// Custom event name for wallet singleton changes
+export const WALLET_SINGLETON_CHANGE_EVENT = "wallet-singleton-change";
+
+/**
+ * Dispatch a custom event when wallet singleton changes
+ * This allows AppInitializer to react immediately without polling
+ */
+function dispatchWalletChange(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(WALLET_SINGLETON_CHANGE_EVENT));
+  }
+}
+
 /**
  * Store wallet in singleton (called when unlocking)
  */
 function setWalletSingleton(wallet: BitcoinWallet, info: WalletInfo): void {
   walletSingleton.instance = wallet;
   walletSingleton.info = info;
+  dispatchWalletChange();
 }
 
 /**
@@ -74,6 +88,7 @@ function clearWalletSingleton(): void {
   }
   walletSingleton.instance = null;
   walletSingleton.info = null;
+  dispatchWalletChange();
 }
 
 /**
@@ -86,6 +101,7 @@ function lockWalletSingleton(): void {
   }
   walletSingleton.instance = null;
   // Keep walletSingleton.info so we can show "locked" state with address
+  dispatchWalletChange();
 }
 
 /**

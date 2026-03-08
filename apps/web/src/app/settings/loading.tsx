@@ -2,7 +2,7 @@
  * Settings Loading State
  */
 
-import { Skeleton, SkeletonCard } from "@bitcoinbaby/ui";
+import { Skeleton } from "@bitcoinbaby/ui";
 
 export default function SettingsLoading() {
   return (

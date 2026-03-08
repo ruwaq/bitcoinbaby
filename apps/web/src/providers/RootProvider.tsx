@@ -130,7 +130,6 @@ export function RootProvider({ children }: RootProviderProps) {
  * Uses useSyncExternalStore for proper hydration detection
  * without triggering cascading renders.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function subscribeToNothing(_callback: () => void): () => void {
   // No external subscription needed for hydration
   return () => {};

@@ -91,7 +91,7 @@ export function useSystemStatus(): UseSystemStatusResult {
           message: "Invalid response from API",
         });
       }
-    } catch (err) {
+    } catch {
       // Network error or API not available
       setError("Could not fetch system status");
       setHealth({

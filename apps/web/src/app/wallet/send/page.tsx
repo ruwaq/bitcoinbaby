@@ -12,7 +12,7 @@
  * - Success/error feedback with explorer link
  */
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useWalletConnection, useBalance } from "@/hooks";
 import { useNetworkStore } from "@bitcoinbaby/core";
@@ -296,6 +296,9 @@ export default function SendPage() {
     sendState,
     withPrivateKey,
     refreshBalance,
+    currentFeeRate,
+    estimatedFee,
+    availableBalance,
   ]);
 
   // Reset form for another send

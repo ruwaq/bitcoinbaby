@@ -24,63 +24,106 @@ interface SyncStatusIndicatorProps {
 
 type SyncStatus = "healthy" | "pending" | "error" | "offline";
 
+interface StatusState {
+  status: SyncStatus;
+  pendingCount: number;
+  tooltip: string;
+}
+
 export function SyncStatusIndicator({ className }: SyncStatusIndicatorProps) {
   const wallet = useWalletStore((s) => s.wallet);
-  const [status, setStatus] = useState<SyncStatus>("healthy");
-  const [pendingCount, setPendingCount] = useState(0);
-  const [tooltip, setTooltip] = useState("");
+  const walletAddress = wallet?.address;
+  const [syncState, setSyncState] = useState<StatusState>({
+    status: "healthy",
+    pendingCount: 0,
+    tooltip: "Initializing...",
+  });
 
   useEffect(() => {
-    if (!wallet?.address) {
-      setStatus("healthy");
-      setTooltip("Connect wallet to start mining");
+    if (!walletAddress) {
       return;
     }
 
-    const updateStatus = async () => {
+    let isCancelled = false;
+
+    const fetchStatus = async () => {
+      if (isCancelled) return;
+
       try {
         const syncManager = getSyncManager();
         const state = syncManager.getState();
-        const stats = await getQueueStats(wallet.address);
+        const stats = await getQueueStats(walletAddress);
 
-        setPendingCount(stats.pending + stats.syncing);
+        if (isCancelled) return;
+
+        const pending = stats.pending + stats.syncing;
 
         if (!state.isOnline) {
-          setStatus("offline");
-          setTooltip(`Offline - ${stats.pending} shares queued`);
+          setSyncState({
+            status: "offline",
+            pendingCount: pending,
+            tooltip: `Offline - ${stats.pending} shares queued`,
+          });
         } else if (state.circuitBreakerActive) {
           const secondsLeft = Math.ceil(
             (state.circuitBreakerUntil - Date.now()) / 1000,
           );
-          setStatus("error");
-          setTooltip(`Rate limited - retry in ${secondsLeft}s`);
+          setSyncState({
+            status: "error",
+            pendingCount: pending,
+            tooltip: `Rate limited - retry in ${secondsLeft}s`,
+          });
         } else if (!state.apiHealthy) {
-          setStatus("error");
-          setTooltip("Server unavailable");
+          setSyncState({
+            status: "error",
+            pendingCount: pending,
+            tooltip: "Server unavailable",
+          });
         } else if (stats.failed > 0) {
-          setStatus("error");
-          setTooltip(`${stats.failed} shares failed`);
+          setSyncState({
+            status: "error",
+            pendingCount: pending,
+            tooltip: `${stats.failed} shares failed`,
+          });
         } else if (stats.pending > 0 || stats.syncing > 0) {
-          setStatus("pending");
-          setTooltip(`Syncing ${stats.pending + stats.syncing} shares...`);
+          setSyncState({
+            status: "pending",
+            pendingCount: pending,
+            tooltip: `Syncing ${stats.pending + stats.syncing} shares...`,
+          });
         } else {
-          setStatus("healthy");
-          setTooltip(`${stats.synced} shares synced`);
+          setSyncState({
+            status: "healthy",
+            pendingCount: pending,
+            tooltip: `${stats.synced} shares synced`,
+          });
         }
       } catch {
-        // SyncManager not initialized yet
-        setStatus("healthy");
-        setTooltip("Initializing...");
+        if (!isCancelled) {
+          setSyncState({
+            status: "healthy",
+            pendingCount: 0,
+            tooltip: "Initializing...",
+          });
+        }
       }
     };
 
-    updateStatus();
-    const interval = setInterval(updateStatus, 2000);
-    return () => clearInterval(interval);
-  }, [wallet?.address]);
+    // Use setTimeout for initial fetch to ensure it runs asynchronously
+    const initialTimeout = setTimeout(fetchStatus, 0);
+    const interval = setInterval(fetchStatus, 2000);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
+  }, [walletAddress]);
 
   // Don't show if no wallet
   if (!wallet) return null;
+
+  const { status, pendingCount, tooltip } = syncState;
 
   return (
     <div className={clsx("relative group", className)} title={tooltip}>

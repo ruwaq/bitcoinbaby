@@ -7,14 +7,11 @@
  * Displays claimable work, prepares claims, and tracks claim history.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { PixelCard, PixelButton } from "@bitcoinbaby/ui";
-import {
-  useWalletStore,
-  useNetworkStore,
-  useWalletProvider,
-} from "@bitcoinbaby/core";
+import { useNetworkStore } from "@bitcoinbaby/core";
 import { TransactionBuilder } from "@bitcoinbaby/bitcoin";
+import { useWalletConnection } from "@/hooks/useWalletConnection";
 import { useClaim } from "@/hooks/useClaim";
 import { useBalance } from "@/hooks/useBalance";
 import { formatBalance, formatDate } from "@/utils/format";
@@ -57,13 +54,11 @@ function ClaimStatusBadge({ status }: { status: string }) {
 }
 
 export function ClaimSection() {
-  const wallet = useWalletStore((s) => s.wallet);
-  const address = wallet?.address ?? null;
-  const publicKey = wallet?.publicKey ?? null;
-  const { config } = useNetworkStore();
+  // Unified wallet connection - handles both internal and external wallets
+  const { address, publicKey, signAndBroadcast, canSign } =
+    useWalletConnection();
 
-  // Wallet provider for signing transactions
-  const { signAndBroadcast, isConnected } = useWalletProvider();
+  const { config } = useNetworkStore();
 
   // Get UTXOs for building transactions
   const { utxos: rawUtxos } = useBalance({
@@ -93,6 +88,18 @@ export function ClaimSection() {
     );
   }, [rawUtxos, address, publicKey]);
 
+  // Adapt signAndBroadcast to useClaim expected format
+  const adaptedSignAndBroadcast = useCallback(
+    async (psbtHex: string): Promise<{ success: boolean; txid: string }> => {
+      const txid = await signAndBroadcast(psbtHex);
+      return {
+        success: txid !== null,
+        txid: txid ?? "",
+      };
+    },
+    [signAndBroadcast],
+  );
+
   const [activeTab, setActiveTab] = useState<"claim" | "history">("claim");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [txidInput, setTxidInput] = useState("");
@@ -105,7 +112,6 @@ export function ClaimSection() {
     isPreparing,
     isConfirming,
     isBroadcasting,
-    isMinting,
     claimError,
     claimHistory,
     isLoadingHistory,
@@ -114,14 +120,14 @@ export function ClaimSection() {
     prepareClaim,
     broadcastClaimTx,
     confirmClaim,
-    triggerMint,
     loadHistory,
     clearPreparedClaim,
   } = useClaim({
     address: address ?? undefined,
     publicKey: publicKey ?? undefined,
     utxos: txUtxos,
-    signAndBroadcast: isConnected ? signAndBroadcast : undefined,
+    // Use unified wallet connection - canSign ensures wallet is unlocked and ready
+    signAndBroadcast: canSign ? adaptedSignAndBroadcast : undefined,
   });
 
   // Handle refresh

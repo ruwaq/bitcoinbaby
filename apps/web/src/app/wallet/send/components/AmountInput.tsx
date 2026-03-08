@@ -7,12 +7,7 @@
  */
 
 import { useState, useCallback, useMemo } from "react";
-import {
-  SATOSHIS_PER_BTC,
-  DUST_THRESHOLD,
-  btcToSats,
-  satsToBtc,
-} from "@/utils/format";
+import { DUST_THRESHOLD, btcToSats, satsToBtc } from "@/utils/format";
 
 interface AmountInputProps {
   value: string;

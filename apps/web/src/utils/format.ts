@@ -21,9 +21,6 @@ export const DUST_THRESHOLD = 546;
 /** Token decimal places (same as sats) */
 export const TOKEN_DECIMALS = 8;
 
-/** Maximum safe integer for Number type */
-const MAX_SAFE_SATS = BigInt(Number.MAX_SAFE_INTEGER);
-
 // =============================================================================
 // BTC / SATOSHI FORMATTING
 // =============================================================================

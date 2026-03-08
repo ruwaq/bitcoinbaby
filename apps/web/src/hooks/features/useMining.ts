@@ -1,12 +1,14 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useMiningWithNFTs, useVirtualBalance } from "@/hooks";
 import { useMiningShareSubmission } from "@/hooks/useMiningShareSubmission";
 import {
   useWalletStore,
   useNFTStore,
+  useNetworkStore,
   MIN_DIFFICULTY,
   useEngagement,
   useThrottledValue,
+  useBonusEngine,
   type WalletInfo,
 } from "@bitcoinbaby/core";
 
@@ -117,6 +119,17 @@ export interface UseMiningReturn {
 
   // Recent reward for animation
   recentReward: bigint | undefined;
+
+  // Bonus engine (centralized calculations)
+  bonuses: {
+    totalMultiplier: number;
+    totalPercentage: number;
+    breakdown: Record<
+      string,
+      { percentage: number; multiplier: number; label: string; status: string }
+    >;
+    isReady: boolean;
+  };
 }
 
 export function useMining(options: UseMiningOptions = {}): UseMiningReturn {
@@ -124,6 +137,11 @@ export function useMining(options: UseMiningOptions = {}): UseMiningReturn {
 
   // Wallet
   const wallet = useWalletStore((s) => s.wallet);
+  const isLocked = useWalletStore((s) => s.isLocked);
+
+  // Network - track changes to stop mining when network switches
+  const network = useNetworkStore((s) => s.network);
+  const previousNetworkRef = useRef(network);
 
   // NFT store
   const { bestBoost, stackedBoost, totalNFTs } = useNFTStore();
@@ -159,6 +177,9 @@ export function useMining(options: UseMiningOptions = {}): UseMiningReturn {
   const { multiplier: engagementResult, state: engagementState } =
     useEngagement();
 
+  // Bonus engine (centralized calculations)
+  const bonusEngine = useBonusEngine();
+
   // Throttle rapidly changing values for smoother UX
   const displayHashrate = useThrottledValue(mining.hashrate, throttleMs);
   const displayEffectiveHashrate = useThrottledValue(
@@ -193,6 +214,29 @@ export function useMining(options: UseMiningOptions = {}): UseMiningReturn {
       return () => clearInterval(interval);
     }
   }, [mining.isRunning, mining.isPaused]);
+
+  // CRITICAL: Stop mining when wallet locks, disconnects, or network changes
+  // This prevents mining to wrong address or submitting proofs on wrong network
+  useEffect(() => {
+    // Check if network changed
+    if (previousNetworkRef.current !== network) {
+      previousNetworkRef.current = network;
+      if (mining.isRunning) {
+        console.log("[useMining] Network changed, stopping mining for safety");
+        mining.stop();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Using specific mining properties to avoid infinite loops
+  }, [network, mining.isRunning, mining.stop]);
+
+  // Stop mining when wallet locks or disconnects
+  useEffect(() => {
+    if ((isLocked || !wallet?.address) && mining.isRunning) {
+      console.log("[useMining] Wallet locked or disconnected, stopping mining");
+      mining.stop();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Using specific mining properties to avoid infinite loops
+  }, [isLocked, wallet?.address, mining.isRunning, mining.stop]);
 
   return {
     wallet,
@@ -261,6 +305,23 @@ export function useMining(options: UseMiningOptions = {}): UseMiningReturn {
     capabilities: mining.capabilities,
 
     recentReward,
+
+    bonuses: {
+      totalMultiplier: bonusEngine.totalMultiplier,
+      totalPercentage: bonusEngine.totalPercentage,
+      breakdown: Object.fromEntries(
+        Object.entries(bonusEngine.breakdown).map(([key, value]) => [
+          key,
+          {
+            percentage: value.percentage,
+            multiplier: value.multiplier,
+            label: value.metadata?.label ?? "",
+            status: value.status,
+          },
+        ]),
+      ),
+      isReady: bonusEngine.isReady,
+    },
   };
 }
 

@@ -12,11 +12,7 @@
  */
 
 import { useState, useCallback, useEffect } from "react";
-import {
-  createTransactionBuilder,
-  TransactionBuilder,
-  type TxUTXO,
-} from "@bitcoinbaby/bitcoin";
+import { createTransactionBuilder, type TxUTXO } from "@bitcoinbaby/bitcoin";
 
 // Workers API URL from environment
 const WORKERS_API_URL =
@@ -384,6 +380,7 @@ export function useClaim({
         setIsConfirming(false);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadHistory defined below, would cause circular dependency
     [address, apiUrl, refreshBalance],
   );
 

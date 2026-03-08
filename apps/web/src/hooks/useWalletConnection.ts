@@ -73,10 +73,13 @@ export interface WalletConnectionActions {
    * Use this ONLY when you need direct private key access
    * (e.g., MiningSubmitter which requires key for Charms protocol)
    *
-   * @returns Result of the callback, or null if key not available
+   * @param callback - Function to execute with private key
+   * @param timeoutMs - Timeout in ms (default 30000) to prevent indefinite key exposure
+   * @returns Result of the callback, or null if key not available or timeout
    */
   withPrivateKey: <T>(
     callback: (privateKey: Uint8Array) => Promise<T>,
+    timeoutMs?: number,
   ) => Promise<T | null>;
 
   /**
@@ -170,10 +173,14 @@ export function useWalletConnection(): UseWalletConnectionReturn {
   /**
    * Execute callback with secure private key access
    * Key is zeroed automatically in finally block
+   *
+   * SECURITY: Includes 30 second timeout to prevent indefinite key exposure
+   * if callback hangs or never resolves
    */
   const withPrivateKey = useCallback(
     async <T>(
       callback: (privateKey: Uint8Array) => Promise<T>,
+      timeoutMs = 30000,
     ): Promise<T | null> => {
       if (isLocked) {
         console.error("[WalletConnection] Wallet is locked");
@@ -186,10 +193,21 @@ export function useWalletConnection(): UseWalletConnectionReturn {
         return null;
       }
 
+      // Create timeout promise to prevent indefinite key exposure
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error("Private key operation timed out"));
+        }, timeoutMs);
+      });
+
       try {
-        return await callback(privateKey);
+        // Race between callback and timeout
+        return await Promise.race([callback(privateKey), timeoutPromise]);
+      } catch (err) {
+        console.error("[WalletConnection] withPrivateKey error:", err);
+        return null;
       } finally {
-        // CRITICAL: Always zero the private key
+        // CRITICAL: Always zero the private key, even on timeout
         privateKey.fill(0);
       }
     },

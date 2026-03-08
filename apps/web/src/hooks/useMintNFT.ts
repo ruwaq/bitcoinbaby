@@ -80,15 +80,6 @@ export interface UseMintNFTReturn {
 // =============================================================================
 
 const BLOODLINES: Bloodline[] = ["royal", "warrior", "rogue", "mystic"];
-const BASE_TYPES: BaseType[] = ["human", "animal", "robot", "mystic", "alien"];
-const RARITY_TIERS: RarityTier[] = [
-  "common",
-  "uncommon",
-  "rare",
-  "epic",
-  "legendary",
-  "mythic",
-];
 
 function generateDNA(): string {
   const bytes = new Uint8Array(32);

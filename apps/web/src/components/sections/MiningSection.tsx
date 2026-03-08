@@ -16,6 +16,7 @@ import {
   NFTBoostPanel,
   EngagementBonusPanel,
   RewardsBreakdownPanel,
+  StreakBonusCard,
   SectionHeader,
   InfoBanner,
   pixelBorders,
@@ -41,6 +42,7 @@ export function MiningSection() {
     engagement,
     capabilities,
     recentReward,
+    bonuses,
   } = useMining();
 
   return (
@@ -184,18 +186,29 @@ export function MiningSection() {
           />
         </div>
 
-        {/* NFT Boost Panel - COMING SOON (not yet applied server-side) */}
+        {/* Streak Bonus Card - Detailed view with progress and timer */}
+        <div className="mb-6">
+          <StreakBonusCard
+            streakCount={shares.session}
+            multiplier={
+              bonuses.breakdown.streak?.multiplier ?? miner.boostMultiplier
+            }
+            isMining={miner.isRunning}
+          />
+        </div>
+
+        {/* NFT Boost Panel - Server-validated */}
         <div className="mb-6">
           <NFTBoostPanel
             bestBoost={nft.bestBoost}
             stackedBoost={nft.stackedBoost}
             totalNFTs={nft.totalNFTs}
             variant="panel"
-            isActive={false} // TODO: Enable when server-side NFT validation ready
+            isActive={bonuses.breakdown.nft?.status === "active"}
           />
         </div>
 
-        {/* Engagement Bonus Panel - COMING SOON (not yet tracked server-side) */}
+        {/* Engagement Bonus Panel - Server-tracked */}
         <div className="mb-6">
           <EngagementBonusPanel
             multiplier={engagement.multiplier}
@@ -204,7 +217,7 @@ export function MiningSection() {
             streakDays={engagement.state.dailyStreak}
             playTimeMinutes={engagement.state.playTimeToday}
             babyHealth={engagement.state.babyHealthScore}
-            isActive={false} // TODO: Enable when server-side engagement tracking ready
+            isActive={bonuses.breakdown.engagement?.status === "active"}
           />
         </div>
 
@@ -212,13 +225,43 @@ export function MiningSection() {
         <div className="mb-6">
           <RewardsBreakdownPanel
             baseReward={10}
-            streakMultiplier={miner.boostMultiplier}
+            streakMultiplier={
+              bonuses.breakdown.streak?.multiplier ?? miner.boostMultiplier
+            }
             streakCount={shares.session}
-            nftBoostPercent={nft.stackedBoost}
+            nftBoostPercent={
+              bonuses.breakdown.nft?.percentage ?? nft.stackedBoost
+            }
             nftCount={nft.totalNFTs}
-            engagementMultiplier={engagement.multiplier}
-            cosmicMultiplier={1.0} // TODO: Get from cosmic hook when ready
-            cosmicStatus="normal"
+            engagementMultiplier={
+              bonuses.breakdown.engagement?.multiplier ?? engagement.multiplier
+            }
+            cosmicMultiplier={bonuses.breakdown.cosmic?.multiplier ?? 1.0}
+            cosmicStatus={
+              (bonuses.breakdown.cosmic?.status as
+                | "thriving"
+                | "normal"
+                | "struggling"
+                | "critical") ?? "normal"
+            }
+            providerStatus={{
+              streak:
+                bonuses.breakdown.streak?.status === "active"
+                  ? "active"
+                  : "coming_soon",
+              nft:
+                bonuses.breakdown.nft?.status === "active"
+                  ? "active"
+                  : "coming_soon",
+              engagement:
+                bonuses.breakdown.engagement?.status === "active"
+                  ? "active"
+                  : "coming_soon",
+              cosmic:
+                bonuses.breakdown.cosmic?.status === "active"
+                  ? "active"
+                  : "coming_soon",
+            }}
           />
         </div>
 

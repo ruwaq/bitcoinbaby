@@ -159,7 +159,7 @@ export function NFTMintFlow({
               "broadcasting_spell",
               "confirming",
               "success",
-            ].map((step, index) => {
+            ].map((step) => {
               const stepKeys = Object.keys(MINT_STEPS);
               const currentIndex = stepKeys.indexOf(currentStep);
               const stepIndex = stepKeys.indexOf(step);

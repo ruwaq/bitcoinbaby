@@ -16,12 +16,14 @@ import { useEffect, useCallback, useRef } from "react";
 import {
   useWalletStore,
   useNFTStore,
+  initializeBonusEngine,
   type WalletInfo,
 } from "@bitcoinbaby/core";
 import { useNFTSync } from "@/hooks/useNFTSync";
 import {
   isWalletSingletonActive,
   getWalletSingletonInfo,
+  WALLET_SINGLETON_CHANGE_EVENT,
 } from "@/hooks/useWallet";
 
 /**
@@ -40,6 +42,15 @@ function toStoreWalletInfo(info: {
 }
 
 export function AppInitializer() {
+  // Initialize bonus engine on first render
+  useEffect(() => {
+    initializeBonusEngine({
+      enableNFT: true,
+      enableEngagement: true,
+      enableCosmic: true,
+    });
+  }, []);
+
   // Get wallet state and actions
   const wallet = useWalletStore((s) => s.wallet);
   const isConnected = useWalletStore((s) => s.isConnected);
@@ -53,8 +64,9 @@ export function AppInitializer() {
   // This hook fetches NFTs from the server and updates the store
   const { isLoading, refresh } = useNFTSync();
 
-  // CRITICAL: Sync wallet singleton to store on mount and periodically
+  // CRITICAL: Sync wallet singleton to store on mount and on changes
   // This ensures the wallet stays connected when navigating between tabs
+  // Uses event-driven sync instead of polling for efficiency
   //
   // FIX: Use refs to avoid recreating callback on every state change
   const isConnectedRef = useRef(isConnected);
@@ -94,10 +106,29 @@ export function AppInitializer() {
     syncWalletToStore();
   }, [syncWalletToStore]);
 
-  // Periodic sync to catch any desync issues (every 2 seconds)
+  // Sync on wallet singleton changes and tab visibility
+  // This replaces inefficient 2-second polling with event-driven updates
   useEffect(() => {
-    const interval = setInterval(syncWalletToStore, 2000);
-    return () => clearInterval(interval);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        syncWalletToStore();
+      }
+    };
+
+    const handleWalletChange = () => {
+      syncWalletToStore();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener(WALLET_SINGLETON_CHANGE_EVENT, handleWalletChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener(
+        WALLET_SINGLETON_CHANGE_EVENT,
+        handleWalletChange,
+      );
+    };
   }, [syncWalletToStore]);
 
   // Force refresh NFTs when wallet unlocks (if we have stale data)
