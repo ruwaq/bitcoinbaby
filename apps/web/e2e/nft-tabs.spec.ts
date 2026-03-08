@@ -48,7 +48,7 @@ test.describe("NFT Collection Tab", () => {
     const nftGrid = page.locator('[class*="grid"], [class*="nft"]');
 
     const hasEmptyState = await emptyState.isVisible().catch(() => false);
-    const hasGrid = (await nftGrid.count()) > 0;
+    const _hasGrid = (await nftGrid.count()) > 0;
 
     // Either shows empty state or grid
     expect(typeof hasEmptyState).toBe("boolean");

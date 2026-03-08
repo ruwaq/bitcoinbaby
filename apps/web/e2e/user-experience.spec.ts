@@ -314,7 +314,7 @@ test.describe("Complete User Flow", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Get some initial content
-    const miningContent = await page.locator("main").textContent();
+    const _miningContent = await page.locator("main").textContent();
 
     // Navigate away
     await page.goto("/?tab=token");

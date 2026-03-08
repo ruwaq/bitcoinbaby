@@ -88,7 +88,7 @@ test.describe("Mining Session Persistence", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Get initial state
-    const initialContent = await page.content();
+    const _initialContent = await page.content();
 
     // Switch to another tab
     await page.goto("/?tab=token");

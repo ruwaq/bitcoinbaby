@@ -155,7 +155,7 @@ test.describe("CORS Headers", () => {
     const response = await request.get(`${API_URL}/health`);
 
     // Check CORS headers
-    const headers = response.headers();
+    const _headers = response.headers();
     // API should allow CORS (or not restrict it)
     expect(response.ok()).toBeTruthy();
   });

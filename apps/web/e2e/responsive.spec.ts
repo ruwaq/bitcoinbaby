@@ -76,7 +76,7 @@ test.describe("Mobile Viewport (375px)", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Page should render without errors
-      const errorCount = await page.getByText(/error|crash|failed/i).count();
+      const _errorCount = await page.getByText(/error|crash|failed/i).count();
       // Some "error" text might be legitimate (error handling UI)
       // Just verify page loaded
       await expect(page.locator("body")).toBeVisible();
@@ -186,7 +186,7 @@ test.describe("Cross-Viewport Consistency", () => {
   test("should maintain pixel art aesthetic across viewports", async ({
     page,
   }) => {
-    for (const [name, viewport] of Object.entries(VIEWPORTS)) {
+    for (const [_name, viewport] of Object.entries(VIEWPORTS)) {
       await page.setViewportSize(viewport);
       await page.goto("/");
 
