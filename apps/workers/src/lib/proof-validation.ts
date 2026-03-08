@@ -6,41 +6,34 @@
  */
 
 // =============================================================================
-// CONSTANTS (must match packages/core/src/tokenomics/constants.ts)
+// CONSTANTS (imported from @bitcoinbaby/shared - Single Source of Truth)
 // =============================================================================
 
-/** Minimum difficulty (D16 to match contract) */
-export const MIN_DIFFICULTY = 16;
+import {
+  MIN_DIFFICULTY,
+  MAX_DIFFICULTY,
+  BASE_REWARD_PER_SHARE,
+  MAX_SHARES_PER_HOUR,
+  MIN_SHARE_INTERVAL_MS,
+  MAX_PROOF_AGE_MS,
+  STREAK_RESET_MS,
+  STREAK_TIERS,
+  STREAK_MULTIPLIERS,
+} from "@bitcoinbaby/shared";
 
-/** Maximum difficulty (reasonable cap to prevent overflow) */
-export const MAX_DIFFICULTY = 32;
-
-/** Base reward per share at minimum difficulty */
-export const BASE_REWARD_PER_SHARE = BigInt(10);
-
-/** Maximum shares per hour per address
- * Safety cap to prevent abuse. WebGPU miners can find many shares quickly.
- * This allows reasonable mining while preventing spam.
- *
- * IMPORTANT: Must be >= VarDiff target rate (1 share/3s = 1200/hr)
- * Set to 1500 to give 25% headroom for burst mining.
- */
-export const MAX_SHARES_PER_HOUR = 1500;
+// Re-export for consumers that import from this module
+export {
+  MIN_DIFFICULTY,
+  MAX_DIFFICULTY,
+  BASE_REWARD_PER_SHARE,
+  MAX_SHARES_PER_HOUR,
+  MIN_SHARE_INTERVAL_MS,
+  MAX_PROOF_AGE_MS,
+  STREAK_RESET_MS,
+};
 
 import { Logger } from "./logger";
 const proofLogger = new Logger("ProofValidation");
-
-/** Minimum time between shares in ms */
-export const MIN_SHARE_INTERVAL_MS = 1000;
-
-/** Maximum proof age in ms (2 hours)
- * Extended to allow offline mining sync and network latency
- * Previous 5 minute limit was causing 400 errors for pending shares
- */
-export const MAX_PROOF_AGE_MS = 2 * 60 * 60 * 1000;
-
-/** Streak reset time (30 minutes) */
-export const STREAK_RESET_MS = 30 * 60 * 1000;
 
 // =============================================================================
 // PROOF VALIDATION
@@ -105,46 +98,35 @@ export async function validateMiningProof(
   }
   const embeddedNonceStr = blockDataParts[blockDataParts.length - 1];
 
-  // Parse nonce from blockData - support both hex and decimal formats
-  // SECURITY: To prevent same blockData validating with two different nonces,
-  // we determine format based on content, not based on what "matches"
+  // SECURITY FIX: Always parse as hex (consistent with cpu-miner.ts and webgpu-miner.ts)
+  // Both miners use nonce.toString(16) which produces hex WITHOUT "0x" prefix
+  // This prevents the ambiguity vulnerability where "123" could be interpreted as:
+  //   - Hex: 0x123 = 291 decimal
+  //   - Decimal: 123 = 123 decimal
+  // By enforcing hex-only parsing, the same blockData can only produce ONE valid nonce
   let embeddedNonce: number;
 
-  // Check for explicit hex prefix
   if (embeddedNonceStr.startsWith("0x")) {
+    // Hex with "0x" prefix (legacy format, still supported)
     embeddedNonce = parseInt(embeddedNonceStr.slice(2), 16);
   } else {
-    // If contains a-f characters, it's definitely hex
-    const hasHexChars = /[a-fA-F]/.test(embeddedNonceStr);
-
-    if (hasHexChars) {
-      // Hex format (contains letters)
-      embeddedNonce = parseInt(embeddedNonceStr, 16);
-    } else {
-      // Pure digits (0-9) - prefer hex interpretation since both miners now use hex
-      // Fall back to decimal only if hex interpretation doesn't match
-      const asHex = parseInt(embeddedNonceStr, 16);
-      const asDecimal = parseInt(embeddedNonceStr, 10);
-
-      // Prefer hex for consistency with current miners
-      if (!isNaN(asHex) && asHex === proof.nonce) {
-        embeddedNonce = asHex;
-      } else if (!isNaN(asDecimal) && asDecimal === proof.nonce) {
-        // Fallback for old shares (backwards compatibility)
-        embeddedNonce = asDecimal;
-      } else {
-        return {
-          valid: false,
-          reason: `Nonce mismatch: blockData "${embeddedNonceStr}" (hex=${asHex}, dec=${asDecimal}) doesn't match proof.nonce=${proof.nonce}`,
-        };
-      }
-    }
+    // Parse as hex WITHOUT prefix (standard miner format)
+    // This is what cpu-miner.ts and webgpu-miner.ts produce: nonce.toString(16)
+    embeddedNonce = parseInt(embeddedNonceStr, 16);
   }
 
   if (isNaN(embeddedNonce)) {
     return {
       valid: false,
-      reason: `Invalid nonce format: "${embeddedNonceStr}"`,
+      reason: `Invalid nonce format: "${embeddedNonceStr}". Expected hexadecimal.`,
+    };
+  }
+
+  // Verify embedded nonce matches proof nonce
+  if (embeddedNonce !== proof.nonce) {
+    return {
+      valid: false,
+      reason: `Nonce mismatch: blockData has "${embeddedNonceStr}" (${embeddedNonce} decimal), proof has ${proof.nonce} decimal`,
     };
   }
 
@@ -244,6 +226,8 @@ export function calculateShareReward(_difficulty: number): bigint {
 /**
  * Calculate streak multiplier
  *
+ * Uses shared constants from @bitcoinbaby/shared for consistency.
+ *
  * 0-9 shares:    1.0x (base)
  * 10-49 shares:  1.2x (+20%)
  * 50-99 shares:  1.5x (+50%)
@@ -252,15 +236,12 @@ export function calculateShareReward(_difficulty: number): bigint {
  * 500+:          2.0x (+100%) MAX
  */
 export function getStreakMultiplier(consecutiveShares: number): number {
-  const tiers = [10, 50, 100, 250, 500];
-  const multipliers = [1.0, 1.2, 1.5, 1.75, 1.9, 2.0];
-
-  for (let i = tiers.length - 1; i >= 0; i--) {
-    if (consecutiveShares >= tiers[i]) {
-      return multipliers[i + 1];
+  for (let i = STREAK_TIERS.length - 1; i >= 0; i--) {
+    if (consecutiveShares >= STREAK_TIERS[i]) {
+      return STREAK_MULTIPLIERS[i + 1];
     }
   }
-  return multipliers[0];
+  return STREAK_MULTIPLIERS[0];
 }
 
 /**
