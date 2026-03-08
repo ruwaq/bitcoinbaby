@@ -17,6 +17,7 @@ import type {
   ProverRequestV11,
 } from "./types";
 import { ApiError } from "../errors";
+import { hash256, countLeadingZeroBits } from "@bitcoinbaby/shared";
 
 /** Union type for spells accepted by the prover */
 type SpellInput = SpellV9 | SpellV10 | SpellV11;
@@ -68,8 +69,14 @@ interface RetryConfig {
 }
 
 // =============================================================================
-// CONSTANTS
+// CONSTANTS (imported from shared config)
 // =============================================================================
+
+import {
+  PROVER_API,
+  getProverUrl as getConfiguredProverUrl,
+  HTTP_TIMEOUTS,
+} from "@bitcoinbaby/shared";
 
 /**
  * Charms Prover API URLs
@@ -95,19 +102,16 @@ interface RetryConfig {
  */
 
 /** Charms hosted prover base URL (latest version) */
-const CHARMS_HOSTED_PROVER_BASE = "https://v11.charms.dev";
+const CHARMS_HOSTED_PROVER_BASE = PROVER_API.production;
 
 /** Local prover URL (for development) */
-const LOCAL_PROVER_URL = "http://localhost:17784";
+const LOCAL_PROVER_URL = PROVER_API.development;
 
 /** Default Charms Prover API URL - use hosted prover by default */
 const DEFAULT_PROVER_URL = CHARMS_HOSTED_PROVER_BASE;
 
 /** Prover URL (configured via environment, falls back to hosted) */
-const CONFIGURED_PROVER_URL =
-  process.env.NEXT_PUBLIC_PROVER_URL ||
-  process.env.PROVER_URL ||
-  DEFAULT_PROVER_URL;
+const CONFIGURED_PROVER_URL = getConfiguredProverUrl();
 
 /**
  * Get the prove endpoint for a given base URL
@@ -123,7 +127,7 @@ function getProveEndpoint(baseUrl: string): string {
 }
 
 /** Default request timeout (2 minutes - proof generation can be slow) */
-const DEFAULT_TIMEOUT_MS = 120_000;
+const DEFAULT_TIMEOUT_MS = HTTP_TIMEOUTS.PROVER;
 
 /** Default retry configuration (BRO-style) */
 const DEFAULT_RETRY_CONFIG: RetryConfig = {
@@ -132,6 +136,93 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxDelayMs: 30000,
   jitterPercent: 10,
 };
+
+// =============================================================================
+// PRE-PROVER VALIDATION
+// =============================================================================
+
+/**
+ * Validation result for pre-prover checks
+ */
+export interface PreProverValidationResult {
+  valid: boolean;
+  error?: string;
+  computedHash?: string;
+  computedLeadingZeros?: number;
+}
+
+/**
+ * Validate PoW proof cryptographically BEFORE sending to prover.
+ *
+ * This prevents wasting prover resources on invalid proofs and provides
+ * immediate feedback to the client.
+ *
+ * SECURITY: This is a client-side check. The prover also validates server-side.
+ *
+ * @param challenge - The pow_challenge (format: "timestamp:address")
+ * @param nonce - The pow_nonce (hex string)
+ * @param difficulty - The pow_difficulty (required leading zero bits)
+ * @returns Validation result with computed hash if valid
+ */
+export async function validatePoWBeforeProver(
+  challenge: string,
+  nonce: string,
+  difficulty: number,
+): Promise<PreProverValidationResult> {
+  // 1. Validate challenge format (timestamp:address)
+  const challengeParts = challenge.split(":");
+  if (challengeParts.length < 2) {
+    return {
+      valid: false,
+      error: `Invalid challenge format. Expected "timestamp:address", got "${challenge}"`,
+    };
+  }
+
+  // 2. Validate nonce is valid hex
+  if (!/^[0-9a-fA-F]+$/.test(nonce)) {
+    return {
+      valid: false,
+      error: `Invalid nonce format. Expected hexadecimal, got "${nonce}"`,
+    };
+  }
+
+  // 3. Validate difficulty is reasonable
+  if (difficulty < 16) {
+    return {
+      valid: false,
+      error: `Difficulty too low. Minimum is 16, got ${difficulty}`,
+    };
+  }
+
+  if (difficulty > 64) {
+    return {
+      valid: false,
+      error: `Difficulty too high. Maximum is 64, got ${difficulty}`,
+    };
+  }
+
+  // 4. Reconstruct blockData and compute hash
+  // Format: challenge:nonce (same as miners use)
+  const blockData = `${challenge}:${nonce}`;
+  const computedHash = await hash256(blockData);
+  const computedLeadingZeros = countLeadingZeroBits(computedHash);
+
+  // 5. Verify hash meets difficulty
+  if (computedLeadingZeros < difficulty) {
+    return {
+      valid: false,
+      error: `Hash does not meet difficulty. Required ${difficulty} leading zeros, got ${computedLeadingZeros}`,
+      computedHash,
+      computedLeadingZeros,
+    };
+  }
+
+  return {
+    valid: true,
+    computedHash,
+    computedLeadingZeros,
+  };
+}
 
 // =============================================================================
 // PROVER CLIENT
@@ -217,6 +308,7 @@ export class CharmsProverClient {
    * Submit PoW spell for proof generation (convenience method)
    *
    * Specifically for SpellV9 format with PoW private_inputs.
+   * Performs cryptographic validation before sending to prover.
    *
    * @param spell - SpellV9 with pow_challenge, pow_nonce, pow_difficulty
    * @returns Commit and spell transaction hexes
@@ -227,8 +319,12 @@ export class CharmsProverClient {
       hasPrivateInputs: !!spell.private_inputs,
     });
 
-    // Validate PoW-specific fields
+    // Validate PoW-specific fields (structure)
     this.validatePoWSpell(spell);
+
+    // SECURITY: Validate PoW cryptographically before sending to prover
+    // This prevents wasting prover resources on invalid proofs
+    await this.validatePoWCryptographic(spell);
 
     return this.prove(spell);
   }
@@ -238,6 +334,7 @@ export class CharmsProverClient {
    *
    * V11 format separates private_inputs from the spell.
    * This is the recommended method for CLI v11.0.1+.
+   * Performs cryptographic validation before sending to prover.
    *
    * @param request - ProverRequestV11 with spell, private_inputs, and funding info
    * @returns Commit and spell transaction hexes
@@ -249,8 +346,11 @@ export class CharmsProverClient {
       hasFundingUtxo: !!request.funding_utxo,
     });
 
-    // Validate V11-specific fields
+    // Validate V11-specific fields (structure)
     this.validateSpellV11(request);
+
+    // SECURITY: Validate PoW cryptographically before sending to prover
+    await this.validatePoWCryptographicV11(request);
 
     // Submit with retry logic
     const response = await this.submitWithRetryV11(request);
@@ -593,6 +693,66 @@ export class CharmsProverClient {
           `pow_difficulty must be at least 16, got ${powInputs.pow_difficulty}`,
         );
       }
+    }
+  }
+
+  /**
+   * Cryptographically validate PoW before sending to prover
+   *
+   * SECURITY: Verifies hash meets difficulty to avoid wasting prover resources
+   */
+  private async validatePoWCryptographic(spell: SpellV9): Promise<void> {
+    if (!spell.private_inputs) return;
+
+    for (const [appKey, inputs] of Object.entries(spell.private_inputs)) {
+      const powInputs = inputs as PoWPrivateInputs;
+
+      const result = await validatePoWBeforeProver(
+        powInputs.pow_challenge,
+        powInputs.pow_nonce,
+        powInputs.pow_difficulty,
+      );
+
+      if (!result.valid) {
+        throw new ProverError(
+          `Pre-prover validation failed for ${appKey}: ${result.error}`,
+        );
+      }
+
+      this.log(`Pre-prover validation passed for ${appKey}`, {
+        hash: result.computedHash?.slice(0, 16) + "...",
+        leadingZeros: result.computedLeadingZeros,
+        difficulty: powInputs.pow_difficulty,
+      });
+    }
+  }
+
+  /**
+   * Cryptographically validate PoW for V11 spells before sending to prover
+   */
+  private async validatePoWCryptographicV11(
+    request: ProverRequestV11,
+  ): Promise<void> {
+    if (!request.app_private_inputs) return;
+
+    for (const [appKey, inputs] of Object.entries(request.app_private_inputs)) {
+      const result = await validatePoWBeforeProver(
+        inputs.pow_challenge,
+        inputs.pow_nonce,
+        inputs.pow_difficulty,
+      );
+
+      if (!result.valid) {
+        throw new ProverError(
+          `Pre-prover validation failed for ${appKey}: ${result.error}`,
+        );
+      }
+
+      this.log(`V11 pre-prover validation passed for ${appKey}`, {
+        hash: result.computedHash?.slice(0, 16) + "...",
+        leadingZeros: result.computedLeadingZeros,
+        difficulty: inputs.pow_difficulty,
+      });
     }
   }
 
