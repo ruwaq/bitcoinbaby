@@ -2,6 +2,12 @@
   "name": "bitcoinbaby",
   "version": "0.0.1",
   "private": true,
+  "pnpm": {
+    "overrides": {
+      "minimatch": ">=9.0.6",
+      "tar": ">=7.5.8"
+    }
+  },
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
