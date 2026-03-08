@@ -14,6 +14,8 @@ import { clsx } from "clsx";
 // TYPES
 // =============================================================================
 
+export type BonusProviderStatus = "active" | "coming_soon" | "disabled";
+
 export interface RewardsBreakdownPanelProps {
   /** Base reward per share */
   baseReward: number;
@@ -31,6 +33,13 @@ export interface RewardsBreakdownPanelProps {
   cosmicMultiplier: number;
   /** Cosmic status */
   cosmicStatus: "thriving" | "normal" | "struggling" | "critical";
+  /** Provider statuses for dynamic active/coming_soon display */
+  providerStatus?: {
+    streak?: BonusProviderStatus;
+    nft?: BonusProviderStatus;
+    engagement?: BonusProviderStatus;
+    cosmic?: BonusProviderStatus;
+  };
   /** Additional CSS classes */
   className?: string;
 }
@@ -48,10 +57,35 @@ export function RewardsBreakdownPanel({
   engagementMultiplier,
   cosmicMultiplier,
   cosmicStatus,
+  providerStatus,
   className,
 }: RewardsBreakdownPanelProps) {
-  // Calculate effective reward (only with active systems)
-  const effectiveReward = Math.floor(baseReward * streakMultiplier);
+  // Determine status for each provider
+  const getStatus = (
+    provider: keyof NonNullable<typeof providerStatus>,
+    defaultActive: boolean,
+  ): "active" | "coming_soon" => {
+    const status = providerStatus?.[provider];
+    if (status === "active") return "active";
+    if (status === "coming_soon" || status === "disabled") return "coming_soon";
+    return defaultActive ? "active" : "coming_soon";
+  };
+
+  // Calculate effective reward dynamically based on active providers
+  let currentMultiplier = 1;
+  if (getStatus("streak", true) === "active") {
+    currentMultiplier *= streakMultiplier;
+  }
+  if (getStatus("nft", false) === "active") {
+    currentMultiplier *= 1 + nftBoostPercent / 100;
+  }
+  if (getStatus("engagement", false) === "active") {
+    currentMultiplier *= engagementMultiplier;
+  }
+  if (getStatus("cosmic", false) === "active") {
+    currentMultiplier *= cosmicMultiplier;
+  }
+  const effectiveReward = Math.floor(baseReward * currentMultiplier);
 
   // Calculate what it would be with ALL systems (for future reference)
   const futureMultiplier =
@@ -86,21 +120,21 @@ export function RewardsBreakdownPanel({
 
       {/* Multipliers List */}
       <div className="space-y-3">
-        {/* Streak - ACTIVE */}
+        {/* Streak */}
         <MultiplierRow
           icon="🔥"
           name="Streak Bonus"
-          status="active"
+          status={getStatus("streak", true)}
           value={`${((streakMultiplier - 1) * 100).toFixed(0)}%`}
           detail={`${streakCount} shares in session`}
           description="Mine continuously to build streak (max 2.0x at 500+ shares)"
         />
 
-        {/* NFT - COMING SOON */}
+        {/* NFT */}
         <MultiplierRow
           icon="🖼️"
           name="NFT Boost"
-          status="coming_soon"
+          status={getStatus("nft", false)}
           value={nftCount > 0 ? `+${nftBoostPercent.toFixed(1)}%` : "0%"}
           detail={
             nftCount > 0
@@ -110,21 +144,21 @@ export function RewardsBreakdownPanel({
           description="Collect NFTs for stacking boosts (diminishing returns)"
         />
 
-        {/* Engagement - COMING SOON */}
+        {/* Engagement */}
         <MultiplierRow
           icon="🎮"
           name="Engagement"
-          status="coming_soon"
+          status={getStatus("engagement", false)}
           value={`+${((engagementMultiplier - 1) * 100).toFixed(1)}%`}
           detail="Baby care + daily streak + play time"
           description="Care for your baby and play daily (max +3%)"
         />
 
-        {/* Cosmic - COMING SOON */}
+        {/* Cosmic */}
         <MultiplierRow
           icon="🌙"
           name="Cosmic Energy"
-          status="coming_soon"
+          status={getStatus("cosmic", false)}
           value={
             cosmicMultiplier >= 1
               ? `+${((cosmicMultiplier - 1) * 100).toFixed(1)}%`

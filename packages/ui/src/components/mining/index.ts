@@ -51,3 +51,6 @@ export {
   RewardsBreakdownPanel,
   type RewardsBreakdownPanelProps,
 } from "./RewardsBreakdownPanel";
+
+// Streak Bonus Card
+export { StreakBonusCard, type StreakBonusCardProps } from "./StreakBonusCard";

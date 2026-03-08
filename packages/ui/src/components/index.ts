@@ -43,6 +43,7 @@ export {
   TokenCounterBadge,
   EngagementBonusPanel,
   RewardsBreakdownPanel,
+  StreakBonusCard,
   type MiningStatusBadgeProps,
   type MiningStatsGridProps,
   type MiningStats,
@@ -50,6 +51,7 @@ export {
   type NFTBoostPanelProps,
   type EngagementBonusPanelProps,
   type RewardsBreakdownPanelProps,
+  type StreakBonusCardProps,
 } from "./mining";
 
 // NFT Components
