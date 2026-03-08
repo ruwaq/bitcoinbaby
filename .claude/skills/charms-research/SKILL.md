@@ -1,31 +1,29 @@
 ---
 name: charms-research
-description: Investiga el protocolo Charms para tokens en Bitcoin. Usa para entender Spells, Runes, y BitcoinOS.
+description: Investiga el protocolo Charms para tokens sobre Bitcoin. Usa cuando se pregunte sobre Spells, Runes, BitcoinOS, BitSNARK, Scrolls API, minting de tokens, o se trabaje en packages/bitcoin/src/charms/. Esencial para entender como BABY tokens funcionan.
 allowed-tools: Read, Grep, Glob, WebFetch, WebSearch
 ---
 
-# Investigacion de Charms Protocol
-
-Investiga el protocolo Charms para crear tokens BABY sobre Bitcoin.
+# Charms Protocol Research
 
 ## Referencias
-
-- Charms Protocol: https://charms.dev/
+- Charms: https://charms.dev/
 - BitcoinOS: https://www.bitcoinos.build/
-- Runes Protocol: Nativo de Bitcoin
+- Docs: https://docs.charms.dev/
 
 ## Conceptos Clave
 
-1. **Spells**: Scripts YAML que definen operaciones de tokens
-2. **Runes**: Standard de tokens usando OP_RETURN
-3. **BitSNARK**: Verificacion ZK off-chain
-4. **Grail Bridge**: Bridge 1-of-N para assets
+| Concepto | Descripcion |
+|----------|-------------|
+| **Spells** | Scripts YAML que definen operaciones de tokens |
+| **Runes** | Standard de tokens usando OP_RETURN |
+| **BitSNARK** | Verificacion ZK off-chain |
+| **Scrolls** | Indexer API para balances/transacciones |
+| **Grail Bridge** | Bridge 1-of-N para assets |
 
-## Spell de Ejemplo (mine-baby.yaml)
-
+## Spell Ejemplo
 ```yaml
 name: mine-baby
-version: 1.0.0
 operations:
   - type: mint
     token: BABY
@@ -33,10 +31,8 @@ operations:
     recipient: miner_address
 ```
 
-## Integracion
-
-1. Estudiar SDK de Charms
-2. Crear spell para mining
-3. Construir transacciones con OP_RETURN
-4. Integrar con Scrolls API
-5. Testing en Bitcoin testnet
+## Scrolls API
+```
+GET /api/v1/balances/{address}
+GET /api/v1/tokens/{rune_id}
+```

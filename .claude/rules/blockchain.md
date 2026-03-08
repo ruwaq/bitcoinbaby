@@ -3,93 +3,27 @@ paths:
   - "packages/bitcoin/**/*"
 ---
 
-# Reglas Blockchain
+# Blockchain Security
 
-## Seguridad de Claves
-```typescript
-// NUNCA hacer esto
-console.log(privateKey); // NUNCA logear claves
-const key = "L1234..."; // NUNCA hardcodear claves
-
-// Correcto: manejar claves de forma segura
-async function signTransaction(tx: Transaction): Promise<SignedTransaction> {
-  // Obtener clave de almacenamiento seguro
-  const privateKey = await secureStorage.getPrivateKey();
-
-  try {
-    return sign(tx, privateKey);
-  } finally {
-    // Limpiar memoria
-    privateKey.fill(0);
-  }
-}
-```
+## Claves Privadas
+Las claves privadas expuestas permiten robo irreversible de fondos. Por eso:
+- Nunca logear: `console.log(privateKey)` expone en DevTools
+- Nunca hardcodear: el codigo es publico en git
+- Limpiar memoria: `privateKey.fill(0)` despues de usar
 
 ## Transacciones
+Validar antes de firmar porque las transacciones son irreversibles:
 ```typescript
-// Siempre validar antes de firmar
-async function createTransaction(params: TxParams): Promise<Transaction> {
-  // 1. Validar inputs
-  if (!isValidAddress(params.to)) {
-    throw new Error('Invalid recipient address');
-  }
-
-  if (params.amount <= 0) {
-    throw new Error('Amount must be positive');
-  }
-
-  // 2. Verificar balance
-  const balance = await getBalance(params.from);
-  const totalCost = params.amount + estimateFee(params);
-
-  if (balance < totalCost) {
-    throw new Error('Insufficient funds');
-  }
-
-  // 3. Construir transaccion
-  return buildTransaction(params);
-}
+if (!isValidAddress(to)) throw new Error('Invalid address');
+if (amount <= 0) throw new Error('Invalid amount');
+if (balance < amount + fee) throw new Error('Insufficient funds');
 ```
 
-## Charms / Scrolls Integration
+## Network
+- `bitcoin.networks.testnet` en desarrollo
+- Verificar network antes de broadcast
+
+## Scrolls API
 ```typescript
-// Usar Scrolls API para consultar balances
-async function getTokenBalance(address: string, runeId: string): Promise<bigint> {
-  const response = await fetch(
-    `${SCROLLS_API}/api/v1/balances/${address}?rune_id=${runeId}`
-  );
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch balance from Scrolls');
-  }
-
-  const data = await response.json();
-  return BigInt(data.balance);
-}
-
-// Crear Spell para mining
-const mineSpell = {
-  name: 'mine-baby',
-  version: '1.0.0',
-  operations: [
-    {
-      type: 'mint',
-      token: 'BABY',
-      amount: 'calculated',
-      recipient: minerAddress,
-      proof: workProof,
-    }
-  ]
-};
-```
-
-## Testing con Testnet
-```typescript
-// Siempre usar testnet para desarrollo
-const NETWORK = process.env.NODE_ENV === 'production'
-  ? bitcoin.networks.bitcoin
-  : bitcoin.networks.testnet;
-
-// Faucets para testing
-// Bitcoin Testnet: https://coinfaucet.eu/en/btc-testnet/
+const balance = await fetch(`${SCROLLS_API}/api/v1/balances/${address}`);
 ```

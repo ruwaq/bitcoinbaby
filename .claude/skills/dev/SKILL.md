@@ -1,22 +1,14 @@
 ---
 name: dev
-description: Inicia el servidor de desarrollo. Usa cuando el usuario quiera correr el proyecto.
+description: Inicia servidores de desarrollo del monorepo BitcoinBaby. Usa cuando usuario diga "dev", "run", "correr", "iniciar", "servidor", "development", "levantar", o quiera ver cambios en tiempo real. Ejecuta pnpm dev.
 disable-model-invocation: true
 allowed-tools: Bash
 ---
 
-# Desarrollo Local
-
-Inicia el servidor de desarrollo del proyecto BitcoinBaby.
-
-## Comandos
+# /dev - Desarrollo Local
 
 ```bash
-# Verificar dependencias
-pnpm install
-
-# Iniciar desarrollo
-pnpm dev
+pnpm install && pnpm dev
 ```
 
-Si hay errores de dependencias, ejecuta `pnpm install` primero.
+Si falla, verificar que las dependencias esten instaladas con `pnpm install`.

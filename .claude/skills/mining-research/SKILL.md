@@ -1,35 +1,30 @@
 ---
 name: mining-research
-description: Investiga implementaciones de mining en browser. Usa para entender WebGPU, Web Workers, y patrones de mineria.
+description: Investiga patrones de mineria en browser para BitcoinBaby. Usa cuando se pregunte sobre WebGPU mining, Web Workers, CPU hashing, orchestrator pattern, hashrate, proof of work en browser, o se trabaje en packages/core/mining/. Referencia principal es BRO Token.
 allowed-tools: Read, Grep, Glob, WebFetch, WebSearch
 ---
 
-# Investigacion de Mining
+# Mining Research
 
-Investiga patrones de mineria en browser para BitcoinBaby.
+## Referencia Principal
+BRO Token: https://github.com/CharmsDev/bro (`webapp/src/mining/`)
 
-## Referencias Clave
+## Patrones Clave
 
-- BRO Token: https://github.com/CharmsDev/bro
-- WebGPU API: https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API
+1. **Orchestrator** - Coordina CPU/GPU miners, maneja bateria/visibilidad
+2. **Web Workers** - Mining sin bloquear UI thread
+3. **WebGPU** - Aceleracion GPU para hashing paralelo
+4. **Proof of Work** - SHA-256 con leading zeros
+
+## Estructura BitcoinBaby
+```
+packages/core/src/mining/
+├── orchestrator.ts     # Coordinador
+├── cpu-miner.ts        # Web Worker
+├── webgpu-miner.ts     # GPU
+└── ai-integration.ts   # PoUW
+```
+
+## APIs
+- WebGPU: https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API
 - Web Workers: https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API
-
-## Patrones a Investigar
-
-1. **Orchestrator Pattern**: Como coordinar CPU y GPU miners
-2. **Web Workers**: No bloquear UI durante mining
-3. **WebGPU**: Aceleracion GPU para hashing
-4. **Proof of Work**: Algoritmos de hashing con leading zeros
-
-## Codigo de Referencia
-
-```
-BRO Token estructura:
-webapp/src/mining/
-├── orchestrator.ts     # Coordinador principal
-├── cpu-miner.ts        # Mining con CPU
-├── webgpu-miner.ts     # Mining con GPU
-└── types.ts            # Interfaces compartidas
-```
-
-Investiga estas implementaciones y adapta para BitcoinBaby.

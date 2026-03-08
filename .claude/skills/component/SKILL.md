@@ -1,58 +1,39 @@
 ---
 name: component
-description: Crea un nuevo componente React en packages/ui. Usa para UI compartida.
+description: Crea componentes React reutilizables en packages/ui con CVA (class-variance-authority). Usa cuando usuario diga "crear componente", "nuevo componente", "UI component", "componente compartido", o necesite agregar elementos visuales al design system.
 disable-model-invocation: true
 argument-hint: "[ComponentName]"
 allowed-tools: Read, Write, Edit
 ---
 
-# Crear Componente UI
+# /component - Crear Componente UI
 
-Crea un nuevo componente React en `packages/ui/src/components/`.
+Ubicacion: `packages/ui/src/components/$ARGUMENTS.tsx`
 
-## Estructura del Componente
+## Template
 
 ```typescript
-// packages/ui/src/components/$ARGUMENTS.tsx
 import { cva, type VariantProps } from 'class-variance-authority';
-import { clsx } from 'clsx';
+import { cn } from '@/lib/utils';
 
-const $ARGUMENTSVariants = cva(
-  'base-classes-here',
-  {
-    variants: {
-      variant: {
-        default: 'default-styles',
-        // agregar variantes
-      },
-      size: {
-        default: 'default-size',
-        sm: 'small-size',
-        lg: 'large-size',
-      },
-    },
-    defaultVariants: {
-      variant: 'default',
-      size: 'default',
-    },
-  }
-);
+const $ARGUMENTSVariants = cva('base-classes', {
+  variants: {
+    variant: { default: '', primary: '', secondary: '' },
+    size: { sm: '', md: '', lg: '' },
+  },
+  defaultVariants: { variant: 'default', size: 'md' },
+});
 
 interface $ARGUMENTSProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof $ARGUMENTSVariants> {}
 
 export function $ARGUMENTS({ className, variant, size, ...props }: $ARGUMENTSProps) {
-  return (
-    <div className={clsx($ARGUMENTSVariants({ variant, size }), className)} {...props} />
-  );
+  return <div className={cn($ARGUMENTSVariants({ variant, size }), className)} {...props} />;
 }
 ```
 
 ## Checklist
-
-1. Crear archivo del componente
+1. Crear componente con template
 2. Exportar desde `packages/ui/src/components/index.ts`
-3. Agregar TypeScript types
-4. Usar class-variance-authority para variantes
-5. Documentar props con JSDoc si es necesario
+3. Seguir estilo pixel-art (ver rules/pixel-art.md)
