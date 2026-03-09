@@ -811,9 +811,10 @@ nftRouter.post(
         tokensEarned: "0",
       };
 
-      // Atomic: create NFT record + add to owner's set + increment counter
+      // Atomic: create NFT record + add to indexes + increment counter
       await redis.hset(`nft:minted:${tokenId}`, nftRecord);
       await redis.sadd(`nft:owned:${body.address}`, tokenId.toString());
+      await redis.sadd("nft:all-tokens", tokenId.toString()); // Global index for explorer
       await redis.incr("nft:minted:count"); // Now only incremented on confirmed mints
 
       nftLogger.info("Confirmed token ID", {
@@ -1084,9 +1085,9 @@ nftRouter.get("/all", async (c) => {
 
     const redis = getRedis(c.env);
 
-    // Get total minted count
-    const mintedCount = await redis.get<number>("nft:minted:count");
-    if (!mintedCount || mintedCount === 0) {
+    // Get all minted token IDs from the global index
+    const allTokenIds = await redis.smembers("nft:all-tokens");
+    if (!allTokenIds || allTokenIds.length === 0) {
       return successResponse(c, {
         nfts: [],
         total: 0,
@@ -1114,7 +1115,7 @@ nftRouter.get("/all", async (c) => {
       }
     }
 
-    // Fetch all NFTs (we need all for filtering/sorting, then paginate)
+    // Fetch all NFTs using the global index (supports random token IDs)
     const allNFTs: Array<
       NFTRecord & {
         isListed: boolean;
@@ -1123,6 +1124,14 @@ nftRouter.get("/all", async (c) => {
         blockchainUrl: string;
       }
     > = [];
+
+    // Stats for ALL NFTs (before filtering)
+    const globalStats = {
+      total: allTokenIds.length,
+      forSale: listingsSet.size,
+      byRarity: {} as Record<string, number>,
+      byBloodline: {} as Record<string, number>,
+    };
 
     // Rarity order for sorting
     const rarityOrder: Record<string, number> = {
@@ -1134,14 +1143,21 @@ nftRouter.get("/all", async (c) => {
       common: 1,
     };
 
-    // Fetch NFTs
-    for (let i = 1; i <= mintedCount; i++) {
-      const nftData = await redis.hgetall(`nft:minted:${i}`);
+    // Fetch NFTs using the global index
+    for (const tokenIdStr of allTokenIds) {
+      const tokenId = parseInt(tokenIdStr, 10);
+      const nftData = await redis.hgetall(`nft:minted:${tokenId}`);
       if (!nftData || Object.keys(nftData).length === 0) continue;
 
-      const nft = parseNFTData(nftData, i);
-      const isListed = listingsSet.has(i.toString());
-      const listingInfo = listingPrices[i];
+      const nft = parseNFTData(nftData, tokenId);
+      const isListed = listingsSet.has(tokenIdStr);
+      const listingInfo = listingPrices[tokenId];
+
+      // Count stats for ALL NFTs (before filtering)
+      globalStats.byRarity[nft.rarityTier] =
+        (globalStats.byRarity[nft.rarityTier] || 0) + 1;
+      globalStats.byBloodline[nft.bloodline] =
+        (globalStats.byBloodline[nft.bloodline] || 0) + 1;
 
       // Apply filters
       if (bloodline !== "all" && nft.bloodline !== bloodline) continue;
@@ -1180,34 +1196,19 @@ nftRouter.get("/all", async (c) => {
         break;
     }
 
-    // Calculate stats
-    const stats = {
-      total: mintedCount,
-      forSale: listingsSet.size,
-      byRarity: {} as Record<string, number>,
-      byBloodline: {} as Record<string, number>,
-    };
-
-    for (const nft of allNFTs) {
-      stats.byRarity[nft.rarityTier] =
-        (stats.byRarity[nft.rarityTier] || 0) + 1;
-      stats.byBloodline[nft.bloodline] =
-        (stats.byBloodline[nft.bloodline] || 0) + 1;
-    }
-
-    // Paginate
-    const total = allNFTs.length;
-    const totalPages = Math.ceil(total / limit);
+    // Paginate filtered results
+    const filteredTotal = allNFTs.length;
+    const totalPages = Math.ceil(filteredTotal / limit);
     const offset = (page - 1) * limit;
     const paginatedNFTs = allNFTs.slice(offset, offset + limit);
 
     return successResponse(c, {
       nfts: paginatedNFTs,
-      total,
+      total: filteredTotal,
       page,
       limit,
       totalPages,
-      stats,
+      stats: globalStats, // Stats for ALL NFTs, not just filtered
     });
   } catch (error) {
     nftLogger.error("[NFT] Get all error:", error);
@@ -1233,21 +1234,19 @@ nftRouter.get("/stats", async (c) => {
 
     const redis = getRedis(c.env);
 
-    // Get counter (max token ID attempted)
-    const counterValue = (await redis.get<number>("nft:minted:count")) || 0;
+    // Get all token IDs from the global index
+    const allTokenIds = await redis.smembers("nft:all-tokens");
     const activeListings = await redis.smembers("nft:active-listings");
     const forSaleCount = activeListings?.length || 0;
 
-    // Count ACTUAL NFTs that exist (not just counter)
-    // Also get distribution stats
+    // Get distribution stats from all NFTs
     const byRarity: Record<string, number> = {};
     const byBloodline: Record<string, number> = {};
-    let actualMintedCount = 0;
 
-    for (let i = 1; i <= counterValue; i++) {
-      const nftData = await redis.hgetall(`nft:minted:${i}`);
+    for (const tokenIdStr of allTokenIds || []) {
+      const tokenId = parseInt(tokenIdStr, 10);
+      const nftData = await redis.hgetall(`nft:minted:${tokenId}`);
       if (nftData && Object.keys(nftData).length > 0) {
-        actualMintedCount++;
         const rarity = nftData.rarityTier as string;
         const blood = nftData.bloodline as string;
         if (rarity) byRarity[rarity] = (byRarity[rarity] || 0) + 1;
@@ -1255,18 +1254,64 @@ nftRouter.get("/stats", async (c) => {
       }
     }
 
+    const totalMinted = allTokenIds?.length || 0;
+
     return successResponse(c, {
-      totalMinted: actualMintedCount,
+      totalMinted,
       totalForSale: forSaleCount,
       maxSupply: MAX_SUPPLY,
-      mintProgress:
-        Math.round((actualMintedCount / MAX_SUPPLY) * 100 * 100) / 100,
+      mintProgress: Math.round((totalMinted / MAX_SUPPLY) * 100 * 100) / 100,
       byRarity,
       byBloodline,
     });
   } catch (error) {
     nftLogger.error("[NFT] Get stats error:", error);
     return errorResponse(c, "Failed to get stats", 500);
+  }
+});
+
+/**
+ * POST /api/nft/migrate-index - Add tokens to the global index
+ *
+ * Pass token IDs in the request body to add them to nft:all-tokens.
+ * Example: POST /api/nft/migrate-index {"tokenIds": [1, 3, 9443]}
+ */
+nftRouter.post("/migrate-index", async (c) => {
+  try {
+    if (!c.env.UPSTASH_REDIS_REST_URL || !c.env.UPSTASH_REDIS_REST_TOKEN) {
+      return errorResponse(c, "Redis not configured", 500);
+    }
+
+    const redis = getRedis(c.env);
+    const body = await c.req.json().catch(() => ({}));
+    const tokenIds: number[] = body.tokenIds || [];
+
+    if (tokenIds.length === 0) {
+      return errorResponse(c, "No tokenIds provided", 400);
+    }
+
+    // Add all token IDs to the global index
+    const tokenStrings = tokenIds.map((id) => id.toString());
+    await redis.sadd("nft:all-tokens", ...tokenStrings);
+
+    // Update the count
+    const finalTokens = await redis.smembers("nft:all-tokens");
+    const actualCount = finalTokens?.length || 0;
+    await redis.set("nft:minted:count", actualCount);
+
+    nftLogger.info("Migration completed", {
+      addedTokens: tokenIds,
+      totalCount: actualCount,
+    });
+
+    return successResponse(c, {
+      migrated: true,
+      addedTokens: tokenIds,
+      totalCount: actualCount,
+    });
+  } catch (error) {
+    nftLogger.error("[NFT] Migration error:", error);
+    return errorResponse(c, "Failed to migrate index", 500);
   }
 });
 
