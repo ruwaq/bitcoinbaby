@@ -429,6 +429,51 @@ export class NFTMintingServiceSimple {
     }
   }
 
+  /**
+   * Check if prover is available and responsive
+   */
+  async healthCheck(): Promise<{
+    available: boolean;
+    latencyMs: number;
+    error?: string;
+  }> {
+    const start = Date.now();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10_000); // 10s timeout for health check
+
+    try {
+      // Simple GET request to check if prover is responsive
+      await fetch(this.proverUrl, {
+        method: "GET",
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      const latencyMs = Date.now() - start;
+
+      // Any response (even 404) means the server is up
+      return {
+        available: true,
+        latencyMs,
+      };
+    } catch (error) {
+      clearTimeout(timeoutId);
+      const latencyMs = Date.now() - start;
+      const message = error instanceof Error ? error.message : "Unknown error";
+
+      nftLogger.warn("Prover health check failed", {
+        error: message,
+        latencyMs,
+      });
+
+      return {
+        available: false,
+        latencyMs,
+        error: message,
+      };
+    }
+  }
+
   private async extractTxid(txHex: string): Promise<string> {
     const bytes = new Uint8Array(txHex.length / 2);
     for (let i = 0; i < txHex.length; i += 2) {

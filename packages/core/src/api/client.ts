@@ -452,6 +452,23 @@ export class BitcoinBabyClient {
   }
 
   /**
+   * Check prover health before minting
+   * Returns availability status and latency
+   */
+  async checkProverHealth(): Promise<
+    ApiResponse<{ available: boolean; latencyMs: number; error?: string }>
+  > {
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/nft/prover-health`,
+      { method: "GET" },
+      1, // Single retry for health check
+    );
+    return response.json() as Promise<
+      ApiResponse<{ available: boolean; latencyMs: number; error?: string }>
+    >;
+  }
+
+  /**
    * Reserve next NFT ID (atomic increment)
    * Returns the reserved token ID for minting and an attemptId for tracking
    * No retry - atomic operation must not be duplicated

@@ -338,6 +338,26 @@ nftRouter.get("/counter", async (c) => {
 });
 
 /**
+ * GET /api/nft/prover-health - Check prover availability
+ */
+nftRouter.get("/prover-health", async (c) => {
+  try {
+    const mintingService = getNFTMintingServiceSimple({
+      proverUrl: "https://v11.charms.dev",
+      appId: c.env.NFT_APP_ID || "placeholder",
+      appVk: c.env.NFT_APP_VK || "placeholder",
+    });
+
+    const health = await mintingService.healthCheck();
+
+    return successResponse(c, health);
+  } catch (error) {
+    nftLogger.error("[NFT] Prover health check error:", error);
+    return errorResponse(c, "Health check failed", 500);
+  }
+});
+
+/**
  * POST /api/nft/reserve - Reserve next NFT ID (atomic increment)
  *
  * Now tracks mint attempts so users can see pending/failed mints.

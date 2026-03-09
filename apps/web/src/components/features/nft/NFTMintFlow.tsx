@@ -24,6 +24,7 @@ import {
 // Step definitions for progress display
 const MINT_STEPS = {
   idle: { label: "", icon: "" },
+  checking_prover: { label: "Checking Prover", icon: "🔍" },
   reserving: { label: "Reserving Token ID", icon: "🎟️" },
   generating_traits: { label: "Generating Traits", icon: "🧬" },
   proving: { label: "Generating ZK Proof", icon: "🔐" },
@@ -109,6 +110,7 @@ export function NFTMintFlow({
 
   if (state === "minting") {
     const stepInfo = MINT_STEPS[currentStep] || MINT_STEPS.idle;
+    const isCheckingProver = currentStep === "checking_prover";
     const isProving = currentStep === "proving";
     const isSigning =
       currentStep === "signing_commit" || currentStep === "signing_spell";
@@ -132,8 +134,9 @@ export function NFTMintFlow({
 
         {/* Step Description */}
         <p className="font-pixel-body text-sm text-pixel-text-muted mb-4">
+          {isCheckingProver && "Verifying prover availability..."}
           {isSigning && "Please confirm in your wallet..."}
-          {isProving && "This may take 30-60 seconds..."}
+          {isProving && "This may take 1-5 minutes..."}
           {isBroadcasting && "Submitting to Bitcoin network..."}
           {currentStep === "reserving" && "Getting your unique token ID..."}
           {currentStep === "generating_traits" &&
@@ -148,8 +151,9 @@ export function NFTMintFlow({
               Progress
             </span>
           </div>
-          <div className="grid grid-cols-9 gap-1">
+          <div className="grid grid-cols-10 gap-1">
             {[
+              "checking_prover",
               "reserving",
               "generating_traits",
               "proving",

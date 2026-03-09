@@ -8,6 +8,7 @@
  * - XP submissions
  */
 
+import { HTTP_TIMEOUTS } from "@bitcoinbaby/shared";
 import { BaseApiClient, type Environment } from "./base-client";
 import type { ApiResponse, NFTRecord } from "../types";
 
@@ -111,6 +112,18 @@ export class NFTClient extends BaseApiClient {
    */
   async getNFTCounter(): Promise<ApiResponse<{ count: number }>> {
     return this.get<{ count: number }>("/api/nft/counter");
+  }
+
+  /**
+   * Check prover health before minting
+   * Returns availability status and latency
+   */
+  async checkProverHealth(): Promise<
+    ApiResponse<{ available: boolean; latencyMs: number; error?: string }>
+  > {
+    return this.get<{ available: boolean; latencyMs: number; error?: string }>(
+      "/api/nft/prover-health",
+    );
   }
 
   /**
@@ -220,11 +233,16 @@ export class NFTClient extends BaseApiClient {
   /**
    * Request NFT proof from Charms prover
    * Returns commit + spell transactions for signing
+   * Uses extended timeout to allow for prover retries
    */
   async proveNFT(
     request: ProveNFTRequest,
   ): Promise<ApiResponse<ProveNFTResult>> {
-    return this.post<ProveNFTResult>("/api/nft/prove", request);
+    return this.postWithTimeout<ProveNFTResult>(
+      "/api/nft/prove",
+      request,
+      HTTP_TIMEOUTS.PROVER_FULL,
+    );
   }
 
   /**

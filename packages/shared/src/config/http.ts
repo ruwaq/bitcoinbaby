@@ -21,8 +21,10 @@ export const HTTP_TIMEOUTS = {
   LONG: 30_000,
   /** Very long operations (mining proof submissions) */
   EXTENDED: 60_000,
-  /** Maximum for prover operations */
+  /** Single prover attempt */
   PROVER: 120_000,
+  /** Full prover flow with retries (workers has 3 retries) */
+  PROVER_FULL: 360_000,
   /** Transaction confirmation polling */
   CONFIRMATION: 600_000,
 } as const;

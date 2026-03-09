@@ -88,6 +88,24 @@ export abstract class BaseApiClient {
   }
 
   /**
+   * Make POST request with custom timeout (for long operations like prover)
+   */
+  protected async postWithTimeout<T>(
+    path: string,
+    body: unknown,
+    timeoutMs: number,
+  ): Promise<ApiResponse<T>> {
+    try {
+      const response = await this.http.post<ApiResponse<T>>(path, body, {
+        timeout: timeoutMs,
+      });
+      return response.data;
+    } catch (error) {
+      return this.handleError<T>(error);
+    }
+  }
+
+  /**
    * Make PUT request and return ApiResponse
    */
   protected async put<T>(

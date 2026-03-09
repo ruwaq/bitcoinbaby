@@ -46,6 +46,7 @@ export interface MintResult {
 
 export type MintStep =
   | "idle"
+  | "checking_prover"
   | "reserving"
   | "generating_traits"
   | "proving"
@@ -114,11 +115,20 @@ function rollRarity(dna: string): RarityTier {
 }
 
 /**
- * Check if hex string is a PSBT (vs raw transaction)
- * PSBT magic number: 0x70736274ff ("psbt" + 0xff)
+ * Check if string is a PSBT (vs raw transaction)
+ * PSBT magic bytes: 0x70736274ff ("psbt" + 0xff)
+ * Can be hex encoded or base64 encoded
  */
-function isPsbt(hex: string): boolean {
-  return hex.toLowerCase().startsWith("70736274ff");
+function isPsbt(data: string): boolean {
+  // Check hex format: 70736274ff
+  if (data.toLowerCase().startsWith("70736274ff")) {
+    return true;
+  }
+  // Check base64 format: cHNidP8 (base64 of "psbt\xff")
+  if (data.startsWith("cHNidP8")) {
+    return true;
+  }
+  return false;
 }
 
 // =============================================================================
@@ -165,6 +175,33 @@ export function useMintNFT(): UseMintNFTReturn {
 
     setIsLoading(true);
     setError(null);
+
+    // Step 0: Check prover health before starting
+    setCurrentStep("checking_prover");
+    const apiClient = getApiClient();
+
+    try {
+      const healthResult = await apiClient.checkProverHealth();
+      if (!healthResult.success || !healthResult.data?.available) {
+        const errorMsg =
+          healthResult.data?.error ||
+          "Charms prover is currently unavailable. Please try again later.";
+        setError(errorMsg);
+        setCurrentStep("error");
+        setIsLoading(false);
+        return {
+          success: false,
+          error: errorMsg,
+        };
+      }
+      console.log(
+        `[MintNFT] Prover health OK (latency: ${healthResult.data.latencyMs}ms)`,
+      );
+    } catch (healthError) {
+      console.warn("[MintNFT] Prover health check failed, proceeding anyway");
+      // Don't block on health check failure - prover might still work
+    }
+
     setCurrentStep("reserving");
 
     // Fetch UTXOs from mempool
@@ -196,7 +233,6 @@ export function useMintNFT(): UseMintNFTReturn {
     // Track reserved token ID and attempt ID for cleanup on error
     let reservedTokenId: number | null = null;
     let attemptId: string | null = null;
-    const apiClient = getApiClient();
 
     try {
       // Step 1: Reserve next NFT ID from server (now tracks attempt)
@@ -306,6 +342,8 @@ export function useMintNFT(): UseMintNFTReturn {
         spellTxid: proveResult.data.spellTxid,
         hasCommitTx: Boolean(commitTxHex),
         hasSpellTx: Boolean(spellTxHex),
+        spellTxPrefix: spellTxHex?.slice(0, 20),
+        spellTxLength: spellTxHex?.length,
       });
 
       if (!spellTxHex) {
@@ -319,6 +357,8 @@ export function useMintNFT(): UseMintNFTReturn {
       console.log("[MintNFT] Transaction formats:", {
         commitIsPsbt,
         spellIsPsbt,
+        // Log first 40 chars for debugging
+        spellPrefix: spellTxHex.slice(0, 40),
       });
 
       let finalCommitHex: string | null = null;
@@ -404,10 +444,21 @@ export function useMintNFT(): UseMintNFTReturn {
       setCurrentStep("broadcasting_spell");
       console.log("[MintNFT] Broadcasting spell transaction...");
 
-      const broadcastSpellTxid =
-        await mempoolClient.broadcastTransaction(finalSpellHex);
-      if (!broadcastSpellTxid) {
-        throw new Error("Failed to broadcast spell transaction");
+      let broadcastSpellTxid: string;
+      try {
+        broadcastSpellTxid =
+          await mempoolClient.broadcastTransaction(finalSpellHex);
+        if (!broadcastSpellTxid) {
+          throw new Error("Failed to broadcast spell transaction");
+        }
+      } catch (broadcastError) {
+        console.error(
+          "[MintNFT] Spell broadcast failed:",
+          broadcastError instanceof Error
+            ? broadcastError.message
+            : broadcastError,
+        );
+        throw broadcastError;
       }
       setSpellTxid(broadcastSpellTxid);
 
