@@ -28,11 +28,10 @@ import type {
   ClaimRequest,
   ClaimStatus,
 } from "../lib/types";
-import { CLAIM_EXPIRATION_MS, MIN_CLAIM_WORK } from "../lib/types";
+import { CLAIM_EXPIRATION_MS } from "../lib/types";
 import {
   getProofAggregator,
   calculateWorkFromDifficulty,
-  calculateTokensFromWork,
   estimateClaimFee,
 } from "../services/proof-aggregator";
 import {
@@ -1393,7 +1392,8 @@ export class VirtualBalanceDO extends DurableObject<Env> {
   /**
    * GET /balance/{address}/claimable - Get claimable balance
    *
-   * Returns the sum of unclaimed work (D²) from all mining proofs.
+   * Returns the sum of actual mining rewards that can be claimed on-chain.
+   * Uses the reward column from mining_proofs (what users actually earned).
    */
   private handleGetClaimableBalance(): Response {
     if (!this.address) {
@@ -1403,26 +1403,27 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     // Get all unclaimed proofs (credited but not claimed)
     const rows = this.sql
       .exec(
-        `SELECT difficulty, created_at FROM mining_proofs
+        `SELECT reward, difficulty, created_at FROM mining_proofs
          WHERE address = ? AND credited = 1 AND claimed = 0
          ORDER BY created_at DESC`,
         this.address,
       )
       .toArray();
 
-    // Calculate total work
+    // Sum actual rewards (what users earned from mining)
+    let claimableTokens = 0n;
     let unclaimedWork = 0n;
     let lastProofAt = 0;
     for (const row of rows) {
+      // Use the actual reward from mining (not recalculated)
+      claimableTokens += BigInt(row.reward as string);
+      // Also track work for reference
       const difficulty = row.difficulty as number;
       unclaimedWork += calculateWorkFromDifficulty(difficulty);
       if (lastProofAt === 0) {
         lastProofAt = row.created_at as number;
       }
     }
-
-    // Calculate claimable tokens
-    const claimableTokens = calculateTokensFromWork(unclaimedWork);
 
     // Get total claimed (from completed claims)
     const claimedRows = this.sql
@@ -1508,10 +1509,10 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       );
     }
 
-    // Get all unclaimed proofs
+    // Get all unclaimed proofs WITH their actual rewards
     const rows = this.sql
       .exec(
-        `SELECT id, hash, difficulty FROM mining_proofs
+        `SELECT id, hash, difficulty, reward FROM mining_proofs
          WHERE address = ? AND credited = 1 AND claimed = 0`,
         this.address,
       )
@@ -1521,19 +1522,23 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       return this.errorResponse("No unclaimed proofs to claim", 400);
     }
 
-    // Calculate total work
+    // Calculate total work AND sum actual rewards
     let totalWork = 0n;
+    let actualTokens = 0n;
     const proofHashes: string[] = [];
     for (const row of rows) {
       const difficulty = row.difficulty as number;
       totalWork += calculateWorkFromDifficulty(difficulty);
+      actualTokens += BigInt(row.reward as string);
       proofHashes.push(row.hash as string);
     }
 
-    // Check minimum work requirement
-    if (totalWork < MIN_CLAIM_WORK) {
+    // Check minimum tokens requirement (use actual rewards, not work)
+    // MIN_CLAIM_WORK is in work units, so we need a minimum token check instead
+    const MIN_CLAIM_TOKENS = 10n; // Minimum 10 tokens to claim
+    if (actualTokens < MIN_CLAIM_TOKENS) {
       return this.errorResponse(
-        `Minimum work required: ${MIN_CLAIM_WORK}. Current: ${totalWork}`,
+        `Minimum ${MIN_CLAIM_TOKENS} tokens required to claim. Current: ${actualTokens}`,
         400,
       );
     }
@@ -1559,6 +1564,11 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       this.address,
       miningProofs,
     );
+
+    // IMPORTANT: Override tokenAmount with actual mining rewards
+    // The aggregator calculates tokens from difficulty, but we want
+    // to use the actual rewards users earned (includes multipliers, etc.)
+    aggregatedProof.tokenAmount = actualTokens;
 
     // Estimate fee
     const feeRate = 5; // Conservative default

@@ -268,18 +268,31 @@ export function useMintNFT(): UseMintNFTReturn {
       console.log("[MintNFT] Prover returned transactions:", {
         commitTxid: proveResult.data.commitTxid,
         spellTxid: proveResult.data.spellTxid,
+        hasCommitTx: Boolean(commitTxHex),
+        hasSpellTx: Boolean(spellTxHex),
       });
 
-      // Step 4: Sign commit transaction
-      setCurrentStep("signing_commit");
-      console.log("[MintNFT] Signing commit transaction...");
+      if (!spellTxHex) {
+        throw new Error("Prover did not return spell transaction");
+      }
 
-      // Convert hex to base64 PSBT for wallet signing
-      // Note: The prover returns raw tx hex, not PSBT. We need to wrap it.
-      // For now, pass hex directly - wallet adapter should handle conversion
-      const signedCommitHex = await signPsbt(commitTxHex);
-      if (!signedCommitHex) {
-        throw new Error("Commit transaction signing was cancelled");
+      let signedCommitHex: string | null = null;
+      let broadcastCommitTxid: string | null = null;
+
+      // Step 4: Sign commit transaction (if present)
+      // Some prover responses only include the spell transaction
+      if (commitTxHex) {
+        setCurrentStep("signing_commit");
+        console.log("[MintNFT] Signing commit transaction...");
+
+        signedCommitHex = await signPsbt(commitTxHex);
+        if (!signedCommitHex) {
+          throw new Error("Commit transaction signing was cancelled");
+        }
+      } else {
+        console.log(
+          "[MintNFT] No commit transaction from prover, skipping commit signing",
+        );
       }
 
       // Step 5: Sign spell transaction
@@ -291,18 +304,21 @@ export function useMintNFT(): UseMintNFTReturn {
         throw new Error("Spell transaction signing was cancelled");
       }
 
-      // Step 6: Broadcast commit transaction
-      setCurrentStep("broadcasting_commit");
-      console.log("[MintNFT] Broadcasting commit transaction...");
+      // Step 6: Broadcast commit transaction (if present)
+      if (signedCommitHex) {
+        setCurrentStep("broadcasting_commit");
+        console.log("[MintNFT] Broadcasting commit transaction...");
 
-      const broadcastCommitTxid =
-        await mempoolClient.broadcastTransaction(signedCommitHex);
-      if (!broadcastCommitTxid) {
-        throw new Error("Failed to broadcast commit transaction");
+        broadcastCommitTxid =
+          await mempoolClient.broadcastTransaction(signedCommitHex);
+        if (!broadcastCommitTxid) {
+          throw new Error("Failed to broadcast commit transaction");
+        }
+        setCommitTxid(broadcastCommitTxid);
+        console.log("[MintNFT] Commit TX broadcast:", broadcastCommitTxid);
+      } else {
+        console.log("[MintNFT] Skipping commit broadcast (single-tx flow)");
       }
-      setCommitTxid(broadcastCommitTxid);
-
-      console.log("[MintNFT] Commit TX broadcast:", broadcastCommitTxid);
 
       // Step 7: Broadcast spell transaction
       setCurrentStep("broadcasting_spell");
@@ -319,11 +335,13 @@ export function useMintNFT(): UseMintNFTReturn {
 
       // Track pending transactions
       startTracking();
-      addTransaction(
-        broadcastCommitTxid,
-        "nft_mint",
-        `Genesis Baby #${reservedTokenId} commit`,
-      );
+      if (broadcastCommitTxid) {
+        addTransaction(
+          broadcastCommitTxid,
+          "nft_mint",
+          `Genesis Baby #${reservedTokenId} commit`,
+        );
+      }
       addTransaction(
         broadcastSpellTxid,
         "nft_mint",
@@ -366,7 +384,7 @@ export function useMintNFT(): UseMintNFTReturn {
         nft: nftState,
         txid: broadcastSpellTxid,
         spellTxid: broadcastSpellTxid,
-        commitTxid: broadcastCommitTxid,
+        commitTxid: broadcastCommitTxid || undefined,
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : "Mint failed";
