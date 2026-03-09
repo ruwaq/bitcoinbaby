@@ -6,6 +6,13 @@
  */
 
 import { claimLogger } from "../lib/logger";
+import {
+  type NormalizedSpell,
+  type ProverRequest,
+  buildProverRequest,
+  addressToScriptPubkey,
+  NFT_DUST_SATS,
+} from "../lib/cbor-spell";
 import type { ClaimStatus } from "../lib/types";
 import { getMempoolService } from "./mempool-service";
 
@@ -180,12 +187,16 @@ export class ClaimMintingService {
    *
    * For V2 claims, we use server-signed aggregate proofs.
    * The spell validates the signature and mints tokens.
+   * Spell is CBOR-encoded as hex string for the v11 prover.
    */
-  private buildMintSpell(request: MintRequest): object {
+  private buildMintSpell(request: MintRequest): ProverRequest {
     const appKey = `t/${this.appId}/${this.appVk}`;
 
+    // Convert address to script pubkey for coins
+    const userScriptPubkey = addressToScriptPubkey(request.address);
+
     // V11 spell format for server-signed claims
-    const spell = {
+    const spell: NormalizedSpell = {
       version: 11,
       tx: {
         // Input: reference the claim TX (proves user paid fees)
@@ -193,24 +204,29 @@ export class ClaimMintingService {
         // Output: all tokens go to the user
         outs: [
           {
-            "0": parseInt(request.tokenAmount, 10),
+            0: parseInt(request.tokenAmount, 10),
+          },
+        ],
+        // Native coin amounts for outputs
+        // Token output gets dust amount, prover handles change
+        coins: [
+          {
+            amount: NFT_DUST_SATS,
+            dest: userScriptPubkey,
           },
         ],
       },
       app_public_inputs: {
-        [appKey]: null,
+        [appKey]: {}, // Empty public inputs
       },
     };
 
-    // Prover expects spell as hex-encoded JSON string
-    const spellJson = JSON.stringify(spell);
-    const spellHex = this.stringToHex(spellJson);
-
-    return {
-      spell: spellHex,
+    // Build prover request with CBOR-encoded spell
+    return buildProverRequest(spell, {
+      changeAddress: request.address,
+      feeRate: 2.0,
       chain: "bitcoin",
-      change_address: request.address,
-      app_private_inputs: {
+      appPrivateInputs: {
         [appKey]: {
           // Server-signed claim data
           claim_type: "aggregated",
@@ -224,24 +240,13 @@ export class ClaimMintingService {
           server_signature: request.serverSignature,
         },
       },
-    };
-  }
-
-  /**
-   * Convert string to hex
-   */
-  private stringToHex(str: string): string {
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(str);
-    return Array.from(bytes)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
+    });
   }
 
   /**
    * Submit spell to Charms prover with retry logic
    */
-  private async submitToProver(spell: object): Promise<{
+  private async submitToProver(proverRequest: ProverRequest): Promise<{
     success: boolean;
     commitTx?: string;
     spellTx?: string;
@@ -251,7 +256,7 @@ export class ClaimMintingService {
 
     for (let attempt = 1; attempt <= MAX_PROVER_RETRIES; attempt++) {
       try {
-        const result = await this.proveOnce(spell);
+        const result = await this.proveOnce(proverRequest);
         return {
           success: true,
           commitTx: result.commitTx,
@@ -285,7 +290,9 @@ export class ClaimMintingService {
   /**
    * Single prover request
    */
-  private async proveOnce(spell: object): Promise<ProverResponse> {
+  private async proveOnce(
+    proverRequest: ProverRequest,
+  ): Promise<ProverResponse> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), PROVER_TIMEOUT_MS);
 
@@ -300,7 +307,7 @@ export class ClaimMintingService {
           "Content-Type": "application/json",
           "User-Agent": "BitcoinBaby/2.0",
         },
-        body: JSON.stringify(spell),
+        body: JSON.stringify(proverRequest),
         signal: controller.signal,
       });
 

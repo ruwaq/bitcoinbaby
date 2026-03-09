@@ -21,6 +21,13 @@
 
 import type { Env } from "../lib/types";
 import { balanceLogger } from "../lib/logger";
+import {
+  type NormalizedSpell,
+  type ProverRequest,
+  buildProverRequest,
+  addressToScriptPubkey,
+  NFT_DUST_SATS,
+} from "../lib/cbor-spell";
 
 // =============================================================================
 // TYPES
@@ -53,8 +60,8 @@ export interface MintingBatchResult {
   batchId: string;
   /** Error message if failed */
   error?: string;
-  /** Spell for Prover API (if using batch mint) */
-  spell?: Record<string, unknown>;
+  /** Prover request (if using batch mint) */
+  spell?: ProverRequest;
   /** Commit TX hex (needs signing) */
   commitTxHex?: string;
   /** Spell TX hex (needs signing) */
@@ -198,48 +205,54 @@ export class BatchMintingService {
   }
 
   /**
-   * Create a batch transfer spell (V10 format)
+   * Create a batch transfer spell (V11 format)
    *
    * Transfers tokens from treasury to multiple recipients.
+   * Spell is CBOR-encoded as hex string for the v11 prover.
    */
-  private createBatchTransferSpell(batch: ReadyBatch): Record<string, unknown> {
-    const appRef = `t/${BABTC_TESTNET4.appId}/${BABTC_TESTNET4.appVk}`;
+  private createBatchTransferSpell(batch: ReadyBatch): ProverRequest {
+    const appKey = `t/${BABTC_TESTNET4.appId}/${BABTC_TESTNET4.appVk}`;
 
-    // Calculate total amount needed
-    const totalAmount = BigInt(batch.totalAmount);
-
-    // Build outputs - one per recipient
+    // Build outputs - one per recipient with token amounts
     const outs = batch.recipients.map((recipient) => ({
-      address: recipient.address,
-      charms: {
-        $01: parseInt(recipient.amount, 10), // Safe for reasonable amounts
-      },
-      sats: 546, // Dust limit
+      0: parseInt(recipient.amount, 10), // App index 0 = first app
     }));
 
-    // V10 spell structure
-    return {
-      version: 10,
-      apps: {
-        $01: appRef,
+    // Build coins - native Bitcoin amounts for each output
+    // Each recipient gets dust amount
+    const coins = batch.recipients.map((recipient) => ({
+      amount: NFT_DUST_SATS,
+      dest: addressToScriptPubkey(recipient.address),
+    }));
+
+    // V11 spell structure
+    const spell: NormalizedSpell = {
+      version: 11,
+      tx: {
+        // Input: Treasury UTXO (placeholder - to be filled by signer)
+        ins: ["TREASURY_UTXO_PLACEHOLDER"],
+        // Outputs: tokens to each recipient
+        outs,
+        // Native coin amounts for outputs
+        coins,
       },
-      ins: [
-        {
-          // Treasury UTXO (to be filled by signer)
-          utxo_id: "TREASURY_UTXO_PLACEHOLDER",
-          charms: {
-            $01: Number(totalAmount),
-          },
-        },
-      ],
-      outs,
+      app_public_inputs: {
+        [appKey]: {}, // Empty public inputs for transfer
+      },
     };
+
+    // Build prover request with CBOR-encoded spell
+    return buildProverRequest(spell, {
+      changeAddress: this.treasuryAddress,
+      feeRate: batch.feeRate || 2.0,
+      chain: "bitcoin",
+    });
   }
 
   /**
    * Submit spell to Prover API
    */
-  private async submitToProver(spell: Record<string, unknown>): Promise<{
+  private async submitToProver(proverRequest: ProverRequest): Promise<{
     success: boolean;
     commitTx?: string;
     spellTx?: string;
@@ -249,21 +262,18 @@ export class BatchMintingService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 120_000); // 2 min timeout
 
-      // Prover expects spell as hex-encoded JSON string
-      const spellJson = JSON.stringify(spell);
-      const spellHex = this.stringToHex(spellJson);
+      // V11 prover endpoint
+      const endpoint = this.proverUrl.includes("charms.dev")
+        ? `${this.proverUrl}/spells/prove`
+        : `${this.proverUrl}/prove`;
 
-      const response = await fetch(`${this.proverUrl}/prove`, {
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "User-Agent": "BitcoinBaby/1.0",
+          "User-Agent": "BitcoinBaby/2.0",
         },
-        body: JSON.stringify({
-          spell: spellHex,
-          chain: "bitcoin",
-          change_address: this.treasuryAddress,
-        }),
+        body: JSON.stringify(proverRequest),
         signal: controller.signal,
       });
 
@@ -355,17 +365,6 @@ export class BatchMintingService {
       maxRecipientsPerBatch: this.maxRecipientsPerBatch,
       minBatchSize: this.minBatchSize,
     };
-  }
-
-  /**
-   * Convert string to hex
-   */
-  private stringToHex(str: string): string {
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(str);
-    return Array.from(bytes)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
   }
 }
 

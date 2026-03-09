@@ -15,6 +15,17 @@
  */
 
 import { nftLogger } from "../lib/logger";
+import {
+  type NormalizedSpell,
+  type ProverRequest,
+  buildProverRequest,
+  addressToScriptPubkey,
+  NFT_DUST_SATS,
+} from "../lib/cbor-spell";
+import {
+  NFT_CONTRACT_VK,
+  NFT_CONTRACT_BINARY,
+} from "../lib/nft-contract-binary";
 
 // =============================================================================
 // TYPES
@@ -76,11 +87,25 @@ export interface NFTMintResult {
 
 /**
  * Prover API response
+ *
+ * The API can return in two formats:
+ * 1. Legacy: { commitTx: string, spellTx: string }
+ * 2. Chain-tagged: [{ bitcoin: string }] or { bitcoin: [string, string] }
+ *
+ * See: docs.charms.dev/guides/wallet-integration/transactions/prover-api
  */
 interface ProverResponse {
-  commitTx: string;
-  spellTx: string;
+  commitTx?: string;
+  spellTx?: string;
+  // Chain-tagged format
+  bitcoin?: string | string[];
 }
+
+// Prover response data (union type for different response formats)
+type ProverResponseData =
+  | ProverResponse
+  | Array<{ bitcoin?: string }>
+  | { bitcoin?: string | string[] };
 
 // =============================================================================
 // CONSTANTS
@@ -101,6 +126,9 @@ const RETRY_DELAY_BASE_MS = 5000;
 /** Zero appId indicates genesis mint - will calculate from funding UTXO */
 const ZERO_APP_ID =
   "0000000000000000000000000000000000000000000000000000000000000000";
+
+/** Mempool.space API for testnet4 */
+const MEMPOOL_API_URL = "https://mempool.space/testnet4/api";
 
 // =============================================================================
 // NFT MINTING SERVICE
@@ -141,6 +169,25 @@ export class NFTMintingService {
   }
 
   /**
+   * Fetch raw transaction hex from mempool.space
+   */
+  private async fetchRawTransaction(txid: string): Promise<string> {
+    const response = await fetch(`${MEMPOOL_API_URL}/tx/${txid}/hex`, {
+      headers: {
+        "User-Agent": "BitcoinBaby/2.0",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch raw tx ${txid}: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    return response.text();
+  }
+
+  /**
    * Get the effective app ID
    * If configured appId is all zeros, calculate from funding UTXO
    */
@@ -162,10 +209,11 @@ export class NFTMintingService {
   /**
    * Process an NFT mint request
    *
-   * 1. Calculate effective appId (from funding UTXO for genesis)
-   * 2. Build V11 spell with NFT state
-   * 3. Submit to Charms prover
-   * 4. Return transactions for signing
+   * 1. Fetch raw transaction for funding UTXO (prev_txs)
+   * 2. Calculate effective appId (from funding UTXO for genesis)
+   * 3. Build V11 spell with NFT state
+   * 4. Submit to Charms prover
+   * 5. Return transactions for signing
    */
   async processMint(request: NFTMintRequest): Promise<NFTMintResult> {
     nftLogger.info("Processing NFT mint request", {
@@ -175,11 +223,24 @@ export class NFTMintingService {
     });
 
     try {
+      // Fetch the raw transaction that created the funding UTXO
+      nftLogger.info("Fetching raw transaction", {
+        txid: request.fundingUtxo.txid,
+      });
+      const rawTxHex = await this.fetchRawTransaction(request.fundingUtxo.txid);
+      nftLogger.info("Fetched raw transaction", {
+        txid: request.fundingUtxo.txid,
+        rawTxHexLength: rawTxHex.length,
+        rawTxHexPreview: rawTxHex.substring(0, 100),
+      });
+
       // Get effective appId (calculate from UTXO for genesis)
       const effectiveAppId = await this.getEffectiveAppId(request.fundingUtxo);
 
-      // Build the mint spell with effective appId
-      const proverRequest = this.buildMintSpell(request, effectiveAppId);
+      // Build the mint spell with effective appId and prev_txs
+      const proverRequest = this.buildMintSpell(request, effectiveAppId, [
+        rawTxHex,
+      ]);
 
       // Submit to prover with retries
       const proverResult = await this.submitToProver(proverRequest);
@@ -225,16 +286,21 @@ export class NFTMintingService {
    * Build the V11 NFT genesis spell
    *
    * NFTs use "n/" prefix and store state objects instead of amounts.
+   * Spell is CBOR-encoded as hex string for the v11 prover.
    */
   private buildMintSpell(
     request: NFTMintRequest,
     effectiveAppId: string,
-  ): object {
+    prevTxs: string[] = [],
+  ): ProverRequest {
     // NFT app reference: n/<appId>/<appVk>
     const appKey = `n/${effectiveAppId}/${this.appVk}`;
 
+    // Convert owner address to script pubkey for coins
+    const ownerScriptPubkey = addressToScriptPubkey(request.ownerAddress);
+
     // V11 spell format for NFT genesis (mint)
-    const spell = {
+    const spell: NormalizedSpell = {
       version: 11,
       tx: {
         // Input: funding UTXO
@@ -242,8 +308,8 @@ export class NFTMintingService {
         // Output: NFT state goes to owner
         outs: [
           {
-            // App index "0" maps to first app in app_public_inputs
-            "0": {
+            // App index 0 maps to first app in app_public_inputs
+            0: {
               // NFT state stored on-chain
               dna: request.nftState.dna,
               bloodline: request.nftState.bloodline,
@@ -261,42 +327,39 @@ export class NFTMintingService {
             },
           },
         ],
+        // Native coin amounts for outputs
+        // NFT output gets dust amount, prover handles change
+        coins: [
+          {
+            amount: NFT_DUST_SATS,
+            dest: ownerScriptPubkey,
+          },
+        ],
       },
       app_public_inputs: {
-        [appKey]: null, // Genesis mint has no public inputs
+        [appKey]: {}, // Genesis mint has empty public inputs
       },
     };
 
-    // Prover expects spell as hex-encoded JSON string
-    const spellJson = JSON.stringify(spell);
-    const spellHex = this.stringToHex(spellJson);
-
-    // Full prover request with funding info
-    return {
-      spell: spellHex,
+    // Build prover request with CBOR-encoded spell and app binary
+    // Reference: github.com/CharmsDev/charms - spell must be hex-encoded CBOR
+    // The prover requires the app binary for proof generation
+    // Pass base64 directly to avoid re-encoding overhead
+    return buildProverRequest(spell, {
+      changeAddress: request.ownerAddress,
+      feeRate: 2.0,
       chain: "bitcoin",
-      // No app_private_inputs needed for NFT genesis
-      funding_utxo: `${request.fundingUtxo.txid}:${request.fundingUtxo.vout}`,
-      funding_utxo_value: request.fundingUtxo.value,
-      change_address: request.ownerAddress,
-    };
-  }
-
-  /**
-   * Convert string to hex
-   */
-  private stringToHex(str: string): string {
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(str);
-    return Array.from(bytes)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
+      prevTxs,
+      binaries: {
+        [NFT_CONTRACT_VK]: NFT_CONTRACT_BINARY,
+      },
+    });
   }
 
   /**
    * Submit spell to Charms prover with retry logic
    */
-  private async submitToProver(proverRequest: object): Promise<{
+  private async submitToProver(proverRequest: ProverRequest): Promise<{
     success: boolean;
     commitTx?: string;
     spellTx?: string;
@@ -340,7 +403,9 @@ export class NFTMintingService {
   /**
    * Single prover request
    */
-  private async proveOnce(proverRequest: object): Promise<ProverResponse> {
+  private async proveOnce(
+    proverRequest: ProverRequest,
+  ): Promise<ProverResponse> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), PROVER_TIMEOUT_MS);
 
@@ -350,13 +415,30 @@ export class NFTMintingService {
         ? `${this.proverUrl}/spells/prove`
         : `${this.proverUrl}/prove`;
 
+      const requestBody = JSON.stringify(proverRequest);
+
+      // Log request for debugging
+      nftLogger.info("Prover request", {
+        endpoint,
+        bodyLength: requestBody.length,
+        bodyPreview: requestBody.substring(0, 500),
+        hasPrevTxs: Boolean(proverRequest.prev_txs),
+        prevTxsCount: proverRequest.prev_txs?.length ?? 0,
+        prevTxsPreview: proverRequest.prev_txs
+          ? proverRequest.prev_txs.map((tx) => ({
+              hasbitcoin: "bitcoin" in tx,
+              txHexLen: tx.bitcoin?.length ?? 0,
+            }))
+          : [],
+      });
+
       const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "User-Agent": "BitcoinBaby/2.0",
         },
-        body: JSON.stringify(proverRequest),
+        body: requestBody,
         signal: controller.signal,
       });
 
@@ -364,16 +446,53 @@ export class NFTMintingService {
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => "Unknown error");
+        nftLogger.error("Prover error response", {
+          status: response.status,
+          error: errorText,
+        });
         throw new Error(`Prover API error: ${response.status} - ${errorText}`);
       }
 
-      const data = (await response.json()) as ProverResponse;
+      const rawData = (await response.json()) as ProverResponseData;
 
-      if (!data.commitTx || !data.spellTx) {
+      // Parse response - handle both legacy and chain-tagged formats
+      // See: docs.charms.dev/guides/wallet-integration/transactions/prover-api
+      let commitTx: string | undefined;
+      let spellTx: string | undefined;
+
+      if ("commitTx" in rawData && "spellTx" in rawData) {
+        // Legacy format: { commitTx, spellTx }
+        const legacyData = rawData as ProverResponse;
+        commitTx = legacyData.commitTx;
+        spellTx = legacyData.spellTx;
+      } else if (Array.isArray(rawData)) {
+        // Chain-tagged array format: [{ bitcoin: "tx1" }, { bitcoin: "tx2" }]
+        const txs = rawData
+          .filter((item) => item.bitcoin)
+          .map((item) => item.bitcoin as string);
+        if (txs.length >= 2) {
+          commitTx = txs[0];
+          spellTx = txs[1];
+        } else if (txs.length === 1) {
+          // Single transaction - use as spell tx
+          spellTx = txs[0];
+        }
+      } else if ("bitcoin" in rawData && rawData.bitcoin) {
+        // Chain-tagged object: { bitcoin: "tx" } or { bitcoin: ["tx1", "tx2"] }
+        if (Array.isArray(rawData.bitcoin)) {
+          commitTx = rawData.bitcoin[0];
+          spellTx = rawData.bitcoin[1] || rawData.bitcoin[0];
+        } else {
+          spellTx = rawData.bitcoin;
+        }
+      }
+
+      if (!spellTx) {
+        nftLogger.error("Invalid prover response format", { rawData });
         throw new Error("Invalid prover response: missing transactions");
       }
 
-      return data;
+      return { commitTx, spellTx };
     } catch (error) {
       clearTimeout(timeoutId);
 

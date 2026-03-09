@@ -13,6 +13,7 @@
   "dependencies": {
     "@bitcoinbaby/shared": "workspace:*",
     "@upstash/redis": "^1.36.3",
+    "cbor2": "^2.3.0",
     "hono": "^4.0.0",
     "yjs": "^13.6.0",
     "zod": "^3.25.76"

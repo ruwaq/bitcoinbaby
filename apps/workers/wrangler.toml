@@ -64,8 +64,8 @@ MAX_FEE_RATE_SAT_VB = "10"
 # Hosted prover: https://v11.charms.dev (latest version)
 # For local development, run: charms server (localhost:17784)
 # Documentation: https://docs.charms.dev/guides/wallet-integration/transactions/prover-api/
-PROVER_URL = "http://localhost:17784"
-CHARMS_PROVER_URL = "http://localhost:17784"
+PROVER_URL = "https://v11.charms.dev"
+CHARMS_PROVER_URL = "https://v11.charms.dev"
 # Scrolls API for token balances
 SCROLLS_API_URL = "https://scrolls.charms.dev"
 # BABTC Token configuration
