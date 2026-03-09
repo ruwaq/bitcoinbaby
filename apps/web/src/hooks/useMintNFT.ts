@@ -26,6 +26,7 @@ import {
 import {
   createMempoolClient,
   rawTxToPsbt,
+  Psbt,
   type Bloodline,
   type BaseType,
   type RarityTier,
@@ -130,6 +131,16 @@ function isPsbt(data: string): boolean {
     return true;
   }
   return false;
+}
+
+/**
+ * Extract raw transaction hex from a signed/finalized PSBT
+ * After signing, the wallet returns a PSBT in hex format.
+ * We need to extract the final transaction to broadcast.
+ */
+function extractRawTxFromPsbt(psbtHex: string): string {
+  const psbt = Psbt.fromHex(psbtHex);
+  return psbt.extractTransaction().toHex();
 }
 
 // =============================================================================
@@ -456,8 +467,13 @@ export function useMintNFT(): UseMintNFTReturn {
 
         console.log("[MintNFT] Broadcasting commit transaction...");
 
+        // Extract raw transaction from signed PSBT if needed
+        const commitRawTx = isPsbt(finalCommitHex)
+          ? extractRawTxFromPsbt(finalCommitHex)
+          : finalCommitHex;
+
         broadcastCommitTxid =
-          await mempoolClient.broadcastTransaction(finalCommitHex);
+          await mempoolClient.broadcastTransaction(commitRawTx);
         if (!broadcastCommitTxid) {
           throw new Error("Failed to broadcast commit transaction");
         }
@@ -469,12 +485,22 @@ export function useMintNFT(): UseMintNFTReturn {
 
       // Step 7: Broadcast spell transaction
       setCurrentStep("broadcasting_spell");
-      console.log("[MintNFT] Broadcasting spell transaction...");
+
+      // Extract raw transaction from signed PSBT
+      // The wallet returns a finalized PSBT in hex, but mempool needs raw TX
+      const spellRawTx = isPsbt(finalSpellHex)
+        ? extractRawTxFromPsbt(finalSpellHex)
+        : finalSpellHex;
+
+      console.log("[MintNFT] Broadcasting spell transaction...", {
+        isPsbt: isPsbt(finalSpellHex),
+        rawTxPrefix: spellRawTx.slice(0, 20),
+      });
 
       let broadcastSpellTxid: string;
       try {
         broadcastSpellTxid =
-          await mempoolClient.broadcastTransaction(finalSpellHex);
+          await mempoolClient.broadcastTransaction(spellRawTx);
         if (!broadcastSpellTxid) {
           throw new Error("Failed to broadcast spell transaction");
         }
