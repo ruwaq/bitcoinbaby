@@ -1335,6 +1335,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     // SECURITY FIX: Previous code had `WHERE 1=1` which deleted ALL users' data
     this.sql.exec("DELETE FROM mining_proofs WHERE address = ?", this.address);
     this.sql.exec("DELETE FROM balance WHERE address = ?", this.address);
+    this.sql.exec("DELETE FROM claims WHERE address = ?", this.address);
 
     // Clear caches
     this.cachedBalance = null;
@@ -1608,8 +1609,18 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       tokenAmount: aggregatedProof.tokenAmount.toString(),
     });
 
+    // Convert BigInt to string for JSON serialization
+    const serializableClaimData = {
+      ...claimData,
+      proof: {
+        ...claimData.proof,
+        totalWork: claimData.proof.totalWork.toString(),
+        tokenAmount: claimData.proof.tokenAmount.toString(),
+      },
+    };
+
     const responseData: ClaimPrepareResponse = {
-      claimData,
+      claimData: serializableClaimData as unknown as typeof claimData,
       totalWork: aggregatedProof.totalWork.toString(),
       proofCount: rows.length,
       tokenAmount: aggregatedProof.tokenAmount.toString(),
