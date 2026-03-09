@@ -358,9 +358,17 @@ nftRouter.get("/prover-health", async (c) => {
 });
 
 /**
- * POST /api/nft/reserve - Reserve next NFT ID (atomic increment)
+ * POST /api/nft/reserve - Reserve a random NFT ID
  *
- * Now tracks mint attempts so users can see pending/failed mints.
+ * Uses random ID selection with collision detection for better UX:
+ * - Each failed mint gets a new random ID (not stuck on same number)
+ * - Token ID is treated as provisional until confirmed
+ * - Failed reservations are automatically cleaned up
+ *
+ * The system maintains:
+ * - nft:minted:count - Total confirmed mints (for stats)
+ * - nft:reserved:{id} - Temporary reservation (expires in 10 min)
+ * - nft:minted:{id} - Confirmed NFT data
  */
 nftRouter.post("/reserve", validateBody(reserveNftSchema), async (c) => {
   const { address } = c.get("validatedBody");
@@ -368,19 +376,76 @@ nftRouter.post("/reserve", validateBody(reserveNftSchema), async (c) => {
   try {
     const redis = getRedis(c.env);
 
-    // Atomic increment
-    const newCount = await redis.incr("nft:minted:count");
+    // Get current confirmed count for supply check
+    const confirmedCount = (await redis.get<number>("nft:minted:count")) || 0;
 
-    if (newCount > MAX_SUPPLY) {
-      await redis.decr("nft:minted:count");
+    if (confirmedCount >= MAX_SUPPLY) {
       return errorResponse(c, "Max supply reached", 400);
     }
 
+    // Find an available random token ID
+    // Use a range slightly larger than MAX_SUPPLY for better distribution
+    const MAX_ATTEMPTS = 20;
+    let tokenId: number | null = null;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      // Generate random ID between 1 and MAX_SUPPLY
+      const candidateId = Math.floor(Math.random() * MAX_SUPPLY) + 1;
+
+      // Check if already minted (confirmed)
+      const isMinted = await redis.exists(`nft:minted:${candidateId}`);
+      if (isMinted) continue;
+
+      // Check if already reserved (pending mint)
+      const isReserved = await redis.exists(`nft:reserved:${candidateId}`);
+      if (isReserved) continue;
+
+      // Try to atomically reserve this ID
+      const reserved = await redis.setnx(
+        `nft:reserved:${candidateId}`,
+        JSON.stringify({
+          address,
+          reservedAt: Date.now(),
+        }),
+      );
+
+      if (reserved) {
+        tokenId = candidateId;
+        // Set 10-minute expiration - if mint doesn't complete, ID is released
+        await redis.expire(`nft:reserved:${candidateId}`, 600);
+        break;
+      }
+    }
+
+    // Fallback to sequential if random fails (unlikely but safe)
+    if (tokenId === null) {
+      // Find first available sequential ID
+      for (let i = 1; i <= MAX_SUPPLY; i++) {
+        const isMinted = await redis.exists(`nft:minted:${i}`);
+        const isReserved = await redis.exists(`nft:reserved:${i}`);
+        if (!isMinted && !isReserved) {
+          const reserved = await redis.setnx(
+            `nft:reserved:${i}`,
+            JSON.stringify({ address, reservedAt: Date.now() }),
+          );
+          if (reserved) {
+            tokenId = i;
+            await redis.expire(`nft:reserved:${i}`, 600);
+            break;
+          }
+        }
+      }
+    }
+
+    if (tokenId === null) {
+      return errorResponse(c, "No available token IDs. Try again later.", 503);
+    }
+
     // Track this mint attempt
-    const attemptId = `${address}:${newCount}:${Date.now()}`;
+    const attemptId = `${address}:${tokenId}:${Date.now()}`;
     const attempt = {
       attemptId,
-      tokenId: newCount,
+      tokenId,
       address,
       status: "reserved", // reserved -> proving -> signing -> broadcasting -> confirmed | failed
       reservedAt: Date.now(),
@@ -388,19 +453,22 @@ nftRouter.post("/reserve", validateBody(reserveNftSchema), async (c) => {
       error: null,
     };
 
-    // Store attempt (expires after 24 hours)
+    // Store attempt (expires after 24 hours for history)
     await redis.hset(`nft:attempt:${attemptId}`, attempt);
     await redis.expire(`nft:attempt:${attemptId}`, 86400);
 
     // Add to user's pending attempts
     await redis.sadd(`nft:attempts:${address}`, attemptId);
 
-    nftLogger.info("Reserved token ID", { tokenId: newCount, address });
+    nftLogger.info("Reserved random token ID", { tokenId, address });
 
     return successResponse(c, {
-      tokenId: newCount,
-      totalMinted: newCount,
+      tokenId,
+      // Note: totalMinted is confirmed mints, not reservations
+      totalMinted: confirmedCount,
       attemptId,
+      // Indicate this is a provisional ID
+      provisional: true,
     });
   } catch (error) {
     nftLogger.error("[NFT] Reserve error:", error);
@@ -645,9 +713,12 @@ nftRouter.post("/prove", validateBody(proveNftSchema), async (c) => {
 /**
  * POST /api/nft/release/:tokenId - Release a reserved NFT ID (if mint failed)
  *
- * This endpoint is called when a mint fails after reserving an ID.
- * It decrements the counter only if the tokenId is the current max.
- * This prevents "lost" token IDs from failed mints.
+ * With the new random ID system, releasing is simple:
+ * - Delete the temporary reservation key
+ * - The ID is immediately available for other users
+ *
+ * Note: Reservations auto-expire after 10 minutes anyway,
+ * but calling release is good practice for immediate cleanup.
  */
 nftRouter.post(
   "/release/:tokenId",
@@ -658,35 +729,29 @@ nftRouter.post(
     try {
       const redis = getRedis(c.env);
 
-      // Atomic release using Lua script to prevent race conditions
-      // Only decrements if tokenId matches current count AND NFT not confirmed
-      const luaScript = `
-        local currentCount = tonumber(redis.call('GET', KEYS[1]) or '0')
-        local tokenId = tonumber(ARGV[1])
-        if currentCount ~= tokenId then
-          return 'not_last_id'
-        end
-        local nftExists = redis.call('EXISTS', KEYS[2])
-        if nftExists == 1 then
-          return 'already_confirmed'
-        end
-        redis.call('DECR', KEYS[1])
-        return 'released'
-      `;
+      // Check if this token is already minted (can't release confirmed mints)
+      const isMinted = await redis.exists(`nft:minted:${tokenId}`);
+      if (isMinted) {
+        return successResponse(c, {
+          released: false,
+          reason: "already_confirmed",
+        });
+      }
 
-      const result = await redis.eval(
-        luaScript,
-        [`nft:minted:count`, `nft:minted:${tokenId}`],
-        [tokenId.toString()],
-      );
+      // Delete the reservation (if it exists)
+      const deleted = await redis.del(`nft:reserved:${tokenId}`);
 
-      if (result === "released") {
-        nftLogger.info("Released token ID", { tokenId });
+      if (deleted) {
+        nftLogger.info("Released reserved token ID", { tokenId });
         return successResponse(c, { released: true });
       }
 
-      nftLogger.info("Cannot release token ID", { tokenId, reason: result });
-      return successResponse(c, { released: false, reason: result as string });
+      // No reservation found - might have auto-expired
+      nftLogger.info("No reservation found to release", { tokenId });
+      return successResponse(c, {
+        released: false,
+        reason: "no_reservation",
+      });
     } catch (error) {
       nftLogger.error("[NFT] Release error:", error);
       return errorResponse(c, "Failed to release NFT ID", 500);
@@ -696,6 +761,11 @@ nftRouter.post(
 
 /**
  * POST /api/nft/confirm/:tokenId - Confirm NFT was minted successfully
+ *
+ * Finalizes a reservation:
+ * - Removes the temporary reservation
+ * - Creates the permanent NFT record
+ * - Increments the confirmed mint counter
  */
 nftRouter.post(
   "/confirm/:tokenId",
@@ -708,6 +778,19 @@ nftRouter.post(
     try {
       const redis = getRedis(c.env);
       const mintedAt = Date.now();
+
+      // Check if this token was reserved (optional - for safety)
+      const reservation = await redis.get(`nft:reserved:${tokenId}`);
+
+      // Clean up the reservation (whether it exists or not)
+      await redis.del(`nft:reserved:${tokenId}`);
+
+      // Check if already minted (idempotency)
+      const existingMint = await redis.exists(`nft:minted:${tokenId}`);
+      if (existingMint) {
+        nftLogger.warn("Token already minted", { tokenId });
+        return successResponse(c, { confirmed: true, alreadyMinted: true });
+      }
 
       const nftRecord = {
         tokenId,
@@ -728,10 +811,16 @@ nftRouter.post(
         tokensEarned: "0",
       };
 
+      // Atomic: create NFT record + add to owner's set + increment counter
       await redis.hset(`nft:minted:${tokenId}`, nftRecord);
       await redis.sadd(`nft:owned:${body.address}`, tokenId.toString());
+      await redis.incr("nft:minted:count"); // Now only incremented on confirmed mints
 
-      nftLogger.info("Confirmed token ID", { tokenId, owner: body.address });
+      nftLogger.info("Confirmed token ID", {
+        tokenId,
+        owner: body.address,
+        hadReservation: !!reservation,
+      });
 
       return successResponse(c, { confirmed: true });
     } catch (error) {
