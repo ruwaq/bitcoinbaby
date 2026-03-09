@@ -19,6 +19,7 @@ export {
   type NFTExplorerResponse,
   type NFTGlobalStats,
 } from "./client";
+export type { MintAttempt } from "./clients/nft-client";
 export type {
   ApiResponse,
   BalanceResponse,

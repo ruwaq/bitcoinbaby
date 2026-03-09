@@ -45,6 +45,7 @@ export function NFTsSection() {
     pendingTransactions,
     refreshTransactions,
     clearCompletedTransactions,
+    mintAttempts,
     walletAddress,
     // Handlers
     handleMintClick,
@@ -163,6 +164,12 @@ export function NFTsSection() {
             txid={minting.txid}
             commitTxid={minting.commitTxid}
             pendingTransactions={pendingTransactions}
+            mintAttempts={mintAttempts.attempts}
+            pendingMintAttempts={mintAttempts.pendingAttempts}
+            failedMintAttempts={mintAttempts.failedAttempts}
+            isLoadingAttempts={mintAttempts.isLoading}
+            hasPendingAttempts={mintAttempts.hasPending}
+            onRefreshAttempts={mintAttempts.refresh}
             onMintClick={handleMintClick}
             onMintAnother={handleMintAnother}
             onViewCollection={handleViewCollection}

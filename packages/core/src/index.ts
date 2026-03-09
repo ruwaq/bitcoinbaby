@@ -31,6 +31,7 @@ export {
   type NFTExplorerQuery,
   type NFTExplorerResponse,
   type NFTGlobalStats,
+  type MintAttempt,
 } from "./api";
 export type {
   ApiResponse,

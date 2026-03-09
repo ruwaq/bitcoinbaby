@@ -80,6 +80,23 @@ export interface ProveNFTResult {
   nextSteps: string[];
 }
 
+export interface MintAttempt {
+  attemptId: string;
+  tokenId: number;
+  status:
+    | "reserved"
+    | "proving"
+    | "signing"
+    | "broadcasting"
+    | "confirmed"
+    | "failed";
+  reservedAt: number;
+  lastUpdatedAt: number;
+  error: string | null;
+  commitTxid: string | null;
+  spellTxid: string | null;
+}
+
 // =============================================================================
 // CLIENT
 // =============================================================================
@@ -98,13 +115,48 @@ export class NFTClient extends BaseApiClient {
 
   /**
    * Reserve next NFT ID (atomic increment)
-   * Returns the reserved token ID for minting
+   * Returns the reserved token ID for minting and an attemptId for tracking
    */
-  async reserveNFT(): Promise<
-    ApiResponse<{ tokenId: number; totalMinted: number }>
+  async reserveNFT(
+    address: string,
+  ): Promise<
+    ApiResponse<{ tokenId: number; totalMinted: number; attemptId: string }>
   > {
-    return this.post<{ tokenId: number; totalMinted: number }>(
-      "/api/nft/reserve",
+    return this.post<{
+      tokenId: number;
+      totalMinted: number;
+      attemptId: string;
+    }>("/api/nft/reserve", { address });
+  }
+
+  /**
+   * Get mint attempts for an address
+   * Shows pending, failed, and recent successful mints
+   */
+  async getMintAttempts(
+    address: string,
+  ): Promise<ApiResponse<{ attempts: MintAttempt[]; count: number }>> {
+    return this.get<{ attempts: MintAttempt[]; count: number }>(
+      `/api/nft/mint-attempts/${address}`,
+    );
+  }
+
+  /**
+   * Update mint attempt status
+   * Call this at each step of the minting process for user visibility
+   */
+  async updateMintAttempt(
+    attemptId: string,
+    status: MintAttempt["status"],
+    options?: { error?: string; commitTxid?: string; spellTxid?: string },
+  ): Promise<ApiResponse<{ updated: boolean; status: string }>> {
+    return this.post<{ updated: boolean; status: string }>(
+      "/api/nft/update-attempt",
+      {
+        attemptId,
+        status,
+        ...options,
+      },
     );
   }
 

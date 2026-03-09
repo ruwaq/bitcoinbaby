@@ -7,6 +7,7 @@ import {
   type PendingTransaction,
   type NFTRecord,
   type NFTListingWithNFT,
+  type MintAttempt,
 } from "@bitcoinbaby/core";
 import { useMintNFT, type MintStep } from "@/hooks/useMintNFT";
 import { useNFTSync, useInvalidateNFTs } from "@/hooks/useNFTSync";
@@ -14,6 +15,7 @@ import { useClaimNFT } from "@/hooks/useClaimNFT";
 import { useVirtualBalance } from "@/hooks/useVirtualBalance";
 import { useMarketplace } from "@/hooks/useMarketplace";
 import { useEvolution } from "@/hooks/useEvolution";
+import { useMintAttempts } from "@/hooks/useMintAttempts";
 import type { BabyNFTState } from "@bitcoinbaby/bitcoin";
 import type { TransactionDetails } from "@bitcoinbaby/ui";
 
@@ -117,6 +119,17 @@ export interface UseNFTsReturn {
   refreshTransactions: () => void;
   clearCompletedTransactions: () => void;
 
+  // Mint attempt tracking
+  mintAttempts: {
+    attempts: MintAttempt[];
+    pendingAttempts: MintAttempt[];
+    failedAttempts: MintAttempt[];
+    isLoading: boolean;
+    hasPending: boolean;
+    hasFailed: boolean;
+    refresh: () => Promise<void>;
+  };
+
   // Wallet address
   walletAddress: string | undefined;
 }
@@ -188,6 +201,17 @@ export function useNFTs(): UseNFTsReturn {
     getXPRequired,
     clearError: clearEvolutionError,
   } = useEvolution();
+
+  // Mint attempts tracking
+  const {
+    attempts: mintAttemptsData,
+    pendingAttempts,
+    failedAttempts,
+    isLoading: isLoadingAttempts,
+    hasPending: hasPendingAttempts,
+    hasFailed: hasFailedAttempts,
+    refresh: refreshAttempts,
+  } = useMintAttempts({ address: walletAddress });
 
   // NFT Sale hook for pricing
   const { formattedPrice, price } = useNFTSale({
@@ -314,6 +338,16 @@ export function useNFTs(): UseNFTsReturn {
     pendingTransactions: nftTransactions,
     refreshTransactions,
     clearCompletedTransactions,
+
+    mintAttempts: {
+      attempts: mintAttemptsData,
+      pendingAttempts,
+      failedAttempts,
+      isLoading: isLoadingAttempts,
+      hasPending: hasPendingAttempts,
+      hasFailed: hasFailedAttempts,
+      refresh: refreshAttempts,
+    },
 
     walletAddress,
   };

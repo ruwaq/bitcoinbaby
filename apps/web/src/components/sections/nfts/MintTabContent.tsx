@@ -1,8 +1,12 @@
 "use client";
 
 import { PendingTransactions } from "@bitcoinbaby/ui";
-import { NFTMintFlow, type MintStep } from "@/components/features/nft";
-import type { PendingTransaction } from "@bitcoinbaby/core";
+import {
+  NFTMintFlow,
+  MintAttemptsPanel,
+  type MintStep,
+} from "@/components/features/nft";
+import type { PendingTransaction, MintAttempt } from "@bitcoinbaby/core";
 import type { BabyNFTState } from "@bitcoinbaby/bitcoin";
 
 type MintState = "info" | "confirming" | "minting" | "revealing" | "success";
@@ -18,6 +22,14 @@ interface MintTabContentProps {
   txid: string | null;
   commitTxid?: string | null;
   pendingTransactions: PendingTransaction[];
+  // Mint attempt tracking
+  mintAttempts?: MintAttempt[];
+  pendingMintAttempts?: MintAttempt[];
+  failedMintAttempts?: MintAttempt[];
+  isLoadingAttempts?: boolean;
+  hasPendingAttempts?: boolean;
+  onRefreshAttempts?: () => void;
+  // Actions
   onMintClick: () => void;
   onMintAnother: () => void;
   onViewCollection: () => void;
@@ -36,6 +48,12 @@ export function MintTabContent({
   txid,
   commitTxid,
   pendingTransactions,
+  mintAttempts = [],
+  pendingMintAttempts = [],
+  failedMintAttempts = [],
+  isLoadingAttempts = false,
+  hasPendingAttempts = false,
+  onRefreshAttempts,
   onMintClick,
   onMintAnother,
   onViewCollection,
@@ -64,6 +82,18 @@ export function MintTabContent({
             Go to Wallet tab to connect
           </p>
         </div>
+      )}
+
+      {/* Mint Attempts Panel - Shows pending/failed mints */}
+      {mintAttempts.length > 0 && onRefreshAttempts && (
+        <MintAttemptsPanel
+          attempts={mintAttempts}
+          pendingAttempts={pendingMintAttempts}
+          failedAttempts={failedMintAttempts}
+          isLoading={isLoadingAttempts}
+          onRefresh={onRefreshAttempts}
+          hasPending={hasPendingAttempts}
+        />
       )}
 
       {/* Pending Transactions Banner */}

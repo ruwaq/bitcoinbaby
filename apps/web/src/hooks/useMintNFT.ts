@@ -193,13 +193,14 @@ export function useMintNFT(): UseMintNFTReturn {
       };
     }
 
-    // Track reserved token ID for cleanup on error
+    // Track reserved token ID and attempt ID for cleanup on error
     let reservedTokenId: number | null = null;
+    let attemptId: string | null = null;
     const apiClient = getApiClient();
 
     try {
-      // Step 1: Reserve next NFT ID from server
-      const reserveResult = await apiClient.reserveNFT();
+      // Step 1: Reserve next NFT ID from server (now tracks attempt)
+      const reserveResult = await apiClient.reserveNFT(wallet.address);
 
       if (!reserveResult.success || !reserveResult.data) {
         throw new Error(
@@ -209,8 +210,9 @@ export function useMintNFT(): UseMintNFTReturn {
       }
 
       reservedTokenId = reserveResult.data.tokenId;
+      attemptId = reserveResult.data.attemptId;
       console.log(
-        `[MintNFT] Reserved token ID: ${reservedTokenId} (total: ${reserveResult.data.totalMinted})`,
+        `[MintNFT] Reserved token ID: ${reservedTokenId} (total: ${reserveResult.data.totalMinted}, attemptId: ${attemptId})`,
       );
 
       // Step 2: Generate NFT traits
@@ -248,6 +250,16 @@ export function useMintNFT(): UseMintNFTReturn {
 
       // Step 3: Submit to prover API
       setCurrentStep("proving");
+
+      // Update attempt status to proving
+      if (attemptId) {
+        apiClient
+          .updateMintAttempt(attemptId, "proving")
+          .catch((err) =>
+            console.warn("[MintNFT] Failed to update attempt:", err),
+          );
+      }
+
       console.log("[MintNFT] Submitting to prover...", {
         tokenId: reservedTokenId,
         address: wallet.address,
@@ -318,6 +330,16 @@ export function useMintNFT(): UseMintNFTReturn {
         if (commitIsPsbt) {
           // PSBT needs signing
           setCurrentStep("signing_commit");
+
+          // Update attempt status to signing
+          if (attemptId) {
+            apiClient
+              .updateMintAttempt(attemptId, "signing")
+              .catch((err) =>
+                console.warn("[MintNFT] Failed to update attempt:", err),
+              );
+          }
+
           console.log("[MintNFT] Signing commit PSBT...");
 
           const signed = await signPsbt(commitTxHex);
@@ -355,6 +377,16 @@ export function useMintNFT(): UseMintNFTReturn {
       // Step 6: Broadcast commit transaction (if present)
       if (finalCommitHex) {
         setCurrentStep("broadcasting_commit");
+
+        // Update attempt status to broadcasting
+        if (attemptId) {
+          apiClient
+            .updateMintAttempt(attemptId, "broadcasting")
+            .catch((err) =>
+              console.warn("[MintNFT] Failed to update attempt:", err),
+            );
+        }
+
         console.log("[MintNFT] Broadcasting commit transaction...");
 
         broadcastCommitTxid =
@@ -421,8 +453,21 @@ export function useMintNFT(): UseMintNFTReturn {
         )
         .catch((err) => console.warn("[MintNFT] Failed to confirm mint:", err));
 
+      // Update attempt status to confirmed
+      if (attemptId) {
+        apiClient
+          .updateMintAttempt(attemptId, "confirmed", {
+            commitTxid: broadcastCommitTxid || undefined,
+            spellTxid: broadcastSpellTxid,
+          })
+          .catch((err) =>
+            console.warn("[MintNFT] Failed to update attempt:", err),
+          );
+      }
+
       // Clear reservedTokenId on success (no cleanup needed)
       reservedTokenId = null;
+      attemptId = null;
 
       setLastMinted(nftState);
       setCurrentStep("success");
@@ -438,6 +483,15 @@ export function useMintNFT(): UseMintNFTReturn {
       const message = err instanceof Error ? err.message : "Mint failed";
       setError(message);
       setCurrentStep("error");
+
+      // Update attempt status to failed
+      if (attemptId) {
+        apiClient
+          .updateMintAttempt(attemptId, "failed", { error: message })
+          .catch((updateErr) =>
+            console.warn("[MintNFT] Failed to update attempt:", updateErr),
+          );
+      }
 
       // Release reserved token ID if mint failed after reservation
       if (reservedTokenId !== null) {

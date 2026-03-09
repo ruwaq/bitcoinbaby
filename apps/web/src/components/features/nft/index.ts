@@ -12,3 +12,4 @@ export { NFTMarketplaceView } from "./NFTMarketplaceView";
 export { NFTExplorerView } from "./NFTExplorerView";
 export { ExplorerNFTCard } from "./ExplorerNFTCard";
 export { ExplorerFilters } from "./ExplorerFilters";
+export { MintAttemptsPanel } from "./MintAttemptsPanel";

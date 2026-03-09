@@ -73,6 +73,7 @@ export {
   type MintResult,
   type UseMintNFTReturn,
 } from "./useMintNFT";
+export { useMintAttempts } from "./useMintAttempts";
 export {
   useNFTSync,
   useInvalidateNFTs,

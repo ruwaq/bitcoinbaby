@@ -27,6 +27,7 @@ import type {
   UserStats,
   SetHashrateResponse,
 } from "./types";
+import type { MintAttempt } from "./clients/nft-client";
 
 // =============================================================================
 // CONFIGURATION
@@ -452,22 +453,65 @@ export class BitcoinBabyClient {
 
   /**
    * Reserve next NFT ID (atomic increment)
-   * Returns the reserved token ID for minting
+   * Returns the reserved token ID for minting and an attemptId for tracking
    * No retry - atomic operation must not be duplicated
    */
-  async reserveNFT(): Promise<
-    ApiResponse<{ tokenId: number; totalMinted: number }>
+  async reserveNFT(
+    address: string,
+  ): Promise<
+    ApiResponse<{ tokenId: number; totalMinted: number; attemptId: string }>
   > {
     const response = await fetchWithRetry(
       `${this.baseUrl}/api/nft/reserve`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address }),
       },
       0, // No retries - atomic counter
     );
     return response.json() as Promise<
-      ApiResponse<{ tokenId: number; totalMinted: number }>
+      ApiResponse<{ tokenId: number; totalMinted: number; attemptId: string }>
+    >;
+  }
+
+  /**
+   * Get mint attempts for an address
+   * Shows pending, failed, and recent successful mints
+   */
+  async getMintAttempts(
+    address: string,
+  ): Promise<ApiResponse<{ attempts: MintAttempt[]; count: number }>> {
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/nft/mint-attempts/${address}`,
+      { method: "GET" },
+      2,
+    );
+    return response.json() as Promise<
+      ApiResponse<{ attempts: MintAttempt[]; count: number }>
+    >;
+  }
+
+  /**
+   * Update mint attempt status
+   * Call this at each step of the minting process for user visibility
+   */
+  async updateMintAttempt(
+    attemptId: string,
+    status: MintAttempt["status"],
+    options?: { error?: string; commitTxid?: string; spellTxid?: string },
+  ): Promise<ApiResponse<{ updated: boolean; status: string }>> {
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/nft/update-attempt`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ attemptId, status, ...options }),
+      },
+      1,
+    );
+    return response.json() as Promise<
+      ApiResponse<{ updated: boolean; status: string }>
     >;
   }
 

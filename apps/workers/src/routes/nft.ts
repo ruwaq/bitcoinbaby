@@ -92,6 +92,10 @@ const addressParamSchema = z.object({
   address: bitcoinAddressSchema,
 });
 
+const reserveNftSchema = z.object({
+  address: bitcoinAddressSchema,
+});
+
 const confirmNftSchema = z.object({
   txid: z
     .string()
@@ -335,8 +339,12 @@ nftRouter.get("/counter", async (c) => {
 
 /**
  * POST /api/nft/reserve - Reserve next NFT ID (atomic increment)
+ *
+ * Now tracks mint attempts so users can see pending/failed mints.
  */
-nftRouter.post("/reserve", async (c) => {
+nftRouter.post("/reserve", validateBody(reserveNftSchema), async (c) => {
+  const { address } = c.get("validatedBody");
+
   try {
     const redis = getRedis(c.env);
 
@@ -348,17 +356,158 @@ nftRouter.post("/reserve", async (c) => {
       return errorResponse(c, "Max supply reached", 400);
     }
 
-    nftLogger.info("Reserved token ID", { tokenId: newCount });
+    // Track this mint attempt
+    const attemptId = `${address}:${newCount}:${Date.now()}`;
+    const attempt = {
+      attemptId,
+      tokenId: newCount,
+      address,
+      status: "reserved", // reserved -> proving -> signing -> broadcasting -> confirmed | failed
+      reservedAt: Date.now(),
+      lastUpdatedAt: Date.now(),
+      error: null,
+    };
+
+    // Store attempt (expires after 24 hours)
+    await redis.hset(`nft:attempt:${attemptId}`, attempt);
+    await redis.expire(`nft:attempt:${attemptId}`, 86400);
+
+    // Add to user's pending attempts
+    await redis.sadd(`nft:attempts:${address}`, attemptId);
+
+    nftLogger.info("Reserved token ID", { tokenId: newCount, address });
 
     return successResponse(c, {
       tokenId: newCount,
       totalMinted: newCount,
+      attemptId,
     });
   } catch (error) {
     nftLogger.error("[NFT] Reserve error:", error);
     return errorResponse(c, "Failed to reserve NFT ID", 500);
   }
 });
+
+/**
+ * GET /api/nft/mint-attempts/:address - Get pending/recent mint attempts
+ *
+ * Returns mint attempts for an address so users can see status of their mints.
+ */
+nftRouter.get(
+  "/mint-attempts/:address",
+  validateParams(addressParamSchema),
+  async (c) => {
+    const { address } = c.get("validatedParams");
+
+    try {
+      const redis = getRedis(c.env);
+
+      // Get all attempt IDs for this address
+      const attemptIds = await redis.smembers(`nft:attempts:${address}`);
+
+      if (!attemptIds || attemptIds.length === 0) {
+        return successResponse(c, { attempts: [], count: 0 });
+      }
+
+      // Fetch all attempts
+      const attempts = await Promise.all(
+        attemptIds.map(async (id) => {
+          const attempt = await redis.hgetall(`nft:attempt:${id}`);
+          if (!attempt || Object.keys(attempt).length === 0) {
+            // Attempt expired, remove from set
+            await redis.srem(`nft:attempts:${address}`, id);
+            return null;
+          }
+          return {
+            attemptId: attempt.attemptId as string,
+            tokenId: parseInt(attempt.tokenId as string, 10),
+            status: attempt.status as string,
+            reservedAt: parseInt(attempt.reservedAt as string, 10),
+            lastUpdatedAt: parseInt(attempt.lastUpdatedAt as string, 10),
+            error: attempt.error || null,
+            commitTxid: attempt.commitTxid || null,
+            spellTxid: attempt.spellTxid || null,
+          };
+        }),
+      );
+
+      const validAttempts = attempts
+        .filter((a): a is NonNullable<typeof a> => a !== null)
+        .sort((a, b) => b.reservedAt - a.reservedAt);
+
+      return successResponse(c, {
+        attempts: validAttempts,
+        count: validAttempts.length,
+      });
+    } catch (error) {
+      nftLogger.error("[NFT] Get mint attempts error:", error);
+      return errorResponse(c, "Failed to get mint attempts", 500);
+    }
+  },
+);
+
+/**
+ * POST /api/nft/update-attempt - Update mint attempt status
+ *
+ * Called by client to update the status of a mint attempt.
+ */
+nftRouter.post(
+  "/update-attempt",
+  validateBody(
+    z.object({
+      attemptId: z.string(),
+      status: z.enum([
+        "reserved",
+        "proving",
+        "signing",
+        "broadcasting",
+        "confirmed",
+        "failed",
+      ]),
+      error: z.string().optional(),
+      commitTxid: z.string().optional(),
+      spellTxid: z.string().optional(),
+    }),
+  ),
+  async (c) => {
+    const { attemptId, status, error, commitTxid, spellTxid } =
+      c.get("validatedBody");
+
+    try {
+      const redis = getRedis(c.env);
+
+      // Check attempt exists
+      const existing = await redis.hgetall(`nft:attempt:${attemptId}`);
+      if (!existing || Object.keys(existing).length === 0) {
+        return errorResponse(c, "Attempt not found or expired", 404);
+      }
+
+      // Update attempt
+      const updates: Record<string, string | number> = {
+        status,
+        lastUpdatedAt: Date.now(),
+      };
+
+      if (error) updates.error = error;
+      if (commitTxid) updates.commitTxid = commitTxid;
+      if (spellTxid) updates.spellTxid = spellTxid;
+
+      await redis.hset(`nft:attempt:${attemptId}`, updates);
+
+      // If confirmed or failed, extend TTL for history purposes
+      if (status === "confirmed" || status === "failed") {
+        await redis.expire(`nft:attempt:${attemptId}`, 604800); // 7 days
+      }
+
+      nftLogger.info("Updated mint attempt", { attemptId, status });
+
+      return successResponse(c, { updated: true, status });
+    } catch (error) {
+      nftLogger.error("[NFT] Update attempt error:", error);
+      return errorResponse(c, "Failed to update attempt", 500);
+    }
+  },
+);
 
 /**
  * POST /api/nft/prove - Submit NFT to Charms prover

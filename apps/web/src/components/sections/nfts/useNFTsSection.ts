@@ -178,6 +178,7 @@ export function useNFTsSection() {
     // Data
     ...nfts,
     explorer,
+    mintAttempts: nfts.mintAttempts,
 
     // Handlers
     handleMintClick,

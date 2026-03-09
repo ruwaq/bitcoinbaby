@@ -7,7 +7,7 @@
  * Displays claimable work, prepares claims, and tracks claim history.
  */
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   PixelCard,
   PixelButton,
@@ -36,7 +36,7 @@ function formatWork(work: string): string {
 }
 
 /**
- * Status badge for claims
+ * Status badge for claims with explanations
  */
 function ClaimStatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
@@ -56,6 +56,52 @@ function ClaimStatusBadge({ status }: { status: string }) {
       {status.toUpperCase()}
     </span>
   );
+}
+
+/**
+ * Get human-readable explanation for claim status
+ */
+function getStatusExplanation(status: string): {
+  message: string;
+  action?: string;
+} {
+  switch (status) {
+    case "prepared":
+      return {
+        message: "Claim prepared, waiting for TX broadcast",
+        action: "Broadcast the transaction to complete",
+      };
+    case "broadcast":
+      return {
+        message: "TX sent, waiting for blockchain confirmation (~10-30 min)",
+        action: "Click 'Mint Now' once confirmed",
+      };
+    case "confirmed":
+      return {
+        message: "TX confirmed on blockchain, ready to mint",
+        action: "Click 'Mint Now' to receive tokens",
+      };
+    case "minting":
+      return {
+        message: "Minting in progress with Charms prover...",
+      };
+    case "completed":
+      return {
+        message: "Tokens successfully minted to your address",
+      };
+    case "failed":
+      return {
+        message: "Minting failed - you can retry",
+        action: "Click 'Retry' to try again",
+      };
+    case "expired":
+      return {
+        message: "Claim expired (not broadcast within time limit)",
+        action: "Prepare a new claim",
+      };
+    default:
+      return { message: "Unknown status" };
+  }
 }
 
 export function ClaimSection() {
@@ -144,6 +190,46 @@ export function ClaimSection() {
     // Use unified wallet connection - canSign ensures wallet is unlocked and ready
     signAndBroadcast: canSign ? adaptedSignAndBroadcast : undefined,
   });
+
+  // Auto-refresh history when there are pending/broadcast claims
+  const autoRefreshRef = useRef<NodeJS.Timeout | null>(null);
+  const hasPendingClaims = claimHistory.some(
+    (c) =>
+      c.status === "broadcast" ||
+      c.status === "confirmed" ||
+      c.status === "minting",
+  );
+
+  useEffect(() => {
+    // Auto-refresh every 30 seconds if there are pending claims
+    if (hasPendingClaims && activeTab === "history") {
+      autoRefreshRef.current = setInterval(() => {
+        loadHistory();
+      }, 30000);
+    }
+
+    return () => {
+      if (autoRefreshRef.current) {
+        clearInterval(autoRefreshRef.current);
+        autoRefreshRef.current = null;
+      }
+    };
+  }, [hasPendingClaims, activeTab, loadHistory]);
+
+  // Refresh on tab visibility change
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && address) {
+        loadHistory();
+        refreshBalance();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [address, loadHistory, refreshBalance]);
 
   // Handle refresh
   const handleRefresh = async () => {
@@ -629,9 +715,26 @@ export function ClaimSection() {
       {activeTab === "history" && (
         <PixelCard>
           <div className="p-4">
-            <h3 className="font-pixel text-sm mb-4">Claim History</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-pixel text-sm">Claim History</h3>
+              <div className="flex items-center gap-2">
+                {hasPendingClaims && (
+                  <span className="text-[10px] text-pixel-secondary animate-pulse">
+                    Auto-refresh active
+                  </span>
+                )}
+                <PixelButton
+                  onClick={() => loadHistory()}
+                  size="sm"
+                  variant="secondary"
+                  disabled={isLoadingHistory}
+                >
+                  {isLoadingHistory ? "..." : "Refresh"}
+                </PixelButton>
+              </div>
+            </div>
 
-            {isLoadingHistory ? (
+            {isLoadingHistory && claimHistory.length === 0 ? (
               <div className="animate-pulse space-y-2">
                 <div className="h-16 bg-pixel-bg-dark rounded" />
                 <div className="h-16 bg-pixel-bg-dark rounded" />
@@ -645,50 +748,111 @@ export function ClaimSection() {
               </div>
             ) : (
               <div className="space-y-3">
-                {claimHistory.map((claim) => (
-                  <div
-                    key={claim.id}
-                    className="bg-pixel-bg-dark/50 rounded p-3"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-pixel text-sm">
-                        {formatBalance(BigInt(claim.amount))} $BABTC
-                      </span>
-                      <ClaimStatusBadge status={claim.status} />
-                    </div>
-                    <div className="text-xs text-gray-400 space-y-1">
-                      <p>{claim.proofCount} proofs</p>
-                      <p>Prepared: {formatDate(claim.preparedAt)}</p>
-                      {claim.claimTxid && (
-                        <a
-                          href={`${config.explorerUrl}/tx/${claim.claimTxid}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-pixel-secondary hover:underline block"
-                        >
-                          View TX
-                        </a>
-                      )}
-                      {/* Mint button for broadcast/confirmed claims */}
-                      {(claim.status === "broadcast" ||
-                        claim.status === "confirmed") &&
-                        claim.claimTxid && (
+                {claimHistory.map((claim) => {
+                  const statusInfo = getStatusExplanation(claim.status);
+                  return (
+                    <div
+                      key={claim.id}
+                      className={`bg-pixel-bg-dark/50 rounded p-3 border-l-2 ${
+                        claim.status === "completed"
+                          ? "border-l-green-500"
+                          : claim.status === "failed"
+                            ? "border-l-red-500"
+                            : claim.status === "minting"
+                              ? "border-l-cyan-500"
+                              : claim.status === "broadcast" ||
+                                  claim.status === "confirmed"
+                                ? "border-l-blue-500"
+                                : "border-l-yellow-500"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-pixel text-sm">
+                          {formatBalance(BigInt(claim.amount))} $BABTC
+                        </span>
+                        <ClaimStatusBadge status={claim.status} />
+                      </div>
+
+                      {/* Status explanation */}
+                      <div className="mb-2 p-2 bg-pixel-bg-dark/50 rounded text-xs">
+                        <p className="text-gray-300">{statusInfo.message}</p>
+                        {statusInfo.action && (
+                          <p className="text-pixel-secondary mt-1 font-medium">
+                            {statusInfo.action}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="text-xs text-gray-400 space-y-1">
+                        <p>{claim.proofCount} proofs</p>
+                        <p>Prepared: {formatDate(claim.preparedAt)}</p>
+                        {claim.confirmedAt && (
+                          <p>Confirmed: {formatDate(claim.confirmedAt)}</p>
+                        )}
+                        {claim.mintedAt && (
+                          <p>Minted: {formatDate(claim.mintedAt)}</p>
+                        )}
+                        {claim.claimTxid && (
+                          <a
+                            href={`${config.explorerUrl}/tx/${claim.claimTxid}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-pixel-secondary hover:underline block"
+                          >
+                            View Claim TX
+                          </a>
+                        )}
+                        {claim.mintTxid && (
+                          <a
+                            href={`${config.explorerUrl}/tx/${claim.mintTxid}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-green-400 hover:underline block"
+                          >
+                            View Mint TX
+                          </a>
+                        )}
+
+                        {/* Action buttons based on status */}
+                        {(claim.status === "broadcast" ||
+                          claim.status === "confirmed") &&
+                          claim.claimTxid && (
+                            <PixelButton
+                              onClick={() =>
+                                handleTriggerMint(claim.id, claim.claimTxid!)
+                              }
+                              disabled={
+                                mintingClaimId === claim.id || isMinting
+                              }
+                              size="sm"
+                              className="mt-2 w-full"
+                            >
+                              {mintingClaimId === claim.id
+                                ? "Minting..."
+                                : "Mint Now"}
+                            </PixelButton>
+                          )}
+
+                        {/* Retry button for failed claims */}
+                        {claim.status === "failed" && claim.claimTxid && (
                           <PixelButton
                             onClick={() =>
                               handleTriggerMint(claim.id, claim.claimTxid!)
                             }
                             disabled={mintingClaimId === claim.id || isMinting}
+                            variant="secondary"
                             size="sm"
                             className="mt-2 w-full"
                           >
                             {mintingClaimId === claim.id
-                              ? "Minting..."
-                              : "Mint Now"}
+                              ? "Retrying..."
+                              : "Retry Mint"}
                           </PixelButton>
                         )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
