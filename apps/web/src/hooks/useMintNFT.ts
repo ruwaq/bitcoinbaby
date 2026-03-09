@@ -240,16 +240,9 @@ export function useMintNFT(): UseMintNFTReturn {
 
       // Step 3: Submit to prover API
       setCurrentStep("proving");
-      console.log("[MintNFT] Submitting to prover...");
-
-      const proveResult = await apiClient.proveNFT({
+      console.log("[MintNFT] Submitting to prover...", {
         tokenId: reservedTokenId,
         address: wallet.address,
-        nftState: {
-          ...nftState,
-          // API expects tokensEarned as string
-          tokensEarned: nftState.tokensEarned.toString(),
-        },
         fundingUtxo: {
           txid: fundingUtxo.txid,
           vout: fundingUtxo.vout,
@@ -257,7 +250,30 @@ export function useMintNFT(): UseMintNFTReturn {
         },
       });
 
+      let proveResult;
+      try {
+        proveResult = await apiClient.proveNFT({
+          tokenId: reservedTokenId,
+          address: wallet.address,
+          nftState: {
+            ...nftState,
+            // API expects tokensEarned as string
+            tokensEarned: nftState.tokensEarned.toString(),
+          },
+          fundingUtxo: {
+            txid: fundingUtxo.txid,
+            vout: fundingUtxo.vout,
+            value: fundingUtxo.value,
+          },
+        });
+        console.log("[MintNFT] Prover response received:", proveResult);
+      } catch (proveError) {
+        console.error("[MintNFT] Prover request failed:", proveError);
+        throw proveError;
+      }
+
       if (!proveResult.success || !proveResult.data) {
+        console.error("[MintNFT] Prover returned error:", proveResult);
         throw new Error(
           proveResult.error || "Failed to generate NFT proof from prover",
         );

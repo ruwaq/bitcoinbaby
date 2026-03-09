@@ -564,6 +564,32 @@ export async function exportQueue(): Promise<QueuedShare[]> {
 }
 
 /**
+ * Clear all pending and failed shares
+ *
+ * Use this when shares are corrupted and cannot sync.
+ * This is a "fresh start" that clears all unsynced shares.
+ *
+ * @returns Number of shares cleared
+ */
+export async function clearPendingShares(): Promise<number> {
+  const database = getDB();
+
+  const toDelete = await database.shares
+    .where("status")
+    .anyOf(["pending", "failed", "syncing"])
+    .toArray();
+
+  const ids = toDelete.map((s) => s.id!);
+  await database.shares.bulkDelete(ids);
+
+  console.log(
+    `[ShareQueue] Cleared ${ids.length} pending/failed shares (fresh start)`,
+  );
+
+  return ids.length;
+}
+
+/**
  * MIGRATION: Fix old shares with decimal nonces in blockData
  *
  * Before the hex nonce fix (commit c774f7c), WebGPU computed hashes with hex nonces

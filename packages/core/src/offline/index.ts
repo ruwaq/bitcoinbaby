@@ -20,6 +20,7 @@ export {
   getPendingReward,
   isHashQueued,
   clearQueue,
+  clearPendingShares,
   exportQueue,
   migrateDecimalNoncesToHex,
   needsNonceMigration,
