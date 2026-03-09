@@ -65,8 +65,12 @@ export class MempoolClient implements BlockchainAPI {
       });
 
       if (!response.ok) {
+        // Get error body for better error messages (especially for broadcast failures)
+        const errorBody = await response.text().catch(() => "");
+        const errorMessage =
+          errorBody || `${response.status} ${response.statusText}`;
         throw new MempoolAPIError(
-          `Mempool API error: ${response.status} ${response.statusText}`,
+          `Mempool API error: ${errorMessage}`,
           response.status,
         );
       }
