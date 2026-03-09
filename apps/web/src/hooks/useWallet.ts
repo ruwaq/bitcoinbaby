@@ -15,6 +15,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   BitcoinWallet,
+  createMempoolClient,
   type WalletInfo as BitcoinWalletInfo,
   type BitcoinNetwork,
 } from "@bitcoinbaby/bitcoin";
@@ -255,8 +256,21 @@ export function useWallet(): UseWalletReturn {
       }
     };
 
-    storeSetSigningFunctions(signPsbtFn);
-  }, [storeSetSigningFunctions]);
+    // Broadcast transaction to mempool
+    const broadcastTxFn = async (txHex: string): Promise<string | null> => {
+      try {
+        const mempoolClient = createMempoolClient({ network });
+        const txid = await mempoolClient.broadcastTransaction(txHex);
+        console.log("[Wallet] Transaction broadcast:", txid);
+        return txid;
+      } catch (error) {
+        console.error("[Wallet] Failed to broadcast transaction:", error);
+        return null;
+      }
+    };
+
+    storeSetSigningFunctions(signPsbtFn, broadcastTxFn);
+  }, [storeSetSigningFunctions, network]);
 
   // State
   const [state, setState] = useState<WalletState>({
