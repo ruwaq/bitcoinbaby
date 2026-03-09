@@ -10,7 +10,7 @@
  * - Rarity and traits
  */
 
-import { Button, pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
+import { Button, pixelShadows, pixelBorders, NFTSprite } from "@bitcoinbaby/ui";
 import type { NFTRecordWithListing } from "@bitcoinbaby/core";
 
 interface ExplorerNFTCardProps {
@@ -66,6 +66,44 @@ export function ExplorerNFTCard({
         >
           {nft.rarityTier}
         </span>
+      </div>
+
+      {/* NFT Sprite */}
+      <div className="flex justify-center mb-3">
+        <NFTSprite
+          baseType={
+            nft.baseType as
+              | "human"
+              | "animal"
+              | "robot"
+              | "mystic"
+              | "alien"
+              | "shaman"
+              | "elemental"
+              | "dragon"
+          }
+          bloodline={
+            nft.bloodline as
+              | "royal"
+              | "warrior"
+              | "rogue"
+              | "mystic"
+              | "scholar"
+              | "merchant"
+          }
+          rarityTier={
+            nft.rarityTier as
+              | "common"
+              | "uncommon"
+              | "rare"
+              | "epic"
+              | "legendary"
+              | "mythic"
+          }
+          dna={nft.dna}
+          size={80}
+          animate={false}
+        />
       </div>
 
       {/* Bloodline + Type */}

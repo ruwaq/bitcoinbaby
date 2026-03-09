@@ -975,19 +975,21 @@ nftRouter.get("/stats", async (c) => {
 
     const redis = getRedis(c.env);
 
-    // Get counts
-    const mintedCount = (await redis.get<number>("nft:minted:count")) || 0;
+    // Get counter (max token ID attempted)
+    const counterValue = (await redis.get<number>("nft:minted:count")) || 0;
     const activeListings = await redis.smembers("nft:active-listings");
     const forSaleCount = activeListings?.length || 0;
 
-    // Get distribution stats (sample first 100 for performance)
+    // Count ACTUAL NFTs that exist (not just counter)
+    // Also get distribution stats
     const byRarity: Record<string, number> = {};
     const byBloodline: Record<string, number> = {};
-    const sampleSize = Math.min(mintedCount, 100);
+    let actualMintedCount = 0;
 
-    for (let i = 1; i <= sampleSize; i++) {
+    for (let i = 1; i <= counterValue; i++) {
       const nftData = await redis.hgetall(`nft:minted:${i}`);
-      if (nftData) {
+      if (nftData && Object.keys(nftData).length > 0) {
+        actualMintedCount++;
         const rarity = nftData.rarityTier as string;
         const blood = nftData.bloodline as string;
         if (rarity) byRarity[rarity] = (byRarity[rarity] || 0) + 1;
@@ -995,22 +997,12 @@ nftRouter.get("/stats", async (c) => {
       }
     }
 
-    // Scale up to total if sampled
-    if (sampleSize < mintedCount) {
-      const scale = mintedCount / sampleSize;
-      for (const key in byRarity) {
-        byRarity[key] = Math.round(byRarity[key] * scale);
-      }
-      for (const key in byBloodline) {
-        byBloodline[key] = Math.round(byBloodline[key] * scale);
-      }
-    }
-
     return successResponse(c, {
-      totalMinted: mintedCount,
+      totalMinted: actualMintedCount,
       totalForSale: forSaleCount,
       maxSupply: MAX_SUPPLY,
-      mintProgress: Math.round((mintedCount / MAX_SUPPLY) * 100 * 100) / 100,
+      mintProgress:
+        Math.round((actualMintedCount / MAX_SUPPLY) * 100 * 100) / 100,
       byRarity,
       byBloodline,
     });

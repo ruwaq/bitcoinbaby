@@ -61,6 +61,7 @@ export {
   NFTStats,
   NFTInfoPanel,
   NFTEvolutionPanel,
+  NFTSprite,
   PendingTransactions,
   getMiningBoost,
   canLevelUp,
