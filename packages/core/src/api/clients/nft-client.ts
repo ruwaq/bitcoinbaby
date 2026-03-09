@@ -27,10 +27,57 @@ export interface NFTMintData {
   evolutionCount: number;
 }
 
-export interface XPSubmissionData {
-  amount: number;
-  source: "mining" | "task" | "game";
-  proof?: string;
+export interface WorkProofData {
+  ownerAddress: string;
+  shareHash: string;
+  difficulty: number;
+  timestamp: number;
+}
+
+export interface WorkProofResult {
+  tokenId: number;
+  xpGained: number;
+  newXp: number;
+  totalXp: number;
+  workCount: number;
+  bloodline: string;
+  multiplier: number;
+  canEvolve: boolean;
+  xpToNextLevel: number;
+}
+
+export interface ProveNFTRequest {
+  tokenId: number;
+  address: string;
+  nftState: {
+    dna: string;
+    bloodline: string;
+    baseType: string;
+    genesisBlock: number;
+    rarityTier: string;
+    tokenId: number;
+    level: number;
+    xp: number;
+    totalXp: number;
+    workCount: number;
+    lastWorkBlock: number;
+    evolutionCount: number;
+    tokensEarned: string;
+  };
+  fundingUtxo: {
+    txid: string;
+    vout: number;
+    value: number;
+  };
+}
+
+export interface ProveNFTResult {
+  tokenId: number;
+  commitTxHex?: string;
+  spellTxHex?: string;
+  commitTxid?: string;
+  spellTxid?: string;
+  nextSteps: string[];
 }
 
 // =============================================================================
@@ -105,16 +152,50 @@ export class NFTClient extends BaseApiClient {
   }
 
   /**
-   * Submit XP for an NFT
+   * Submit work proof to gain XP for an NFT
+   * XP is calculated based on difficulty and bloodline multiplier
    */
-  async submitXP(
+  async submitWorkProof(
     tokenId: number,
-    xpData: XPSubmissionData,
-  ): Promise<ApiResponse<{ newXp: number; newLevel: number }>> {
-    return this.post<{ newXp: number; newLevel: number }>(
-      `/api/nft/${tokenId}/xp`,
-      xpData,
+    workProof: WorkProofData,
+  ): Promise<ApiResponse<WorkProofResult>> {
+    return this.post<WorkProofResult>(
+      `/api/nft/${tokenId}/work-proof`,
+      workProof,
     );
+  }
+
+  /**
+   * Request NFT proof from Charms prover
+   * Returns commit + spell transactions for signing
+   */
+  async proveNFT(
+    request: ProveNFTRequest,
+  ): Promise<ApiResponse<ProveNFTResult>> {
+    return this.post<ProveNFTResult>("/api/nft/prove", request);
+  }
+
+  /**
+   * Request NFT evolution
+   * Requires sufficient XP and BABTC balance
+   */
+  async evolveNFT(
+    tokenId: number,
+    address: string,
+  ): Promise<
+    ApiResponse<{
+      nft: NFTRecord;
+      evolutionCost: string;
+      previousLevel: number;
+      newLevel: number;
+    }>
+  > {
+    return this.post<{
+      nft: NFTRecord;
+      evolutionCost: string;
+      previousLevel: number;
+      newLevel: number;
+    }>("/api/nft/evolve", { tokenId, address });
   }
 
   /**

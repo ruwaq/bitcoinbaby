@@ -348,8 +348,8 @@ export interface CborProverRequest {
   tx_ins_beamed_source_utxos?: Record<number, [string, number?]>;
   /** App binaries (raw bytes for CBOR) */
   binaries?: Map<Uint8Array, Uint8Array>;
-  /** Previous transactions */
-  prev_txs?: Array<{ bitcoin?: Uint8Array; cardano?: Uint8Array }>;
+  /** Previous transactions (hex strings for CBOR, same as JSON) */
+  prev_txs?: Array<{ bitcoin?: string; cardano?: string }>;
   /** Change address */
   change_address: string;
   /** Fee rate in sats/vB (must be float) */
@@ -406,10 +406,12 @@ export function buildCborProverRequest(
     request.app_private_inputs = options.appPrivateInputs;
   }
 
-  // Add prev_txs in chain-tagged format with raw bytes
+  // Add prev_txs in chain-tagged format
+  // NOTE: The prover expects prev_txs.bitcoin as a hex string, not raw bytes
+  // This matches the JSON format behavior
   if (options.prevTxs && options.prevTxs.length > 0) {
     request.prev_txs = options.prevTxs.map((txHex) => ({
-      bitcoin: hexToBytes(txHex),
+      bitcoin: txHex,
     }));
   }
 

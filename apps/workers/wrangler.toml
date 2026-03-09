@@ -85,7 +85,8 @@ PLATFORM_FEE_PERCENT = "20"
 # APP_ID will be established by first mint (SHA256 of funding UTXO)
 # Update NFT_APP_ID after first successful mint
 NFT_APP_ID = "0000000000000000000000000000000000000000000000000000000000000000"
-NFT_APP_VK = "121bda56d29f461640d21875b80832b0a7092b7f1aa6142d6e2bc93014f85535"
+# VK is SHA256 of the compiled WASM binary (genesis-babies contract)
+NFT_APP_VK = "04aab369e6cd3210fde734b175e09c599229548eda5c5b283c18630782583a61"
 
 # Production environment
 [env.production]
@@ -136,7 +137,8 @@ PLATFORM_FEE_PERCENT = "20"
 # APP_ID will be established by first mint (SHA256 of funding UTXO)
 # Update NFT_APP_ID after first successful mint
 NFT_APP_ID = "0000000000000000000000000000000000000000000000000000000000000000"
-NFT_APP_VK = "121bda56d29f461640d21875b80832b0a7092b7f1aa6142d6e2bc93014f85535"
+# VK is SHA256 of the compiled WASM binary (genesis-babies contract)
+NFT_APP_VK = "04aab369e6cd3210fde734b175e09c599229548eda5c5b283c18630782583a61"
 
 # Production KV namespace (shared with development - same dedup across all envs)
 [[env.production.kv_namespaces]]

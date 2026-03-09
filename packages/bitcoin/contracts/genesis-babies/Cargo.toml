@@ -10,9 +10,8 @@ license = "MIT"
 name = "genesis_babies"
 
 [dependencies]
-# Charms SDK - same version as babtc-v2
-charms-sdk = { version = "11.0.1" }
-serde = { version = "1.0", features = ["derive"] }
+# Charms SDK - v11 for V11 prover
+charms-sdk = { version = "11.0" }
 
 [profile.release]
 lto = "fat"

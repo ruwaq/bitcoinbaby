@@ -34,7 +34,7 @@ import {
   bitcoinAddressSchema,
 } from "../lib/middleware";
 import { nftLogger } from "../lib/logger";
-import { getNFTMintingService } from "../services/nft-minting-service";
+import { getNFTMintingServiceSimple } from "../services/nft-minting-simple";
 
 // =============================================================================
 // DETERMINISTIC RANDOM (from txid seed)
@@ -372,7 +372,7 @@ nftRouter.post("/reserve", async (c) => {
  * 1. Client reserves tokenId via POST /api/nft/reserve
  * 2. Client generates traits (DNA, bloodline, rarity) locally
  * 3. Client calls this endpoint with NFT state + funding UTXO
- * 4. Server builds V11 spell and submits to Charms prover
+ * 4. Server builds V10 spell (JSON) and submits to Charms prover
  * 5. Server returns commitTx + spellTx for signing
  * 6. Client signs both transactions with wallet
  * 7. Client broadcasts commitTx first, then spellTx
@@ -407,15 +407,11 @@ nftRouter.post("/prove", validateBody(proveNftSchema), async (c) => {
       );
     }
 
-    // Get prover URL
-    const proverUrl = c.env.CHARMS_PROVER_URL || "https://v11.charms.dev";
-
-    // Get minting service
-    const mintingService = getNFTMintingService({
-      proverUrl,
+    // Get minting service (simple JSON format - like original)
+    const mintingService = getNFTMintingServiceSimple({
+      proverUrl: "https://v11.charms.dev",
       appId: nftAppId,
       appVk: nftAppVk,
-      network: "testnet4",
     });
 
     nftLogger.info("Submitting NFT to prover", {

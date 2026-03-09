@@ -113,6 +113,14 @@ function rollRarity(dna: string): RarityTier {
   return "common"; // 50%
 }
 
+/**
+ * Check if hex string is a PSBT (vs raw transaction)
+ * PSBT magic number: 0x70736274ff ("psbt" + 0xff)
+ */
+function isPsbt(hex: string): boolean {
+  return hex.toLowerCase().startsWith("70736274ff");
+}
+
 // =============================================================================
 // HOOK
 // =============================================================================
@@ -292,41 +300,65 @@ export function useMintNFT(): UseMintNFTReturn {
         throw new Error("Prover did not return spell transaction");
       }
 
-      let signedCommitHex: string | null = null;
+      // Detect if prover returned PSBT or raw transaction
+      const commitIsPsbt = commitTxHex ? isPsbt(commitTxHex) : false;
+      const spellIsPsbt = isPsbt(spellTxHex);
+
+      console.log("[MintNFT] Transaction formats:", {
+        commitIsPsbt,
+        spellIsPsbt,
+      });
+
+      let finalCommitHex: string | null = null;
+      let finalSpellHex: string = spellTxHex;
       let broadcastCommitTxid: string | null = null;
 
-      // Step 4: Sign commit transaction (if present)
-      // Some prover responses only include the spell transaction
+      // Step 4: Handle commit transaction (if present)
       if (commitTxHex) {
-        setCurrentStep("signing_commit");
-        console.log("[MintNFT] Signing commit transaction...");
+        if (commitIsPsbt) {
+          // PSBT needs signing
+          setCurrentStep("signing_commit");
+          console.log("[MintNFT] Signing commit PSBT...");
 
-        signedCommitHex = await signPsbt(commitTxHex);
-        if (!signedCommitHex) {
-          throw new Error("Commit transaction signing was cancelled");
+          const signed = await signPsbt(commitTxHex);
+          if (!signed) {
+            throw new Error("Commit transaction signing was cancelled");
+          }
+          finalCommitHex = signed;
+        } else {
+          // Raw transaction - ready to broadcast
+          console.log("[MintNFT] Commit is raw TX, skipping signing");
+          finalCommitHex = commitTxHex;
         }
       } else {
         console.log(
-          "[MintNFT] No commit transaction from prover, skipping commit signing",
+          "[MintNFT] No commit transaction from prover, skipping commit",
         );
       }
 
-      // Step 5: Sign spell transaction
-      setCurrentStep("signing_spell");
-      console.log("[MintNFT] Signing spell transaction...");
+      // Step 5: Handle spell transaction
+      if (spellIsPsbt) {
+        // PSBT needs signing
+        setCurrentStep("signing_spell");
+        console.log("[MintNFT] Signing spell PSBT...");
 
-      const signedSpellHex = await signPsbt(spellTxHex);
-      if (!signedSpellHex) {
-        throw new Error("Spell transaction signing was cancelled");
+        const signed = await signPsbt(spellTxHex);
+        if (!signed) {
+          throw new Error("Spell transaction signing was cancelled");
+        }
+        finalSpellHex = signed;
+      } else {
+        // Raw transaction from V11 prover - ready to broadcast
+        console.log("[MintNFT] Spell is raw TX, skipping signing (V11 prover)");
       }
 
       // Step 6: Broadcast commit transaction (if present)
-      if (signedCommitHex) {
+      if (finalCommitHex) {
         setCurrentStep("broadcasting_commit");
         console.log("[MintNFT] Broadcasting commit transaction...");
 
         broadcastCommitTxid =
-          await mempoolClient.broadcastTransaction(signedCommitHex);
+          await mempoolClient.broadcastTransaction(finalCommitHex);
         if (!broadcastCommitTxid) {
           throw new Error("Failed to broadcast commit transaction");
         }
@@ -341,7 +373,7 @@ export function useMintNFT(): UseMintNFTReturn {
       console.log("[MintNFT] Broadcasting spell transaction...");
 
       const broadcastSpellTxid =
-        await mempoolClient.broadcastTransaction(signedSpellHex);
+        await mempoolClient.broadcastTransaction(finalSpellHex);
       if (!broadcastSpellTxid) {
         throw new Error("Failed to broadcast spell transaction");
       }

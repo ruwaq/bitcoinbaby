@@ -19,7 +19,10 @@ export {
   NFTClient,
   getNFTClient,
   type NFTMintData,
-  type XPSubmissionData,
+  type WorkProofData,
+  type WorkProofResult,
+  type ProveNFTRequest,
+  type ProveNFTResult,
 } from "./nft-client";
 export { GameClient, getGameClient } from "./game-client";
 export { LeaderboardClient, getLeaderboardClient } from "./leaderboard-client";
