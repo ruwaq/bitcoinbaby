@@ -1291,8 +1291,9 @@ nftRouter.post("/migrate-index", async (c) => {
     }
 
     // Add all token IDs to the global index
-    const tokenStrings = tokenIds.map((id) => id.toString());
-    await redis.sadd("nft:all-tokens", ...tokenStrings);
+    for (const id of tokenIds) {
+      await redis.sadd("nft:all-tokens", id.toString());
+    }
 
     // Update the count
     const finalTokens = await redis.smembers("nft:all-tokens");

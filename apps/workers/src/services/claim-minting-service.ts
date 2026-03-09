@@ -91,9 +91,10 @@ export class ClaimMintingService {
    * Process a mint request
    *
    * 1. Verify claim TX is confirmed on-chain
-   * 2. Build mint spell with claim data
-   * 3. Submit to Charms prover
-   * 4. Return mint transaction IDs
+   * 2. Get prev_tx hex for prover
+   * 3. Build mint spell with claim data
+   * 4. Submit to Charms prover
+   * 5. Return mint transaction IDs
    */
   async processMint(request: MintRequest): Promise<MintResult> {
     claimLogger.info("Processing mint request", {
@@ -113,10 +114,21 @@ export class ClaimMintingService {
         };
       }
 
-      // Step 2: Build the mint spell
-      const spell = this.buildMintSpell(request);
+      // Step 2: Get the claim TX hex for prev_txs (required by v11 prover)
+      const mempool = getMempoolService(this.network);
+      const claimTxHex = await mempool.getTransactionHex(request.claimTxid);
+      if (!claimTxHex) {
+        return {
+          success: false,
+          status: "failed",
+          error: "Could not fetch claim transaction hex",
+        };
+      }
 
-      // Step 3: Submit to prover with retries
+      // Step 3: Build the mint spell with prev_txs
+      const spell = this.buildMintSpell(request, claimTxHex);
+
+      // Step 4: Submit to prover with retries
       const proverResult = await this.submitToProver(spell);
       if (!proverResult.success) {
         return {
@@ -188,8 +200,14 @@ export class ClaimMintingService {
    * For V2 claims, we use server-signed aggregate proofs.
    * The spell validates the signature and mints tokens.
    * Spell is CBOR-encoded as hex string for the v11 prover.
+   *
+   * @param request - The mint request data
+   * @param claimTxHex - Raw hex of the claim transaction (for prev_txs)
    */
-  private buildMintSpell(request: MintRequest): ProverRequest {
+  private buildMintSpell(
+    request: MintRequest,
+    claimTxHex: string,
+  ): ProverRequest {
     const appKey = `t/${this.appId}/${this.appVk}`;
 
     // Convert address to script pubkey for coins
@@ -221,11 +239,12 @@ export class ClaimMintingService {
       },
     };
 
-    // Build prover request with CBOR-encoded spell
+    // Build prover request with CBOR-encoded spell and prev_txs
     return buildProverRequest(spell, {
       changeAddress: request.address,
       feeRate: 2.0,
       chain: "bitcoin",
+      prevTxs: [claimTxHex], // Required by v11 prover
       appPrivateInputs: {
         [appKey]: {
           // Server-signed claim data

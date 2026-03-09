@@ -181,6 +181,45 @@ export class MempoolService {
   }
 
   /**
+   * Get raw transaction hex
+   */
+  async getTransactionHex(txid: string): Promise<string | null> {
+    // Validate txid format
+    if (!/^[a-fA-F0-9]{64}$/.test(txid)) {
+      claimLogger.error("Invalid txid format", { txid });
+      return null;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        REQUEST_TIMEOUT_MS,
+      );
+
+      const response = await fetch(`${this.baseUrl}/tx/${txid}/hex`, {
+        headers: { Accept: "text/plain" },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.status === 404) {
+        return null;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      return await response.text();
+    } catch (error) {
+      claimLogger.error("Failed to get transaction hex", { txid, error });
+      return null;
+    }
+  }
+
+  /**
    * Get recommended fee rates
    */
   async getFeeRates(): Promise<{
