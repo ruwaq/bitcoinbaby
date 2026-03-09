@@ -18,6 +18,7 @@ import type {
 } from "./types";
 import { ApiError } from "../errors";
 import { hash256, countLeadingZeroBits } from "@bitcoinbaby/shared";
+import * as cbor from "cbor2";
 
 /** Union type for spells accepted by the prover */
 type SpellInput = SpellV9 | SpellV10 | SpellV11;
@@ -139,6 +140,136 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxDelayMs: 30000,
   jitterPercent: 10,
 };
+
+// =============================================================================
+// CBOR ENCODING HELPERS
+// =============================================================================
+
+/**
+ * Convert hex string to Uint8Array
+ */
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+  }
+  return bytes;
+}
+
+/**
+ * Convert Uint8Array to hex string
+ */
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
+ * Convert UTXO string "txid:index" to 36-byte array for CBOR
+ * Format: [32 bytes txid reversed] + [4 bytes index little-endian]
+ */
+function utxoIdToBytes(utxoStr: string): Uint8Array {
+  const parts = utxoStr.split(":");
+  if (parts.length !== 2) {
+    throw new Error(`Invalid UTXO format: ${utxoStr}`);
+  }
+
+  const [txidHex, indexStr] = parts;
+  const index = parseInt(indexStr, 10);
+
+  const bytes = new Uint8Array(36);
+  // Reverse txid bytes (Bitcoin display order)
+  for (let i = 0; i < 32; i++) {
+    bytes[i] = parseInt(txidHex.substr((31 - i) * 2, 2), 16);
+  }
+  // Index as little-endian u32
+  bytes[32] = index & 0xff;
+  bytes[33] = (index >> 8) & 0xff;
+  bytes[34] = (index >> 16) & 0xff;
+  bytes[35] = (index >> 24) & 0xff;
+
+  return bytes;
+}
+
+/**
+ * Convert App string "tag/identity/vk" to CBOR tuple
+ */
+function appToTuple(appStr: string): [string, Uint8Array, Uint8Array] {
+  const parts = appStr.split("/");
+  if (parts.length !== 3) {
+    throw new Error(`Invalid App format: ${appStr}`);
+  }
+
+  const [tag, identityHex, vkHex] = parts;
+  return [tag, hexToBytes(identityHex), hexToBytes(vkHex)];
+}
+
+/**
+ * Convert SpellV11 to CBOR-compatible format and encode to hex
+ */
+function encodeSpellV11ToCborHex(spell: SpellV11): string {
+  // Convert tx.ins from strings to bytes
+  const tx: Record<string, unknown> = {};
+
+  if (spell.tx.ins) {
+    tx.ins = spell.tx.ins.map((utxo) => utxoIdToBytes(utxo));
+  }
+
+  if (spell.tx.refs) {
+    tx.refs = spell.tx.refs.map((utxo) => utxoIdToBytes(utxo));
+  }
+
+  // Convert outputs to Maps with integer keys
+  tx.outs = spell.tx.outs.map((output) => {
+    const map = new Map<number, unknown>();
+    for (const [key, value] of Object.entries(output)) {
+      map.set(parseInt(key, 10), value);
+    }
+    return map;
+  });
+
+  if (spell.tx.beamed_outs) {
+    tx.beamed_outs = spell.tx.beamed_outs;
+  }
+
+  // Convert coins if present
+  if (spell.tx.coins) {
+    tx.coins = spell.tx.coins.map((coin) => ({
+      amount: coin.amt,
+      dest: hexToBytes(coin.dest_hash),
+    }));
+  }
+
+  // Convert app_public_inputs keys from strings to tuples
+  const appPublicInputs = new Map<unknown, unknown>();
+  for (const [appStr, data] of Object.entries(spell.app_public_inputs)) {
+    const appTuple = appToTuple(appStr);
+    appPublicInputs.set(appTuple, data);
+  }
+
+  const cborSpell: Record<string, unknown> = {
+    version: spell.version,
+    tx,
+    app_public_inputs: appPublicInputs,
+  };
+
+  if (spell.mock) {
+    cborSpell.mock = spell.mock;
+  }
+
+  // Encode to CBOR bytes
+  const cborBytes = cbor.encode(cborSpell);
+  return bytesToHex(new Uint8Array(cborBytes));
+}
+
+/**
+ * Encode private inputs to CBOR hex string
+ */
+function encodePrivateInputsToCborHex(inputs: PoWPrivateInputsV11): string {
+  const cborBytes = cbor.encode(inputs);
+  return bytesToHex(new Uint8Array(cborBytes));
+}
 
 // =============================================================================
 // PRE-PROVER VALIDATION
@@ -420,15 +551,34 @@ export class CharmsProverClient {
     try {
       const proveEndpoint = getProveEndpoint(this.proverUrl);
 
-      // Prover expects spell as hex-encoded JSON string
-      const spellJson = JSON.stringify(request.spell);
-      const spellHex = this.stringToHex(spellJson);
+      // Encode spell as CBOR hex (required by Charms prover V11)
+      const spellHex = encodeSpellV11ToCborHex(request.spell);
 
-      const proverPayload = {
-        ...request,
+      // Build prover payload with CBOR-encoded components
+      const proverPayload: Record<string, unknown> = {
         spell: spellHex,
+        change_address: request.change_address,
+        fee_rate: request.funding_utxo_value ? 2.0 : 2.0001, // Ensure float
         chain: "bitcoin",
       };
+
+      // Encode app_private_inputs as CBOR hex strings
+      if (request.app_private_inputs) {
+        const encodedInputs: Record<string, string> = {};
+        for (const [appKey, inputs] of Object.entries(
+          request.app_private_inputs,
+        )) {
+          encodedInputs[appKey] = encodePrivateInputsToCborHex(inputs);
+        }
+        proverPayload.app_private_inputs = encodedInputs;
+      }
+
+      // Add prev_txs in chain-tagged format
+      if (request.prev_txs && request.prev_txs.length > 0) {
+        proverPayload.prev_txs = request.prev_txs.map((txHex) => ({
+          bitcoin: txHex,
+        }));
+      }
 
       const response = await fetch(proveEndpoint, {
         method: "POST",

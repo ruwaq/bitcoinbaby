@@ -58,7 +58,7 @@ export interface NormalizedSpell {
 export interface ProverRequest {
   /** Hex-encoded CBOR spell */
   spell: string;
-  /** App private inputs (hex-encoded CBOR values) */
+  /** App private inputs - CBOR-encoded hex strings for V11 prover */
   app_private_inputs?: Record<string, string>;
   /** Beamed source UTXOs */
   tx_ins_beamed_source_utxos?: Record<number, [string, number?]>;
@@ -298,6 +298,8 @@ export function buildProverRequest(
   };
 
   // Add app_private_inputs if provided
+  // IMPORTANT: Prover V11 expects app_private_inputs values as CBOR-encoded hex strings,
+  // NOT as direct JSON objects. Each value must be encoded to CBOR and converted to hex.
   if (options.appPrivateInputs) {
     request.app_private_inputs = {};
     for (const [appKey, inputs] of Object.entries(options.appPrivateInputs)) {
@@ -342,8 +344,12 @@ export interface CborProverRequest {
   spell: unknown;
   /** App private inputs (CBOR objects, not hex) */
   app_private_inputs?: Record<string, unknown>;
+  /** Beamed source UTXOs */
+  tx_ins_beamed_source_utxos?: Record<number, [string, number?]>;
+  /** App binaries (raw bytes for CBOR) */
+  binaries?: Map<Uint8Array, Uint8Array>;
   /** Previous transactions */
-  prev_txs?: Array<{ bitcoin?: string; cardano?: string }>;
+  prev_txs?: Array<{ bitcoin?: Uint8Array; cardano?: Uint8Array }>;
   /** Change address */
   change_address: string;
   /** Fee rate in sats/vB (must be float) */
@@ -357,6 +363,11 @@ export interface CborProverRequest {
  *
  * Use this when sending requests with Content-Type: application/cbor
  *
+ * In CBOR format:
+ * - spell is direct object (not hex-encoded)
+ * - binaries is Map<Uint8Array, Uint8Array> (vk bytes -> binary bytes)
+ * - prev_txs contains raw bytes (not hex strings)
+ *
  * @param spell - The normalized spell
  * @param options - Additional request options
  * @returns Complete request to encode with cbor.encode()
@@ -369,6 +380,8 @@ export function buildCborProverRequest(
     chain?: "bitcoin" | "cardano";
     appPrivateInputs?: Record<string, unknown>;
     prevTxs?: string[];
+    /** App binaries - vk hex string -> binary bytes */
+    binaries?: Record<string, Uint8Array>;
   },
 ): CborProverRequest {
   // Convert spell to CBOR-compatible format (direct object)
@@ -393,11 +406,22 @@ export function buildCborProverRequest(
     request.app_private_inputs = options.appPrivateInputs;
   }
 
-  // Add prev_txs in chain-tagged format
+  // Add prev_txs in chain-tagged format with raw bytes
   if (options.prevTxs && options.prevTxs.length > 0) {
     request.prev_txs = options.prevTxs.map((txHex) => ({
-      bitcoin: txHex,
+      bitcoin: hexToBytes(txHex),
     }));
+  }
+
+  // Add binaries as Map<vk_bytes, binary_bytes>
+  // CBOR expects the verification key as bytes, not hex string
+  if (options.binaries) {
+    const binariesMap = new Map<Uint8Array, Uint8Array>();
+    for (const [vkHex, binaryBytes] of Object.entries(options.binaries)) {
+      const vkBytes = hexToBytes(vkHex);
+      binariesMap.set(vkBytes, binaryBytes);
+    }
+    request.binaries = binariesMap;
   }
 
   return request;
