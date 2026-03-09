@@ -39,9 +39,9 @@ export const DEFAULT_CLIENT_VARDIFF_CONFIG: ClientVarDiffConfig = {
   variancePercent: 0.3, // ±30% acceptable
   minDiff: MIN_DIFFICULTY, // D22
   maxDiff: MAX_DIFFICULTY, // D32
-  retargetShares: 10, // Retarget every 10 shares
+  retargetShares: 5, // Retarget every 5 shares (reduced from 10 for faster warmup)
   minSamples: 3, // Need at least 3 samples
-  hashrateStabilityThreshold: 50_000_000, // 50M hashes before trusting hashrate
+  hashrateStabilityThreshold: 10_000_000, // 10M hashes (~0.2s at 57 MH/s) before trusting hashrate
 };
 
 // =============================================================================
@@ -205,9 +205,10 @@ export function processShareForVarDiff(
     // Shares too fast → increase difficulty
     const ratio = config.targetShareTime / medianTime;
     const diffIncrease = Math.log2(ratio);
+    // Allow up to +4 per adjustment for faster warmup (was +2)
     newDiff = Math.min(
       config.maxDiff,
-      state.currentDiff + Math.min(Math.ceil(diffIncrease), 2),
+      state.currentDiff + Math.min(Math.ceil(diffIncrease), 4),
     );
     if (newDiff !== state.currentDiff) {
       changed = true;
@@ -217,6 +218,7 @@ export function processShareForVarDiff(
     // Shares too slow → decrease difficulty
     const ratio = medianTime / config.targetShareTime;
     const diffDecrease = Math.log2(ratio);
+    // Keep -2 max for decreasing (conservative)
     newDiff = Math.max(
       config.minDiff,
       state.currentDiff - Math.min(Math.ceil(diffDecrease), 2),

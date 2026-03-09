@@ -100,7 +100,8 @@ class MiningManager {
   private clientVarDiffState: ClientVarDiffState =
     createInitialClientVarDiffState();
   private lastHashrateCheck: number = 0;
-  private hashrateCheckInterval: number = 5000; // Check every 5 seconds
+  private hashrateCheckInterval: number = 2000; // Check every 2 seconds (reduced from 5s)
+  private hasInitialDifficultyBeenSet: boolean = false; // Track if we've done initial adjustment
 
   private state: MiningManagerState = {
     isRunning: false,
@@ -402,6 +403,10 @@ class MiningManager {
     // Release leadership
     this.tabCoordinator?.releaseLeadership();
 
+    // Reset VarDiff tracking for next session
+    this.hasInitialDifficultyBeenSet = false;
+    this.clientVarDiffState = createInitialClientVarDiffState();
+
     this.updateState({ sessionStartTime: null });
   }
 
@@ -519,16 +524,27 @@ class MiningManager {
   ): void {
     const now = Date.now();
 
-    // Throttle checks to avoid excessive processing
-    if (now - this.lastHashrateCheck < this.hashrateCheckInterval) {
-      return;
-    }
-    this.lastHashrateCheck = now;
-
     // Skip if hashrate not stable yet
     if (!isHashrateStable(totalHashes, DEFAULT_CLIENT_VARDIFF_CONFIG)) {
       return;
     }
+
+    // CRITICAL: Allow IMMEDIATE first check when hashrate stabilizes
+    // This prevents rate limiting during the initial warmup period
+    const isFirstStableCheck = !this.hasInitialDifficultyBeenSet;
+
+    // Throttle subsequent checks to avoid excessive processing
+    if (
+      !isFirstStableCheck &&
+      now - this.lastHashrateCheck < this.hashrateCheckInterval
+    ) {
+      return;
+    }
+    this.lastHashrateCheck = now;
+
+    // Calculate optimal difficulty from hashrate
+    // For high-hashrate miners (GPU), this is critical to avoid rate limiting
+    const safeDiff = getMinSafeDifficulty(hashrate, 1500); // MAX_SHARES_PER_HOUR
 
     // Try to set initial difficulty from hashrate
     const result = setInitialDifficultyFromHashrate(
@@ -538,24 +554,33 @@ class MiningManager {
       DEFAULT_CLIENT_VARDIFF_CONFIG,
     );
 
-    if (result.changed) {
-      this.clientVarDiffState = result.state;
+    // Mark that we've done initial check
+    if (isFirstStableCheck) {
+      this.hasInitialDifficultyBeenSet = true;
+    }
 
-      // Also check if we need a higher difficulty to avoid rate limits
-      const safeDiff = getMinSafeDifficulty(hashrate, 1500); // MAX_SHARES_PER_HOUR
-      const finalDiff = Math.max(result.newDifficulty, safeDiff);
+    // Use the higher of optimal and safe difficulty
+    const finalDiff = Math.max(
+      result.newDifficulty,
+      safeDiff,
+      this.state.difficulty, // Don't go below current
+    );
 
-      if (finalDiff !== this.state.difficulty) {
-        const oldDiff = this.state.difficulty;
-        this.setDifficulty(finalDiff);
-        log.info("Client VarDiff adjustment", {
-          oldDiff,
-          newDiff: finalDiff,
-          hashrateMH: (hashrate / 1_000_000).toFixed(2),
-          optimalDiff: result.newDifficulty,
-          safeDiff,
-        });
-      }
+    if (finalDiff !== this.state.difficulty) {
+      const oldDiff = this.state.difficulty;
+      this.clientVarDiffState = {
+        ...result.state,
+        currentDiff: finalDiff,
+      };
+      this.setDifficulty(finalDiff);
+      log.info("Client VarDiff adjustment", {
+        oldDiff,
+        newDiff: finalDiff,
+        hashrateMH: (hashrate / 1_000_000).toFixed(2),
+        optimalDiff: result.newDifficulty,
+        safeDiff,
+        isFirstCheck: isFirstStableCheck,
+      });
     }
   }
 
@@ -635,6 +660,11 @@ class MiningManager {
     this.orchestrator?.terminate();
     this.orchestrator = null;
     this.listeners.clear();
+
+    // Reset VarDiff tracking
+    this.hasInitialDifficultyBeenSet = false;
+    this.clientVarDiffState = createInitialClientVarDiffState();
+
     this.state = {
       isRunning: false,
       isPaused: false,
