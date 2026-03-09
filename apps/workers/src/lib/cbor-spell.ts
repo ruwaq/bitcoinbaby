@@ -314,13 +314,20 @@ export function buildProverRequest(
     }));
   }
 
-  // Add binaries if provided
+  // Add binaries if provided (as hex, not base64)
+  // The Charms prover API expects binaries as hex-encoded strings
   if (options.binaries) {
     request.binaries = {};
     for (const [vk, binary] of Object.entries(options.binaries)) {
-      // Accept both base64 string or Uint8Array
-      request.binaries[vk] =
-        typeof binary === "string" ? binary : bytesToBase64(binary);
+      if (typeof binary === "string") {
+        // Check if it's base64 (contains non-hex characters like / + =)
+        // Base64: A-Za-z0-9+/= | Hex: 0-9a-fA-F
+        const isBase64 = /[+/=]/i.test(binary) || /[g-zG-Z]/i.test(binary);
+        request.binaries[vk] = isBase64 ? base64ToHex(binary) : binary;
+      } else {
+        // Uint8Array - convert to hex
+        request.binaries[vk] = bytesToHex(binary);
+      }
     }
   }
 
@@ -432,6 +439,22 @@ function bytesToBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode.apply(null, Array.from(chunk));
   }
   return btoa(binary);
+}
+
+/**
+ * Convert base64 string to hex string
+ * The Charms prover API expects binaries as hex, not base64
+ */
+function base64ToHex(base64: string): string {
+  // Decode base64 to binary string
+  const binary = atob(base64);
+  // Convert each character to hex
+  let hex = "";
+  for (let i = 0; i < binary.length; i++) {
+    const byte = binary.charCodeAt(i);
+    hex += byte.toString(16).padStart(2, "0");
+  }
+  return hex;
 }
 
 /**
