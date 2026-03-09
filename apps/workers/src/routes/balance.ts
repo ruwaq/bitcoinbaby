@@ -13,7 +13,12 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Env } from "../lib/types";
-import { getVirtualBalanceStub, forwardToDO, safeDOCall } from "../lib/helpers";
+import {
+  getVirtualBalanceStub,
+  forwardToDO,
+  safeDOCall,
+  errorResponse,
+} from "../lib/helpers";
 import {
   validateBody,
   validateParams,
@@ -106,11 +111,19 @@ balanceRouter.post(
 
 /**
  * DELETE /api/balance/:address/reset - Reset user balance (testnet only)
+ * Requires ADMIN_KEY header for security
  */
 balanceRouter.delete(
   "/:address/reset",
   validateParams(addressParamSchema),
   async (c) => {
+    // Require admin key for destructive operation
+    const adminKey = c.req.header("X-Admin-Key");
+    const expectedKey = c.env.ADMIN_KEY;
+    if (!expectedKey || adminKey !== expectedKey) {
+      return errorResponse(c, "Unauthorized - admin key required", 401);
+    }
+
     const { address } = c.get("validatedParams");
 
     return safeDOCall(

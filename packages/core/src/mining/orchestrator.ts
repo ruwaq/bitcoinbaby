@@ -218,6 +218,14 @@ export class MiningOrchestrator {
 
     // Execute AI task asynchronously (non-blocking)
     // The share is reported immediately, AI proof is added if available
+    const safeCallback = (res: MiningResult) => {
+      try {
+        this.events.onWorkFound?.(res);
+      } catch (callbackError) {
+        log.error("onWorkFound callback error", { error: callbackError });
+      }
+    };
+
     this.aiIntegration
       .onShareFound()
       .then((aiResult) => {
@@ -231,19 +239,19 @@ export class MiningOrchestrator {
             taskId: aiResult.taskId,
             computeTimeMs: aiResult.computeTime?.toFixed(0),
           });
-          this.events.onWorkFound?.(enhancedResult);
+          safeCallback(enhancedResult);
         } else {
           // AI failed or skipped, report share without AI proof
           if (aiResult?.error) {
             log.warn("AI task failed", { error: aiResult.error });
           }
-          this.events.onWorkFound?.(result);
+          safeCallback(result);
         }
       })
       .catch((error) => {
         // AI completely failed, mining continues normally
         log.warn("AI integration error", { error });
-        this.events.onWorkFound?.(result);
+        safeCallback(result);
       });
   }
 

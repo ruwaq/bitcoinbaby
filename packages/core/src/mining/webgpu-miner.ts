@@ -223,11 +223,16 @@ export class WebGPUMiner implements Miner {
    * FIX: Clean up ALL buffers first to prevent GPU memory leak on restart
    */
   private async prepareChallenge(challenge: string): Promise<void> {
+    // Guard against device loss during recovery
+    if (!this.device) {
+      throw new Error("GPU device not available");
+    }
+
     // Clean up all existing buffers before creating new ones
     // This prevents GPU memory leak if prepareChallenge is called multiple times
     this.cleanupBuffers();
 
-    const device = this.device!;
+    const device = this.device;
 
     // Recreate all persistent buffers that were destroyed by cleanupBuffers()
     this.uniformBuffer = device.createBuffer({

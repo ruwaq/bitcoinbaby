@@ -98,8 +98,8 @@ const requireAdmin = createMiddleware<{ Bindings: Env }>(async (c, next) => {
   const adminKey = c.req.header("X-Admin-Key");
   const expectedKey = c.env.ADMIN_KEY;
 
-  // If admin key is configured, require it
-  if (expectedKey && adminKey !== expectedKey) {
+  // Require admin key - block if not configured or doesn't match
+  if (!expectedKey || adminKey !== expectedKey) {
     return errorResponse(c, "Unauthorized", 401);
   }
 
