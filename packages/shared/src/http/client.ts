@@ -61,6 +61,24 @@ export interface HttpResponse<T> {
 }
 
 // =============================================================================
+// HELPERS
+// =============================================================================
+
+/**
+ * JSON replacer that handles bigint serialization
+ */
+function bigIntReplacer(_key: string, value: unknown): unknown {
+  return typeof value === "bigint" ? value.toString() : value;
+}
+
+/**
+ * Serialize body to JSON with bigint support
+ */
+function serializeBody(body: unknown): string {
+  return JSON.stringify(body, bigIntReplacer);
+}
+
+// =============================================================================
 // IMPLEMENTATION
 // =============================================================================
 
@@ -105,7 +123,7 @@ export class HttpClient {
     return this.request<T>(path, {
       ...options,
       method: "POST",
-      body: body ? JSON.stringify(body) : undefined,
+      body: body ? serializeBody(body) : undefined,
       headers: {
         "Content-Type": "application/json",
         ...options?.headers,
@@ -124,7 +142,7 @@ export class HttpClient {
     return this.request<T>(path, {
       ...options,
       method: "PUT",
-      body: body ? JSON.stringify(body) : undefined,
+      body: body ? serializeBody(body) : undefined,
       headers: {
         "Content-Type": "application/json",
         ...options?.headers,

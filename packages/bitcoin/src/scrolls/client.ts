@@ -152,145 +152,69 @@ export class ScrollsClient {
   /**
    * Get token balances for an address
    *
-   * Queries the Scrolls indexer for all Charms token balances.
-   * Returns empty balances if the API endpoint is not yet available.
+   * NOTE: Scrolls API does not have a balance endpoint yet.
+   * This method returns empty balances until the endpoint is available.
+   * See: https://scrolls.charms.dev (only has /config, /address, /sign)
    *
    * @param address - Bitcoin address to query
-   * @param tokenTicker - Optional specific token ticker to filter (e.g., 'BABY')
+   * @param _tokenTicker - Optional specific token ticker to filter (unused)
    */
   async getTokenBalances(
     address: string,
-    tokenTicker?: string,
+    _tokenTicker?: string,
   ): Promise<AddressTokenBalances> {
-    try {
-      // Build query path with optional token filter
-      const queryParams = tokenTicker ? `?ticker=${tokenTicker}` : "";
-      const path = `/${this.network}/balances/${address}${queryParams}`;
-
-      // API response structure (when available)
-      interface ApiBalanceResponse {
-        balances: Array<{
-          ticker: string;
-          token_id: string;
-          amount: string; // BigInt as string
-          utxo_count: number;
-        }>;
-        block_height: number;
-      }
-
-      const response = await this.fetch<ApiBalanceResponse>(path);
-
-      return {
-        address,
-        network: this.network,
-        balances: response.balances.map((b) => ({
-          ticker: b.ticker,
-          tokenId: b.token_id,
-          amount: BigInt(b.amount),
-          utxoCount: b.utxo_count,
-        })),
-        blockHeight: response.block_height,
-        timestamp: Date.now(),
-      };
-    } catch (error) {
-      // If API returns 404 or endpoint not available, return empty balances
-      if (error instanceof ScrollsAPIError && error.statusCode === 404) {
-        return {
-          address,
-          network: this.network,
-          balances: [],
-          blockHeight: 0,
-          timestamp: Date.now(),
-        };
-      }
-      throw error;
-    }
+    // Scrolls API does not have balance endpoint - return empty
+    // When Charms team adds this endpoint, implement the actual call here
+    return {
+      address,
+      network: this.network,
+      balances: [],
+      blockHeight: 0,
+      timestamp: Date.now(),
+    };
   }
 
   /**
    * Get balance for a specific token
    *
-   * Convenience method to get balance of a single token type.
+   * NOTE: Scrolls API does not have a balance endpoint yet.
    *
-   * @param address - Bitcoin address to query
-   * @param tokenTicker - Token ticker (e.g., 'BABY')
+   * @param _address - Bitcoin address to query (unused)
+   * @param _tokenTicker - Token ticker (unused)
    */
   async getTokenBalance(
-    address: string,
-    tokenTicker: string,
+    _address: string,
+    _tokenTicker: string,
   ): Promise<TokenBalance | null> {
-    const balances = await this.getTokenBalances(address, tokenTicker);
-    return balances.balances.find((b) => b.ticker === tokenTicker) || null;
+    // Scrolls API does not have balance endpoint
+    return null;
   }
 
   /**
    * Get token UTXOs for an address
    *
-   * Returns all UTXOs that contain Charms tokens.
+   * NOTE: Scrolls API does not have a UTXOs endpoint yet.
    *
-   * @param address - Bitcoin address to query
-   * @param tokenTicker - Optional token ticker to filter
+   * @param _address - Bitcoin address to query (unused)
+   * @param _tokenTicker - Optional token ticker to filter (unused)
    */
   async getTokenUTXOs(
-    address: string,
-    tokenTicker?: string,
+    _address: string,
+    _tokenTicker?: string,
   ): Promise<TokenUTXO[]> {
-    try {
-      const queryParams = tokenTicker ? `?ticker=${tokenTicker}` : "";
-      const path = `/${this.network}/utxos/${address}/tokens${queryParams}`;
-
-      // API response structure (when available)
-      interface ApiUtxoResponse {
-        utxos: Array<{
-          txid: string;
-          vout: number;
-          satoshis: number;
-          token_amount: string;
-          ticker: string;
-          confirmed: boolean;
-          block_height?: number;
-        }>;
-      }
-
-      const response = await this.fetch<ApiUtxoResponse>(path);
-
-      return response.utxos.map((u) => ({
-        txid: u.txid,
-        vout: u.vout,
-        satoshis: u.satoshis,
-        tokenAmount: BigInt(u.token_amount),
-        ticker: u.ticker,
-        confirmed: u.confirmed,
-        blockHeight: u.block_height,
-      }));
-    } catch (error) {
-      // If API returns 404 or endpoint not available, return empty array
-      if (error instanceof ScrollsAPIError && error.statusCode === 404) {
-        return [];
-      }
-      throw error;
-    }
+    // Scrolls API does not have UTXOs endpoint
+    return [];
   }
 
   /**
    * Check if token balance API is available
    *
-   * Some Scrolls deployments may not have the balance endpoint enabled.
+   * NOTE: Currently always returns false as Scrolls API
+   * does not have balance/UTXOs endpoints yet.
    */
   async isTokenBalanceAvailable(): Promise<boolean> {
-    try {
-      // Try to fetch with a dummy address to check endpoint availability
-      await this.fetch(
-        `/${this.network}/balances/tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx`,
-      );
-      return true;
-    } catch (error) {
-      if (error instanceof ScrollsAPIError && error.statusCode === 404) {
-        return false;
-      }
-      // Other errors (network, timeout) - assume available but failed
-      return true;
-    }
+    // Scrolls API does not have balance endpoint yet
+    return false;
   }
 }
 

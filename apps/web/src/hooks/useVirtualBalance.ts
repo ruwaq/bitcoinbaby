@@ -16,9 +16,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { getApiClient, useNetworkStore } from "@bitcoinbaby/core";
 import type { BalanceResponse, ApiMiningProof } from "@bitcoinbaby/core";
 import {
-  createScrollsClient,
-  type ScrollsClient,
-  type ScrollsNetwork,
+  createExplorerClient,
+  type CharmsExplorerClient,
+  type ExplorerNetwork,
 } from "@bitcoinbaby/bitcoin";
 
 /**
@@ -33,7 +33,7 @@ interface VirtualBalanceState {
   pendingWithdraw: bigint;
   /** Available to withdraw (virtual - pending) */
   availableToWithdraw: bigint;
-  /** On-chain confirmed balance (from Scrolls) */
+  /** On-chain confirmed balance (from Charms Explorer) */
   onChainBalance: bigint;
   /** Total mined all-time (from Workers) */
   totalMined: bigint;
@@ -47,8 +47,8 @@ interface VirtualBalanceState {
   lastUpdated: number | null;
   /** Workers API connectivity */
   workersApiAvailable: boolean;
-  /** Scrolls API connectivity */
-  scrollsApiAvailable: boolean;
+  /** Explorer API connectivity */
+  explorerApiAvailable: boolean;
 }
 
 /**
@@ -123,12 +123,13 @@ export function useVirtualBalance(
 ): UseVirtualBalanceReturn {
   const { address, tokenTicker = "BABY", refreshInterval = 60000 } = options;
 
-  // Network config for Scrolls
+  // Network config for Explorer
   const { config } = useNetworkStore();
-  const scrollsNetwork: ScrollsNetwork = config.scrolls;
+  const explorerNetwork: ExplorerNetwork =
+    config.scrolls === "main" ? "mainnet" : "testnet4";
 
-  // Scrolls client ref
-  const scrollsClientRef = useRef<ScrollsClient | null>(null);
+  // Explorer client ref
+  const explorerClientRef = useRef<CharmsExplorerClient | null>(null);
 
   // Debounce timer ref for sync events
   const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -144,13 +145,12 @@ export function useVirtualBalance(
     };
   }, []);
 
-  // Initialize Scrolls client
+  // Initialize Explorer client
   useEffect(() => {
-    scrollsClientRef.current = createScrollsClient({
-      baseUrl: config.scrollsApi.replace("/api/v1", ""),
-      network: scrollsNetwork,
+    explorerClientRef.current = createExplorerClient({
+      network: explorerNetwork,
     });
-  }, [config.scrollsApi, scrollsNetwork]);
+  }, [explorerNetwork]);
 
   // State
   const [state, setState] = useState<VirtualBalanceState>({
@@ -165,7 +165,7 @@ export function useVirtualBalance(
     error: null,
     lastUpdated: null,
     workersApiAvailable: true,
-    scrollsApiAvailable: true,
+    explorerApiAvailable: true,
   });
 
   /**
@@ -190,19 +190,21 @@ export function useVirtualBalance(
     }, [address]);
 
   /**
-   * Fetch on-chain balance from Scrolls API
+   * Fetch on-chain balance from Charms Explorer API
+   * Uses the Charms Explorer indexer for balance queries
    */
   const fetchOnChainBalance = useCallback(async (): Promise<bigint> => {
-    if (!address || !scrollsClientRef.current) return 0n;
+    if (!address || !explorerClientRef.current) return 0n;
 
     try {
-      const balance = await scrollsClientRef.current.getTokenBalance(
+      const balance = await explorerClientRef.current.getTokenBalance(
         address,
         tokenTicker,
       );
-      return balance?.amount ?? 0n;
+      return balance;
     } catch (error) {
-      console.error("[VirtualBalance] Scrolls API error:", error);
+      // Explorer API error - silently return 0
+      console.warn("[VirtualBalance] Explorer API error:", error);
       return 0n;
     }
   }, [address, tokenTicker]);
@@ -260,7 +262,7 @@ export function useVirtualBalance(
         errors.push(`Workers: ${virtualResult.reason}`);
       }
       if (onChainResult.status === "rejected") {
-        errors.push(`Scrolls: ${onChainResult.reason}`);
+        errors.push(`Explorer: ${onChainResult.reason}`);
       }
 
       setState({
@@ -275,7 +277,7 @@ export function useVirtualBalance(
         error: errors.length > 0 ? errors.join("; ") : null,
         lastUpdated: Date.now(),
         workersApiAvailable: virtualData !== null,
-        scrollsApiAvailable: onChainResult.status === "fulfilled",
+        explorerApiAvailable: onChainResult.status === "fulfilled",
       });
     } catch (error) {
       // Check if still mounted after async operations
@@ -378,7 +380,7 @@ export function useVirtualBalance(
         error: null,
         lastUpdated: null,
         workersApiAvailable: true,
-        scrollsApiAvailable: true,
+        explorerApiAvailable: true,
       });
       return;
     }

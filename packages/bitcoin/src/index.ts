@@ -198,7 +198,7 @@ export {
   createMintingManager,
 } from "./charms/index";
 
-// Scrolls API & Charms Service
+// Scrolls API & Charms Service (signing only)
 export {
   // Client
   ScrollsClient,
@@ -224,6 +224,20 @@ export {
   type AddressTokenBalances,
   type TokenUTXO,
 } from "./scrolls";
+
+// Charms Explorer API (balances & UTXOs)
+export {
+  CharmsExplorerClient,
+  ExplorerAPIError,
+  createExplorerClient,
+  getExplorerClient,
+  type ExplorerClientOptions,
+  type ExplorerNetwork,
+  type CharmBalance as ExplorerCharmBalance,
+  type CharmUTXO as ExplorerCharmUTXO,
+  type WalletCharmsResponse,
+  type WalletUTXOsResponse,
+} from "./explorer";
 
 // Blockchain API (Mempool.space)
 export {
