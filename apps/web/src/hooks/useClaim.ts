@@ -259,6 +259,7 @@ export function useClaim({
 
       // Auto-confirm the claim with the txid
       const claimId = preparedClaim.claimData.proof.nonce;
+      let confirmFailed = false;
       try {
         const confirmResponse = await fetch(`${apiUrl}/api/claim/confirm`, {
           method: "POST",
@@ -273,10 +274,21 @@ export function useClaim({
           setPreparedClaim(null);
           // Trigger balance refresh (non-blocking)
           refreshBalance().catch(console.error);
+        } else {
+          // Confirmation failed but TX was broadcast
+          console.error("Confirm API error:", confirmResult.error);
+          confirmFailed = true;
         }
       } catch (confirmError) {
         console.error("Failed to confirm claim:", confirmError);
-        // TX was still broadcast, so return txid
+        confirmFailed = true;
+      }
+
+      // Notify user if confirmation failed (TX was broadcast but not confirmed on server)
+      if (confirmFailed) {
+        setClaimError(
+          `TX broadcast (${result.txid.slice(0, 8)}...) but server confirmation failed. Use manual claim with txid.`,
+        );
       }
 
       return result.txid;

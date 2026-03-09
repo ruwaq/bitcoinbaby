@@ -151,7 +151,7 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
 function hexToBytes(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
   }
   return bytes;
 }
@@ -181,7 +181,7 @@ function utxoIdToBytes(utxoStr: string): Uint8Array {
   const bytes = new Uint8Array(36);
   // Reverse txid bytes (Bitcoin display order)
   for (let i = 0; i < 32; i++) {
-    bytes[i] = parseInt(txidHex.substr((31 - i) * 2, 2), 16);
+    bytes[i] = parseInt(txidHex.substring((31 - i) * 2, (31 - i) * 2 + 2), 16);
   }
   // Index as little-endian u32
   bytes[32] = index & 0xff;

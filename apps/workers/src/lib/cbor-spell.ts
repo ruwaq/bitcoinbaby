@@ -109,7 +109,7 @@ function utxoIdToBytes(utxoStr: string): Uint8Array {
   // First 32 bytes: txid (hex to bytes, REVERSED)
   // Bitcoin txids are displayed in reverse byte order
   for (let i = 0; i < 32; i++) {
-    bytes[i] = parseInt(txidHex.substr((31 - i) * 2, 2), 16);
+    bytes[i] = parseInt(txidHex.substring((31 - i) * 2, (31 - i) * 2 + 2), 16);
   }
 
   // Last 4 bytes: index as little-endian u32
@@ -473,7 +473,7 @@ function bytesToBase64(bytes: Uint8Array): string {
 export function hexToBytes(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
   }
   return bytes;
 }

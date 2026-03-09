@@ -489,34 +489,35 @@ nftRouter.post(
     try {
       const redis = getRedis(c.env);
 
-      // Get current count
-      const currentCount = await redis.get<number>("nft:minted:count");
+      // Atomic release using Lua script to prevent race conditions
+      // Only decrements if tokenId matches current count AND NFT not confirmed
+      const luaScript = `
+        local currentCount = tonumber(redis.call('GET', KEYS[1]) or '0')
+        local tokenId = tonumber(ARGV[1])
+        if currentCount ~= tokenId then
+          return 'not_last_id'
+        end
+        local nftExists = redis.call('EXISTS', KEYS[2])
+        if nftExists == 1 then
+          return 'already_confirmed'
+        end
+        redis.call('DECR', KEYS[1])
+        return 'released'
+      `;
 
-      // Only decrement if this is the last reserved ID and it's not confirmed
-      if (currentCount === tokenId) {
-        // Check if this ID was already confirmed (has NFT data)
-        const nftData = await redis.hgetall(`nft:minted:${tokenId}`);
-        if (nftData && Object.keys(nftData).length > 0) {
-          // Already confirmed, don't release
-          return successResponse(c, {
-            released: false,
-            reason: "already_confirmed",
-          });
-        }
+      const result = await redis.eval(
+        luaScript,
+        [`nft:minted:count`, `nft:minted:${tokenId}`],
+        [tokenId.toString()],
+      );
 
-        // Safe to release - decrement counter
-        await redis.decr("nft:minted:count");
+      if (result === "released") {
         nftLogger.info("Released token ID", { tokenId });
         return successResponse(c, { released: true });
       }
 
-      // Not the last ID - can't release safely (would create gaps)
-      // This is OK - gaps are acceptable, we just try to avoid them
-      nftLogger.info("Cannot release token ID (not last)", {
-        tokenId,
-        currentCount,
-      });
-      return successResponse(c, { released: false, reason: "not_last_id" });
+      nftLogger.info("Cannot release token ID", { tokenId, reason: result });
+      return successResponse(c, { released: false, reason: result as string });
     } catch (error) {
       nftLogger.error("[NFT] Release error:", error);
       return errorResponse(c, "Failed to release NFT ID", 500);
@@ -689,9 +690,8 @@ nftRouter.post("/claim", validateBody(claimNftSchema), async (c) => {
       );
     }
 
-    // Create NFT record
-    const claimCount = await redis.incr("nft:claim:count");
-    const tokenId = claimCount;
+    // Create NFT record - use same counter as minting to avoid tokenId collision
+    const tokenId = await redis.incr("nft:minted:count");
     const mintedAt = Date.now();
 
     // Generate deterministic traits based on txid (verifiable and fair)
@@ -1221,6 +1221,11 @@ nftRouter.post("/list", validateBody(listNftSchema), async (c) => {
 
 /**
  * DELETE /api/nft/unlist/:tokenId - Remove NFT listing
+ *
+ * TODO: SECURITY - Add signature verification for authentication.
+ * Currently relies on X-Wallet-Address header which can be spoofed.
+ * Should require signed message: `unlist:${tokenId}:${timestamp}`
+ * with Schnorr signature verification.
  */
 nftRouter.delete(
   "/unlist/:tokenId",

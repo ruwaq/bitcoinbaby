@@ -241,7 +241,10 @@ export class NFTMintingServiceSimple {
     const bytes = new Uint8Array(36);
     // Reverse txid bytes (Bitcoin display order)
     for (let i = 0; i < 32; i++) {
-      bytes[i] = parseInt(txidHex.substr((31 - i) * 2, 2), 16);
+      bytes[i] = parseInt(
+        txidHex.substring((31 - i) * 2, (31 - i) * 2 + 2),
+        16,
+      );
     }
     // Index as little-endian u32
     bytes[32] = index & 0xff;
@@ -255,7 +258,7 @@ export class NFTMintingServiceSimple {
   private hexToBytes(hex: string): Uint8Array {
     const bytes = new Uint8Array(hex.length / 2);
     for (let i = 0; i < hex.length; i += 2) {
-      bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+      bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
     }
     return bytes;
   }
@@ -429,7 +432,7 @@ export class NFTMintingServiceSimple {
   private async extractTxid(txHex: string): Promise<string> {
     const bytes = new Uint8Array(txHex.length / 2);
     for (let i = 0; i < txHex.length; i += 2) {
-      bytes[i / 2] = parseInt(txHex.substr(i, 2), 16);
+      bytes[i / 2] = parseInt(txHex.substring(i, i + 2), 16);
     }
     const hash1 = await crypto.subtle.digest("SHA-256", bytes);
     const hash2 = await crypto.subtle.digest("SHA-256", hash1);

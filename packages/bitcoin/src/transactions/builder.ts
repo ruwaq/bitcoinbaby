@@ -544,8 +544,14 @@ export class TransactionBuilder {
       0,
     );
 
-    // Finalize all inputs
-    psbt.finalizeAllInputs();
+    // Finalize all inputs (will fail if signatures are invalid)
+    try {
+      psbt.finalizeAllInputs();
+    } catch (error) {
+      throw new Error(
+        `PSBT finalization failed: ${error instanceof Error ? error.message : "unknown error"}`,
+      );
+    }
 
     // Extract transaction
     const tx = psbt.extractTransaction();
