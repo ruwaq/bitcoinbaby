@@ -206,11 +206,13 @@ export interface SpellV11CoinOutput {
  * V11 PoW private inputs (passed separately from spell)
  * Used with Charms CLI: --private-inputs=./private-inputs.yaml
  * Or via Prover API: app_private_inputs field
+ *
+ * IMPORTANT: Field names must match MiningWitness struct in contract
  */
 export interface PoWPrivateInputsV11 {
-  pow_challenge: string; // "timestamp:address"
-  pow_nonce: string; // Hex nonce
-  pow_difficulty: number; // Leading zero bits
+  challenge: string; // "timestamp:address"
+  nonce: string; // Hex nonce
+  difficulty: number; // Leading zero bits
 }
 
 /**

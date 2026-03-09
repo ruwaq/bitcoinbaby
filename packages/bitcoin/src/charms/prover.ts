@@ -668,25 +668,25 @@ export class CharmsProverClient {
       throw new ProverError("Request must have app_private_inputs");
     }
 
-    // Validate PoW private inputs
+    // Validate PoW private inputs (V11 uses challenge/nonce/difficulty, not pow_ prefix)
     for (const [appKey, inputs] of Object.entries(app_private_inputs)) {
-      if (!inputs.pow_challenge) {
-        throw new ProverError(`Missing pow_challenge for app ${appKey}`);
+      if (!inputs.challenge) {
+        throw new ProverError(`Missing challenge for app ${appKey}`);
       }
 
-      if (!inputs.pow_nonce) {
-        throw new ProverError(`Missing pow_nonce for app ${appKey}`);
+      if (!inputs.nonce) {
+        throw new ProverError(`Missing nonce for app ${appKey}`);
       }
 
-      if (typeof inputs.pow_difficulty !== "number") {
+      if (typeof inputs.difficulty !== "number") {
         throw new ProverError(
-          `Missing or invalid pow_difficulty for app ${appKey}`,
+          `Missing or invalid difficulty for app ${appKey}`,
         );
       }
 
-      if (inputs.pow_difficulty < 16) {
+      if (inputs.difficulty < 16) {
         throw new ProverError(
-          `pow_difficulty must be at least 16, got ${inputs.pow_difficulty}`,
+          `difficulty must be at least 16, got ${inputs.difficulty}`,
         );
       }
     }
@@ -900,9 +900,9 @@ export class CharmsProverClient {
 
     for (const [appKey, inputs] of Object.entries(request.app_private_inputs)) {
       const result = await validatePoWBeforeProver(
-        inputs.pow_challenge,
-        inputs.pow_nonce,
-        inputs.pow_difficulty,
+        inputs.challenge,
+        inputs.nonce,
+        inputs.difficulty,
       );
 
       if (!result.valid) {
@@ -914,7 +914,7 @@ export class CharmsProverClient {
       this.log(`V11 pre-prover validation passed for ${appKey}`, {
         hash: result.computedHash?.slice(0, 16) + "...",
         leadingZeros: result.computedLeadingZeros,
-        difficulty: inputs.pow_difficulty,
+        difficulty: inputs.difficulty,
       });
     }
   }

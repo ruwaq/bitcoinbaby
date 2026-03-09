@@ -515,7 +515,7 @@ export function validateAmountForSpell(amount: bigint): void {
  *
  * This is the primary method for BABTC mining:
  * 1. Miner finds valid PoW (challenge:nonce -> hash with D bits)
- * 2. Creates spell with pow_challenge, pow_nonce, pow_difficulty
+ * 2. Creates spell with challenge, nonce, difficulty
  * 3. Contract validates the PoW and mints tokens
  */
 export interface TokenMintParamsV9 {
@@ -677,7 +677,7 @@ export interface TokenMintParamsV11 {
  * This is the current format for creating mint spells.
  * Uses BRO-style reward calculation based on difficulty.
  *
- * NOTE: Private inputs (pow_challenge, pow_nonce, pow_difficulty)
+ * NOTE: Private inputs (challenge, nonce, difficulty)
  * are NOT included in the spell - they're passed separately to the prover.
  *
  * @example
@@ -731,10 +731,11 @@ export function createBABTCMintSpellV11(params: TokenMintParamsV11): {
   };
 
   // Create private inputs (passed separately to prover)
+  // Field names must match MiningWitness struct in contract
   const privateInputs: PoWPrivateInputsV11 = {
-    pow_challenge: params.challenge,
-    pow_nonce: params.nonce,
-    pow_difficulty: params.difficulty,
+    challenge: params.challenge,
+    nonce: params.nonce,
+    difficulty: params.difficulty,
   };
 
   // Create full prover request
