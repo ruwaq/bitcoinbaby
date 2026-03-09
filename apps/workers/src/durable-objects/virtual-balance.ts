@@ -387,6 +387,9 @@ export class VirtualBalanceDO extends DurableObject<Env> {
           if (action === "update-claim-status") {
             return this.handleUpdateClaimStatus(request);
           }
+          if (action === "cancel-claim") {
+            return this.handleCancelClaim(request);
+          }
           break;
 
         case "DELETE":
@@ -1491,11 +1494,12 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       return this.errorResponse("Address required", 400);
     }
 
-    // Check for pending claims
+    // Auto-cancel any existing pending claims (allows user to start fresh)
+    // This is more user-friendly than blocking with 409
     const pendingClaims = this.sql
       .exec(
         `SELECT id FROM claims
-         WHERE address = ? AND status IN ('prepared', 'broadcast')
+         WHERE address = ? AND status = 'prepared'
          AND expires_at > ?`,
         this.address,
         Date.now(),
@@ -1503,8 +1507,39 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       .toArray();
 
     if (pendingClaims.length > 0) {
+      // Cancel old pending claims and release their proofs
+      for (const claim of pendingClaims) {
+        const claimId = claim.id as string;
+        this.sql.exec(
+          `UPDATE claims SET status = 'cancelled' WHERE id = ?`,
+          claimId,
+        );
+        // Release proofs that were locked to this claim
+        this.sql.exec(
+          `UPDATE mining_proofs SET claim_id = NULL WHERE claim_id = ?`,
+          claimId,
+        );
+        balanceLogger.info("Auto-cancelled pending claim for new prepare", {
+          address: this.address,
+          cancelledClaimId: claimId,
+        });
+      }
+    }
+
+    // Block if there's a broadcast claim (TX already sent, can't cancel)
+    const broadcastClaims = this.sql
+      .exec(
+        `SELECT id FROM claims
+         WHERE address = ? AND status = 'broadcast'
+         AND expires_at > ?`,
+        this.address,
+        Date.now(),
+      )
+      .toArray();
+
+    if (broadcastClaims.length > 0) {
       return this.errorResponse(
-        "You have a pending claim. Complete or wait for it to expire.",
+        "You have a broadcast claim waiting for confirmation. Please wait for it to complete.",
         409,
       );
     }
@@ -1750,6 +1785,111 @@ export class VirtualBalanceDO extends DurableObject<Env> {
   }
 
   /**
+   * POST /balance/{address}/cancel-claim - Cancel a pending claim
+   *
+   * Allows users to cancel claims that are still in 'prepared' status.
+   * Releases the locked proofs so they can be claimed again.
+   */
+  private async handleCancelClaim(request: Request): Promise<Response> {
+    if (!this.address) {
+      return this.errorResponse("Address required", 400);
+    }
+
+    const body = (await request.json()) as {
+      claimId?: string;
+    };
+
+    // If no claimId provided, cancel all pending claims for this address
+    if (!body.claimId) {
+      const pendingClaims = this.sql
+        .exec(
+          `SELECT id FROM claims WHERE address = ? AND status = 'prepared'`,
+          this.address,
+        )
+        .toArray();
+
+      if (pendingClaims.length === 0) {
+        return this.errorResponse("No pending claims to cancel", 404);
+      }
+
+      let cancelledCount = 0;
+      for (const claim of pendingClaims) {
+        const claimId = claim.id as string;
+        this.sql.exec(
+          `UPDATE claims SET status = 'cancelled' WHERE id = ?`,
+          claimId,
+        );
+        this.sql.exec(
+          `UPDATE mining_proofs SET claim_id = NULL WHERE claim_id = ?`,
+          claimId,
+        );
+        cancelledCount++;
+      }
+
+      balanceLogger.info("Cancelled all pending claims", {
+        address: this.address,
+        count: cancelledCount,
+      });
+
+      const response: ApiResponse<{ cancelled: number }> = {
+        success: true,
+        data: { cancelled: cancelledCount },
+        timestamp: Date.now(),
+      };
+
+      return Response.json(response);
+    }
+
+    // Cancel specific claim
+    const claimRows = this.sql
+      .exec(
+        `SELECT status FROM claims WHERE id = ? AND address = ?`,
+        body.claimId,
+        this.address,
+      )
+      .toArray();
+
+    if (claimRows.length === 0) {
+      return this.errorResponse("Claim not found", 404);
+    }
+
+    const status = claimRows[0].status as ClaimStatus;
+
+    // Only allow cancelling 'prepared' claims
+    if (status !== "prepared") {
+      return this.errorResponse(
+        `Cannot cancel claim in status: ${status}. Only 'prepared' claims can be cancelled.`,
+        400,
+      );
+    }
+
+    // Cancel the claim
+    this.sql.exec(
+      `UPDATE claims SET status = 'cancelled' WHERE id = ?`,
+      body.claimId,
+    );
+
+    // Release the proofs
+    this.sql.exec(
+      `UPDATE mining_proofs SET claim_id = NULL WHERE claim_id = ?`,
+      body.claimId,
+    );
+
+    balanceLogger.info("Claim cancelled", {
+      address: this.address,
+      claimId: body.claimId,
+    });
+
+    const response: ApiResponse<{ cancelled: boolean; claimId: string }> = {
+      success: true,
+      data: { cancelled: true, claimId: body.claimId },
+      timestamp: Date.now(),
+    };
+
+    return Response.json(response);
+  }
+
+  /**
    * GET /balance/{address}/claim-status/{claimId} - Get claim status
    */
   private handleGetClaimStatus(claimId: string): Response {
@@ -1905,6 +2045,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       "completed",
       "failed",
       "expired",
+      "cancelled",
     ];
 
     if (!validStatuses.includes(body.status)) {

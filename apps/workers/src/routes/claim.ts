@@ -329,6 +329,54 @@ claimRouter.get(
 );
 
 /**
+ * POST /api/claim/cancel - Cancel a pending claim
+ *
+ * Allows users to cancel claims that are in 'prepared' status.
+ * This releases the locked proofs so they can be included in a new claim.
+ */
+claimRouter.post(
+  "/cancel",
+  validateBody(
+    z.object({
+      address: bitcoinAddressSchema,
+      claimId: z.string().uuid().optional(),
+    }),
+  ),
+  async (c) => {
+    const { address, claimId } = c.get("validatedBody");
+
+    try {
+      const stub = getVirtualBalanceStub(c.env, address);
+      const response = await forwardToDO(
+        stub,
+        `/balance/${address}/cancel-claim`,
+        {
+          method: "POST",
+          body: { claimId },
+        },
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return errorResponse(c, errorText, mapStatusCode(response.status));
+      }
+
+      const result = await response.json();
+
+      claimLogger.info("Claim cancelled", {
+        address,
+        claimId: claimId || "all",
+      });
+
+      return Response.json(result);
+    } catch (error) {
+      claimLogger.error("Failed to cancel claim", error);
+      return errorResponse(c, "Failed to cancel claim", 500);
+    }
+  },
+);
+
+/**
  * POST /api/claim/mint - Complete minting after TX confirmation
  *
  * Called after the user's claim TX is confirmed on Bitcoin.

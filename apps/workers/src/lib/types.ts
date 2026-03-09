@@ -412,7 +412,8 @@ export type ClaimStatus =
   | "minting" // Submitting to Charms prover
   | "completed" // Tokens minted successfully
   | "failed" // Failed at any step
-  | "expired"; // User never submitted TX (24h timeout)
+  | "expired" // User never submitted TX (24h timeout)
+  | "cancelled"; // User cancelled the claim
 
 /**
  * User's claimable balance
