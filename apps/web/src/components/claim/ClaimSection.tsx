@@ -97,10 +97,11 @@ export function ClaimSection() {
   const adaptedSignAndBroadcast = useCallback(
     async (psbtHex: string): Promise<{ success: boolean; txid: string }> => {
       const txid = await signAndBroadcast(psbtHex);
-      return {
-        success: txid !== null,
-        txid: txid ?? "",
-      };
+      if (!txid) {
+        // Explicit failure - don't return empty string
+        return { success: false, txid: "" };
+      }
+      return { success: true, txid };
     },
     [signAndBroadcast],
   );

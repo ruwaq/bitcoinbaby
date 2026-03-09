@@ -152,6 +152,14 @@ export function useWalletConnection(): UseWalletConnectionReturn {
           // Extract raw tx from signed PSBT
           const { Psbt } = await import("@bitcoinbaby/bitcoin");
           const psbt = Psbt.fromHex(signedHex);
+
+          // Finalize PSBT if not already finalized
+          try {
+            psbt.finalizeAllInputs();
+          } catch {
+            // Already finalized or partial - continue
+          }
+
           const rawTxHex = psbt.extractTransaction().toHex();
 
           return await storeBroadcastTx(rawTxHex);

@@ -228,9 +228,11 @@ export function useClaim({
 
     try {
       // Build the claim transaction with OP_RETURN
+      // Use API fee rate from balance, or default to 5 sat/vB
+      const feeRate = claimableBalance?.feeRate ?? 5;
       const txBuilder = createTransactionBuilder({
         network: "testnet4",
-        feeRate: preparedClaim.claimData.estimatedFee > 0 ? 5 : 5, // Use API fee rate
+        feeRate,
         enableRBF: true,
       });
 
@@ -297,6 +299,7 @@ export function useClaim({
     publicKey,
     apiUrl,
     refreshBalance,
+    claimableBalance,
   ]);
 
   // Trigger minting after TX is confirmed

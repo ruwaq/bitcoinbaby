@@ -159,6 +159,12 @@ export class MempoolClient implements BlockchainAPI {
       },
       body: txHex,
     });
+
+    // Validate response is a valid txid (64 lowercase hex chars)
+    if (!/^[a-f0-9]{64}$/.test(response)) {
+      throw new MempoolAPIError(`Broadcast failed: ${response}`, 400);
+    }
+
     return response;
   }
 
