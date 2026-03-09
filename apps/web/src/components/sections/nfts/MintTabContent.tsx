@@ -29,6 +29,7 @@ interface MintTabContentProps {
   isLoadingAttempts?: boolean;
   hasPendingAttempts?: boolean;
   onRefreshAttempts?: () => void;
+  onClearFailedAttempts?: () => void;
   // Actions
   onMintClick: () => void;
   onMintAnother: () => void;
@@ -54,6 +55,7 @@ export function MintTabContent({
   isLoadingAttempts = false,
   hasPendingAttempts = false,
   onRefreshAttempts,
+  onClearFailedAttempts,
   onMintClick,
   onMintAnother,
   onViewCollection,
@@ -93,6 +95,7 @@ export function MintTabContent({
           isLoading={isLoadingAttempts}
           onRefresh={onRefreshAttempts}
           hasPending={hasPendingAttempts}
+          onClearFailed={onClearFailedAttempts}
         />
       )}
 

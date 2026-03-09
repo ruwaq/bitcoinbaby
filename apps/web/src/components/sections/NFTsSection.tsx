@@ -170,6 +170,7 @@ export function NFTsSection() {
             isLoadingAttempts={mintAttempts.isLoading}
             hasPendingAttempts={mintAttempts.hasPending}
             onRefreshAttempts={mintAttempts.refresh}
+            onClearFailedAttempts={mintAttempts.clearFailed}
             onMintClick={handleMintClick}
             onMintAnother={handleMintAnother}
             onViewCollection={handleViewCollection}

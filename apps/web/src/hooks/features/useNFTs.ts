@@ -128,6 +128,7 @@ export interface UseNFTsReturn {
     hasPending: boolean;
     hasFailed: boolean;
     refresh: () => Promise<void>;
+    clearFailed: () => void;
   };
 
   // Wallet address
@@ -211,6 +212,7 @@ export function useNFTs(): UseNFTsReturn {
     hasPending: hasPendingAttempts,
     hasFailed: hasFailedAttempts,
     refresh: refreshAttempts,
+    clearFailed: clearFailedAttempts,
   } = useMintAttempts({ address: walletAddress });
 
   // NFT Sale hook for pricing
@@ -347,6 +349,7 @@ export function useNFTs(): UseNFTsReturn {
       hasPending: hasPendingAttempts,
       hasFailed: hasFailedAttempts,
       refresh: refreshAttempts,
+      clearFailed: clearFailedAttempts,
     },
 
     walletAddress,

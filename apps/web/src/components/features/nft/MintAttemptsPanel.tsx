@@ -16,6 +16,7 @@ interface MintAttemptsPanelProps {
   isLoading: boolean;
   onRefresh: () => void;
   hasPending: boolean;
+  onClearFailed?: () => void;
 }
 
 // Status display info
@@ -88,8 +89,10 @@ export function MintAttemptsPanel({
   isLoading,
   onRefresh,
   hasPending,
+  onClearFailed,
 }: MintAttemptsPanelProps) {
   const { config } = useNetworkStore();
+  const hasFailed = failedAttempts.length > 0;
 
   // Don't show if no attempts
   if (attempts.length === 0) {
@@ -136,16 +139,26 @@ export function MintAttemptsPanel({
         </div>
 
         {/* Summary badges */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-4">
           {pendingAttempts.length > 0 && (
             <span className="font-pixel text-[8px] px-2 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30">
               {pendingAttempts.length} Pending
             </span>
           )}
-          {failedAttempts.length > 0 && (
-            <span className="font-pixel text-[8px] px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30">
-              {failedAttempts.length} Failed
-            </span>
+          {hasFailed && (
+            <>
+              <span className="font-pixel text-[8px] px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30">
+                {failedAttempts.length} Failed
+              </span>
+              {onClearFailed && (
+                <button
+                  onClick={onClearFailed}
+                  className="font-pixel text-[8px] px-2 py-1 bg-red-500/10 text-red-300 border border-red-500/30 hover:bg-red-500/20 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </>
           )}
         </div>
 
@@ -167,7 +180,9 @@ export function MintAttemptsPanel({
                 {/* Header */}
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-pixel text-sm text-pixel-text">
-                    Token #{attempt.tokenId}
+                    {attempt.status === "confirmed"
+                      ? `Token #${attempt.tokenId}`
+                      : "Minting..."}
                   </span>
                   <span
                     className={`font-pixel text-[8px] px-2 py-0.5 rounded ${statusInfo.color}`}
