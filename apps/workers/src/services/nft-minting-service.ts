@@ -267,16 +267,30 @@ export class NFTMintingService {
       },
     };
 
+    // Prover expects spell as hex-encoded JSON string
+    const spellJson = JSON.stringify(spell);
+    const spellHex = this.stringToHex(spellJson);
+
     // Full prover request with funding info
-    // Per docs.charms.dev: spell is object, chain is required
     return {
-      spell,
+      spell: spellHex,
       chain: "bitcoin",
       // No app_private_inputs needed for NFT genesis
       funding_utxo: `${request.fundingUtxo.txid}:${request.fundingUtxo.vout}`,
       funding_utxo_value: request.fundingUtxo.value,
       change_address: request.ownerAddress,
     };
+  }
+
+  /**
+   * Convert string to hex
+   */
+  private stringToHex(str: string): string {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(str);
+    return Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
   }
 
   /**

@@ -249,7 +249,10 @@ export class BatchMintingService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 120_000); // 2 min timeout
 
-      // Per docs.charms.dev: spell is object, chain and change_address are required
+      // Prover expects spell as hex-encoded JSON string
+      const spellJson = JSON.stringify(spell);
+      const spellHex = this.stringToHex(spellJson);
+
       const response = await fetch(`${this.proverUrl}/prove`, {
         method: "POST",
         headers: {
@@ -257,7 +260,7 @@ export class BatchMintingService {
           "User-Agent": "BitcoinBaby/1.0",
         },
         body: JSON.stringify({
-          spell,
+          spell: spellHex,
           chain: "bitcoin",
           change_address: this.treasuryAddress,
         }),
@@ -352,6 +355,17 @@ export class BatchMintingService {
       maxRecipientsPerBatch: this.maxRecipientsPerBatch,
       minBatchSize: this.minBatchSize,
     };
+  }
+
+  /**
+   * Convert string to hex
+   */
+  private stringToHex(str: string): string {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(str);
+    return Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
   }
 }
 

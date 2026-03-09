@@ -420,9 +420,13 @@ export class CharmsProverClient {
     try {
       const proveEndpoint = getProveEndpoint(this.proverUrl);
 
-      // Per docs.charms.dev: add chain field for Bitcoin
+      // Prover expects spell as hex-encoded JSON string
+      const spellJson = JSON.stringify(request.spell);
+      const spellHex = this.stringToHex(spellJson);
+
       const proverPayload = {
         ...request,
+        spell: spellHex,
         chain: "bitcoin",
       };
 
@@ -898,6 +902,17 @@ export class CharmsProverClient {
     if (this.debug) {
       proverLog.debug(message, data as Record<string, unknown>);
     }
+  }
+
+  /**
+   * Convert string to hex
+   */
+  private stringToHex(str: string): string {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(str);
+    return Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
   }
 }
 

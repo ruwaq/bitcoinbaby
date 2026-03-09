@@ -202,9 +202,12 @@ export class ClaimMintingService {
       },
     };
 
-    // Per docs.charms.dev: spell is object, chain and change_address are required
+    // Prover expects spell as hex-encoded JSON string
+    const spellJson = JSON.stringify(spell);
+    const spellHex = this.stringToHex(spellJson);
+
     return {
-      spell,
+      spell: spellHex,
       chain: "bitcoin",
       change_address: request.address,
       app_private_inputs: {
@@ -222,6 +225,17 @@ export class ClaimMintingService {
         },
       },
     };
+  }
+
+  /**
+   * Convert string to hex
+   */
+  private stringToHex(str: string): string {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(str);
+    return Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
   }
 
   /**
