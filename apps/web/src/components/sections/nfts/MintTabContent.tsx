@@ -1,7 +1,7 @@
 "use client";
 
 import { PendingTransactions } from "@bitcoinbaby/ui";
-import { NFTMintFlow } from "@/components/features/nft";
+import { NFTMintFlow, type MintStep } from "@/components/features/nft";
 import type { PendingTransaction } from "@bitcoinbaby/core";
 import type { BabyNFTState } from "@bitcoinbaby/bitcoin";
 
@@ -9,12 +9,14 @@ type MintState = "info" | "confirming" | "minting" | "revealing" | "success";
 
 interface MintTabContentProps {
   mintState: MintState;
+  currentStep?: MintStep;
   isWalletConnected: boolean;
   formattedPrice: string;
   canMint: boolean;
   error: string | null;
   lastMinted: BabyNFTState | null;
   txid: string | null;
+  commitTxid?: string | null;
   pendingTransactions: PendingTransaction[];
   onMintClick: () => void;
   onMintAnother: () => void;
@@ -25,12 +27,14 @@ interface MintTabContentProps {
 
 export function MintTabContent({
   mintState,
+  currentStep,
   isWalletConnected,
   formattedPrice,
   canMint,
   error,
   lastMinted,
   txid,
+  commitTxid,
   pendingTransactions,
   onMintClick,
   onMintAnother,
@@ -83,11 +87,13 @@ export function MintTabContent({
 
       <NFTMintFlow
         state={mintState === "confirming" ? "info" : mintState}
+        currentStep={currentStep}
         formattedPrice={formattedPrice}
         canMint={canMint}
         isWalletConnected={isWalletConnected}
         lastMinted={lastMinted}
         txid={txid}
+        commitTxid={commitTxid}
         onMintClick={onMintClick}
         onMintAnother={onMintAnother}
         onViewCollection={onViewCollection}

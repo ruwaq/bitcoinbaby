@@ -154,12 +154,14 @@ export function NFTsSection() {
         {activeTab === "mint" && (
           <MintTabContent
             mintState={mintState}
+            currentStep={minting.currentStep}
             isWalletConnected={minting.isWalletConnected}
             formattedPrice={minting.price.formatted}
             canMint={minting.canMint}
             error={minting.error}
             lastMinted={minting.lastMinted}
             txid={minting.txid}
+            commitTxid={minting.commitTxid}
             pendingTransactions={pendingTransactions}
             onMintClick={handleMintClick}
             onMintAnother={handleMintAnother}

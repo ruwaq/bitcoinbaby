@@ -8,7 +8,7 @@ import {
   type NFTRecord,
   type NFTListingWithNFT,
 } from "@bitcoinbaby/core";
-import { useMintNFT } from "@/hooks/useMintNFT";
+import { useMintNFT, type MintStep } from "@/hooks/useMintNFT";
 import { useNFTSync, useInvalidateNFTs } from "@/hooks/useNFTSync";
 import { useClaimNFT } from "@/hooks/useClaimNFT";
 import { useVirtualBalance } from "@/hooks/useVirtualBalance";
@@ -57,6 +57,8 @@ export interface UseNFTsReturn {
     error: string | null;
     lastMinted: BabyNFTState | null;
     txid: string | null;
+    commitTxid: string | null;
+    currentStep: MintStep;
     reset: () => void;
     canMint: boolean;
     isWalletConnected: boolean;
@@ -146,6 +148,8 @@ export function useNFTs(): UseNFTsReturn {
     error: mintError,
     lastMinted,
     txid,
+    commitTxid,
+    currentStep,
     mint,
     reset: resetMint,
     canMint,
@@ -264,6 +268,8 @@ export function useNFTs(): UseNFTsReturn {
       error: mintError,
       lastMinted,
       txid,
+      commitTxid,
+      currentStep,
       reset: resetMint,
       canMint,
       isWalletConnected,
