@@ -30,5 +30,6 @@ export {
   createWithdrawTransaction,
   createSendTransaction,
   createMintNFTTransaction,
+  createClaimTransaction,
   type TransactionDetails,
 } from "./TransactionConfirmModal";

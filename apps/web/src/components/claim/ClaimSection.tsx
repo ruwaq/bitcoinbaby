@@ -8,7 +8,12 @@
  */
 
 import { useState, useMemo, useCallback } from "react";
-import { PixelCard, PixelButton } from "@bitcoinbaby/ui";
+import {
+  PixelCard,
+  PixelButton,
+  TransactionConfirmModal,
+  createClaimTransaction,
+} from "@bitcoinbaby/ui";
 import { useNetworkStore } from "@bitcoinbaby/core";
 import { TransactionBuilder } from "@bitcoinbaby/bitcoin";
 import { useWalletConnection } from "@/hooks/useWalletConnection";
@@ -103,6 +108,11 @@ export function ClaimSection() {
   const [activeTab, setActiveTab] = useState<"claim" | "history">("claim");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [txidInput, setTxidInput] = useState("");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [broadcastResult, setBroadcastResult] = useState<{
+    success: boolean;
+    txid?: string;
+  } | null>(null);
 
   const {
     claimableBalance,
@@ -145,12 +155,32 @@ export function ClaimSection() {
     await prepareClaim();
   };
 
-  // Handle auto-broadcast (one-click claim)
-  const handleAutoBroadcast = async () => {
+  // Show confirmation modal before broadcasting
+  const handleShowConfirmModal = () => {
+    setBroadcastResult(null);
+    setShowConfirmModal(true);
+  };
+
+  // Handle confirmed broadcast (after user confirms in modal)
+  const handleConfirmedBroadcast = async () => {
+    setShowConfirmModal(false);
     const txid = await broadcastClaimTx();
     if (txid) {
       setTxidInput("");
+      setBroadcastResult({ success: true, txid });
+    } else {
+      setBroadcastResult({ success: false });
     }
+  };
+
+  // Close modal without broadcasting
+  const handleCancelModal = () => {
+    setShowConfirmModal(false);
+  };
+
+  // Clear broadcast result and start fresh
+  const handleDismissResult = () => {
+    setBroadcastResult(null);
   };
 
   // Handle confirm claim (manual txid entry)
@@ -418,19 +448,72 @@ export function ClaimSection() {
                     )}
                   </div>
 
+                  {/* Broadcast Success Result */}
+                  {broadcastResult?.success && broadcastResult.txid && (
+                    <div className="bg-green-500/20 border border-green-500/50 rounded p-4">
+                      <p className="text-sm text-green-400 font-pixel mb-2">
+                        TRANSACTION BROADCAST
+                      </p>
+                      <p className="text-xs text-gray-300 mb-3">
+                        Your claim transaction has been broadcast to the Bitcoin
+                        network. Tokens will be minted after confirmation
+                        (~10-30 min).
+                      </p>
+                      <div className="bg-pixel-bg-dark/50 rounded p-2 mb-3">
+                        <p className="text-xs text-gray-400 mb-1">
+                          Transaction ID:
+                        </p>
+                        <a
+                          href={`${config.explorerUrl}/tx/${broadcastResult.txid}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-pixel-secondary hover:underline font-mono break-all"
+                        >
+                          {broadcastResult.txid}
+                        </a>
+                      </div>
+                      <PixelButton
+                        onClick={handleDismissResult}
+                        variant="secondary"
+                        className="w-full"
+                      >
+                        Done
+                      </PixelButton>
+                    </div>
+                  )}
+
+                  {/* Broadcast Failed Result */}
+                  {broadcastResult && !broadcastResult.success && (
+                    <div className="bg-red-500/20 border border-red-500/50 rounded p-4">
+                      <p className="text-sm text-red-400 font-pixel mb-2">
+                        BROADCAST FAILED
+                      </p>
+                      <p className="text-xs text-gray-300 mb-3">
+                        The transaction could not be broadcast. Please try again
+                        or check your wallet connection.
+                      </p>
+                      <PixelButton
+                        onClick={handleDismissResult}
+                        variant="secondary"
+                        className="w-full"
+                      >
+                        Try Again
+                      </PixelButton>
+                    </div>
+                  )}
+
                   {/* Auto-broadcast option (preferred) */}
-                  {canAutoBroadcast && (
+                  {canAutoBroadcast && !broadcastResult && (
                     <div className="bg-green-500/10 border border-green-500/30 rounded p-3">
                       <p className="text-xs text-green-400 font-pixel mb-2">
                         ONE-CLICK CLAIM
                       </p>
                       <p className="text-xs text-gray-300 mb-3">
-                        Click the button below to automatically create and
-                        broadcast the claim transaction using your connected
-                        wallet.
+                        Click the button below to review and confirm your claim
+                        transaction.
                       </p>
                       <PixelButton
-                        onClick={handleAutoBroadcast}
+                        onClick={handleShowConfirmModal}
                         disabled={isBroadcasting || isConfirming}
                         className="w-full"
                       >
@@ -589,6 +672,30 @@ export function ClaimSection() {
           </p>
         </div>
       </PixelCard>
+
+      {/* Transaction Confirmation Modal */}
+      {preparedClaim && (
+        <TransactionConfirmModal
+          isOpen={showConfirmModal}
+          transaction={createClaimTransaction({
+            tokenAmount: formatBalance(BigInt(preparedClaim.tokenAmount)),
+            netTokens: preparedClaim.netTokens
+              ? formatBalance(BigInt(preparedClaim.netTokens))
+              : undefined,
+            proofCount: preparedClaim.proofCount,
+            networkFee: preparedClaim.estimatedFee,
+            feeRate: preparedClaim.claimData.estimatedFee > 0 ? 5 : undefined,
+            platformFeePercent: preparedClaim.platformFeePercent,
+            platformFeeTokens: preparedClaim.platformFeeTokens
+              ? formatBalance(BigInt(preparedClaim.platformFeeTokens))
+              : undefined,
+            fromAddress: address ?? "",
+          })}
+          isLoading={isBroadcasting}
+          onConfirm={handleConfirmedBroadcast}
+          onCancel={handleCancelModal}
+        />
+      )}
     </div>
   );
 }

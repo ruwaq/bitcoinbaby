@@ -19,6 +19,7 @@ export interface TransactionDetails {
     | "withdraw"
     | "send"
     | "stake"
+    | "claim"
     | "custom";
   /** Title for the modal */
   title: string;
@@ -81,6 +82,7 @@ export const TransactionConfirmModal: FC<TransactionConfirmModalProps> = ({
       case "evolve":
         return "sparkle";
       case "withdraw":
+      case "claim":
         return "coin";
       case "stake":
         return "heart";
@@ -421,6 +423,70 @@ export function createMintNFTTransaction(params: {
     recipient: params.toAddress,
     estimatedTime: "~10-30 minutes",
     warning: "NFT mints are final and cannot be reversed",
+  };
+}
+
+/**
+ * Create claim transaction details
+ */
+export function createClaimTransaction(params: {
+  tokenAmount: string;
+  netTokens?: string;
+  proofCount: number;
+  networkFee: number;
+  feeRate?: number;
+  platformFeePercent?: number;
+  platformFeeTokens?: string;
+  fromAddress: string;
+}): TransactionDetails {
+  const netAmount = params.netTokens ?? params.tokenAmount;
+  const costs: TransactionDetails["costs"] = [];
+
+  // Show gross amount if there's a platform fee
+  if (params.platformFeePercent && params.platformFeePercent > 0) {
+    costs.push({
+      label: "Gross Tokens",
+      amount: `${params.tokenAmount} $BABTC`,
+      sublabel: `${params.proofCount} proofs`,
+    });
+    costs.push({
+      label: `Platform Fee (${params.platformFeePercent}%)`,
+      amount: `-${params.platformFeeTokens ?? "0"} $BABTC`,
+      sublabel: "supports development",
+    });
+    costs.push({
+      label: "You Receive",
+      amount: `${netAmount} $BABTC`,
+    });
+  } else {
+    costs.push({
+      label: "Tokens to Claim",
+      amount: `${netAmount} $BABTC`,
+      sublabel: `${params.proofCount} proofs`,
+    });
+  }
+
+  return {
+    type: "claim",
+    title: "Claim Mining Rewards",
+    description:
+      "Convert your mining work into $BABTC tokens. This will create a Bitcoin transaction that mints your tokens.",
+    steps: [
+      "Build claim transaction with your mining proofs",
+      "Sign transaction with your wallet",
+      "Broadcast to Bitcoin network",
+      "Tokens minted after confirmation (~10-30 min)",
+    ],
+    costs,
+    totalSats: params.networkFee,
+    formattedTotal: `${netAmount} $BABTC`,
+    feeEstimate: params.feeRate
+      ? `${params.networkFee} sats (${params.feeRate} sat/vB)`
+      : `${params.networkFee} sats`,
+    source: params.fromAddress,
+    estimatedTime: "~10-30 minutes",
+    additionalInfo:
+      "You pay the Bitcoin network fee. This transaction cannot be reversed once broadcast.",
   };
 }
 
