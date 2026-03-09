@@ -34,7 +34,7 @@ import type {
 
 const API_ENDPOINTS = {
   development: "http://localhost:8787",
-  production: "https://bitcoinbaby-api-prod.andeanlabs-58f.workers.dev",
+  production: "https://bitcoinbaby-api.andeanlabs-58f.workers.dev",
 } as const;
 
 type Environment = keyof typeof API_ENDPOINTS;

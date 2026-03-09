@@ -329,7 +329,7 @@ class SyncManager {
       const baseUrl =
         typeof window !== "undefined" &&
         window.location.hostname !== "localhost"
-          ? "https://bitcoinbaby-api-prod.andeanlabs-58f.workers.dev"
+          ? "https://bitcoinbaby-api.andeanlabs-58f.workers.dev"
           : "http://localhost:8787";
       const response = await fetch(`${baseUrl}/health`, { method: "GET" });
 
@@ -761,7 +761,7 @@ class SyncManager {
     // Use the same API URL as the main API client
     const apiUrl =
       typeof window !== "undefined" && window.location.hostname !== "localhost"
-        ? "https://bitcoinbaby-api-prod.andeanlabs-58f.workers.dev"
+        ? "https://bitcoinbaby-api.andeanlabs-58f.workers.dev"
         : "http://localhost:8787";
 
     // Fire and forget - wrap in try-catch and don't await

@@ -10,7 +10,7 @@ import { useState, useEffect, useCallback } from "react";
 // Workers API URL from environment or default
 const WORKERS_API_URL =
   process.env.NEXT_PUBLIC_WORKERS_API_URL ||
-  "https://bitcoinbaby-api.workers.dev";
+  "https://bitcoinbaby-api.andeanlabs-58f.workers.dev";
 
 export type SystemStatus =
   | "operational"

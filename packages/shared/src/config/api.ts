@@ -25,7 +25,7 @@ export interface ApiEndpoints {
  */
 export const WORKERS_API = {
   development: "http://localhost:8787",
-  production: "https://bitcoinbaby-api-prod.andeanlabs-58f.workers.dev",
+  production: "https://bitcoinbaby-api.andeanlabs-58f.workers.dev",
   test: "http://localhost:8787",
 } as const;
 

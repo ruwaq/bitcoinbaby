@@ -75,7 +75,7 @@ function getBoolEnv(key: string, fallback: boolean = false): boolean {
 
 const DEFAULTS = {
   WORKERS_API_DEV: "http://localhost:8787",
-  WORKERS_API_PROD: "https://bitcoinbaby-api-prod.andeanlabs-58f.workers.dev",
+  WORKERS_API_PROD: "https://bitcoinbaby-api.andeanlabs-58f.workers.dev",
   PROVER_DEV: "http://localhost:17784",
   PROVER_PROD: "https://v11.charms.dev",
 
