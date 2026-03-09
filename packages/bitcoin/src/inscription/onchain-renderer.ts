@@ -67,9 +67,10 @@ function getDNA(){
   return'0'.repeat(64);
 }
 
-// Parse DNA to traits
+// Parse DNA to traits (with input sanitization)
 function parseDNA(d){
-  const h=d.replace(/^0x/,'').padEnd(64,'0');
+  // Sanitize: remove non-hex chars, take first 64, pad if needed
+  const h=d.replace(/^0x/,'').replace(/[^0-9a-fA-F]/g,'').slice(0,64).padEnd(64,'0');
   return{
     baseType:parseInt(h[0],16)%8,
     bloodline:parseInt(h[1],16)%4,
@@ -119,11 +120,16 @@ const BLOOD_ACC={
   mystic:'<polygon points="8,-3 3,3 13,3" fill="#aa44ff" stroke="#551188" stroke-width="0.3"/><polygon points="8,-1 8.5,0 9.5,0 8.7,0.5 9,1 8,0.5 7,1 7.3,0.5 6.5,0 7.5,0" fill="#ffcc00"/>'
 };
 
-// SVG element helpers
+// Escape HTML attribute values to prevent XSS
+function esc(v){
+  return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// SVG element helpers (with XSS protection)
 function el(tag,attrs,children){
   let s='<'+tag;
   for(let k in attrs){
-    if(attrs[k]!==undefined)s+=' '+k+'="'+attrs[k]+'"';
+    if(attrs[k]!==undefined)s+=' '+k+'="'+esc(attrs[k])+'"';
   }
   if(children!==undefined){
     s+='>'+children+'</'+tag+'>';

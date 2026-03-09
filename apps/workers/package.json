@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@bitcoinbaby/shared": "workspace:*",
+    "@noble/secp256k1": "^3.0.0",
     "@upstash/redis": "^1.36.3",
     "cbor2": "^2.3.0",
     "hono": "^4.0.0",

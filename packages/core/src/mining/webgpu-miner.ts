@@ -177,45 +177,8 @@ export class WebGPUMiner implements Miner {
   }
 
   private async buildPipeline(): Promise<void> {
-    const device = this.device!;
-
-    // Create persistent buffers
-    this.uniformBuffer = device.createBuffer({
-      label: "mining-params",
-      size: 32,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-
-    this.bestDigestBuffer = device.createBuffer({
-      label: "best-digest",
-      size: 32,
-      usage:
-        GPUBufferUsage.STORAGE |
-        GPUBufferUsage.COPY_SRC |
-        GPUBufferUsage.COPY_DST,
-    });
-
-    this.bestInfoBuffer = device.createBuffer({
-      label: "best-info",
-      size: 16,
-      usage:
-        GPUBufferUsage.STORAGE |
-        GPUBufferUsage.COPY_SRC |
-        GPUBufferUsage.COPY_DST,
-    });
-
-    // Read-back buffers
-    this.readDigestBuffer = device.createBuffer({
-      label: "read-digest",
-      size: 32,
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-    });
-
-    this.readInfoBuffer = device.createBuffer({
-      label: "read-info",
-      size: 16,
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-    });
+    // Buffers are now created in prepareChallenge() to avoid redundant creation
+    // This method is kept for potential future initialization logic
   }
 
   /**
@@ -628,12 +591,8 @@ export class WebGPUMiner implements Miner {
   terminate(): void {
     this.stop();
     this.shouldRecover = false; // Prevent recovery after explicit termination
-    this.challengeBuffer?.destroy();
-    this.uniformBuffer?.destroy();
-    this.bestDigestBuffer?.destroy();
-    this.bestInfoBuffer?.destroy();
-    this.readDigestBuffer?.destroy();
-    this.readInfoBuffer?.destroy();
+    // Use cleanupBuffers for proper unmap handling
+    this.cleanupBuffers();
     this.device?.destroy();
     this.device = null;
   }
@@ -720,14 +679,31 @@ export class WebGPUMiner implements Miner {
 
   /**
    * Clean up GPU buffers without destroying device
+   * IMPORTANT: Properly handles mapped buffers to prevent memory leaks
    */
   private cleanupBuffers(): void {
-    this.challengeBuffer?.destroy();
-    this.uniformBuffer?.destroy();
-    this.bestDigestBuffer?.destroy();
-    this.bestInfoBuffer?.destroy();
-    this.readDigestBuffer?.destroy();
-    this.readInfoBuffer?.destroy();
+    // Helper to safely destroy a buffer (unmap first if needed)
+    const safeDestroy = (buffer: GPUBuffer | null) => {
+      if (!buffer) return;
+      try {
+        // GPUBuffer.mapState tells us if buffer is mapped
+        // If mapped, unmap before destroying to prevent memory leak
+        if (buffer.mapState === "mapped") {
+          buffer.unmap();
+        }
+        buffer.destroy();
+      } catch (e) {
+        // Buffer may already be destroyed or in invalid state
+        log.debug("Buffer cleanup warning", { error: e });
+      }
+    };
+
+    safeDestroy(this.challengeBuffer);
+    safeDestroy(this.uniformBuffer);
+    safeDestroy(this.bestDigestBuffer);
+    safeDestroy(this.bestInfoBuffer);
+    safeDestroy(this.readDigestBuffer);
+    safeDestroy(this.readInfoBuffer);
 
     this.challengeBuffer = null;
     this.uniformBuffer = null;

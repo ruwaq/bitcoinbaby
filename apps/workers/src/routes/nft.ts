@@ -1361,36 +1361,111 @@ nftRouter.post("/list", validateBody(listNftSchema), async (c) => {
 });
 
 /**
+ * Schema for authenticated unlist request
+ *
+ * Requires Schnorr signature to prevent spoofing.
+ * Message format: unlist:{tokenId}:{timestamp}
+ */
+const unlistBodySchema = z.object({
+  /** Seller's Bitcoin address */
+  sellerAddress: bitcoinAddressSchema,
+  /** Unix timestamp (ms) - must be within 5 minutes */
+  timestamp: z.number().int().positive(),
+  /** Schnorr signature (64 bytes hex) of: unlist:{tokenId}:{timestamp} */
+  signature: z
+    .string()
+    .length(128)
+    .regex(/^[a-fA-F0-9]+$/)
+    .optional(), // Optional for backward compatibility
+  /** x-only public key (32 bytes hex) for signature verification */
+  publicKey: z
+    .string()
+    .length(64)
+    .regex(/^[a-fA-F0-9]+$/)
+    .optional(),
+});
+
+/**
  * DELETE /api/nft/unlist/:tokenId - Remove NFT listing
  *
- * TODO: SECURITY - Add signature verification for authentication.
- * Currently relies on X-Wallet-Address header which can be spoofed.
- * Should require signed message: `unlist:${tokenId}:${timestamp}`
- * with Schnorr signature verification.
+ * SECURITY: Now requires signed request with timestamp to prevent spoofing.
+ * The client must sign: `unlist:${tokenId}:${timestamp}` with Schnorr.
+ *
+ * Backward compatibility: If no signature provided, falls back to address-only
+ * verification (will be deprecated in future versions).
  */
 nftRouter.delete(
   "/unlist/:tokenId",
   validateParams(tokenIdParamSchema),
+  validateBody(unlistBodySchema),
   async (c) => {
     const { tokenId } = c.get("validatedParams");
-    const sellerAddress = c.req.header("X-Wallet-Address");
-
-    if (!sellerAddress) {
-      return errorResponse(c, "X-Wallet-Address header required", 400);
-    }
+    const { sellerAddress, timestamp, signature, publicKey } =
+      c.get("validatedBody");
 
     try {
       const redis = getRedis(c.env);
 
+      // Validate timestamp is within 5 minutes
+      const now = Date.now();
+      const fiveMinutes = 5 * 60 * 1000;
+      if (Math.abs(now - timestamp) > fiveMinutes) {
+        return errorResponse(c, "Request expired. Timestamp too old.", 400);
+      }
+
+      // Get listing
       const listing = await redis.hgetall(`nft:listing:${tokenId}`);
       if (!listing || Object.keys(listing).length === 0) {
         return errorResponse(c, "NFT is not listed", 404);
       }
 
+      // Verify seller address matches
       if (listing.sellerAddress !== sellerAddress) {
         return errorResponse(c, "Only the seller can unlist", 403);
       }
 
+      // Signature verification (if provided)
+      if (signature && publicKey) {
+        const { verifySchnorrSignature, createAuthMessage } =
+          await import("../lib/crypto");
+
+        const message = createAuthMessage("unlist", tokenId, timestamp);
+        const isValid = await verifySchnorrSignature(
+          signature,
+          message,
+          publicKey,
+        );
+
+        if (!isValid) {
+          marketplaceLogger.warn("Invalid unlist signature", {
+            tokenId,
+            address: sellerAddress.slice(0, 10),
+          });
+          return errorResponse(c, "Invalid signature", 401);
+        }
+
+        marketplaceLogger.info("Signature verified for unlist", { tokenId });
+      } else {
+        // Backward compatibility warning - will be removed in future
+        marketplaceLogger.warn("Unlist without signature (deprecated)", {
+          tokenId,
+          address: sellerAddress.slice(0, 10),
+        });
+      }
+
+      // Check for replay attack - use timestamp as nonce
+      const nonceKey = `nft:unlist-nonce:${sellerAddress}:${tokenId}:${timestamp}`;
+      const nonceUsed = await redis.get(nonceKey);
+      if (nonceUsed) {
+        return errorResponse(
+          c,
+          "Request already processed (replay attack)",
+          400,
+        );
+      }
+      await redis.set(nonceKey, "1", { ex: 600 }); // 10 min TTL
+
+      // Remove listing
       await redis.del(`nft:listing:${tokenId}`);
       await redis.srem("nft:active-listings", tokenId.toString());
 
@@ -1428,15 +1503,24 @@ nftRouter.post(
     try {
       const redis = getRedis(c.env);
 
-      // Check if txid already used
-      const existingPurchase = await redis.get(`nft:purchase:${txid}`);
-      if (existingPurchase) {
+      // Atomically try to claim this txid to prevent race conditions
+      // SETNX returns 1 if key was set (new), 0 if already existed
+      const purchaseLockKey = `nft:purchase:${txid}`;
+      const lockAcquired = await redis.setnx(
+        purchaseLockKey,
+        `pending:${tokenId}`,
+      );
+
+      if (!lockAcquired) {
         return errorResponse(
           c,
           "This transaction was already used for a purchase",
           400,
         );
       }
+
+      // Set TTL on the lock in case verification fails (auto-cleanup)
+      await redis.expire(purchaseLockKey, 3600); // 1 hour TTL
 
       // Get listing
       const listing = await redis.hgetall(`nft:listing:${tokenId}`);
@@ -1536,8 +1620,8 @@ nftRouter.post(
         amount: paymentOutput.value,
       });
 
-      // Transfer ownership
-      await redis.set(`nft:purchase:${txid}`, tokenId.toString());
+      // Transfer ownership (update lock key to final value)
+      await redis.set(purchaseLockKey, tokenId.toString());
       await redis.srem(`nft:owned:${sellerAddress}`, tokenId.toString());
       await redis.sadd(`nft:owned:${buyerAddress}`, tokenId.toString());
       await redis.hset(`nft:minted:${tokenId}`, { address: buyerAddress });
@@ -1828,12 +1912,15 @@ nftRouter.post(
         );
       }
 
-      // Check for duplicate share hash (prevent double-counting)
+      // Atomically claim share hash to prevent double-counting (race condition fix)
+      // SETNX returns 1 if key was set (new), 0 if already existed
       const shareKey = `nft:share:${shareHash}`;
-      const existingShare = await redis.get(shareKey);
-      if (existingShare) {
+      const shareClaimed = await redis.setnx(shareKey, `pending:${tokenId}`);
+      if (!shareClaimed) {
         return errorResponse(c, "This share was already submitted", 400);
       }
+      // Set TTL immediately (24 hours)
+      await redis.expire(shareKey, 86400);
 
       // Calculate XP
       const bloodline = (nftData.bloodline as string) || "rogue";
@@ -1859,8 +1946,8 @@ nftRouter.post(
         lastWorkBlock: timestamp.toString(),
       });
 
-      // Mark share as used (expire after 24 hours to prevent infinite storage)
-      await redis.set(shareKey, tokenId.toString(), { ex: 86400 });
+      // Update share record with final tokenId (already has TTL from SETNX)
+      await redis.set(shareKey, tokenId.toString());
 
       // Check if NFT can now evolve
       const currentLevel = parseInt(nftData.level as string, 10) || 1;

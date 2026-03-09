@@ -283,6 +283,9 @@ export class MiningOrchestrator {
 
   /**
    * Stop the active miner
+   *
+   * Thread-safe: Handles concurrent calls and in-progress operations.
+   * Sets flags atomically to ensure clean shutdown.
    */
   stop(): void {
     // Cancel any in-progress start() operation
@@ -290,15 +293,20 @@ export class MiningOrchestrator {
       this.startCancelled = true;
     }
 
-    if (!this.isRunning) {
+    // Set isRunning to false FIRST to signal other operations to abort
+    // This is checked by handleMinerError() to prevent starting new miners
+    const wasRunning = this.isRunning;
+    this.isRunning = false;
+
+    if (!wasRunning && !this.isStarting && !this.isHandlingError) {
       return;
     }
 
+    // Stop the active miner (may be null if stop called during startup)
     if (this.activeMiner) {
       this.activeMiner.stop();
     }
 
-    this.isRunning = false;
     this.events.onStatusChange?.("stopped");
   }
 
