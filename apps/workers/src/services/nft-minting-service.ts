@@ -268,9 +268,10 @@ export class NFTMintingService {
     };
 
     // Full prover request with funding info
-    // Note: Charms prover expects spell as a JSON STRING, not an object
+    // Per docs.charms.dev: spell is object, chain is required
     return {
-      spell: JSON.stringify(spell),
+      spell,
+      chain: "bitcoin",
       // No app_private_inputs needed for NFT genesis
       funding_utxo: `${request.fundingUtxo.txid}:${request.fundingUtxo.vout}`,
       funding_utxo_value: request.fundingUtxo.value,

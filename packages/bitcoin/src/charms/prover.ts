@@ -419,14 +419,20 @@ export class CharmsProverClient {
 
     try {
       const proveEndpoint = getProveEndpoint(this.proverUrl);
+
+      // Per docs.charms.dev: add chain field for Bitcoin
+      const proverPayload = {
+        ...request,
+        chain: "bitcoin",
+      };
+
       const response = await fetch(proveEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "User-Agent": "BitcoinBaby/1.0",
         },
-        // V11 request format: spell + app_private_inputs + funding info
-        body: JSON.stringify(request),
+        body: JSON.stringify(proverPayload),
         signal: controller.signal,
       });
 

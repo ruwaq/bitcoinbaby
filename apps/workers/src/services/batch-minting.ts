@@ -249,14 +249,18 @@ export class BatchMintingService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 120_000); // 2 min timeout
 
-      // Note: Charms prover expects spell as a JSON STRING, not an object
+      // Per docs.charms.dev: spell is object, chain and change_address are required
       const response = await fetch(`${this.proverUrl}/prove`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "User-Agent": "BitcoinBaby/1.0",
         },
-        body: JSON.stringify({ spell: JSON.stringify(spell) }),
+        body: JSON.stringify({
+          spell,
+          chain: "bitcoin",
+          change_address: this.treasuryAddress,
+        }),
         signal: controller.signal,
       });
 

@@ -202,9 +202,11 @@ export class ClaimMintingService {
       },
     };
 
-    // Note: Charms prover expects spell as a JSON STRING, not an object
+    // Per docs.charms.dev: spell is object, chain and change_address are required
     return {
-      spell: JSON.stringify(spell),
+      spell,
+      chain: "bitcoin",
+      change_address: request.address,
       app_private_inputs: {
         [appKey]: {
           // Server-signed claim data
