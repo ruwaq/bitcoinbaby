@@ -47,8 +47,8 @@ export function middleware(request: NextRequest) {
     "font-src 'self' https://fonts.gstatic.com",
     // Images
     "img-src 'self' data: blob:",
-    // API connections - Bitcoin network APIs + Workers API
-    "connect-src 'self' https://mempool.space https://scrolls.charms.dev https://*.workers.dev wss://mempool.space",
+    // API connections - Bitcoin network APIs + Workers API + Charms APIs
+    "connect-src 'self' https://mempool.space https://scrolls.charms.dev https://*.workers.dev wss://mempool.space https://charms-explorer-api.fly.dev https://v11.charms.dev",
     // Web Workers for mining
     "worker-src 'self' blob:",
     // Prevent framing (clickjacking protection)

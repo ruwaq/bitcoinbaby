@@ -185,23 +185,26 @@ export class ClaimMintingService {
     const appKey = `t/${this.appId}/${this.appVk}`;
 
     // V11 spell format for server-signed claims
-    return {
-      spell: {
-        version: 11,
-        tx: {
-          // Input: reference the claim TX (proves user paid fees)
-          ins: [`${request.claimTxid}:0`],
-          // Output: all tokens go to the user
-          outs: [
-            {
-              "0": parseInt(request.tokenAmount, 10),
-            },
-          ],
-        },
-        app_public_inputs: {
-          [appKey]: null,
-        },
+    const spell = {
+      version: 11,
+      tx: {
+        // Input: reference the claim TX (proves user paid fees)
+        ins: [`${request.claimTxid}:0`],
+        // Output: all tokens go to the user
+        outs: [
+          {
+            "0": parseInt(request.tokenAmount, 10),
+          },
+        ],
       },
+      app_public_inputs: {
+        [appKey]: null,
+      },
+    };
+
+    // Note: Charms prover expects spell as a JSON STRING, not an object
+    return {
+      spell: JSON.stringify(spell),
       app_private_inputs: {
         [appKey]: {
           // Server-signed claim data
