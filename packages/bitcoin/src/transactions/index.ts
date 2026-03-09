@@ -37,3 +37,6 @@ export {
   calculateSpellSize,
   validateSpell,
 } from "./spell-encoder";
+
+// PSBT Utilities
+export { rawTxToPsbt, type FundingUtxo } from "./psbt-utils";

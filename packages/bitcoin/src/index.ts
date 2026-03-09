@@ -320,6 +320,9 @@ export {
   createSpellOpReturn,
   calculateSpellSize,
   validateSpell,
+  // PSBT Utilities
+  rawTxToPsbt,
+  type FundingUtxo,
   // Types
   type TxUTXO,
   type TxInput,

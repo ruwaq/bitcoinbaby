@@ -25,6 +25,7 @@ import {
 } from "@bitcoinbaby/core";
 import {
   createMempoolClient,
+  rawTxToPsbt,
   type Bloodline,
   type BaseType,
   type RarityTier,
@@ -400,7 +401,7 @@ export function useMintNFT(): UseMintNFTReturn {
 
       // Step 5: Handle spell transaction
       if (spellIsPsbt) {
-        // PSBT needs signing
+        // Already a PSBT - sign directly
         setCurrentStep("signing_spell");
         console.log("[MintNFT] Signing spell PSBT...");
 
@@ -410,8 +411,34 @@ export function useMintNFT(): UseMintNFTReturn {
         }
         finalSpellHex = signed;
       } else {
-        // Raw transaction from V11 prover - ready to broadcast
-        console.log("[MintNFT] Spell is raw TX, skipping signing (V11 prover)");
+        // Raw transaction from V11 prover - convert to PSBT and sign
+        setCurrentStep("signing_spell");
+        console.log("[MintNFT] Converting raw TX to PSBT for signing...");
+
+        try {
+          const psbtHex = await rawTxToPsbt(
+            spellTxHex,
+            fundingUtxo,
+            wallet.address,
+            mempoolClient,
+          );
+          console.log("[MintNFT] PSBT created, requesting wallet signature...");
+
+          const signed = await signPsbt(psbtHex);
+          if (!signed) {
+            throw new Error("Spell transaction signing was cancelled");
+          }
+          finalSpellHex = signed;
+          console.log("[MintNFT] Spell transaction signed successfully");
+        } catch (convertError) {
+          console.error(
+            "[MintNFT] Failed to convert/sign raw TX:",
+            convertError,
+          );
+          throw new Error(
+            `Failed to sign transaction: ${convertError instanceof Error ? convertError.message : "Unknown error"}`,
+          );
+        }
       }
 
       // Step 6: Broadcast commit transaction (if present)
