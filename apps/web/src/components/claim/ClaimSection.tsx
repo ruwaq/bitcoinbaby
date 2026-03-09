@@ -113,7 +113,9 @@ export function ClaimSection() {
   const [broadcastResult, setBroadcastResult] = useState<{
     success: boolean;
     txid?: string;
+    claimId?: string;
   } | null>(null);
+  const [mintingClaimId, setMintingClaimId] = useState<string | null>(null);
 
   const {
     claimableBalance,
@@ -123,6 +125,7 @@ export function ClaimSection() {
     isPreparing,
     isConfirming,
     isBroadcasting,
+    isMinting,
     claimError,
     claimHistory,
     isLoadingHistory,
@@ -131,6 +134,7 @@ export function ClaimSection() {
     prepareClaim,
     broadcastClaimTx,
     confirmClaim,
+    triggerMint,
     loadHistory,
     clearPreparedClaim,
   } = useClaim({
@@ -165,12 +169,28 @@ export function ClaimSection() {
   // Handle confirmed broadcast (after user confirms in modal)
   const handleConfirmedBroadcast = async () => {
     setShowConfirmModal(false);
+    const claimId = preparedClaim?.claimData.proof.nonce;
     const txid = await broadcastClaimTx();
-    if (txid) {
+    if (txid && claimId) {
       setTxidInput("");
-      setBroadcastResult({ success: true, txid });
+      setBroadcastResult({ success: true, txid, claimId });
+      // Refresh history to show new claim
+      await loadHistory();
     } else {
       setBroadcastResult({ success: false });
+    }
+  };
+
+  // Trigger mint for a broadcast claim
+  const handleTriggerMint = async (claimId: string, claimTxid: string) => {
+    setMintingClaimId(claimId);
+    try {
+      const success = await triggerMint(claimId, claimTxid);
+      if (success) {
+        await loadHistory();
+      }
+    } finally {
+      setMintingClaimId(null);
     }
   };
 
@@ -649,6 +669,23 @@ export function ClaimSection() {
                           View TX
                         </a>
                       )}
+                      {/* Mint button for broadcast/confirmed claims */}
+                      {(claim.status === "broadcast" ||
+                        claim.status === "confirmed") &&
+                        claim.claimTxid && (
+                          <PixelButton
+                            onClick={() =>
+                              handleTriggerMint(claim.id, claim.claimTxid!)
+                            }
+                            disabled={mintingClaimId === claim.id || isMinting}
+                            size="sm"
+                            className="mt-2 w-full"
+                          >
+                            {mintingClaimId === claim.id
+                              ? "Minting..."
+                              : "Mint Now"}
+                          </PixelButton>
+                        )}
                     </div>
                   </div>
                 ))}
