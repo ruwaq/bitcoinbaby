@@ -2081,13 +2081,15 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         body.claimId,
         this.address,
       );
-    } else if (body.status === "failed" && body.error) {
+    } else if (body.status === "failed") {
+      // Always save error message when failed, default to "Unknown error" if not provided
+      const errorMsg = body.error || "Minting failed - no details available";
       this.sql.exec(
         `UPDATE claims
          SET status = ?, error = ?
          WHERE id = ? AND address = ?`,
         body.status,
-        body.error,
+        errorMsg,
         body.claimId,
         this.address,
       );
