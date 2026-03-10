@@ -51,6 +51,7 @@ export function ModalManager() {
       <ModalDialog
         open={activeOverlay === "unlock-wallet"}
         onOpenChange={(open) => !open && closeOverlay()}
+        accessibleTitle="Unlock Wallet"
       >
         <UnlockWalletModal />
       </ModalDialog>
@@ -63,6 +64,7 @@ export function ModalManager() {
           activeOverlay === "delete-wallet"
         }
         onOpenChange={(open) => !open && closeOverlay()}
+        accessibleTitle="Confirm Action"
       >
         <ConfirmActionModal />
       </ModalDialog>
@@ -72,6 +74,7 @@ export function ModalManager() {
         open={activeOverlay === "recovery-phrase"}
         onOpenChange={(open) => !open && closeOverlay()}
         preventClose
+        accessibleTitle="Recovery Phrase"
       >
         <RecoveryPhraseModal />
       </ModalDialog>
@@ -80,6 +83,7 @@ export function ModalManager() {
       <ModalDialog
         open={activeOverlay === "change-password"}
         onOpenChange={(open) => !open && closeOverlay()}
+        accessibleTitle="Change Password"
       >
         <ChangePasswordModal />
       </ModalDialog>

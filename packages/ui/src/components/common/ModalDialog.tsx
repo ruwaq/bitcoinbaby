@@ -8,6 +8,7 @@
  */
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { clsx } from "clsx";
 
 interface ModalDialogProps {
@@ -16,6 +17,8 @@ interface ModalDialogProps {
   children: React.ReactNode;
   /** Prevent closing on overlay click */
   preventClose?: boolean;
+  /** Accessible title for screen readers (hidden visually) */
+  accessibleTitle?: string;
 }
 
 export function ModalDialog({
@@ -23,6 +26,7 @@ export function ModalDialog({
   onOpenChange,
   children,
   preventClose = false,
+  accessibleTitle = "Dialog",
 }: ModalDialogProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -36,6 +40,7 @@ export function ModalDialog({
           )}
         />
         <DialogPrimitive.Content
+          aria-describedby={undefined}
           onPointerDownOutside={(e) => {
             if (preventClose) {
               e.preventDefault();
@@ -61,6 +66,9 @@ export function ModalDialog({
             "duration-200",
           )}
         >
+          <VisuallyHidden.Root asChild>
+            <DialogPrimitive.Title>{accessibleTitle}</DialogPrimitive.Title>
+          </VisuallyHidden.Root>
           {children}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

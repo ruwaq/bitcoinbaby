@@ -15,6 +15,7 @@
   "dependencies": {
     "@bitcoinbaby/core": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-visually-hidden": "^1.2.4",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "qrcode.react": "^4.2.0",
