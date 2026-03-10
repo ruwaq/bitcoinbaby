@@ -15,6 +15,10 @@ import {
 } from "../lib/cbor-spell";
 import type { ClaimStatus } from "../lib/types";
 import { getMempoolService } from "./mempool-service";
+import {
+  BABTC_V2_CONTRACT_VK,
+  BABTC_V2_CONTRACT_BINARY,
+} from "../lib/babtc-v2-contract-binary";
 
 // =============================================================================
 // TYPES
@@ -72,18 +76,17 @@ const RETRY_DELAY_BASE_MS = 5000;
 export class ClaimMintingService {
   private proverUrl: string;
   private appId: string;
-  private appVk: string;
   private network: "mainnet" | "testnet" | "testnet4";
 
   constructor(config: {
     proverUrl?: string;
     appId: string;
-    appVk: string;
+    appVk?: string; // Deprecated: V2 uses BABTC_V2_CONTRACT_VK from binary
     network?: "mainnet" | "testnet" | "testnet4";
   }) {
     this.proverUrl = config.proverUrl || DEFAULT_CHARMS_PROVER_URL;
     this.appId = config.appId;
-    this.appVk = config.appVk;
+    // Note: appVk is ignored - we use BABTC_V2_CONTRACT_VK directly
     this.network = config.network || "testnet4";
   }
 
@@ -208,7 +211,8 @@ export class ClaimMintingService {
     request: MintRequest,
     claimTxHex: string,
   ): ProverRequest {
-    const appKey = `t/${this.appId}/${this.appVk}`;
+    // Use V2 contract VK for appKey - must match the binary we're sending
+    const appKey = `t/${this.appId}/${BABTC_V2_CONTRACT_VK}`;
 
     // Convert address to script pubkey for coins
     const userScriptPubkey = addressToScriptPubkey(request.address);
@@ -239,21 +243,24 @@ export class ClaimMintingService {
       },
     };
 
-    // Build prover request with CBOR-encoded spell and prev_txs
+    // Build prover request with CBOR-encoded spell, prev_txs, and binaries
     return buildProverRequest(spell, {
       changeAddress: request.address,
       feeRate: 2.0,
       chain: "bitcoin",
       prevTxs: [claimTxHex], // Required by v11 prover
+      // Include the BABTC contract binary - required by prover to verify spell
+      binaries: {
+        [BABTC_V2_CONTRACT_VK]: BABTC_V2_CONTRACT_BINARY,
+      },
       appPrivateInputs: {
         [appKey]: {
-          // Server-signed claim data
-          claim_type: "aggregated",
+          // ClaimWitness format for BABTC V2 contract
           address: request.address,
-          total_work: request.totalWork,
+          total_work: parseInt(request.totalWork, 10),
           proof_count: request.proofCount,
           merkle_root: request.merkleRoot,
-          token_amount: request.tokenAmount,
+          token_amount: parseInt(request.tokenAmount, 10),
           timestamp: request.timestamp,
           nonce: request.nonce,
           server_signature: request.serverSignature,
@@ -411,7 +418,7 @@ let mintingServiceInstance: ClaimMintingService | null = null;
 export function getClaimMintingService(config: {
   proverUrl?: string;
   appId: string;
-  appVk: string;
+  appVk?: string; // Deprecated: V2 uses BABTC_V2_CONTRACT_VK from binary
   network?: "mainnet" | "testnet" | "testnet4";
 }): ClaimMintingService {
   if (!mintingServiceInstance) {

@@ -25,6 +25,8 @@ import {
   migrateDecimalNoncesToHex,
   needsLowDifficultyCleanup,
   cleanupLowDifficultyShares,
+  needsMissingBlockDataCleanup,
+  cleanupMissingBlockDataShares,
   type QueuedShare,
   type QueueStats,
 } from "./share-queue";
@@ -78,11 +80,11 @@ export type SyncEventHandler = (event: SyncEvent) => void;
 // =============================================================================
 
 const DEFAULT_CONFIG: SyncManagerConfig = {
-  syncInterval: 3000, // Faster sync for large queues
+  syncInterval: 5000, // 5 seconds between sync cycles
   healthCheckInterval: 30000,
-  maxConcurrent: 5, // Increased parallelism
+  maxConcurrent: 2, // Reduced parallelism to avoid rate limits
   maxRetries: 10,
-  batchSize: 50, // Process more shares per cycle (50 × 5 parallel = 250/cycle)
+  batchSize: 10, // Process fewer shares per cycle (10 × 2 = 20/cycle max)
 };
 
 class SyncManager {
@@ -139,6 +141,7 @@ class SyncManager {
     // Run migrations (one-time fixes)
     this.runMigrationIfNeeded();
     this.runLowDifficultyCleanupIfNeeded();
+    this.runMissingBlockDataCleanupIfNeeded();
 
     // Start sync loop
     if (!this.syncTimer) {
@@ -226,6 +229,30 @@ class SyncManager {
   }
 
   /**
+   * Clean up old shares without blockData
+   *
+   * Shares without blockData cannot be validated by the server.
+   * This cleanup removes them to prevent repeated sync failures.
+   */
+  private async runMissingBlockDataCleanupIfNeeded(): Promise<void> {
+    try {
+      const needs = await needsMissingBlockDataCleanup();
+      if (!needs) {
+        console.log("[SyncManager] No missing-blockData cleanup needed");
+        return;
+      }
+
+      console.log("[SyncManager] Cleaning up shares without blockData...");
+      const result = await cleanupMissingBlockDataShares();
+      console.log(
+        `[SyncManager] Cleanup complete: ${result.deleted} shares deleted, ${result.remaining} remaining`,
+      );
+    } catch (error) {
+      console.error("[SyncManager] Missing blockData cleanup failed:", error);
+    }
+  }
+
+  /**
    * Stop the sync manager
    */
   stop(): void {
@@ -287,6 +314,14 @@ class SyncManager {
         );
         this.lastRejectedLogTime = now;
       }
+      return { queued: false, duplicate: false };
+    }
+
+    // Reject shares with missing blockData (server requires it for validation)
+    if (!share.blockData || share.blockData.trim() === "") {
+      console.warn(
+        "[SyncManager] Share rejected: missing blockData. Cannot validate proof without original challenge:nonce data.",
+      );
       return { queued: false, duplicate: false };
     }
 

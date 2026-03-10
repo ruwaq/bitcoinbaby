@@ -787,3 +787,71 @@ export async function needsLowDifficultyCleanup(): Promise<boolean> {
 
   return count > 0;
 }
+
+// =============================================================================
+// MIGRATION: Clean up shares without blockData
+// =============================================================================
+
+/**
+ * MIGRATION: Clean up shares without blockData
+ *
+ * Shares without blockData will be rejected by the server (validation error).
+ * This migration removes them from the queue to prevent repeated failed syncs.
+ *
+ * Note: blockData is not indexed, so we filter in memory.
+ *
+ * @returns Number of shares deleted
+ */
+export async function cleanupMissingBlockDataShares(): Promise<{
+  deleted: number;
+  remaining: number;
+}> {
+  const database = getDB();
+
+  try {
+    // Get all pending shares and filter for missing blockData
+    const allShares = await database.shares.toArray();
+    const invalidShares = allShares.filter(
+      (s) => !s.blockData || s.blockData.trim() === "",
+    );
+
+    if (invalidShares.length === 0) {
+      console.log("[ShareQueue] No shares with missing blockData to clean up");
+      return { deleted: 0, remaining: allShares.length };
+    }
+
+    console.log(
+      `[ShareQueue] Found ${invalidShares.length} shares without blockData, cleaning up...`,
+    );
+
+    // Delete them
+    const ids = invalidShares.map((s) => s.id!);
+    await database.shares.bulkDelete(ids);
+
+    // Count remaining
+    const remaining = await database.shares.count();
+
+    console.log(
+      `[ShareQueue] Deleted ${ids.length} shares without blockData, ${remaining} remaining`,
+    );
+
+    return { deleted: ids.length, remaining };
+  } catch (error) {
+    console.error("[ShareQueue] Missing blockData cleanup failed:", error);
+    throw error;
+  }
+}
+
+/**
+ * Check if missing blockData cleanup is needed
+ */
+export async function needsMissingBlockDataCleanup(): Promise<boolean> {
+  const database = getDB();
+
+  const allShares = await database.shares.toArray();
+  const invalidCount = allShares.filter(
+    (s) => !s.blockData || s.blockData.trim() === "",
+  ).length;
+
+  return invalidCount > 0;
+}

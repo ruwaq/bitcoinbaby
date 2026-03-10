@@ -17,9 +17,159 @@ import {
 import { useNetworkStore } from "@bitcoinbaby/core";
 import { TransactionBuilder } from "@bitcoinbaby/bitcoin";
 import { useWalletConnection } from "@/hooks/useWalletConnection";
-import { useClaim } from "@/hooks/useClaim";
+import { useClaim, type ClaimStatus } from "@/hooks/useClaim";
 import { useBalance } from "@/hooks/useBalance";
+import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { formatBalance, formatDate } from "@/utils/format";
+
+// =============================================================================
+// CLAIM PROGRESS STEPPER
+// =============================================================================
+
+interface ClaimStep {
+  id: string;
+  label: string;
+  description: string;
+}
+
+const CLAIM_STEPS: ClaimStep[] = [
+  { id: "prepare", label: "Prepare", description: "Aggregating proofs" },
+  { id: "sign", label: "Sign", description: "Sign transaction" },
+  { id: "broadcast", label: "Broadcast", description: "Send to network" },
+  { id: "confirm", label: "Confirm", description: "Wait for block" },
+  { id: "mint", label: "Mint", description: "ZK proof generation" },
+];
+
+function getStepFromStatus(status: ClaimStatus): number {
+  switch (status) {
+    case "idle":
+    case "loading-balance":
+      return -1;
+    case "preparing":
+      return 0;
+    case "ready-to-broadcast":
+      return 1;
+    case "broadcasting":
+      return 2;
+    case "waiting-confirmation":
+    case "confirming":
+      return 3;
+    case "minting":
+      return 4;
+    case "completed":
+      return 5;
+    case "error":
+      return -2;
+    default:
+      return -1;
+  }
+}
+
+function ClaimProgressStepper({
+  status,
+  error,
+}: {
+  status: ClaimStatus;
+  error?: string | null;
+}) {
+  const currentStep = getStepFromStatus(status);
+
+  if (currentStep < 0 && status !== "error") return null;
+
+  return (
+    <div className="bg-pixel-bg-dark/50 rounded p-4 mb-4">
+      <p className="text-xs text-gray-400 mb-3 font-pixel">CLAIM PROGRESS</p>
+
+      {/* Progress bar */}
+      <div className="relative mb-4">
+        <div className="h-2 bg-pixel-bg-dark rounded-full overflow-hidden">
+          <div
+            className={`h-full transition-all duration-500 ${
+              status === "error"
+                ? "bg-red-500"
+                : status === "completed"
+                  ? "bg-green-500"
+                  : "bg-pixel-primary"
+            }`}
+            style={{
+              width: `${Math.max(0, Math.min(100, (currentStep / CLAIM_STEPS.length) * 100))}%`,
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Steps */}
+      <div className="flex justify-between">
+        {CLAIM_STEPS.map((step, index) => {
+          const isActive = index === currentStep;
+          const isCompleted = index < currentStep;
+          const isPending = index > currentStep;
+
+          return (
+            <div
+              key={step.id}
+              className={`flex flex-col items-center text-center ${
+                isActive ? "scale-110" : ""
+              } transition-transform`}
+            >
+              {/* Step indicator */}
+              <div
+                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-pixel mb-1
+                  ${
+                    isCompleted
+                      ? "bg-green-500 text-white"
+                      : isActive
+                        ? "bg-pixel-primary text-white animate-pulse"
+                        : "bg-pixel-bg-dark text-gray-500"
+                  }
+                `}
+              >
+                {isCompleted ? "✓" : index + 1}
+              </div>
+
+              {/* Label */}
+              <span
+                className={`text-[10px] font-pixel ${
+                  isActive
+                    ? "text-pixel-primary"
+                    : isCompleted
+                      ? "text-green-400"
+                      : "text-gray-500"
+                }`}
+              >
+                {step.label}
+              </span>
+
+              {/* Description (only for active step) */}
+              {isActive && (
+                <span className="text-[9px] text-pixel-secondary animate-pulse mt-0.5">
+                  {step.description}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Error state */}
+      {status === "error" && error && (
+        <div className="mt-3 p-2 bg-red-500/20 rounded text-xs text-red-400">
+          <span className="font-pixel">ERROR:</span> {error}
+        </div>
+      )}
+
+      {/* Completed state */}
+      {status === "completed" && (
+        <div className="mt-3 p-2 bg-green-500/20 rounded text-xs text-green-400 text-center">
+          <span className="font-pixel">TOKENS MINTED!</span>
+          <p className="text-[10px] text-gray-400 mt-1">
+            Check your wallet balance above
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * Format work as a readable number
@@ -61,9 +211,13 @@ function ClaimStatusBadge({ status }: { status: string }) {
 /**
  * Get human-readable explanation for claim status
  */
-function getStatusExplanation(status: string): {
+function getStatusExplanation(
+  status: string,
+  error?: string | null,
+): {
   message: string;
   action?: string;
+  errorDetail?: string;
 } {
   switch (status) {
     case "prepared":
@@ -87,13 +241,37 @@ function getStatusExplanation(status: string): {
       };
     case "completed":
       return {
-        message: "Tokens successfully minted to your address",
+        message: "Tokens successfully minted to your wallet as BABTC",
       };
-    case "failed":
+    case "failed": {
+      // Parse error to give user-friendly message
+      let errorDetail = error || "Unknown error";
+      let friendlyMessage = "Minting failed";
+
+      if (
+        error?.includes("502") ||
+        error?.includes("timeout") ||
+        error?.includes("Timeout")
+      ) {
+        friendlyMessage = "Prover server temporarily unavailable";
+        errorDetail =
+          "The Charms prover is overloaded or down. This is a temporary issue.";
+      } else if (error?.includes("400")) {
+        friendlyMessage = "Invalid request";
+        errorDetail =
+          "The claim data may be corrupted. Try preparing a new claim.";
+      } else if (error?.includes("Prover failed")) {
+        friendlyMessage = "Prover service error";
+        errorDetail =
+          "The ZK proof generation failed. This is usually temporary.";
+      }
+
       return {
-        message: "Minting failed - you can retry",
-        action: "Click 'Retry' to try again",
+        message: friendlyMessage,
+        action: "Click 'Retry' to try again (prover may be available now)",
+        errorDetail,
       };
+    }
     case "expired":
       return {
         message: "Claim expired (not broadcast within time limit)",
@@ -163,10 +341,22 @@ export function ClaimSection() {
   } | null>(null);
   const [mintingClaimId, setMintingClaimId] = useState<string | null>(null);
 
+  // Get BABTC balance (tokens already claimed to wallet)
+  const {
+    confirmedBalance: babtcBalance,
+    isLoading: babtcLoading,
+    refresh: refreshBabtc,
+  } = useTokenBalance({
+    address: address ?? undefined,
+    tokenTicker: "BABTC",
+    refreshInterval: 60000,
+  });
+
   const {
     claimableBalance,
     isLoadingBalance,
     balanceError,
+    status,
     preparedClaim,
     isPreparing,
     isConfirming,
@@ -317,7 +507,37 @@ export function ClaimSection() {
 
   return (
     <div className="space-y-4">
-      {/* Balance Overview */}
+      {/* Your BABTC Wallet Balance */}
+      <PixelCard>
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-pixel text-lg text-pixel-secondary">
+              Your Wallet
+            </h2>
+            <PixelButton
+              onClick={refreshBabtc}
+              size="sm"
+              variant="secondary"
+              disabled={babtcLoading}
+            >
+              {babtcLoading ? "..." : "Refresh"}
+            </PixelButton>
+          </div>
+          <div className="bg-pixel-bg-dark/50 rounded p-4 text-center border-2 border-pixel-secondary/30">
+            <p className="text-xs text-gray-400 mb-1">
+              BABTC Balance (On-Chain)
+            </p>
+            <p className="font-pixel text-3xl text-pixel-secondary">
+              {babtcLoading ? "---" : formatBalance(babtcBalance)}
+            </p>
+            <p className="text-xs text-gray-500 mt-2">
+              Tokens claimed to your Bitcoin wallet as Charms
+            </p>
+          </div>
+        </div>
+      </PixelCard>
+
+      {/* Claimable Work Overview */}
       <PixelCard>
         <div className="p-4">
           <div className="flex items-center justify-between mb-4">
@@ -474,6 +694,9 @@ export function ClaimSection() {
       {activeTab === "claim" && (
         <PixelCard>
           <div className="p-4">
+            {/* Progress Stepper - shows during active claim flow */}
+            <ClaimProgressStepper status={status} error={claimError} />
+
             {!preparedClaim ? (
               <>
                 <h3 className="font-pixel text-sm mb-4">Prepare Claim</h3>
@@ -749,7 +972,10 @@ export function ClaimSection() {
             ) : (
               <div className="space-y-3">
                 {claimHistory.map((claim) => {
-                  const statusInfo = getStatusExplanation(claim.status);
+                  const statusInfo = getStatusExplanation(
+                    claim.status,
+                    claim.error,
+                  );
                   return (
                     <div
                       key={claim.id}
@@ -776,6 +1002,11 @@ export function ClaimSection() {
                       {/* Status explanation */}
                       <div className="mb-2 p-2 bg-pixel-bg-dark/50 rounded text-xs">
                         <p className="text-gray-300">{statusInfo.message}</p>
+                        {statusInfo.errorDetail && (
+                          <p className="text-red-400/80 mt-1 text-[10px]">
+                            {statusInfo.errorDetail}
+                          </p>
+                        )}
                         {statusInfo.action && (
                           <p className="text-pixel-secondary mt-1 font-medium">
                             {statusInfo.action}
@@ -861,16 +1092,44 @@ export function ClaimSection() {
 
       {/* Info Notice */}
       <PixelCard>
-        <div className="p-4 text-center">
-          <p className="text-xs text-pixel-secondary font-pixel mb-2">
-            HOW IT WORKS
+        <div className="p-4">
+          <p className="text-xs text-pixel-secondary font-pixel mb-3 text-center">
+            HOW CLAIMING WORKS
           </p>
-          <p className="text-xs text-gray-400">
-            Your mining proofs are aggregated into a claim. With a connected
-            wallet, click &quot;Claim Tokens&quot; to automatically create and
-            broadcast the transaction. You pay the Bitcoin network fee (~1000
-            sats). A 20% platform fee goes to the foundation to support ongoing
-            development.
+          <div className="space-y-3 text-xs text-gray-400">
+            <div className="flex gap-3">
+              <span className="text-pixel-primary font-pixel">1.</span>
+              <p>
+                <strong className="text-white">Mine</strong> - Earn $BABY tokens
+                by mining (shown in &quot;Claimable Work&quot;)
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <span className="text-pixel-primary font-pixel">2.</span>
+              <p>
+                <strong className="text-white">Claim</strong> - Click
+                &quot;Claim Tokens&quot; to create a Bitcoin transaction (~1000
+                sats fee)
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <span className="text-pixel-primary font-pixel">3.</span>
+              <p>
+                <strong className="text-white">Mint</strong> - After TX
+                confirms, tokens are minted via Charms ZK prover
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <span className="text-pixel-secondary font-pixel">4.</span>
+              <p>
+                <strong className="text-pixel-secondary">Receive</strong> -
+                BABTC tokens appear in &quot;Your Wallet&quot; above
+              </p>
+            </div>
+          </div>
+          <p className="text-[10px] text-gray-500 mt-3 text-center">
+            20% platform fee supports development. Tokens are stored on Bitcoin
+            as Charms.
           </p>
         </div>
       </PixelCard>

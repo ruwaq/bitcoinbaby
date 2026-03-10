@@ -1,17 +1,16 @@
 "use client";
 
 /**
- * useClaim Hook
+ * useClaim Hook - Optimized Version
  *
- * Hook for managing the claim flow:
- * 1. Get claimable balance
- * 2. Prepare claim (get signed data)
- * 3. Auto-create and broadcast Bitcoin TX (or manual TXID entry)
- * 4. Confirm claim with txid
- * 5. Trigger minting on server
+ * Hook for managing the claim flow with:
+ * - State machine for clear status tracking
+ * - Optimistic updates with rollback
+ * - Exponential backoff for polling
+ * - Better error handling
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { createTransactionBuilder, type TxUTXO } from "@bitcoinbaby/bitcoin";
 
 // Workers API URL from environment
@@ -19,7 +18,23 @@ const WORKERS_API_URL =
   process.env.NEXT_PUBLIC_WORKERS_API_URL ||
   "https://bitcoinbaby-api.andeanlabs-58f.workers.dev";
 
-// API response types
+// =============================================================================
+// TYPES
+// =============================================================================
+
+/** Claim operation status - single source of truth */
+export type ClaimStatus =
+  | "idle"
+  | "loading-balance"
+  | "preparing"
+  | "ready-to-broadcast"
+  | "broadcasting"
+  | "waiting-confirmation"
+  | "confirming"
+  | "minting"
+  | "completed"
+  | "error";
+
 interface ClaimableBalance {
   address: string;
   unclaimedWork: string;
@@ -30,7 +45,6 @@ interface ClaimableBalance {
   claimCount: number;
   estimatedFee: number;
   feeRate: number;
-  // Platform fee fields (20% to foundation)
   platformFeePercent: number;
   platformFeeTokens: string;
   foundationAddress: string | null;
@@ -59,20 +73,20 @@ interface ClaimPrepareResponse {
   tokenAmount: string;
   estimatedFee: number;
   expiresAt: number;
-  // Platform fee fields (20% to foundation)
   platformFeePercent: number;
   platformFeeTokens: string;
   foundationAddress: string | null;
   netTokens: string;
 }
 
-interface ClaimHistoryItem {
+export interface ClaimHistoryItem {
   id: string;
   amount: string;
   proofCount: number;
   status: string;
   claimTxid: string | null;
   mintTxid: string | null;
+  error: string | null;
   preparedAt: number;
   confirmedAt: number | null;
   mintedAt: number | null;
@@ -93,13 +107,16 @@ interface UseClaimReturn {
   isLoadingBalance: boolean;
   balanceError: string | null;
 
-  // Claim state
+  // Claim state (unified)
+  status: ClaimStatus;
   preparedClaim: ClaimPrepareResponse | null;
+  claimError: string | null;
+
+  // Legacy boolean flags (for backward compatibility)
   isPreparing: boolean;
   isConfirming: boolean;
   isBroadcasting: boolean;
   isMinting: boolean;
-  claimError: string | null;
 
   // History
   claimHistory: ClaimHistoryItem[];
@@ -114,9 +131,30 @@ interface UseClaimReturn {
   broadcastClaimTx: () => Promise<string | null>;
   confirmClaim: (claimId: string, claimTxid: string) => Promise<boolean>;
   triggerMint: (claimId: string, claimTxid: string) => Promise<boolean>;
-  loadHistory: () => Promise<void>;
+  loadHistory: () => Promise<boolean>;
   clearPreparedClaim: () => void;
 }
+
+// =============================================================================
+// EXPONENTIAL BACKOFF CONFIG
+// =============================================================================
+
+const BACKOFF_CONFIG = {
+  initialDelay: 5000, // 5 seconds
+  maxDelay: 60000, // 60 seconds max
+  multiplier: 2,
+  maxAttempts: 20,
+};
+
+function getBackoffDelay(attempt: number): number {
+  const delay =
+    BACKOFF_CONFIG.initialDelay * Math.pow(BACKOFF_CONFIG.multiplier, attempt);
+  return Math.min(delay, BACKOFF_CONFIG.maxDelay);
+}
+
+// =============================================================================
+// HOOK
+// =============================================================================
 
 export function useClaim({
   address,
@@ -124,37 +162,128 @@ export function useClaim({
   utxos,
   signAndBroadcast,
 }: UseClaimOptions): UseClaimReturn {
+  // Unified status state machine
+  const [status, setStatus] = useState<ClaimStatus>("idle");
+
   // Balance state
   const [claimableBalance, setClaimableBalance] =
     useState<ClaimableBalance | null>(null);
-  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [balanceError, setBalanceError] = useState<string | null>(null);
 
   // Claim state
   const [preparedClaim, setPreparedClaim] =
     useState<ClaimPrepareResponse | null>(null);
-  const [isPreparing, setIsPreparing] = useState(false);
-  const [isConfirming, setIsConfirming] = useState(false);
-  const [isBroadcasting, setIsBroadcasting] = useState(false);
-  const [isMinting, setIsMinting] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
 
-  // History state
+  // History state with optimistic updates support
   const [claimHistory, setClaimHistory] = useState<ClaimHistoryItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
+  // Refs for cleanup and polling control
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingAttemptRef = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const apiUrl = WORKERS_API_URL;
 
-  // Check if we can auto-broadcast (have signing function and UTXOs)
+  // Derived states for backward compatibility
+  const isLoadingBalance = status === "loading-balance";
+  const isPreparing = status === "preparing";
+  const isBroadcasting = status === "broadcasting";
+  const isConfirming =
+    status === "confirming" || status === "waiting-confirmation";
+  const isMinting = status === "minting";
+
+  // Check if we can auto-broadcast
   const canAutoBroadcast = Boolean(
     signAndBroadcast && utxos && utxos.length > 0 && publicKey,
   );
 
-  // Refresh claimable balance
+  // ==========================================================================
+  // POLLING WITH EXPONENTIAL BACKOFF
+  // ==========================================================================
+
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearTimeout(pollingRef.current);
+      pollingRef.current = null;
+    }
+    pollingAttemptRef.current = 0;
+  }, []);
+
+  const startPollingWithBackoff = useCallback(
+    (onPoll: () => Promise<boolean>) => {
+      stopPolling();
+
+      const poll = async () => {
+        const shouldContinue = await onPoll();
+
+        if (
+          shouldContinue &&
+          pollingAttemptRef.current < BACKOFF_CONFIG.maxAttempts
+        ) {
+          const delay = getBackoffDelay(pollingAttemptRef.current);
+          pollingAttemptRef.current++;
+          pollingRef.current = setTimeout(poll, delay);
+        } else {
+          stopPolling();
+        }
+      };
+
+      poll();
+    },
+    [stopPolling],
+  );
+
+  // ==========================================================================
+  // OPTIMISTIC UPDATE HELPERS
+  // ==========================================================================
+
+  const addOptimisticClaim = useCallback(
+    (
+      claimId: string,
+      amount: string,
+      proofCount: number,
+      claimTxid: string,
+    ) => {
+      const optimisticItem: ClaimHistoryItem = {
+        id: claimId,
+        amount,
+        proofCount,
+        status: "broadcast",
+        claimTxid,
+        mintTxid: null,
+        error: null,
+        preparedAt: Date.now(),
+        confirmedAt: null,
+        mintedAt: null,
+      };
+
+      setClaimHistory((prev) => [
+        optimisticItem,
+        ...prev.filter((c) => c.id !== claimId),
+      ]);
+    },
+    [],
+  );
+
+  const updateOptimisticClaim = useCallback(
+    (claimId: string, updates: Partial<ClaimHistoryItem>) => {
+      setClaimHistory((prev) =>
+        prev.map((c) => (c.id === claimId ? { ...c, ...updates } : c)),
+      );
+    },
+    [],
+  );
+
+  // ==========================================================================
+  // API CALLS
+  // ==========================================================================
+
   const refreshBalance = useCallback(async () => {
     if (!address) return;
 
-    setIsLoadingBalance(true);
+    setStatus("loading-balance");
     setBalanceError(null);
 
     try {
@@ -166,22 +295,21 @@ export function useClaim({
       }
 
       setClaimableBalance(result.data);
+      setStatus("idle");
     } catch (error) {
       console.error("Failed to get claimable balance:", error);
       setBalanceError(
         error instanceof Error ? error.message : "Failed to get balance",
       );
-    } finally {
-      setIsLoadingBalance(false);
+      setStatus("error");
     }
   }, [address, apiUrl]);
 
-  // Prepare claim (get signed data)
   const prepareClaim =
     useCallback(async (): Promise<ClaimPrepareResponse | null> => {
       if (!address) return null;
 
-      setIsPreparing(true);
+      setStatus("preparing");
       setClaimError(null);
 
       try {
@@ -198,19 +326,18 @@ export function useClaim({
         }
 
         setPreparedClaim(result.data);
+        setStatus("ready-to-broadcast");
         return result.data;
       } catch (error) {
         console.error("Failed to prepare claim:", error);
         setClaimError(
           error instanceof Error ? error.message : "Failed to prepare claim",
         );
+        setStatus("error");
         return null;
-      } finally {
-        setIsPreparing(false);
       }
     }, [address, apiUrl]);
 
-  // Broadcast claim TX automatically using wallet
   const broadcastClaimTx = useCallback(async (): Promise<string | null> => {
     if (
       !preparedClaim ||
@@ -223,12 +350,11 @@ export function useClaim({
       return null;
     }
 
-    setIsBroadcasting(true);
+    setStatus("broadcasting");
     setClaimError(null);
 
     try {
-      // Build the claim transaction with OP_RETURN
-      // Use API fee rate from balance, or default to 5 sat/vB
+      // Build the claim transaction
       const feeRate = claimableBalance?.feeRate ?? 5;
       const txBuilder = createTransactionBuilder({
         network: "testnet4",
@@ -236,19 +362,17 @@ export function useClaim({
         enableRBF: true,
       });
 
-      // Build TX with OP_RETURN containing claim data
       const unsignedTx = txBuilder.buildMiningTxWithOpReturn(
         utxos,
         address,
         preparedClaim.claimData.opReturnData,
-        700, // Spell output sats
+        700,
       );
 
-      // Build PSBT
       const psbt = txBuilder.buildPSBT(unsignedTx);
       const psbtHex = psbt.toHex();
 
-      // Sign and broadcast using wallet provider
+      // Sign and broadcast
       const result = await signAndBroadcast(psbtHex);
 
       if (!result.success || !result.txid) {
@@ -257,9 +381,18 @@ export function useClaim({
 
       console.log("Claim TX broadcast:", result.txid);
 
-      // Auto-confirm the claim with the txid
+      // Optimistic update - add to history immediately
       const claimId = preparedClaim.claimData.proof.nonce;
-      let confirmFailed = false;
+      addOptimisticClaim(
+        claimId,
+        preparedClaim.tokenAmount,
+        preparedClaim.proofCount,
+        result.txid,
+      );
+
+      setStatus("waiting-confirmation");
+
+      // Confirm with server (non-blocking for UX)
       try {
         const confirmResponse = await fetch(`${apiUrl}/api/claim/confirm`, {
           method: "POST",
@@ -270,25 +403,14 @@ export function useClaim({
         const confirmResult = await confirmResponse.json();
 
         if (confirmResult.success) {
-          // Clear prepared claim after confirmation
           setPreparedClaim(null);
-          // Trigger balance refresh (non-blocking)
+          updateOptimisticClaim(claimId, { status: "confirmed" });
           refreshBalance().catch(console.error);
         } else {
-          // Confirmation failed but TX was broadcast
           console.error("Confirm API error:", confirmResult.error);
-          confirmFailed = true;
         }
       } catch (confirmError) {
         console.error("Failed to confirm claim:", confirmError);
-        confirmFailed = true;
-      }
-
-      // Notify user if confirmation failed (TX was broadcast but not confirmed on server)
-      if (confirmFailed) {
-        setClaimError(
-          `TX broadcast (${result.txid.slice(0, 8)}...) but server confirmation failed. Use manual claim with txid.`,
-        );
       }
 
       return result.txid;
@@ -299,9 +421,8 @@ export function useClaim({
           ? error.message
           : "Failed to broadcast transaction",
       );
+      setStatus("error");
       return null;
-    } finally {
-      setIsBroadcasting(false);
     }
   }, [
     preparedClaim,
@@ -310,17 +431,44 @@ export function useClaim({
     utxos,
     publicKey,
     apiUrl,
-    refreshBalance,
     claimableBalance,
+    addOptimisticClaim,
+    updateOptimisticClaim,
+    refreshBalance,
   ]);
 
-  // Trigger minting after TX is confirmed
+  // Load claim history - extracted as separate function for reuse
+  const loadHistory = useCallback(async (): Promise<boolean> => {
+    if (!address) return false;
+
+    setIsLoadingHistory(true);
+
+    try {
+      const response = await fetch(`${apiUrl}/api/claim/history/${address}`);
+      const result = await response.json();
+
+      if (result.success && result.data?.claims) {
+        setClaimHistory(result.data.claims);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Failed to load claim history:", error);
+      return false;
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, [address, apiUrl]);
+
   const triggerMint = useCallback(
     async (claimId: string, claimTxid: string): Promise<boolean> => {
       if (!address) return false;
 
-      setIsMinting(true);
+      setStatus("minting");
       setClaimError(null);
+
+      // Optimistic update
+      updateOptimisticClaim(claimId, { status: "minting" });
 
       try {
         const response = await fetch(`${apiUrl}/api/claim/mint`, {
@@ -332,37 +480,70 @@ export function useClaim({
         const result = await response.json();
 
         if (!result.success) {
-          // If TX not confirmed yet, that's expected
+          // TX not confirmed yet - expected, start polling
           if (result.data?.status === "broadcast") {
-            console.log("TX in mempool, waiting for confirmation...");
-            return true; // Not an error, just waiting
+            console.log("TX in mempool, starting polling...");
+            updateOptimisticClaim(claimId, { status: "broadcast" });
+
+            // Start polling with exponential backoff
+            startPollingWithBackoff(async () => {
+              const pollResult = await loadHistory();
+              const claim = claimHistory.find((c) => c.id === claimId);
+              // Continue polling if still broadcast/confirmed
+              return (
+                claim?.status === "broadcast" || claim?.status === "confirmed"
+              );
+            });
+
+            setStatus("waiting-confirmation");
+            return true;
           }
-          throw new Error(result.error || "Failed to mint tokens");
+
+          // Actual error
+          const errorMsg = result.error || "Failed to mint tokens";
+          updateOptimisticClaim(claimId, { status: "failed", error: errorMsg });
+          throw new Error(errorMsg);
         }
 
-        // Refresh balance after successful mint
+        // Success!
+        updateOptimisticClaim(claimId, {
+          status: "completed",
+          mintTxid: result.data?.mintTxid,
+          mintedAt: Date.now(),
+        });
+
         await refreshBalance();
+        setStatus("completed");
+
+        // Reset to idle after showing success
+        setTimeout(() => setStatus("idle"), 3000);
 
         return true;
       } catch (error) {
         console.error("Failed to trigger mint:", error);
-        setClaimError(
-          error instanceof Error ? error.message : "Failed to mint tokens",
-        );
+        const errorMsg =
+          error instanceof Error ? error.message : "Failed to mint tokens";
+        setClaimError(errorMsg);
+        setStatus("error");
         return false;
-      } finally {
-        setIsMinting(false);
       }
     },
-    [address, apiUrl, refreshBalance],
+    [
+      address,
+      apiUrl,
+      updateOptimisticClaim,
+      startPollingWithBackoff,
+      claimHistory,
+      refreshBalance,
+      loadHistory,
+    ],
   );
 
-  // Confirm claim with txid
   const confirmClaim = useCallback(
     async (claimId: string, claimTxid: string): Promise<boolean> => {
       if (!address) return false;
 
-      setIsConfirming(true);
+      setStatus("confirming");
       setClaimError(null);
 
       try {
@@ -378,11 +559,9 @@ export function useClaim({
           throw new Error(result.error || "Failed to confirm claim");
         }
 
-        // Clear prepared claim after confirmation
         setPreparedClaim(null);
-
-        // Refresh balance and history
         await Promise.all([refreshBalance(), loadHistory()]);
+        setStatus("idle");
 
         return true;
       } catch (error) {
@@ -390,40 +569,22 @@ export function useClaim({
         setClaimError(
           error instanceof Error ? error.message : "Failed to confirm claim",
         );
+        setStatus("error");
         return false;
-      } finally {
-        setIsConfirming(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadHistory defined below, would cause circular dependency
     [address, apiUrl, refreshBalance],
   );
 
-  // Load claim history
-  const loadHistory = useCallback(async () => {
-    if (!address) return;
-
-    setIsLoadingHistory(true);
-
-    try {
-      const response = await fetch(`${apiUrl}/api/claim/history/${address}`);
-      const result = await response.json();
-
-      if (result.success && result.data?.claims) {
-        setClaimHistory(result.data.claims);
-      }
-    } catch (error) {
-      console.error("Failed to load claim history:", error);
-    } finally {
-      setIsLoadingHistory(false);
-    }
-  }, [address, apiUrl]);
-
-  // Clear prepared claim
   const clearPreparedClaim = useCallback(() => {
     setPreparedClaim(null);
     setClaimError(null);
+    setStatus("idle");
   }, []);
+
+  // ==========================================================================
+  // EFFECTS
+  // ==========================================================================
 
   // Load balance on mount
   useEffect(() => {
@@ -433,19 +594,75 @@ export function useClaim({
     }
   }, [address, refreshBalance, loadHistory]);
 
+  // Auto-polling for pending claims with exponential backoff
+  useEffect(() => {
+    const hasPendingClaims = claimHistory.some(
+      (c) =>
+        c.status === "broadcast" ||
+        c.status === "confirmed" ||
+        c.status === "minting",
+    );
+
+    if (hasPendingClaims && address) {
+      startPollingWithBackoff(async () => {
+        await loadHistory();
+        // Check if still has pending claims
+        const stillPending = claimHistory.some(
+          (c) =>
+            c.status === "broadcast" ||
+            c.status === "confirmed" ||
+            c.status === "minting",
+        );
+        return stillPending;
+      });
+    } else {
+      stopPolling();
+    }
+
+    return () => stopPolling();
+  }, [
+    claimHistory,
+    address,
+    startPollingWithBackoff,
+    stopPolling,
+    loadHistory,
+  ]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopPolling();
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [stopPolling]);
+
   return {
+    // Balance
     claimableBalance,
     isLoadingBalance,
     balanceError,
+
+    // Status (new unified state)
+    status,
     preparedClaim,
+    claimError,
+
+    // Legacy flags
     isPreparing,
     isConfirming,
     isBroadcasting,
     isMinting,
-    claimError,
-    canAutoBroadcast,
+
+    // History
     claimHistory,
     isLoadingHistory,
+
+    // Capabilities
+    canAutoBroadcast,
+
+    // Actions
     refreshBalance,
     prepareClaim,
     broadcastClaimTx,

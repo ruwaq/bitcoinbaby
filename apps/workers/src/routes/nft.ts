@@ -811,11 +811,16 @@ nftRouter.post(
         tokensEarned: "0",
       };
 
-      // Atomic: create NFT record + add to indexes + increment counter
+      // Create NFT record FIRST, then add to indexes
+      // Order matters: data must exist before it's indexed
       await redis.hset(`nft:minted:${tokenId}`, nftRecord);
-      await redis.sadd(`nft:owned:${body.address}`, tokenId.toString());
-      await redis.sadd("nft:all-tokens", tokenId.toString()); // Global index for explorer
-      await redis.incr("nft:minted:count"); // Now only incremented on confirmed mints
+
+      // Then add to all indexes in parallel
+      await Promise.all([
+        redis.sadd(`nft:owned:${body.address}`, tokenId.toString()),
+        redis.sadd("nft:all-tokens", tokenId.toString()),
+        redis.incr("nft:minted:count"),
+      ]);
 
       nftLogger.info("Confirmed token ID", {
         tokenId,

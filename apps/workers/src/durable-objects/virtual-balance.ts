@@ -1989,6 +1989,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       status: row.status as ClaimStatus,
       claimTxid: (row.claim_txid as string) || null,
       mintTxid: (row.mint_txid as string) || null,
+      error: (row.error as string) || null,
       preparedAt: row.prepared_at as number,
       confirmedAt: (row.confirmed_at as number) || null,
       mintedAt: (row.minted_at as number) || null,
@@ -2002,6 +2003,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         status: ClaimStatus;
         claimTxid: string | null;
         mintTxid: string | null;
+        error: string | null;
         preparedAt: number;
         confirmedAt: number | null;
         mintedAt: number | null;
