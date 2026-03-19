@@ -96,7 +96,7 @@ Address: tb1pjnkc6432y0muu7r0mwrxj0sc8y9kaq7dsh477xfuk5faannhe9psxkkqmc
 Path: m/86'/1'/0'/0/0
 
 === NFT_TREASURY WALLET (Genesis Babies Sales) ===
-Mnemonic: ankle patient double route wreck rally choose lizard spoon analyst below chat
+Mnemonic: [GUARDADO EN PASSWORD MANAGER - NUNCA COMMITEAR]
 Address: tb1p7kk2fuf8kv5vjftczlezfded94v9ay9s0h7ggd87k5d5ws744lesw7smmu
 Path: m/86'/1'/0'/0/0
 Purpose: Recibe TODOS los pagos de venta de NFTs (50,000 sats cada uno)

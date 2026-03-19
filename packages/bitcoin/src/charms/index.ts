@@ -32,6 +32,13 @@ export type {
   SpellOutput,
   MiningPrivateInputs,
   MiningMintSpellParams,
+  // Spell Format V11 (Current - CLI v11.1.0+)
+  SpellV11,
+  SpellV11Transaction,
+  SpellV11Output,
+  SpellV11CoinOutput,
+  PoWPrivateInputsV11,
+  ProverRequestV11,
   // Common
   AppType,
   AppReference,
@@ -83,6 +90,9 @@ export type {
   TokenMintParamsV9,
   // V10 (Merkle Proofs)
   TokenMintParamsV10,
+  // V11 (Current - CLI v11.1.0+)
+  TokenMintParamsV11,
+  TokenTransferParamsV11,
 } from "./token";
 
 export {
@@ -100,12 +110,16 @@ export {
   // Spell Generation (V2 - deprecated)
   createTokenMintSpell,
   createTokenTransferSpell,
-  // Spell Generation (V9 - PoW Direct, primary)
+  // Spell Generation (V9 - PoW Direct)
   createBABTCMintSpellV9,
   createBABTCMintSpellV9WithRewards,
   // Spell Generation (V10 - Merkle Proofs)
   createBABTCMintSpellV10,
   createBABTCTransferSpellV10,
+  // Spell Generation (V11 - Current, CLI v11.1.0+)
+  createBABTCMintSpellV11,
+  createBABTCTransferSpellV11,
+  addressToScriptPubKeyHex,
   validateAmountForSpell,
 } from "./token";
 

@@ -9,6 +9,26 @@
  *
  * NOTE: This module uses fully dynamic imports to avoid bundling
  * the AI package (which has Node.js-only dependencies) into the browser build.
+ *
+ * ============================================================================
+ * SECURITY WARNING - NOT PRODUCTION READY
+ * ============================================================================
+ *
+ * This AI PoUW implementation is EXPERIMENTAL and lacks server-side
+ * verification. Without backend validation:
+ *
+ * 1. AI proofs can be spoofed (client-side only verification)
+ * 2. Tasks use a static pool (not randomized server-side)
+ * 3. Users can claim rewards without performing real AI work
+ *
+ * DO NOT ENABLE in production until server-side verification is implemented.
+ * See: docs/SECURITY_AUDIT_2026-03-08.md for details.
+ *
+ * Required for production:
+ * - Backend generates unique tasks with nonces
+ * - Backend re-executes AI inference to verify outputs
+ * - Task pool is randomized per-request from server
+ * ============================================================================
  */
 
 // Types are defined locally to avoid importing from @bitcoinbaby/ai at build time

@@ -70,14 +70,14 @@ export {
   type CharmsConfig,
 } from "./charms-legacy";
 
-// Charms Protocol (v2 + v10)
+// Charms Protocol (v2 + v10 + v11)
 export {
   // Types V2 (legacy)
   type CharmsNetwork,
   type SpellV2,
   type SpellV2Input,
   type SpellV2Output,
-  // Types V10 (current)
+  // Types V10
   type SpellV10,
   type SpellV10Input,
   type SpellV10Output,
@@ -88,6 +88,13 @@ export {
   type ExtractedCharm,
   type CharmBalance,
   type ScrollsConfigResponse,
+  // Types V11 (current)
+  type SpellV11,
+  type SpellV11Output,
+  type SpellV11CoinOutput,
+  type SpellV11Transaction,
+  type PoWPrivateInputsV11,
+  type ProverRequestV11,
   // Constants
   DUST_LIMIT,
   CHARMS_PROTOCOL_VERSION,
@@ -104,6 +111,7 @@ export {
   type TokenBalance as CharmsTokenBalance,
   type MiningReward,
   type TokenMintParamsV10,
+  type TokenMintParamsV11,
   BABTC_CONFIG,
   BABTC_METADATA,
   getCurrentEpoch,
@@ -117,6 +125,9 @@ export {
   createTokenTransferSpell,
   createBABTCMintSpellV10,
   createBABTCTransferSpellV10,
+  createBABTCMintSpellV11,
+  createBABTCTransferSpellV11,
+  addressToScriptPubKeyHex,
   validateAmountForSpell,
   // Batch Transfer (Withdrawal Pool)
   type BatchRecipient,
