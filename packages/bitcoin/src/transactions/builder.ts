@@ -147,33 +147,219 @@ export class TransactionBuilder {
   }
 
   /**
-   * Select coins for transaction
+   * Select coins for transaction using Branch & Bound algorithm
+   *
+   * Tries to find an exact match first (no change), then falls back to
+   * minimizing waste. This prevents creating dust UTXOs which would be
+   * lost to fees.
+   *
+   * Based on Bitcoin Core's coin selection:
+   * https://github.com/bitcoin/bitcoin/blob/master/src/wallet/coinselection.cpp
    */
   selectCoins(
     utxos: TxUTXO[],
     targetAmount: number,
     extraOutputs: number = 0,
   ): CoinSelection {
-    // Sort by value descending for efficiency
-    const sorted = [...utxos].sort((a, b) => b.value - a.value);
-
-    const selected: TxUTXO[] = [];
-    let totalInputValue = 0;
-
     // Estimate fee based on actual UTXO types
     const estimateFee = (selectedUtxos: TxUTXO[]): number => {
-      // Calculate input vbytes based on actual UTXO types
       const inputVbytes = selectedUtxos.reduce(
         (sum, utxo) => sum + getInputVbytes(utxo),
         0,
       );
       // P2TR output: ~43 vbytes (we output to Taproot by default)
+      // +1 for change output if needed
       const outputVbytes = (2 + extraOutputs) * OUTPUT_VBYTES.P2TR;
       const baseVbytes = 10.5; // Transaction overhead
       return Math.ceil(
         (inputVbytes + outputVbytes + baseVbytes) * this.feeRate,
       );
     };
+
+    // Cost of adding change output (for waste calculation)
+    const changeCost = Math.ceil(OUTPUT_VBYTES.P2TR * this.feeRate);
+
+    // Try Branch & Bound first for exact match or minimal waste
+    const bnbResult = this.branchAndBoundSelect(
+      utxos,
+      targetAmount,
+      estimateFee,
+      changeCost,
+    );
+
+    if (bnbResult) {
+      const fee = estimateFee(bnbResult.inputs);
+      const totalInputValue = bnbResult.inputs.reduce(
+        (sum, u) => sum + u.value,
+        0,
+      );
+      const change = totalInputValue - targetAmount - fee;
+
+      log.debug("BnB coin selection", {
+        inputs: bnbResult.inputs.length,
+        change,
+        fee,
+        waste: bnbResult.waste,
+      });
+
+      return {
+        inputs: bnbResult.inputs,
+        totalInputValue,
+        change: change >= this.dustThreshold ? change : 0,
+        fee: change >= this.dustThreshold ? fee : fee + change,
+      };
+    }
+
+    // Fallback to greedy selection (largest first)
+    log.debug("BnB failed, falling back to greedy selection");
+    return this.greedySelect(utxos, targetAmount, estimateFee);
+  }
+
+  /**
+   * Branch & Bound coin selection algorithm
+   *
+   * Searches for a selection that either:
+   * 1. Exactly matches target + fee (no change)
+   * 2. Minimizes "waste" (excess that would be lost to dust)
+   *
+   * Returns null if no good solution found within iteration limit.
+   */
+  private branchAndBoundSelect(
+    utxos: TxUTXO[],
+    targetAmount: number,
+    estimateFee: (utxos: TxUTXO[]) => number,
+    changeCost: number,
+  ): { inputs: TxUTXO[]; waste: number } | null {
+    const MAX_ITERATIONS = 100_000;
+    let iterations = 0;
+
+    // Sort by effective value descending (value - cost to spend)
+    const sorted = [...utxos]
+      .map((utxo) => ({
+        utxo,
+        effectiveValue:
+          utxo.value - Math.ceil(getInputVbytes(utxo) * this.feeRate),
+      }))
+      .filter((u) => u.effectiveValue > 0) // Skip UTXOs that cost more to spend
+      .sort((a, b) => b.effectiveValue - a.effectiveValue);
+
+    if (sorted.length === 0) {
+      return null;
+    }
+
+    // Calculate total available
+    const totalAvailable = sorted.reduce((sum, u) => sum + u.effectiveValue, 0);
+
+    // Quick check if we have enough
+    if (totalAvailable < targetAmount) {
+      return null;
+    }
+
+    // Use object wrapper to avoid TypeScript narrowing issues with closures
+    const result: { selection: TxUTXO[] | null; waste: number } = {
+      selection: null,
+      waste: Infinity,
+    };
+
+    // DFS with pruning
+    const search = (
+      index: number,
+      currentSelection: TxUTXO[],
+      currentValue: number,
+      remainingValue: number,
+    ): boolean => {
+      iterations++;
+      if (iterations > MAX_ITERATIONS) {
+        return false; // Give up, let greedy handle it
+      }
+
+      const fee = estimateFee(currentSelection);
+      const target = targetAmount + fee;
+      const excess = currentValue - target;
+
+      // Found exact match or acceptable small excess (avoid dust)
+      if (excess >= 0 && excess < this.dustThreshold) {
+        const waste = excess; // All excess is waste (goes to fee)
+        if (waste < result.waste) {
+          result.waste = waste;
+          result.selection = [...currentSelection];
+        }
+        return true;
+      }
+
+      // Found valid selection with change
+      if (excess >= this.dustThreshold) {
+        // Waste = cost of creating change output
+        const waste = changeCost;
+        if (waste < result.waste) {
+          result.waste = waste;
+          result.selection = [...currentSelection];
+        }
+        // Don't return - keep searching for better
+      }
+
+      // Pruning: if even including all remaining can't reach target, stop
+      if (currentValue + remainingValue < target) {
+        return false;
+      }
+
+      // Pruning: if we already exceed target significantly, stop adding
+      if (excess > this.dustThreshold * 10) {
+        return false;
+      }
+
+      // Try including/excluding each remaining UTXO
+      for (let i = index; i < sorted.length; i++) {
+        const { utxo, effectiveValue } = sorted[i];
+
+        // Include this UTXO
+        currentSelection.push(utxo);
+        const newRemaining = remainingValue - effectiveValue;
+
+        search(
+          i + 1,
+          currentSelection,
+          currentValue + effectiveValue,
+          newRemaining,
+        );
+
+        // Exclude this UTXO
+        currentSelection.pop();
+
+        // Early exit if we found perfect solution (0 waste)
+        if (result.waste === 0) {
+          return true;
+        }
+      }
+
+      return result.selection !== null;
+    };
+
+    // Start search
+    const totalRemaining = sorted.reduce((sum, u) => sum + u.effectiveValue, 0);
+    search(0, [], 0, totalRemaining);
+
+    if (result.selection !== null && result.selection.length > 0) {
+      return { inputs: result.selection, waste: result.waste };
+    }
+
+    return null;
+  }
+
+  /**
+   * Greedy coin selection (fallback)
+   * Selects largest UTXOs first until target is met
+   */
+  private greedySelect(
+    utxos: TxUTXO[],
+    targetAmount: number,
+    estimateFee: (utxos: TxUTXO[]) => number,
+  ): CoinSelection {
+    // Sort by value descending for efficiency
+    const sorted = [...utxos].sort((a, b) => b.value - a.value);
+
+    const selected: TxUTXO[] = [];
+    let totalInputValue = 0;
 
     // Select coins
     for (const utxo of sorted) {

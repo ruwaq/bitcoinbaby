@@ -22,6 +22,7 @@ import type {
   SpellV10,
   SpellV11,
   SpellV11Output,
+  SpellV11CoinOutput,
   PoWPrivateInputsV11,
   ProverRequestV11,
   AppType,
@@ -34,6 +35,42 @@ import {
   createTokenTransferSpellV10,
   MIN_SPELL_OUTPUT_SATS,
 } from "./types";
+import * as bitcoin from "bitcoinjs-lib";
+import type { BitcoinNetwork } from "../types";
+
+// =============================================================================
+// NETWORK UTILITIES
+// =============================================================================
+
+/**
+ * Network configurations for bitcoinjs-lib
+ */
+const BITCOIN_NETWORKS: Record<BitcoinNetwork, bitcoin.Network> = {
+  mainnet: bitcoin.networks.bitcoin,
+  testnet: bitcoin.networks.testnet,
+  testnet4: bitcoin.networks.testnet,
+  regtest: bitcoin.networks.regtest,
+};
+
+/**
+ * Convert a Bitcoin address to its scriptPubKey hex representation
+ *
+ * For P2TR (Taproot) addresses (bc1p/tb1p):
+ * - Returns "5120" + 64 hex chars (32 bytes pubkey)
+ * - OP_1 (0x51) + PUSH32 (0x20) + pubkey
+ *
+ * @param address - Bitcoin address (bech32/bech32m)
+ * @param network - Bitcoin network (default: testnet4)
+ * @returns scriptPubKey as hex string (e.g., "5120abcd...")
+ */
+export function addressToScriptPubKeyHex(
+  address: string,
+  network: BitcoinNetwork = "testnet4",
+): string {
+  const networkConfig = BITCOIN_NETWORKS[network];
+  const script = bitcoin.address.toOutputScript(address, networkConfig);
+  return Buffer.from(script).toString("hex");
+}
 
 // =============================================================================
 // TOKEN CONFIGURATION
@@ -669,6 +706,10 @@ export interface TokenMintParamsV11 {
   };
   /** Change address for remaining funds */
   changeAddress?: string;
+  /** Previous transactions hex (required by V11 prover) */
+  prevTxs?: string[];
+  /** Bitcoin network (default: testnet4) */
+  network?: BitcoinNetwork;
 }
 
 /**
@@ -711,7 +752,14 @@ export function createBABTCMintSpellV11(params: TokenMintParamsV11): {
   // App reference key (t = token)
   const appKey = `t/${params.appId}/${params.appVk}`;
 
+  // Convert addresses to scriptPubKey hex (required by V11 format)
+  const network = params.network || "testnet4";
+  const minerDest = addressToScriptPubKeyHex(params.minerAddress, network);
+  const devDest = addressToScriptPubKeyHex(params.devAddress, network);
+  const stakingDest = addressToScriptPubKeyHex(params.stakingAddress, network);
+
   // Create V11 spell (without private_inputs)
+  // V11 requires coins field with amount/dest for each output
   const spell: SpellV11 = {
     version: 11,
     tx: {
@@ -723,6 +771,12 @@ export function createBABTCMintSpellV11(params: TokenMintParamsV11): {
         { "0": Number(reward.devShare) } as SpellV11Output,
         // Output 2: Staking pool (5%)
         { "0": Number(reward.stakingShare) } as SpellV11Output,
+      ],
+      // Native satoshi outputs with destinations
+      coins: [
+        { amount: MIN_SPELL_OUTPUT_SATS, dest: minerDest },
+        { amount: MIN_SPELL_OUTPUT_SATS, dest: devDest },
+        { amount: MIN_SPELL_OUTPUT_SATS, dest: stakingDest },
       ],
     },
     app_public_inputs: {
@@ -749,6 +803,7 @@ export function createBABTCMintSpellV11(params: TokenMintParamsV11): {
       : undefined,
     funding_utxo_value: params.fundingUtxo?.value,
     change_address: params.changeAddress,
+    prev_txs: params.prevTxs,
   };
 
   return {

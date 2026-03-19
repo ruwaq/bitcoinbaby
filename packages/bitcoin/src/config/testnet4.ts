@@ -62,12 +62,13 @@ export const BABTC_TESTNET4 = {
 
   /**
    * Verification Key - SHA256 hash of the WASM binary
-   * Generated from compiled contract
+   * Generated with: charms app vk ./target/wasm32-wasip1/release/babtc-contract.wasm
+   * Updated: 2026-03-05 (synced with deployment.ts)
    */
   appVk:
     process.env.NEXT_PUBLIC_BABTC_APP_VK ||
     process.env.BABTC_APP_VK ||
-    "ab70796e62562b5245cf746d7ecf4b95b86df582921ae42ec2ceea25612807c6",
+    "acf2ec0b7245eb9c3371ef4e67eb1ca3f85d712b1aeca438a6a6d1898392179d",
 
   /** Token ticker */
   ticker: "BABTC",

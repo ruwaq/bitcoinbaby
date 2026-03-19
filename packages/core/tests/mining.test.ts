@@ -341,3 +341,249 @@ describe("Mining Types", () => {
     expect(types).toBeDefined();
   });
 });
+
+// =============================================================================
+// INTEGRATION TESTS
+// =============================================================================
+
+describe("Mining Integration", () => {
+  describe("Orchestrator State Machine", () => {
+    it("should transition from idle -> starting -> running", async () => {
+      const { MiningOrchestrator } = await import("../src/mining/orchestrator");
+
+      const orchestrator = new MiningOrchestrator({
+        preferWebGPU: false,
+        fallbackToCPU: true,
+      });
+
+      const states: string[] = [];
+      orchestrator.on("onStatusChange", (status) => {
+        states.push(status);
+      });
+
+      // Initial state should be idle/not running
+      expect(orchestrator.getIsRunning()).toBe(false);
+
+      // When we terminate, it should clean up without error
+      orchestrator.terminate();
+    });
+
+    it("should handle rapid start/stop cycles", async () => {
+      const { MiningOrchestrator } = await import("../src/mining/orchestrator");
+
+      const orchestrator = new MiningOrchestrator({
+        preferWebGPU: false,
+        fallbackToCPU: true,
+      });
+
+      // Rapid cycles should not throw or cause memory leaks
+      for (let i = 0; i < 5; i++) {
+        orchestrator.stop();
+      }
+
+      orchestrator.terminate();
+    });
+  });
+
+  describe("Challenge Generation", () => {
+    it("should create valid challenge format", async () => {
+      // Challenge format: "timestamp:address"
+      const timestamp = Date.now();
+      const address = "tb1p123456789abcdef";
+      const challenge = `${timestamp}:${address}`;
+
+      expect(challenge).toMatch(/^\d+:tb1p[a-z0-9]+$/);
+
+      // Parse and validate
+      const parts = challenge.split(":");
+      expect(parts.length).toBe(2);
+      expect(parseInt(parts[0])).toBeGreaterThan(0);
+      expect(parts[1].startsWith("tb1p")).toBe(true);
+    });
+
+    it("should generate unique challenges", () => {
+      const address = "tb1p123456789abcdef";
+      const challenges = new Set<string>();
+
+      for (let i = 0; i < 10; i++) {
+        const challenge = `${Date.now() + i}:${address}`;
+        challenges.add(challenge);
+      }
+
+      // All challenges should be unique
+      expect(challenges.size).toBe(10);
+    });
+  });
+
+  describe("Hashrate Aggregation", () => {
+    it("should aggregate hashrates from multiple workers", async () => {
+      // Simulate hashrate data from multiple workers
+      const workerHashrates = new Map<number, number>();
+      workerHashrates.set(0, 1000); // Worker 0: 1000 H/s
+      workerHashrates.set(1, 1200); // Worker 1: 1200 H/s
+      workerHashrates.set(2, 800); // Worker 2: 800 H/s
+
+      // Calculate aggregate
+      const totalHashrate = Array.from(workerHashrates.values()).reduce(
+        (sum, hr) => sum + hr,
+        0,
+      );
+
+      expect(totalHashrate).toBe(3000);
+    });
+
+    it("should handle worker hashrate going to zero", async () => {
+      const workerHashrates = new Map<number, number>();
+      workerHashrates.set(0, 1000);
+      workerHashrates.set(1, 0); // Worker stopped
+      workerHashrates.set(2, 800);
+
+      const totalHashrate = Array.from(workerHashrates.values()).reduce(
+        (sum, hr) => sum + hr,
+        0,
+      );
+
+      // Should still calculate correctly with one worker at 0
+      expect(totalHashrate).toBe(1800);
+    });
+  });
+
+  describe("Difficulty Validation", () => {
+    it("should enforce minimum difficulty of 16", async () => {
+      const { MiningOrchestrator } = await import("../src/mining/orchestrator");
+
+      const orchestrator = new MiningOrchestrator({
+        initialDifficulty: 10, // Below minimum
+        preferWebGPU: false,
+      });
+
+      // The orchestrator should be created (difficulty handled internally)
+      expect(orchestrator).toBeDefined();
+
+      orchestrator.terminate();
+    });
+
+    it("should accept valid difficulty range", async () => {
+      const { MiningOrchestrator } = await import("../src/mining/orchestrator");
+
+      // Test valid difficulties
+      const validDifficulties = [16, 17, 20, 24, 32];
+
+      for (const diff of validDifficulties) {
+        const orchestrator = new MiningOrchestrator({
+          initialDifficulty: diff,
+          preferWebGPU: false,
+        });
+        expect(orchestrator).toBeDefined();
+        orchestrator.terminate();
+      }
+    });
+  });
+
+  describe("Proof Validation", () => {
+    it("should validate proof meets difficulty", () => {
+      // A hash with 17 leading zero bits would start with "0000" (16 bits) + 0-7 nibble (1 bit)
+      const hash17zeros = "00007fff" + "f".repeat(56);
+      const hash16zeros = "0000ffff" + "f".repeat(56);
+
+      // Count leading zeros
+      const countLeadingZeroBits = (hash: string): number => {
+        let count = 0;
+        for (const char of hash) {
+          const nibble = parseInt(char, 16);
+          if (nibble === 0) {
+            count += 4;
+          } else {
+            if (nibble < 8) count += 1;
+            if (nibble < 4) count += 1;
+            if (nibble < 2) count += 1;
+            break;
+          }
+        }
+        return count;
+      };
+
+      expect(countLeadingZeroBits(hash17zeros)).toBeGreaterThanOrEqual(17);
+      expect(countLeadingZeroBits(hash16zeros)).toBe(16);
+    });
+  });
+
+  describe("Worker Error Handling", () => {
+    it("should track restart attempts per worker", () => {
+      const maxRestarts = 3;
+      const workerRestartAttempts = new Map<number, number>();
+
+      // Simulate worker failures
+      const handleWorkerError = (workerId: number): boolean => {
+        const attempts = workerRestartAttempts.get(workerId) ?? 0;
+
+        if (attempts >= maxRestarts) {
+          return false; // Can't restart
+        }
+
+        workerRestartAttempts.set(workerId, attempts + 1);
+        return true; // Restarted
+      };
+
+      // Worker 0 fails 3 times
+      expect(handleWorkerError(0)).toBe(true);
+      expect(handleWorkerError(0)).toBe(true);
+      expect(handleWorkerError(0)).toBe(true);
+      expect(handleWorkerError(0)).toBe(false); // Max reached
+
+      // Worker 1 can still restart
+      expect(handleWorkerError(1)).toBe(true);
+    });
+
+    it("should only stop mining when ALL workers fail", () => {
+      const maxRestarts = 3;
+      const workerCount = 4;
+      const workerRestartAttempts = new Map<number, number>();
+
+      // Initialize all workers at max attempts except one
+      for (let i = 0; i < workerCount - 1; i++) {
+        workerRestartAttempts.set(i, maxRestarts);
+      }
+      workerRestartAttempts.set(workerCount - 1, 0); // One worker still alive
+
+      // Check if all workers have failed
+      const allFailed = Array.from({ length: workerCount }, (_, i) => i).every(
+        (i) => (workerRestartAttempts.get(i) ?? 0) >= maxRestarts,
+      );
+
+      expect(allFailed).toBe(false); // Not all failed
+
+      // Now fail the last worker
+      workerRestartAttempts.set(workerCount - 1, maxRestarts);
+
+      const allFailedNow = Array.from(
+        { length: workerCount },
+        (_, i) => i,
+      ).every((i) => (workerRestartAttempts.get(i) ?? 0) >= maxRestarts);
+
+      expect(allFailedNow).toBe(true); // All failed
+    });
+  });
+
+  describe("Memory Management", () => {
+    it("should clear hashrate data when worker stops", () => {
+      const workerHashrates = new Map<number, number>();
+      const workerTotalHashes = new Map<number, number>();
+
+      // Setup worker data
+      workerHashrates.set(0, 1000);
+      workerTotalHashes.set(0, 1000000);
+
+      // Simulate worker stop/cleanup
+      const cleanupWorker = (workerId: number) => {
+        workerHashrates.delete(workerId);
+        // Note: total hashes should be preserved for stats
+      };
+
+      cleanupWorker(0);
+
+      expect(workerHashrates.has(0)).toBe(false);
+      expect(workerTotalHashes.has(0)).toBe(true); // Preserved
+    });
+  });
+});

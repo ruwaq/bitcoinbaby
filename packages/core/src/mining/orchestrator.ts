@@ -30,7 +30,10 @@ const defaultConfig: OrchestratorConfig = {
   throttleOnBattery: true,
   throttleWhenHidden: true,
   initialDifficulty: MIN_DIFFICULTY, // D22 - sustainable emission rate
-  enableAIPoUW: false, // AI PoUW disabled by default
+  // SECURITY: AI PoUW is DISABLED by default until server-side verification
+  // is implemented. Without server-side validation, AI proofs can be spoofed.
+  // See: docs/SECURITY_AUDIT_2026-03-08.md
+  enableAIPoUW: false,
   aiTaskFrequency: 1, // Execute AI task on every share
 };
 

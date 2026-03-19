@@ -197,9 +197,9 @@ export type SpellV11Output = Record<string, number | Record<string, unknown>>;
 
 export interface SpellV11CoinOutput {
   /** Amount in satoshis */
-  amt: number;
-  /** Destination hash */
-  dest_hash: string;
+  amount: number;
+  /** Full scriptPubKey hex (e.g., "5120..." for P2TR) */
+  dest: string;
 }
 
 /**

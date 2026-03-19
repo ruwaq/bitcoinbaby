@@ -233,11 +233,11 @@ function encodeSpellV11ToCborHex(spell: SpellV11): string {
     tx.beamed_outs = spell.tx.beamed_outs;
   }
 
-  // Convert coins if present
+  // Convert coins if present (V11 format: amount/dest)
   if (spell.tx.coins) {
     tx.coins = spell.tx.coins.map((coin) => ({
-      amount: coin.amt,
-      dest: hexToBytes(coin.dest_hash),
+      amount: coin.amount,
+      dest: hexToBytes(coin.dest),
     }));
   }
 
