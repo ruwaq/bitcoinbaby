@@ -8,7 +8,9 @@
     "deploy": "wrangler deploy",
     "deploy:production": "wrangler deploy --env production",
     "typecheck": "tsc --noEmit",
-    "tail": "wrangler tail"
+    "tail": "wrangler tail",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@bitcoinbaby/shared": "workspace:*",
@@ -22,6 +24,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260305.0",
     "typescript": "^5.0.0",
+    "vitest": "^4.1.0",
     "wrangler": "^4.0.0"
   }
 }
