@@ -13,6 +13,7 @@ import {
   EVOLUTION_COSTS,
   XP_REQUIREMENTS,
   LEVEL_BOOSTS,
+  GENESIS_BABIES_CONFIG,
   createNFTWorkProofSpell,
   createNFTLevelUpSpell,
 } from "./nft";
@@ -79,7 +80,11 @@ export class EvolutionService {
     const xpRequired = XP_REQUIREMENTS[nextLevel] || 0;
     const tokenCost = EVOLUTION_COSTS[nextLevel] || 0n;
     const currentBoost = getMiningBoost(nft);
-    const nextBoost = LEVEL_BOOSTS[nextLevel] || currentBoost;
+    // Calculate next boost including both level and rarity
+    const nextLevelBoost = LEVEL_BOOSTS[nextLevel] ?? LEVEL_BOOSTS[nft.level];
+    const rarityBoost =
+      GENESIS_BABIES_CONFIG.rarityTiers[nft.rarityTier]?.boost || 0;
+    const nextBoost = nextLevelBoost + rarityBoost;
 
     return {
       currentLevel: nft.level,

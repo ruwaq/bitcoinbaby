@@ -412,28 +412,26 @@ export interface DirectMintResult {
 /**
  * Create a direct mint transaction for a user
  *
- * STATUS: NOT IMPLEMENTED
+ * DESIGN NOTE: Direct minting is handled CLIENT-SIDE, not in Workers
  *
- * This is an alternative flow where each user's mining proof
- * is converted to on-chain tokens individually (like BRO token).
+ * This function exists as a placeholder documenting the architecture decision.
+ * Direct proof-to-mint flow (like BRO token) requires:
+ * 1. WASM/bitcoinjs-lib - not compatible with Workers runtime
+ * 2. Client-side wallet signing - requires browser wallet interaction
  *
- * The implementation exists in `packages/bitcoin/src/charms/minting-manager.ts`
- * but is not yet integrated into Cloudflare Workers due to:
- * 1. WASM/bitcoinjs-lib compatibility with Workers runtime
- * 2. Signing flow requires client-side wallet interaction
+ * ARCHITECTURE:
+ * - Direct Mint (client): scripts/mint-babtc-v11.ts, MintingManager
+ * - Batch Mint (server): BatchMintingService.processBatch() above
  *
- * CURRENT WORKAROUND:
- * Use batch minting via WithdrawPool instead:
- * 1. User mines and accumulates virtual balance
- * 2. User requests withdrawal to BTC address
- * 3. System batches withdrawals and mints on-chain
+ * USER FLOWS:
+ * A) Direct Mint (power users):
+ *    → Use CLI script or integrate MintingManager in frontend
+ *    → @see packages/bitcoin/src/charms/minting-manager.ts
  *
- * FUTURE IMPLEMENTATION:
- * Integrate MintingManager.createMintV9() flow:
- * 1. Build mining TX with OP_RETURN
- * 2. Return PSBT for client signing
- * 3. Broadcast and wait for confirmation
- * 4. Generate Merkle proof and submit to Prover
+ * B) Batch Mint (standard users):
+ *    1. Mine via browser → earn virtual balance
+ *    2. POST /api/withdraw → queue withdrawal
+ *    3. System batches and mints on-chain
  *
  * @see packages/bitcoin/src/charms/minting-manager.ts
  */

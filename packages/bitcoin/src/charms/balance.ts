@@ -128,31 +128,27 @@ export class BABTCBalanceService {
   }
 
   /**
-   * Get pending mining rewards for an address
+   * Get pending on-chain rewards for an address
    *
-   * STATUS: NOT IMPLEMENTED - Returns 0n
+   * DESIGN NOTE: Returns 0n by design
    *
-   * Full pending reward tracking requires parsing spell data from
-   * transaction witnesses, which depends on charms-wallet-js SDK
-   * supporting spell witness parsing.
+   * This service handles ON-CHAIN balances only via Scrolls API.
+   * Pending/unconfirmed rewards are tracked separately:
    *
-   * Current behavior:
-   * - Always returns 0n (no pending rewards shown)
-   * - Confirmed balances from Scrolls API are authoritative
-   * - Users see balance updates after transaction confirms
+   * - Virtual balance (mined, not withdrawn) → Workers API
+   * - Combined view → useUnifiedBalance hook in @bitcoinbaby/core
    *
-   * Future implementation (when SDK support available):
-   * 1. Get unconfirmed transactions for the address
-   * 2. Parse spell witness data from each TX
-   * 3. Extract pending mint amounts
-   * 4. Sum and return pending rewards
+   * The architecture intentionally separates concerns:
+   * - packages/bitcoin: On-chain data (blockchain agnostic)
+   * - apps/workers: Virtual balance (application state)
+   * - packages/core: Combined hooks for UI consumption
    *
-   * Tracking issue: Consider using virtual balance from workers API
-   * as a workaround for pending rewards until SDK support.
+   * For full balance including virtual:
+   * @see packages/core/src/hooks/useUnifiedBalance.ts
+   * @see packages/core/src/api/clients/balance-client.ts
    */
   async getPendingRewards(_address: string): Promise<bigint> {
-    // Returns 0n - pending rewards not tracked yet
-    // Confirmed balances from getBalance() are authoritative
+    // On-chain pending not tracked - use useUnifiedBalance for combined view
     return 0n;
   }
 

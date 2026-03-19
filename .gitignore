@@ -54,7 +54,6 @@ docs/
 
 # Scripts with sensitive data (keys, test wallets)
 packages/bitcoin/scripts/
-packages/bitcoin/tests/e2e/
 
 # Local development files
 *.local.ts
