@@ -62,11 +62,17 @@ export const MAX_DIFFICULTY = 32;
  * Generate a valid mining proof with specified difficulty
  *
  * Actually mines a real proof (slow for high difficulty)
+ *
+ * The server expects:
+ * - blockData format: "prefix:timestamp:nonceHex"
+ * - nonce embedded in blockData as hex (without 0x prefix)
+ * - hash = double_sha256(blockData)
  */
 export function generateValidProof(
   difficulty: number = MIN_DIFFICULTY,
 ): MockProof {
-  const blockData = generateBlockData();
+  const timestamp = Date.now();
+  const prefix = `block:${timestamp}`;
   let nonce = 0;
   let hash: string;
 
@@ -74,9 +80,11 @@ export function generateValidProof(
   const maxAttempts = Math.pow(2, difficulty + 4); // Allow some margin
 
   while (nonce < maxAttempts) {
-    const input = blockData + nonce.toString();
+    // Format: prefix:nonceHex (nonce as hex WITHOUT 0x prefix)
+    const blockData = `${prefix}:${nonce.toString(16)}`;
+
     // Double SHA256 (Bitcoin standard)
-    const firstHash = createHash("sha256").update(input).digest();
+    const firstHash = createHash("sha256").update(blockData).digest();
     hash = createHash("sha256").update(firstHash).digest("hex");
 
     if (countLeadingZeroBits(hash) >= difficulty) {
@@ -100,12 +108,14 @@ export function generateValidProof(
 export function generateInvalidProof(): MockProof {
   // Hash with insufficient leading zeros (starts with 'f')
   // This will fail the difficulty check since MIN_DIFFICULTY=16 requires 4+ leading hex zeros
+  const timestamp = Date.now();
+  const nonce = 12345;
   return {
     hash: "f" + "a".repeat(63), // No leading zeros
-    nonce: 12345,
+    nonce,
     difficulty: MIN_DIFFICULTY,
-    blockData: generateBlockData(),
-    timestamp: Date.now(),
+    blockData: `block:${timestamp}:${nonce.toString(16)}`,
+    timestamp,
   };
 }
 
@@ -113,17 +123,18 @@ export function generateInvalidProof(): MockProof {
  * Generate a proof with insufficient difficulty
  */
 export function generateLowDifficultyProof(): MockProof {
-  const blockData = generateBlockData();
-  const input = blockData + "0";
-  const firstHash = createHash("sha256").update(input).digest();
+  const timestamp = Date.now();
+  const nonce = 0;
+  const blockData = `block:${timestamp}:${nonce.toString(16)}`;
+  const firstHash = createHash("sha256").update(blockData).digest();
   const hash = createHash("sha256").update(firstHash).digest("hex");
 
   return {
     hash,
-    nonce: 0,
+    nonce,
     difficulty: 4, // Below minimum
     blockData,
-    timestamp: Date.now(),
+    timestamp,
   };
 }
 
@@ -210,11 +221,12 @@ export function generateClaimData(
 
 /**
  * Generate random block data for mining
+ * Note: For actual proof generation, use generateValidProof() which
+ * embeds the nonce correctly. This is for test data only.
  */
-export function generateBlockData(): string {
+export function generateBlockData(nonce: number = 0): string {
   const timestamp = Date.now();
-  const random = randomBytes(16).toString("hex");
-  return `block:${timestamp}:${random}`;
+  return `block:${timestamp}:${nonce.toString(16)}`;
 }
 
 /**
