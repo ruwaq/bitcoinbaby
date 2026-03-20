@@ -3,7 +3,7 @@
 **Fecha**: 2026-03-08
 **Proyecto**: BitcoinBaby - Gamified Mining Ecosystem
 **Repositorio**: https://github.com/AndeLabs/bitcoinbaby
-**Auditor**: Claude Opus 4.5 (Security + Architecture Analysis)
+**Auditor**: Internal Security Review
 
 ---
 
