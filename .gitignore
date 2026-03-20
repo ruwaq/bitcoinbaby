@@ -40,10 +40,8 @@ apps/native/android/app/build/
 *.apk
 *.ipa
 
-# Claude local files
-.claude/CLAUDE.local.md
-.claude/settings.local.json
-.claude/plans/
+# Claude Code (development tool config)
+.claude/
 
 # Admin wallet (sensitive - never commit!)
 scripts/admin-wallet.md
