@@ -210,6 +210,46 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       CREATE INDEX IF NOT EXISTS idx_proofs_claimed
       ON mining_proofs(claimed)
     `);
+
+    // Index for efficient pruning queries (archive old proofs)
+    this.sql.exec(`
+      CREATE INDEX IF NOT EXISTS idx_proofs_created_at
+      ON mining_proofs(created_at)
+    `);
+  }
+
+  /**
+   * Archive old proofs to prevent unbounded storage growth
+   *
+   * Keeps last 30 days of proofs, deletes older ones.
+   * Called periodically or on balance fetch.
+   *
+   * @returns Number of proofs archived (deleted)
+   */
+  private async pruneOldProofs(): Promise<number> {
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+    // Only delete proofs that are:
+    // 1. Older than 30 days
+    // 2. Already credited (credited = 1)
+    // 3. Already claimed OR not part of a pending claim
+    const result = this.sql.exec(
+      `DELETE FROM mining_proofs
+       WHERE created_at < ?
+       AND credited = 1
+       AND (claimed = 1 OR claim_id IS NULL)`,
+      thirtyDaysAgo,
+    );
+
+    const deleted = result.rowsWritten;
+    if (deleted > 0) {
+      balanceLogger.info("Pruned old proofs", {
+        deleted,
+        cutoffDate: new Date(thirtyDaysAgo).toISOString(),
+      });
+    }
+
+    return deleted;
   }
 
   /**
@@ -218,6 +258,15 @@ export class VirtualBalanceDO extends DurableObject<Env> {
    */
   private getOrCreateBalance(address: string): VirtualBalance {
     const now = Date.now();
+
+    // Probabilistic pruning (1% chance on cache miss)
+    // This ensures old proofs are cleaned up without impacting hot path
+    if (Math.random() < 0.01) {
+      // Fire and forget - don't block balance fetch
+      this.pruneOldProofs().catch((err) => {
+        balanceLogger.warn("Pruning failed", { error: String(err) });
+      });
+    }
 
     // Return cached balance if still valid
     if (

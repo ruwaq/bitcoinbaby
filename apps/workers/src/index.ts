@@ -118,12 +118,49 @@ app.get("/", (c) => {
   });
 });
 
-app.get("/health", (c) => {
-  return c.json({
-    status: "ok",
-    environment: c.env.ENVIRONMENT,
-    timestamp: Date.now(),
-  });
+app.get("/health", async (c) => {
+  const checks: Record<string, "ok" | "error" | "unknown"> = {
+    api: "ok",
+    redis: "unknown",
+    kv: "unknown",
+  };
+
+  // Check Redis connectivity
+  try {
+    const redis = getRedis(c.env);
+    if (redis) {
+      await redis.ping();
+      checks.redis = "ok";
+    }
+  } catch {
+    checks.redis = "error";
+  }
+
+  // Check KV availability
+  try {
+    if (c.env.CACHE) {
+      // Simple read test
+      await c.env.CACHE.get("health-check-test");
+      checks.kv = "ok";
+    }
+  } catch {
+    checks.kv = "error";
+  }
+
+  const allHealthy = Object.values(checks).every(
+    (v) => v === "ok" || v === "unknown",
+  );
+
+  return c.json(
+    {
+      status: allHealthy ? "healthy" : "degraded",
+      environment: c.env.ENVIRONMENT,
+      version: "2.0.0",
+      checks,
+      timestamp: Date.now(),
+    },
+    allHealthy ? 200 : 503,
+  );
 });
 
 // =============================================================================

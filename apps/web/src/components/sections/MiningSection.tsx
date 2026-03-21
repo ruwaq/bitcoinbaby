@@ -74,17 +74,18 @@ export function MiningSection() {
           </p>
         </InfoBanner>
 
-        {/* Connection Warning */}
+        {/* Wallet Setup Prompt - Inviting, not blocking */}
         {!wallet && (
-          <InfoBanner variant="warning" icon="&#128274;" className="mb-6">
-            <p className="font-pixel text-pixel-xs uppercase mb-1">
-              Wallet Not Connected
+          <InfoBanner variant="highlight" icon="&#127775;" className="mb-6">
+            <p className="font-pixel text-pixel-xs text-pixel-primary uppercase mb-1">
+              Ready to Mine?
             </p>
-            <p className="font-pixel-body text-sm text-pixel-text-muted">
-              Connect your wallet to start earning $BABY tokens.{" "}
-              <span className="text-pixel-primary">
-                Go to Wallet tab to connect.
-              </span>
+            <p className="font-pixel-body text-sm text-pixel-text">
+              Create your wallet in 30 seconds to start earning $BABY tokens.
+              Your device is ready to mine!
+            </p>
+            <p className="font-pixel text-pixel-2xs text-pixel-secondary mt-2">
+              &#8594; Go to Wallet tab to get started
             </p>
           </InfoBanner>
         )}
