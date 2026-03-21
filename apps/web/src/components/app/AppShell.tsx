@@ -58,6 +58,7 @@ async function resetAllData() {
 }
 import { AppHeader } from "./AppHeader";
 import { TabNavigation, type TabType } from "./TabNavigation";
+import { TestnetBanner } from "./TestnetBanner";
 
 // Reset confirmation modal component
 function ResetConfirmationModal({
@@ -267,6 +268,9 @@ function AppShellInner() {
 
   return (
     <div className="min-h-screen flex flex-col bg-pixel-bg-dark">
+      {/* Testnet Banner */}
+      <TestnetBanner />
+
       {/* Persistent Header */}
       <AppHeader onMiningClick={goToMining} onWalletClick={goToWallet} />
 
