@@ -60,6 +60,15 @@ export {
   type UseVirtualBalanceOptions,
 } from "./useVirtualBalance";
 
+// Claim - Server-Assisted (simplified UX)
+export {
+  useClaim,
+  type ClaimStatus,
+  type ClaimBalance,
+  type UseClaimOptions,
+  type UseClaimReturn,
+} from "./useClaim";
+
 // Game hooks - re-exported from @bitcoinbaby/core
 // Local versions deprecated, use from core
 export { useBabyState } from "./useBabyState";

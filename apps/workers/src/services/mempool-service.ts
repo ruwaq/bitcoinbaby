@@ -2,7 +2,7 @@
  * Mempool Service
  *
  * Verifies Bitcoin transactions on-chain via Mempool.space API.
- * Used to verify claim transactions before minting.
+ * Includes KV caching to reduce API calls and latency.
  */
 
 import { claimLogger } from "../lib/logger";
@@ -32,21 +32,46 @@ export interface TxVerificationResult {
   error?: string;
 }
 
+export interface UTXO {
+  txid: string;
+  vout: number;
+  value: number;
+  status: { confirmed: boolean; block_height?: number };
+}
+
+export interface FeeRates {
+  fastestFee: number;
+  halfHourFee: number;
+  hourFee: number;
+  economyFee: number;
+  minimumFee: number;
+}
+
+// =============================================================================
+// CACHE CONFIG
+// =============================================================================
+
+const CACHE_TTL = {
+  FEE_RATES: 120, // 2 minutes - fees change slowly
+  UTXOS: 30, // 30 seconds - balance checks are frequent
+  TX_PENDING: 60, // 1 minute for pending TXs
+  TX_CONFIRMED: 600, // 10 minutes for confirmed TXs
+  BLOCK_HEIGHT: 60, // 1 minute
+};
+
+const CACHE_PREFIX = "mempool:";
+
 // =============================================================================
 // CONSTANTS
 // =============================================================================
 
-/** Mempool.space API base URLs */
 const MEMPOOL_API_URLS = {
   mainnet: "https://mempool.space/api",
   testnet: "https://mempool.space/testnet/api",
   testnet4: "https://mempool.space/testnet4/api",
 };
 
-/** Request timeout */
 const REQUEST_TIMEOUT_MS = 10_000;
-
-/** Retry configuration */
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
@@ -56,19 +81,91 @@ const RETRY_DELAY_MS = 1000;
 
 export class MempoolService {
   private baseUrl: string;
-  private currentBlockHeight: number | null = null;
-  private blockHeightCacheTime: number = 0;
-  private readonly BLOCK_HEIGHT_CACHE_MS = 60_000; // 1 minute cache
+  private network: string;
+  private kv: KVNamespace | null = null;
+
+  // In-memory fallback cache
+  private memCache: Map<string, { data: unknown; expiresAt: number }> =
+    new Map();
+  private readonly MEM_CACHE_MAX_SIZE = 100;
 
   constructor(network: "mainnet" | "testnet" | "testnet4" = "testnet4") {
     this.baseUrl = MEMPOOL_API_URLS[network];
+    this.network = network;
   }
 
   /**
-   * Verify a transaction exists and get its status
+   * Set KV namespace for caching (optional)
+   */
+  setKV(kv: KVNamespace | null): void {
+    this.kv = kv;
+  }
+
+  // ===========================================================================
+  // CACHING HELPERS
+  // ===========================================================================
+
+  private cacheKey(type: string, id: string): string {
+    return `${CACHE_PREFIX}${this.network}:${type}:${id}`;
+  }
+
+  private async getFromCache<T>(key: string): Promise<T | null> {
+    // Try KV first
+    if (this.kv) {
+      try {
+        const cached = await this.kv.get(key, "json");
+        if (cached) return cached as T;
+      } catch {
+        // KV error, fall through to memory cache
+      }
+    }
+
+    // Memory cache fallback
+    const memCached = this.memCache.get(key);
+    if (memCached && memCached.expiresAt > Date.now()) {
+      return memCached.data as T;
+    }
+
+    return null;
+  }
+
+  private async setInCache<T>(
+    key: string,
+    data: T,
+    ttlSeconds: number,
+  ): Promise<void> {
+    // Set in KV
+    if (this.kv) {
+      try {
+        await this.kv.put(key, JSON.stringify(data), {
+          expirationTtl: ttlSeconds,
+        });
+      } catch {
+        // KV error, continue with memory cache
+      }
+    }
+
+    // Also set in memory cache
+    if (this.memCache.size >= this.MEM_CACHE_MAX_SIZE) {
+      // Evict oldest entries
+      const oldestKey = this.memCache.keys().next().value;
+      if (oldestKey) this.memCache.delete(oldestKey);
+    }
+
+    this.memCache.set(key, {
+      data,
+      expiresAt: Date.now() + ttlSeconds * 1000,
+    });
+  }
+
+  // ===========================================================================
+  // PUBLIC API
+  // ===========================================================================
+
+  /**
+   * Verify a transaction exists and get its status (cached)
    */
   async verifyTransaction(txid: string): Promise<TxVerificationResult> {
-    // Validate txid format
     if (!/^[a-fA-F0-9]{64}$/.test(txid)) {
       return {
         exists: false,
@@ -78,30 +175,45 @@ export class MempoolService {
       };
     }
 
+    const cacheKey = this.cacheKey("tx", txid);
+
+    // Check cache
+    const cached = await this.getFromCache<TxVerificationResult>(cacheKey);
+    if (cached) return cached;
+
     try {
       const txInfo = await this.fetchWithRetry<MempoolTxInfo>(`/tx/${txid}`);
 
       if (!txInfo) {
-        return {
+        const result: TxVerificationResult = {
           exists: false,
           confirmed: false,
           confirmations: 0,
         };
+        // Don't cache "not found" - TX might still be propagating
+        return result;
       }
 
-      // Get current block height for confirmations
       const currentHeight = await this.getCurrentBlockHeight();
       const confirmations =
         txInfo.status.confirmed && txInfo.status.block_height
           ? Math.max(0, currentHeight - txInfo.status.block_height + 1)
           : 0;
 
-      return {
+      const result: TxVerificationResult = {
         exists: true,
         confirmed: txInfo.status.confirmed,
         confirmations,
         blockHeight: txInfo.status.block_height,
       };
+
+      // Cache based on confirmation status
+      const ttl = txInfo.status.confirmed
+        ? CACHE_TTL.TX_CONFIRMED
+        : CACHE_TTL.TX_PENDING;
+      await this.setInCache(cacheKey, result, ttl);
+
+      return result;
     } catch (error) {
       claimLogger.error("Failed to verify transaction", { txid, error });
       return {
@@ -115,9 +227,6 @@ export class MempoolService {
 
   /**
    * Wait for a transaction to be confirmed
-   * @param txid Transaction ID
-   * @param requiredConfirmations Minimum confirmations (default: 1)
-   * @param timeoutMs Maximum wait time (default: 10 minutes)
    */
   async waitForConfirmation(
     txid: string,
@@ -125,7 +234,7 @@ export class MempoolService {
     timeoutMs: number = 600_000,
   ): Promise<TxVerificationResult> {
     const startTime = Date.now();
-    const pollInterval = 30_000; // Poll every 30 seconds
+    const pollInterval = 30_000;
 
     while (Date.now() - startTime < timeoutMs) {
       const result = await this.verifyTransaction(txid);
@@ -135,11 +244,9 @@ export class MempoolService {
       }
 
       if (!result.exists) {
-        // Transaction not found - might still be propagating
         claimLogger.info("TX not found yet, waiting...", { txid });
       }
 
-      // Wait before next poll
       await this.sleep(pollInterval);
     }
 
@@ -155,36 +262,28 @@ export class MempoolService {
    * Get current block height (cached)
    */
   async getCurrentBlockHeight(): Promise<number> {
-    const now = Date.now();
+    const cacheKey = this.cacheKey("height", "current");
 
-    // Return cached value if fresh
-    if (
-      this.currentBlockHeight !== null &&
-      now - this.blockHeightCacheTime < this.BLOCK_HEIGHT_CACHE_MS
-    ) {
-      return this.currentBlockHeight;
-    }
+    const cached = await this.getFromCache<number>(cacheKey);
+    if (cached !== null) return cached;
 
     try {
       const height = await this.fetchWithRetry<number>("/blocks/tip/height");
       if (height !== null) {
-        this.currentBlockHeight = height;
-        this.blockHeightCacheTime = now;
+        await this.setInCache(cacheKey, height, CACHE_TTL.BLOCK_HEIGHT);
         return height;
       }
     } catch (error) {
       claimLogger.error("Failed to get block height", { error });
     }
 
-    // Return cached value even if stale, or 0 if no cache
-    return this.currentBlockHeight ?? 0;
+    return 0;
   }
 
   /**
-   * Get raw transaction hex
+   * Get raw transaction hex (not cached - rarely used)
    */
   async getTransactionHex(txid: string): Promise<string | null> {
-    // Validate txid format
     if (!/^[a-fA-F0-9]{64}$/.test(txid)) {
       claimLogger.error("Invalid txid format", { txid });
       return null;
@@ -204,13 +303,8 @@ export class MempoolService {
 
       clearTimeout(timeoutId);
 
-      if (response.status === 404) {
-        return null;
-      }
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       return await response.text();
     } catch (error) {
@@ -220,52 +314,159 @@ export class MempoolService {
   }
 
   /**
-   * Get recommended fee rates
+   * Get UTXOs for an address (cached)
    */
-  async getFeeRates(): Promise<{
-    fastestFee: number;
-    halfHourFee: number;
-    hourFee: number;
-    economyFee: number;
-    minimumFee: number;
+  async getAddressUtxos(address: string): Promise<UTXO[]> {
+    const cacheKey = this.cacheKey("utxos", address);
+
+    const cached = await this.getFromCache<UTXO[]>(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const utxos = await this.fetchWithRetry<UTXO[]>(
+        `/address/${address}/utxo`,
+      );
+      const result = utxos ?? [];
+
+      await this.setInCache(cacheKey, result, CACHE_TTL.UTXOS);
+      return result;
+    } catch (error) {
+      claimLogger.error("Failed to get address UTXOs", { address, error });
+      return [];
+    }
+  }
+
+  /**
+   * Invalidate UTXO cache for an address (call after TX broadcast)
+   */
+  async invalidateUtxoCache(address: string): Promise<void> {
+    const cacheKey = this.cacheKey("utxos", address);
+    this.memCache.delete(cacheKey);
+
+    if (this.kv) {
+      try {
+        await this.kv.delete(cacheKey);
+      } catch {
+        // Ignore KV errors
+      }
+    }
+  }
+
+  /**
+   * Get address balance (uses UTXO cache)
+   */
+  async getAddressBalance(address: string): Promise<{
+    confirmed: number;
+    unconfirmed: number;
   }> {
     try {
-      const fees = await this.fetchWithRetry<{
-        fastestFee: number;
-        halfHourFee: number;
-        hourFee: number;
-        economyFee: number;
-        minimumFee: number;
-      }>("/v1/fees/recommended");
+      const data = await this.fetchWithRetry<{
+        address: string;
+        chain_stats: { funded_txo_sum: number; spent_txo_sum: number };
+        mempool_stats: { funded_txo_sum: number; spent_txo_sum: number };
+      }>(`/address/${address}`);
 
-      return (
-        fees ?? {
-          fastestFee: 10,
-          halfHourFee: 5,
-          hourFee: 3,
-          economyFee: 2,
-          minimumFee: 1,
-        }
-      );
-    } catch {
-      // Return defaults on error
+      if (!data) {
+        return { confirmed: 0, unconfirmed: 0 };
+      }
+
       return {
-        fastestFee: 10,
-        halfHourFee: 5,
-        hourFee: 3,
-        economyFee: 2,
-        minimumFee: 1,
+        confirmed:
+          data.chain_stats.funded_txo_sum - data.chain_stats.spent_txo_sum,
+        unconfirmed:
+          data.mempool_stats.funded_txo_sum - data.mempool_stats.spent_txo_sum,
       };
+    } catch (error) {
+      claimLogger.error("Failed to get address balance", { address, error });
+      return { confirmed: 0, unconfirmed: 0 };
     }
+  }
+
+  /**
+   * Broadcast a raw transaction (invalidates UTXO cache)
+   */
+  async broadcastTransaction(
+    txHex: string,
+    senderAddress?: string,
+  ): Promise<string> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        REQUEST_TIMEOUT_MS,
+      );
+
+      const response = await fetch(`${this.baseUrl}/tx`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: txHex,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Broadcast failed: ${response.status} - ${errorText}`);
+      }
+
+      const txid = await response.text();
+      claimLogger.info("Transaction broadcast", { txid });
+
+      // Invalidate UTXO cache for sender
+      if (senderAddress) {
+        await this.invalidateUtxoCache(senderAddress);
+      }
+
+      return txid;
+    } catch (error) {
+      claimLogger.error("Failed to broadcast transaction", { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get recommended fee rates (cached)
+   */
+  async getFeeRates(): Promise<FeeRates> {
+    const cacheKey = this.cacheKey("fees", "recommended");
+
+    const cached = await this.getFromCache<FeeRates>(cacheKey);
+    if (cached) return cached;
+
+    const defaultFees: FeeRates = {
+      fastestFee: 10,
+      halfHourFee: 5,
+      hourFee: 3,
+      economyFee: 2,
+      minimumFee: 1,
+    };
+
+    try {
+      const fees = await this.fetchWithRetry<FeeRates>("/v1/fees/recommended");
+      const result = fees ?? defaultFees;
+
+      await this.setInCache(cacheKey, result, CACHE_TTL.FEE_RATES);
+      return result;
+    } catch {
+      return defaultFees;
+    }
+  }
+
+  /**
+   * Get cache stats (for monitoring)
+   */
+  getCacheStats(): { memorySize: number; network: string } {
+    return {
+      memorySize: this.memCache.size,
+      network: this.network,
+    };
   }
 
   // ===========================================================================
   // PRIVATE HELPERS
   // ===========================================================================
 
-  /**
-   * Fetch with retry logic
-   */
   private async fetchWithRetry<T>(endpoint: string): Promise<T | null> {
     let lastError: Error | null = null;
 
@@ -284,9 +485,7 @@ export class MempoolService {
 
         clearTimeout(timeoutId);
 
-        if (response.status === 404) {
-          return null;
-        }
+        if (response.status === 404) return null;
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${await response.text()}`);
@@ -326,4 +525,16 @@ export function getMempoolService(
     mempoolServiceInstance = new MempoolService(network);
   }
   return mempoolServiceInstance;
+}
+
+/**
+ * Initialize mempool service with KV caching
+ */
+export function initMempoolService(
+  network: "mainnet" | "testnet" | "testnet4",
+  kv: KVNamespace | null,
+): MempoolService {
+  const service = getMempoolService(network);
+  service.setKV(kv);
+  return service;
 }

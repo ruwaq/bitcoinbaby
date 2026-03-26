@@ -265,31 +265,135 @@ export const errorHandler = createMiddleware<{ Bindings: Env }>(
 // RATE LIMITING MIDDLEWARE
 // =============================================================================
 
-/**
- * Simple in-memory rate limiter
- *
- * Note: For production, use Cloudflare's built-in rate limiting
- * or a distributed solution like Redis.
- */
-const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+/** In-memory fallback cache for when KV is unavailable */
+const rateLimitMemCache = new Map<string, { count: number; resetAt: number }>();
+const MEM_CACHE_MAX_SIZE = 10000;
 
-export function rateLimit(options: {
+export interface RateLimitOptions {
+  /** Time window in milliseconds */
   windowMs: number;
+  /** Maximum requests per window */
   max: number;
+  /** Custom key generator (default: CF-Connecting-IP) */
   keyGenerator?: (c: Context) => string;
-}) {
-  const { windowMs, max, keyGenerator } = options;
+  /** Prefix for KV keys */
+  prefix?: string;
+  /** Skip rate limiting in development */
+  skipInDev?: boolean;
+}
+
+/**
+ * Distributed rate limiter using KV with in-memory fallback
+ *
+ * Features:
+ * - Uses KV for distributed rate limiting across workers
+ * - Falls back to in-memory when KV unavailable
+ * - Supports custom key generators for per-address limits
+ * - Automatically cleans up expired entries
+ */
+export function rateLimit(options: RateLimitOptions) {
+  const {
+    windowMs,
+    max,
+    keyGenerator,
+    prefix = "rl:",
+    skipInDev = false,
+  } = options;
 
   return createMiddleware<{ Bindings: Env }>(async (c, next) => {
-    const key = keyGenerator
-      ? keyGenerator(c)
-      : c.req.header("CF-Connecting-IP") || "anonymous";
+    // Skip in development if configured
+    if (skipInDev && c.env.ENVIRONMENT === "development") {
+      await next();
+      return;
+    }
 
+    const ip = c.req.header("CF-Connecting-IP") || "anonymous";
+    const key = keyGenerator ? keyGenerator(c) : ip;
+    const kvKey = `${prefix}${key}`;
     const now = Date.now();
-    const record = rateLimitStore.get(key);
+    const windowEnd = now + windowMs;
+
+    // Try KV first (distributed)
+    const kv = c.env.CACHE;
+    if (kv) {
+      try {
+        const cached = await kv.get<{ count: number; resetAt: number }>(
+          kvKey,
+          "json",
+        );
+
+        if (!cached || now > cached.resetAt) {
+          // New window
+          await kv.put(
+            kvKey,
+            JSON.stringify({ count: 1, resetAt: windowEnd }),
+            { expirationTtl: Math.ceil(windowMs / 1000) + 60 },
+          );
+          await next();
+          return;
+        }
+
+        if (cached.count >= max) {
+          const retryAfter = Math.ceil((cached.resetAt - now) / 1000);
+          c.header("Retry-After", String(retryAfter));
+          c.header("X-RateLimit-Limit", String(max));
+          c.header("X-RateLimit-Remaining", "0");
+          c.header(
+            "X-RateLimit-Reset",
+            String(Math.ceil(cached.resetAt / 1000)),
+          );
+
+          apiLogger.warn("Rate limit exceeded", {
+            ip,
+            key,
+            count: cached.count,
+          });
+
+          return c.json<ApiResponse>(
+            {
+              success: false,
+              error: "Rate limit exceeded. Please try again later.",
+              timestamp: now,
+            },
+            429,
+          );
+        }
+
+        // Increment counter
+        await kv.put(
+          kvKey,
+          JSON.stringify({ count: cached.count + 1, resetAt: cached.resetAt }),
+          { expirationTtl: Math.ceil((cached.resetAt - now) / 1000) + 60 },
+        );
+
+        c.header("X-RateLimit-Limit", String(max));
+        c.header("X-RateLimit-Remaining", String(max - cached.count - 1));
+        c.header("X-RateLimit-Reset", String(Math.ceil(cached.resetAt / 1000)));
+
+        await next();
+        return;
+      } catch (kvError) {
+        apiLogger.warn("KV rate limit error, falling back to memory", {
+          error: kvError,
+        });
+        // Fall through to memory-based rate limiting
+      }
+    }
+
+    // In-memory fallback (single worker only)
+    const record = rateLimitMemCache.get(kvKey);
 
     if (!record || now > record.resetAt) {
-      rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
+      // Cleanup old entries periodically
+      if (rateLimitMemCache.size > MEM_CACHE_MAX_SIZE) {
+        const entries = Array.from(rateLimitMemCache.entries());
+        const toDelete = entries
+          .filter(([, v]) => now > v.resetAt)
+          .slice(0, 1000);
+        toDelete.forEach(([k]) => rateLimitMemCache.delete(k));
+      }
+
+      rateLimitMemCache.set(kvKey, { count: 1, resetAt: windowEnd });
       await next();
       return;
     }
@@ -301,7 +405,7 @@ export function rateLimit(options: {
         {
           success: false,
           error: "Rate limit exceeded. Please try again later.",
-          timestamp: Date.now(),
+          timestamp: now,
         },
         429,
       );
@@ -311,6 +415,83 @@ export function rateLimit(options: {
     await next();
   });
 }
+
+/**
+ * Pre-configured rate limits for common use cases
+ */
+export const rateLimits = {
+  /** General API: 100 req/min */
+  general: rateLimit({ windowMs: 60_000, max: 100 }),
+
+  /** Mining credit: 60 req/min (1/sec target rate) */
+  miningCredit: rateLimit({
+    windowMs: 60_000,
+    max: 60,
+    prefix: "rl:mine:",
+    skipInDev: true, // Allow tests to pass in development
+    keyGenerator: (c) => {
+      const address =
+        c.req.param("address") || c.req.header("X-Wallet-Address");
+      const ip = c.req.header("CF-Connecting-IP") || "anon";
+      return address || ip;
+    },
+  }),
+
+  /** Claim operations: 10 req/min */
+  claim: rateLimit({
+    windowMs: 60_000,
+    max: 10,
+    prefix: "rl:claim:",
+    skipInDev: true, // Allow tests to pass in development
+    keyGenerator: (c) => {
+      const ip = c.req.header("CF-Connecting-IP") || "anon";
+      return ip;
+    },
+  }),
+
+  /** Admin operations: 30 req/min */
+  admin: rateLimit({
+    windowMs: 60_000,
+    max: 30,
+    prefix: "rl:admin:",
+  }),
+};
+
+// =============================================================================
+// METRICS MIDDLEWARE
+// =============================================================================
+
+import { recordRequest } from "./metrics";
+
+/**
+ * Metrics collection middleware
+ *
+ * Records request count, latency, and status for all routes.
+ */
+export const metricsMiddleware = createMiddleware<{ Bindings: Env }>(
+  async (c, next) => {
+    const start = Date.now();
+    const method = c.req.method;
+
+    // Normalize path for metrics (remove IDs)
+    let endpoint = c.req.path;
+    endpoint = endpoint
+      .replace(/\/[a-fA-F0-9]{64}/g, "/:txid")
+      .replace(/\/tb1[a-zA-HJ-NP-Z0-9]{25,62}/g, "/:address")
+      .replace(/\/bc1[a-zA-HJ-NP-Z0-9]{25,62}/g, "/:address")
+      .replace(
+        /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+        "/:uuid",
+      );
+
+    await next();
+
+    const duration = Date.now() - start;
+    const status = c.res.status;
+
+    recordRequest(endpoint, method, status, duration);
+  },
+);
 
 // =============================================================================
 // LOGGING MIDDLEWARE

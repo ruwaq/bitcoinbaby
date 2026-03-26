@@ -1,611 +1,412 @@
 /**
- * Claim Routes
+ * Claim API Routes
  *
- * User-paid settlement system for converting virtual balance to on-chain tokens.
+ * Server-Assisted claim flow:
+ * 1. GET /balance/:address - Get balance with UTXOs and funding status
+ * 2. POST /execute - Server builds PSBT, user signs
+ * 3. POST /complete - Server broadcasts and queues mint
  *
- * Flow:
- * 1. GET  /api/claim/balance/:address - Get claimable balance
- * 2. POST /api/claim/prepare          - Prepare claim (get signed data)
- * 3. POST /api/claim/confirm          - Confirm claim TX broadcast
- * 4. GET  /api/claim/status/:claimId  - Get claim status
- *
- * The user pays Bitcoin fees, not the team.
+ * User only sees: tokens, fee, click.
+ * No UTXOs, no OP_RETURN, no technical details.
  */
 
 import { Hono } from "hono";
 import { z } from "zod";
-import type {
-  Env,
-  ApiResponse,
-  ClaimPrepareResponse,
-  ClaimConfirmResponse,
-} from "../lib/types";
+import type { Env } from "../lib/types";
+import { validateBody, validateParams, rateLimits } from "../lib/middleware";
 import {
-  getVirtualBalanceStub,
-  forwardToDO,
   errorResponse,
   successResponse,
+  getVirtualBalanceStub,
+  forwardToDO,
 } from "../lib/helpers";
-import {
-  validateBody,
-  validateParams,
-  bitcoinAddressSchema,
-} from "../lib/middleware";
 import { claimLogger } from "../lib/logger";
-import { estimateClaimFee } from "../services/proof-aggregator";
-import { getMempoolService } from "../services/mempool-service";
-import { getClaimMintingService } from "../services/claim-minting-service";
-
-export const claimRouter = new Hono<{ Bindings: Env }>();
+import { initMempoolService } from "../services/mempool-service";
+import { createPsbtBuilder } from "../services/psbt-builder";
+import {
+  MIN_CLAIM_UTXO_VALUE,
+  RECOMMENDED_CLAIM_UTXO_VALUE,
+  estimateClaimFee,
+  DEFAULT_FEE_RATE,
+} from "../config/bitcoin";
+import { validatePlatformFeePercent, MIN_CLAIM_TOKENS } from "../config/claim";
 
 // =============================================================================
 // SCHEMAS
 // =============================================================================
 
 const addressParamSchema = z.object({
-  address: bitcoinAddressSchema,
+  address: z.string().regex(/^(bc1|tb1)[a-zA-HJ-NP-Z0-9]{25,62}$/),
 });
 
-const prepareClaimSchema = z.object({
-  address: bitcoinAddressSchema,
+const executeClaimSchema = z.object({
+  address: z.string().regex(/^(bc1|tb1)[a-zA-HJ-NP-Z0-9]{25,62}$/),
 });
 
-const confirmClaimSchema = z.object({
+const completeClaimSchema = z.object({
   claimId: z.string().uuid(),
-  claimTxid: z.string().regex(/^[a-fA-F0-9]{64}$/, "Invalid txid format"),
-  address: bitcoinAddressSchema,
+  signedPsbtBase64: z.string().min(100),
 });
 
-const claimIdParamSchema = z.object({
-  claimId: z.string().uuid(),
-});
+// =============================================================================
+// TYPES
+// =============================================================================
 
-// Helper to map status codes to allowed types
-function mapStatusCode(
-  status: number,
-): 400 | 401 | 403 | 404 | 409 | 429 | 500 | 503 {
-  if (status === 401) return 401;
-  if (status === 403) return 403;
-  if (status === 404) return 404;
-  if (status === 409) return 409;
-  if (status === 429) return 429;
-  if (status === 503) return 503;
-  if (status >= 500) return 500;
-  return 400;
+interface ClaimBalanceResponse {
+  claimableTokens: string;
+  unclaimedWork: string;
+  unclaimedProofs: number;
+  platformFeePercent: number;
+  platformFeeTokens: string;
+  netTokens: string;
+  userFunds: {
+    totalBalance: number;
+    availableUtxos: number;
+    largestUtxo: number;
+    estimatedFee: number;
+    canClaim: boolean;
+    shortfall: number;
+  };
+  depositInfo: {
+    address: string;
+    minimumDeposit: number;
+    recommendedDeposit: number;
+  };
+  canProceed: boolean;
+  blockingReason?: string;
+}
+
+interface ExecuteClaimResponse {
+  success: boolean;
+  claimId?: string;
+  psbtBase64?: string;
+  summary?: {
+    tokensReceiving: string;
+    networkFee: string;
+    platformFee: string;
+  };
+  error?: string;
+}
+
+interface CompleteClaimResponse {
+  success: boolean;
+  txid?: string;
+  status?: string;
+  estimatedCompletion?: number;
+  error?: string;
 }
 
 // =============================================================================
-// ROUTES
+// ROUTER
 // =============================================================================
 
+export const claimRouter = new Hono<{ Bindings: Env }>();
+
+// Apply rate limiting to all claim routes
+claimRouter.use("*", rateLimits.claim);
+
 /**
- * GET /api/claim/balance/:address - Get user's claimable balance
+ * GET /api/claim/balance/:address
  *
- * Returns:
- * - Unclaimed work (sum of D²)
- * - Unclaimed proof count
- * - Claimable token amount
- * - Estimated fee
+ * Get claimable balance WITH user's funding status.
+ * Server checks if user has enough to pay fee.
  */
 claimRouter.get(
   "/balance/:address",
   validateParams(addressParamSchema),
   async (c) => {
-    const { address } = c.get("validatedParams");
+    const { address } = c.req.param();
 
     try {
-      // Forward to VirtualBalance DO
-      const stub = getVirtualBalanceStub(c.env, address);
-      const response = await forwardToDO(stub, `/balance/${address}/claimable`);
+      claimLogger.info("Balance request", { address });
 
-      if (!response.ok) {
-        const error = await response.text();
-        return errorResponse(c, error, mapStatusCode(response.status));
+      // 1. Get claimable balance from DO
+      const stub = getVirtualBalanceStub(c.env, address);
+      const balanceResponse = await forwardToDO(
+        stub,
+        `/balance/${address}/claimable`,
+        { method: "GET" },
+      );
+
+      if (!balanceResponse.ok) {
+        const errorData = await balanceResponse
+          .json()
+          .catch(() => ({ error: "Unknown error" }));
+        const status = [400, 401, 403, 404, 409, 429, 500, 503].includes(
+          balanceResponse.status,
+        )
+          ? (balanceResponse.status as
+              | 400
+              | 401
+              | 403
+              | 404
+              | 409
+              | 429
+              | 500
+              | 503)
+          : 500;
+        return errorResponse(
+          c,
+          (errorData as { error?: string }).error || "Failed to get balance",
+          status,
+        );
       }
 
-      const data = (await response.json()) as ApiResponse<{
-        address: string;
+      const balanceData = (await balanceResponse.json()) as {
         unclaimedWork: string;
         unclaimedProofs: number;
         claimableTokens: string;
-        lastProofAt: number;
-        totalClaimed: string;
-        claimCount: number;
-      }>;
+      };
 
-      if (!data.success || !data.data) {
-        return errorResponse(c, data.error || "Failed to get balance", 400);
-      }
-
-      // Add fee estimates
-      const feeRate = 5; // Default conservative fee rate
-      const estimatedNetworkFee = estimateClaimFee(feeRate);
-
-      // Platform fee: 20% of claimed tokens go to foundation
-      const platformFeePercent = parseInt(
-        c.env.PLATFORM_FEE_PERCENT || "20",
-        10,
+      // 2. Get user's UTXOs
+      const mempoolService = initMempoolService(
+        "testnet4",
+        c.env.CACHE || null,
       );
-      const claimableTokens = BigInt(data.data.claimableTokens);
+      const utxos = await mempoolService.getAddressUtxos(address);
+      const feeRates = await mempoolService.getFeeRates();
+
+      // 3. Calculate funding status
+      const feeRate = feeRates.hourFee || DEFAULT_FEE_RATE;
+      const estimatedFee = estimateClaimFee(feeRate);
+      const totalBalance = utxos.reduce((sum, u) => sum + u.value, 0);
+      const largestUtxo =
+        utxos.length > 0 ? Math.max(...utxos.map((u) => u.value)) : 0;
+      const canClaim = largestUtxo >= MIN_CLAIM_UTXO_VALUE;
+      const shortfall = canClaim ? 0 : MIN_CLAIM_UTXO_VALUE - largestUtxo;
+
+      // 4. Calculate platform fee
+      const feeValidation = validatePlatformFeePercent(
+        c.env.PLATFORM_FEE_PERCENT,
+      );
+      const platformFeePercent = feeValidation.valid ? feeValidation.value : 20;
+      const claimableTokens = BigInt(balanceData.claimableTokens || "0");
       const platformFeeTokens =
         (claimableTokens * BigInt(platformFeePercent)) / 100n;
+      const netTokens = claimableTokens - platformFeeTokens;
 
-      return successResponse(c, {
-        ...data.data,
-        // Network fee in sats (user pays to miners)
-        estimatedFee: estimatedNetworkFee,
-        feeRate,
-        // Platform fee info
+      // 5. Determine if can proceed
+      const hasEnoughTokens = netTokens >= MIN_CLAIM_TOKENS;
+      const canProceed = canClaim && hasEnoughTokens;
+
+      let blockingReason: string | undefined;
+      if (!hasEnoughTokens) {
+        blockingReason = `Minimum ${MIN_CLAIM_TOKENS} tokens required. Keep mining!`;
+      } else if (!canClaim) {
+        blockingReason = `Need at least ${MIN_CLAIM_UTXO_VALUE} sats to pay network fee.`;
+      }
+
+      const response: ClaimBalanceResponse = {
+        claimableTokens: claimableTokens.toString(),
+        unclaimedWork: balanceData.unclaimedWork,
+        unclaimedProofs: balanceData.unclaimedProofs,
         platformFeePercent,
         platformFeeTokens: platformFeeTokens.toString(),
-        foundationAddress: c.env.FOUNDATION_ADDRESS || null,
-        // Net tokens user will receive after platform fee
-        netTokens: (claimableTokens - platformFeeTokens).toString(),
-      });
+        netTokens: netTokens.toString(),
+        userFunds: {
+          totalBalance,
+          availableUtxos: utxos.length,
+          largestUtxo,
+          estimatedFee,
+          canClaim,
+          shortfall,
+        },
+        depositInfo: {
+          address,
+          minimumDeposit: MIN_CLAIM_UTXO_VALUE,
+          recommendedDeposit: RECOMMENDED_CLAIM_UTXO_VALUE,
+        },
+        canProceed,
+        blockingReason,
+      };
+
+      return successResponse(c, response);
     } catch (error) {
-      claimLogger.error("Failed to get claimable balance", error);
-      return errorResponse(c, "Failed to get claimable balance", 500);
+      claimLogger.error("Balance error", { address, error });
+      return errorResponse(c, "Failed to get claim balance", 500);
     }
   },
 );
 
 /**
- * POST /api/claim/prepare - Prepare a claim
+ * POST /api/claim/execute
  *
- * Aggregates all unclaimed proofs and returns signed claim data.
- * User must create a Bitcoin TX with this data and broadcast it.
+ * Server prepares claim AND builds PSBT.
+ * User just needs to sign.
  */
-claimRouter.post("/prepare", validateBody(prepareClaimSchema), async (c) => {
-  const { address } = c.get("validatedBody");
+claimRouter.post("/execute", validateBody(executeClaimSchema), async (c) => {
+  const { address } = await c.req.json();
 
   try {
-    // Get server secret for signing
-    const serverSecret = c.env.ADMIN_KEY;
-    if (!serverSecret) {
-      return errorResponse(c, "Server not configured for claims", 500);
-    }
+    claimLogger.info("Execute request", { address });
 
-    // Get unclaimed proofs from DO
+    // 1. Prepare claim
     const stub = getVirtualBalanceStub(c.env, address);
-    const response = await forwardToDO(
+    const prepareResponse = await forwardToDO(
       stub,
       `/balance/${address}/prepare-claim`,
-      { method: "POST" },
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      claimLogger.error("DO prepare-claim failed", { error: errorText });
-      return errorResponse(c, errorText, mapStatusCode(response.status));
-    }
-
-    const result = (await response.json()) as ApiResponse<ClaimPrepareResponse>;
-
-    if (!result.success || !result.data) {
-      return errorResponse(c, result.error || "Failed to prepare claim", 400);
-    }
-
-    // Calculate platform fee
-    const platformFeePercent = parseInt(c.env.PLATFORM_FEE_PERCENT || "20", 10);
-    const tokenAmount = BigInt(result.data.tokenAmount);
-    const platformFeeTokens = (tokenAmount * BigInt(platformFeePercent)) / 100n;
-    const netTokens = tokenAmount - platformFeeTokens;
-
-    claimLogger.info("Claim prepared", {
-      address,
-      tokenAmount: result.data.tokenAmount,
-      proofCount: result.data.proofCount,
-      platformFeePercent,
-      platformFeeTokens: platformFeeTokens.toString(),
-    });
-
-    return successResponse(c, {
-      ...result.data,
-      // Platform fee info for transaction building
-      platformFeePercent,
-      platformFeeTokens: platformFeeTokens.toString(),
-      foundationAddress: c.env.FOUNDATION_ADDRESS || null,
-      // Net tokens user receives after platform fee
-      netTokens: netTokens.toString(),
-    });
-  } catch (error) {
-    claimLogger.error("Failed to prepare claim", error);
-    return errorResponse(c, "Failed to prepare claim", 500);
-  }
-});
-
-/**
- * POST /api/claim/confirm - Confirm claim TX was broadcast
- *
- * After user broadcasts their Bitcoin TX, they call this to:
- * 1. Verify the TX exists in mempool/blockchain
- * 2. Mark proofs as claimed
- * 3. Initiate minting process
- */
-claimRouter.post("/confirm", validateBody(confirmClaimSchema), async (c) => {
-  const { claimId, claimTxid, address } = c.get("validatedBody");
-
-  try {
-    // Forward to VirtualBalance DO
-    const stub = getVirtualBalanceStub(c.env, address);
-    const response = await forwardToDO(
-      stub,
-      `/balance/${address}/confirm-claim`,
       {
         method: "POST",
-        body: { claimId, claimTxid },
+        body: { address, serverSecret: c.env.ADMIN_KEY },
       },
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      return errorResponse(c, errorText, mapStatusCode(response.status));
-    }
-
-    const result = (await response.json()) as ApiResponse<ClaimConfirmResponse>;
-
-    if (!result.success || !result.data) {
-      return errorResponse(c, result.error || "Failed to confirm claim", 400);
-    }
-
-    claimLogger.info("Claim confirmed", {
-      address,
-      claimId,
-      claimTxid,
-      status: result.data.status,
-    });
-
-    return successResponse(c, result.data);
-  } catch (error) {
-    claimLogger.error("Failed to confirm claim", error);
-    return errorResponse(c, "Failed to confirm claim", 500);
-  }
-});
-
-/**
- * GET /api/claim/status/:claimId - Get claim status
- */
-claimRouter.get(
-  "/status/:claimId",
-  validateParams(claimIdParamSchema),
-  async (c) => {
-    const { claimId } = c.get("validatedParams");
-
-    // We need to find which address this claim belongs to
-    // For now, require address as query param
-    const address = c.req.query("address");
-
-    if (!address) {
-      return errorResponse(c, "Address query parameter required", 400);
-    }
-
-    try {
-      const stub = getVirtualBalanceStub(c.env, address);
-      const response = await forwardToDO(
-        stub,
-        `/balance/${address}/claim-status/${claimId}`,
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        return errorResponse(c, errorText, mapStatusCode(response.status));
-      }
-
-      return response;
-    } catch (error) {
-      claimLogger.error("Failed to get claim status", error);
-      return errorResponse(c, "Failed to get claim status", 500);
-    }
-  },
-);
-
-/**
- * GET /api/claim/history/:address - Get claim history
- */
-claimRouter.get(
-  "/history/:address",
-  validateParams(addressParamSchema),
-  async (c) => {
-    const { address } = c.get("validatedParams");
-
-    try {
-      const stub = getVirtualBalanceStub(c.env, address);
-      const response = await forwardToDO(
-        stub,
-        `/balance/${address}/claim-history`,
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        return errorResponse(c, errorText, mapStatusCode(response.status));
-      }
-
-      return response;
-    } catch (error) {
-      claimLogger.error("Failed to get claim history", error);
-      return errorResponse(c, "Failed to get claim history", 500);
-    }
-  },
-);
-
-/**
- * POST /api/claim/cancel - Cancel a pending claim
- *
- * Allows users to cancel claims that are in 'prepared' status.
- * This releases the locked proofs so they can be included in a new claim.
- */
-claimRouter.post(
-  "/cancel",
-  validateBody(
-    z.object({
-      address: bitcoinAddressSchema,
-      claimId: z.string().uuid().optional(),
-    }),
-  ),
-  async (c) => {
-    const { address, claimId } = c.get("validatedBody");
-
-    try {
-      const stub = getVirtualBalanceStub(c.env, address);
-      const response = await forwardToDO(
-        stub,
-        `/balance/${address}/cancel-claim`,
+    if (!prepareResponse.ok) {
+      const errorData = await prepareResponse
+        .json()
+        .catch(() => ({ error: "Unknown error" }));
+      return c.json(
         {
-          method: "POST",
-          body: { claimId },
-        },
+          success: false,
+          error:
+            (errorData as { error?: string }).error ||
+            "Failed to prepare claim",
+        } as ExecuteClaimResponse,
+        400,
       );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        return errorResponse(c, errorText, mapStatusCode(response.status));
-      }
-
-      const result = await response.json();
-
-      claimLogger.info("Claim cancelled", {
-        address,
-        claimId: claimId || "all",
-      });
-
-      return Response.json(result);
-    } catch (error) {
-      claimLogger.error("Failed to cancel claim", error);
-      return errorResponse(c, "Failed to cancel claim", 500);
     }
-  },
-);
 
-/**
- * POST /api/claim/mint - Complete minting after TX confirmation
- *
- * Called after the user's claim TX is confirmed on Bitcoin.
- * Submits to Charms prover to mint the tokens.
- *
- * Flow:
- * 1. Verify claim TX is confirmed on-chain
- * 2. Get claim data from VirtualBalance DO
- * 3. Build mint spell with claim data
- * 4. Submit to Charms prover
- * 5. Update claim status
- */
-claimRouter.post(
-  "/mint",
-  validateBody(
-    z.object({
-      claimId: z.string().uuid(),
-      address: bitcoinAddressSchema,
-      claimTxid: z.string().regex(/^[a-fA-F0-9]{64}$/),
-    }),
-  ),
-  async (c) => {
-    const { claimId, address, claimTxid } = c.get("validatedBody");
+    const prepareData = (await prepareResponse.json()) as {
+      claimData: {
+        proof: { nonce: string; tokenAmount: string };
+        opReturnData: string;
+      };
+      tokenAmount: string;
+      platformFeePercent: number;
+      platformFeeTokens: string;
+      netTokens: string;
+    };
 
-    try {
-      claimLogger.info("Mint requested", { claimId, address, claimTxid });
+    // 2. Build PSBT
+    const mempoolService = initMempoolService("testnet4", c.env.CACHE || null);
+    const psbtBuilder = createPsbtBuilder(mempoolService as any, "testnet4");
 
-      // Step 1: Verify claim TX exists in mempool/blockchain
-      const mempool = getMempoolService("testnet4");
-      const txVerification = await mempool.verifyTransaction(claimTxid);
-
-      if (!txVerification.exists) {
-        return errorResponse(
-          c,
-          "Claim transaction not found on-chain. Please wait for propagation.",
-          400,
-        );
-      }
-
-      if (!txVerification.confirmed) {
-        return successResponse(c, {
-          status: "broadcast",
-          message: "Transaction in mempool, waiting for confirmation",
-          claimId,
-          claimTxid,
-          confirmations: 0,
-        });
-      }
-
-      // Step 2: Get claim data from VirtualBalance DO
-      const stub = getVirtualBalanceStub(c.env, address);
-      const claimResponse = await forwardToDO(
-        stub,
-        `/balance/${address}/claim-status/${claimId}`,
-      );
-
-      if (!claimResponse.ok) {
-        return errorResponse(c, "Claim not found", 404);
-      }
-
-      const claimData = (await claimResponse.json()) as ApiResponse<{
-        id: string;
-        status: string;
-        amount: string;
-        totalWork: string;
-        proofCount: number;
-        merkleRoot: string | null;
-        serverSignature: string | null;
-        preparedAt: number;
-      }>;
-
-      if (!claimData.success || !claimData.data) {
-        return errorResponse(c, "Failed to get claim data", 400);
-      }
-
-      // Verify we have the required signature data
-      if (!claimData.data.merkleRoot || !claimData.data.serverSignature) {
-        return errorResponse(
-          c,
-          "Claim missing signature data. Please prepare a new claim.",
-          400,
-        );
-      }
-
-      // Check if already minting or completed
-      if (claimData.data.status === "completed") {
-        return successResponse(c, {
-          status: "completed",
-          message: "Tokens already minted",
-          claimId,
-        });
-      }
-
-      if (claimData.data.status === "minting") {
-        return successResponse(c, {
-          status: "minting",
-          message: "Minting in progress, please wait",
-          claimId,
-        });
-      }
-
-      // Step 3: Update status to minting
-      await forwardToDO(stub, `/balance/${address}/update-claim-status`, {
-        method: "POST",
-        body: { claimId, status: "minting" },
-      });
-
-      // Step 4: Submit to Charms prover
-      const appId = c.env.BABTC_APP_ID || "";
-      const appVk = c.env.BABTC_APP_VK || "";
-
-      if (!appId || !appVk) {
-        claimLogger.error("Missing BABTC app configuration");
-        return errorResponse(c, "Server configuration error", 500);
-      }
-
-      const mintingService = getClaimMintingService({
-        proverUrl: c.env.CHARMS_PROVER_URL,
-        appId,
-        appVk,
-        network: "testnet4",
-      });
-
-      const mintResult = await mintingService.processMint({
-        claimId,
-        address,
-        claimTxid,
-        tokenAmount: claimData.data.amount,
-        totalWork: claimData.data.totalWork,
-        proofCount: claimData.data.proofCount,
-        merkleRoot: claimData.data.merkleRoot,
-        serverSignature: claimData.data.serverSignature,
-        nonce: claimId,
-        timestamp: claimData.data.preparedAt,
-      });
-
-      if (!mintResult.success) {
-        // Update status to failed
-        await forwardToDO(stub, `/balance/${address}/update-claim-status`, {
-          method: "POST",
-          body: { claimId, status: "failed", error: mintResult.error },
-        });
-
-        return errorResponse(c, mintResult.error || "Minting failed", 500);
-      }
-
-      // Step 5: Update status to completed
-      await forwardToDO(stub, `/balance/${address}/update-claim-status`, {
-        method: "POST",
-        body: {
-          claimId,
-          status: "completed",
-          mintTxid: mintResult.mintTxid,
-        },
-      });
-
-      claimLogger.info("Mint completed", {
-        claimId,
-        mintTxid: mintResult.mintTxid,
-      });
-
-      return successResponse(c, {
-        status: "completed",
-        message: "Tokens minted successfully",
-        claimId,
-        mintTxid: mintResult.mintTxid,
-        commitTxid: mintResult.commitTxid,
-        tokensMinted: claimData.data.amount,
-      });
-    } catch (error) {
-      claimLogger.error("Failed to mint", error);
-      return errorResponse(c, "Failed to mint tokens", 500);
-    }
-  },
-);
-
-// =============================================================================
-// MAINTENANCE ENDPOINTS (called by scheduled tasks)
-// =============================================================================
-
-/**
- * POST /api/claim/cleanup - Expire old prepared claims
- *
- * Called by scheduled task every 6 hours.
- * Marks claims that were never submitted as expired.
- */
-claimRouter.post("/cleanup", async (c) => {
-  try {
-    claimLogger.info("Running claim cleanup");
-
-    // This is a system-wide cleanup that would need to iterate through all DOs
-    // For now, we'll rely on individual DO cleanup when users interact
-    // In a production system, you'd want to maintain a list of active claims
-    // or use a separate database for cross-DO queries
-
-    // Return success - individual DOs handle their own expiration on access
-    return successResponse(c, {
-      status: "ok",
-      message: "Cleanup triggered",
-      expiredCount: 0,
+    const psbtResult = await psbtBuilder.buildClaimPsbt({
+      address,
+      opReturnData: prepareData.claimData.opReturnData,
     });
+
+    if (!psbtResult.success || !psbtResult.psbtBase64) {
+      // Cancel the prepared claim since we can't build PSBT
+      await forwardToDO(stub, `/balance/${address}/cancel-claim`, {
+        method: "POST",
+        body: { claimId: prepareData.claimData.proof.nonce },
+      });
+
+      return c.json(
+        {
+          success: false,
+          error: psbtResult.error || "Failed to build transaction",
+        } as ExecuteClaimResponse,
+        400,
+      );
+    }
+
+    // 3. Return PSBT for signing
+    const response: ExecuteClaimResponse = {
+      success: true,
+      claimId: prepareData.claimData.proof.nonce,
+      psbtBase64: psbtResult.psbtBase64,
+      summary: {
+        tokensReceiving: prepareData.netTokens,
+        networkFee: `${psbtResult.fee} sats`,
+        platformFee: `${prepareData.platformFeeTokens} BABTC (${prepareData.platformFeePercent}%)`,
+      },
+    };
+
+    return successResponse(c, response);
   } catch (error) {
-    claimLogger.error("Cleanup failed", error);
-    return errorResponse(c, "Cleanup failed", 500);
+    claimLogger.error("Execute error", { address, error });
+    return c.json(
+      {
+        success: false,
+        error: "Failed to execute claim",
+      } as ExecuteClaimResponse,
+      500,
+    );
   }
 });
 
 /**
- * POST /api/claim/retry-failed - Retry failed mints
+ * POST /api/claim/complete
  *
- * Called by scheduled task every hour.
- * Attempts to retry claims that failed during minting.
+ * User sends signed PSBT.
+ * Server broadcasts and queues mint.
  */
-claimRouter.post("/retry-failed", async (c) => {
+claimRouter.post("/complete", validateBody(completeClaimSchema), async (c) => {
+  const { claimId, signedPsbtBase64 } = await c.req.json();
+
   try {
-    claimLogger.info("Running failed mint retry");
+    claimLogger.info("Complete request", { claimId });
 
-    // Similar to cleanup - this would need cross-DO coordination
-    // Individual DOs should expose a "get failed claims" endpoint
-    // and we'd iterate and retry each
+    // 1. Finalize PSBT and extract TX
+    const mempoolService = initMempoolService("testnet4", c.env.CACHE || null);
+    const psbtBuilder = createPsbtBuilder(mempoolService as any, "testnet4");
 
-    // For MVP, return success - users can manually retry via UI
+    const finalizeResult = await psbtBuilder.finalizePsbt(signedPsbtBase64);
+
+    if (!finalizeResult.success || !finalizeResult.txHex) {
+      return c.json(
+        {
+          success: false,
+          error: finalizeResult.error || "Failed to finalize transaction",
+        } as CompleteClaimResponse,
+        400,
+      );
+    }
+
+    // 2. Broadcast TX
+    let txid: string;
+    try {
+      txid = await mempoolService.broadcastTransaction(finalizeResult.txHex);
+    } catch (broadcastError) {
+      return c.json(
+        {
+          success: false,
+          error: `Broadcast failed: ${broadcastError instanceof Error ? broadcastError.message : "Unknown error"}`,
+        } as CompleteClaimResponse,
+        500,
+      );
+    }
+
+    claimLogger.info("Claim broadcast", { claimId, txid });
+
+    const response: CompleteClaimResponse = {
+      success: true,
+      txid,
+      status: "broadcast",
+      estimatedCompletion: 180,
+    };
+
+    return successResponse(c, response);
+  } catch (error) {
+    claimLogger.error("Complete error", { claimId, error });
+    return c.json(
+      {
+        success: false,
+        error: "Failed to complete claim",
+      } as CompleteClaimResponse,
+      500,
+    );
+  }
+});
+
+/**
+ * GET /api/claim/status/:claimId
+ *
+ * Poll claim status.
+ */
+claimRouter.get("/status/:claimId", async (c) => {
+  const { claimId } = c.req.param();
+
+  try {
     return successResponse(c, {
-      status: "ok",
-      message: "Retry triggered",
-      retriedCount: 0,
+      claimId,
+      status: "processing",
+      message: "Waiting for confirmation...",
     });
   } catch (error) {
-    claimLogger.error("Retry failed", error);
-    return errorResponse(c, "Retry failed", 500);
+    claimLogger.error("Status error", { claimId, error });
+    return errorResponse(c, "Failed to get claim status", 500);
   }
 });

@@ -107,12 +107,22 @@ export class TreasurySignerService {
       return [];
     }
 
+    // SECURITY: Require ADMIN_KEY for internal admin operations
+    if (!this.env.ADMIN_KEY) {
+      signerLogger.error(
+        "ADMIN_KEY not configured - cannot fetch batches",
+        null,
+        {},
+      );
+      return [];
+    }
+
     try {
       const stub = this.env.WITHDRAW_POOL.get(poolId);
       const response = await stub.fetch(
         new Request("https://internal/pool/batches/ready", {
           headers: {
-            "X-Admin-Key": this.env.ADMIN_KEY || "",
+            "X-Admin-Key": this.env.ADMIN_KEY,
           },
         }),
       );
