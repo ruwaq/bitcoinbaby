@@ -31,6 +31,8 @@ export interface Env {
   SCROLLS_API_KEY?: string;
   BATCH_WALLET_SEED?: string;
   ADMIN_KEY?: string;
+  /** Separate key for signing claims (more secure than using ADMIN_KEY) */
+  CLAIM_SECRET_KEY?: string;
 
   // Charms/Prover configuration
   PROVER_URL?: string;

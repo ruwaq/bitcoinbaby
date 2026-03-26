@@ -11,6 +11,7 @@ import {
   NFT_CONTRACT_VK,
   NFT_CONTRACT_BINARY,
 } from "../lib/nft-contract-binary";
+import { MEMPOOL_API_URLS, type BitcoinNetwork } from "../config/bitcoin";
 
 // =============================================================================
 // TYPES
@@ -89,10 +90,17 @@ interface ProverResponseData {
 export class NFTMintingServiceSimple {
   private proverUrl: string;
   private appId: string;
+  private network: BitcoinNetwork;
 
-  constructor(config: { proverUrl?: string; appId: string; appVk?: string }) {
+  constructor(config: {
+    proverUrl?: string;
+    appId: string;
+    appVk?: string;
+    network?: BitcoinNetwork;
+  }) {
     this.proverUrl = config.proverUrl || DEFAULT_PROVER_URL;
     this.appId = config.appId;
+    this.network = config.network || "testnet4";
     // Note: appVk is accepted for compatibility but we use NFT_CONTRACT_VK directly
   }
 
@@ -142,9 +150,8 @@ export class NFTMintingServiceSimple {
    * Fetch raw transaction hex from mempool API
    */
   private async fetchRawTransaction(txid: string): Promise<string> {
-    const response = await fetch(
-      `https://mempool.space/testnet4/api/tx/${txid}/hex`,
-    );
+    const baseUrl = MEMPOOL_API_URLS[this.network];
+    const response = await fetch(`${baseUrl}/tx/${txid}/hex`);
     if (!response.ok) {
       throw new Error(`Failed to fetch tx ${txid}: ${response.status}`);
     }
@@ -492,16 +499,12 @@ export class NFTMintingServiceSimple {
   }
 }
 
-// Factory
-let serviceInstance: NFTMintingServiceSimple | null = null;
-
+// Factory - creates new instance per request to support network switching
 export function getNFTMintingServiceSimple(config: {
   proverUrl?: string;
   appId: string;
   appVk: string;
+  network?: BitcoinNetwork;
 }): NFTMintingServiceSimple {
-  if (!serviceInstance) {
-    serviceInstance = new NFTMintingServiceSimple(config);
-  }
-  return serviceInstance;
+  return new NFTMintingServiceSimple(config);
 }

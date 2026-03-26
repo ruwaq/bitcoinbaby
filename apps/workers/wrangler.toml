@@ -163,8 +163,11 @@ crons = ["0 */6 * * *"]
 #   BATCH_WALLET_SEED - Seed for batch transaction signing (NEVER commit!)
 #   TREASURY_ADDRESS - Address holding BABTC for batch transfers
 #
+# Required for claims:
+#   CLAIM_SECRET_KEY - HMAC key for signing claim proofs (32+ chars, separate from ADMIN_KEY)
+#
 # Optional:
-#   ADMIN_KEY - Admin API key for reset endpoints
+#   ADMIN_KEY - Admin API key for reset endpoints (fallback for CLAIM_SECRET_KEY if not set)
 #   PROVER_URL - Custom Prover API URL (default: https://v11.charms.dev)
 #
 # =============================================================================

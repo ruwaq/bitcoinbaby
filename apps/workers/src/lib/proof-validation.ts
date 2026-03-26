@@ -353,17 +353,19 @@ export async function isProofUsedGlobally(
   environment?: string,
 ): Promise<{ used: boolean; error?: string }> {
   if (!kv) {
-    // CRITICAL: In production, reject if KV not available
+    // CRITICAL: In production, BLOCK all proofs if KV not available
+    // This prevents duplicate submissions across workers
     if (environment === "production") {
       if (!kvWarningLogged) {
         proofLogger.error(
           "CRITICAL: KV namespace not configured in production! " +
-            "Rejecting proof submissions until KV is configured.",
+            "Blocking all proof submissions until KV is configured.",
         );
         kvWarningLogged = true;
       }
+      // Return used: true to BLOCK the proof (fail-safe)
       return {
-        used: false,
+        used: true,
         error: "Service temporarily unavailable. Please try again later.",
       };
     }
@@ -376,11 +378,12 @@ export async function isProofUsedGlobally(
     const existing = await kv.get(key);
     return { used: existing !== null };
   } catch (error) {
-    // KV error - log and reject in production
+    // KV error - log and BLOCK in production (fail-safe)
     proofLogger.error("KV read error:", error);
     if (environment === "production") {
+      // Return used: true to BLOCK the proof (fail-safe)
       return {
-        used: false,
+        used: true,
         error: "Service temporarily unavailable. Please try again later.",
       };
     }

@@ -189,29 +189,17 @@ export class ProofAggregator {
   /**
    * Create claim data for Bitcoin TX (sync wrapper)
    *
-   * @deprecated Use createClaimDataAsync() instead.
-   * This sync version generates a PLACEHOLDER signature that is NOT valid
-   * for on-chain verification. It should only be used for:
-   * 1. Preview/estimation purposes
-   * 2. Generating unsigned data structure
+   * @deprecated REMOVED - Use createClaimDataAsync() instead.
+   * This method previously generated invalid placeholder signatures.
+   * All claim operations MUST use the async version for valid signatures.
    *
-   * For production claims, ALWAYS use createClaimDataAsync().
+   * @throws Error Always throws - use createClaimDataAsync() instead
    */
-  createClaimData(proof: AggregatedProof, estimatedFee: number): ClaimData {
-    // WARNING: This generates a placeholder signature that is NOT VALID
-    // for on-chain verification. Use createClaimDataAsync() for real claims.
-    const signatureMessage = this.createSignatureMessage(proof);
-    const placeholderSignature = `pending:${signatureMessage.slice(0, 32)}`;
-    const opReturnData = this.encodeOpReturnSync(proof, placeholderSignature);
-
-    return {
-      proof,
-      serverSignature: placeholderSignature,
-      opReturnData,
-      estimatedFee,
-      // @ts-expect-error - Flag indicating this needs async finalization
-      _requiresAsyncFinalization: true,
-    };
+  createClaimData(_proof: AggregatedProof, _estimatedFee: number): ClaimData {
+    throw new Error(
+      "createClaimData() is deprecated and disabled. " +
+        "Use createClaimDataAsync() for valid HMAC-SHA256 signatures.",
+    );
   }
 
   /**
@@ -360,38 +348,6 @@ export class ProofAggregator {
       proof.timestamp.toString(),
       proof.nonce,
     ].join("|");
-  }
-
-  /**
-   * Encode claim data for OP_RETURN (sync version)
-   */
-  private encodeOpReturnSync(
-    proof: AggregatedProof,
-    signature: string,
-  ): string {
-    // Compress to fit in OP_RETURN (80 bytes max)
-    const compact = {
-      a: proof.address,
-      w: proof.totalWork.toString(),
-      c: proof.proofCount,
-      m: proof.merkleRoot.slice(0, 16),
-      t: proof.tokenAmount.toString(),
-      ts: proof.timestamp,
-      n: proof.nonce.slice(0, 8),
-      s: signature.slice(0, 16),
-    };
-
-    const fullData = JSON.stringify(compact);
-
-    // Simple hash for data reference
-    let hash = 0;
-    for (let i = 0; i < fullData.length; i++) {
-      hash = ((hash << 5) - hash + fullData.charCodeAt(i)) | 0;
-    }
-    const dataHash = Math.abs(hash).toString(16).padStart(32, "0").slice(0, 32);
-
-    const opReturn = `${CLAIM_PREFIX}|${dataHash}`;
-    return bytesToHex(stringToBytes(opReturn));
   }
 
   /**

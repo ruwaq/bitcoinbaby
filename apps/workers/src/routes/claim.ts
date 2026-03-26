@@ -28,6 +28,8 @@ import {
   RECOMMENDED_CLAIM_UTXO_VALUE,
   estimateClaimFee,
   DEFAULT_FEE_RATE,
+  getNetworkForEnvironment,
+  validateAddressNetwork,
 } from "../config/bitcoin";
 import { validatePlatformFeePercent, MIN_CLAIM_TOKENS } from "../config/claim";
 
@@ -159,10 +161,9 @@ claimRouter.get(
       };
 
       // 2. Get user's UTXOs
-      const mempoolService = initMempoolService(
-        "testnet4",
-        c.env.CACHE || null,
-      );
+      const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
+      validateAddressNetwork(address, network);
+      const mempoolService = initMempoolService(network, c.env.CACHE || null);
       const utxos = await mempoolService.getAddressUtxos(address);
       const feeRates = await mempoolService.getFeeRates();
 
@@ -278,8 +279,9 @@ claimRouter.post("/execute", validateBody(executeClaimSchema), async (c) => {
     };
 
     // 2. Build PSBT
-    const mempoolService = initMempoolService("testnet4", c.env.CACHE || null);
-    const psbtBuilder = createPsbtBuilder(mempoolService as any, "testnet4");
+    const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
+    const mempoolService = initMempoolService(network, c.env.CACHE || null);
+    const psbtBuilder = createPsbtBuilder(mempoolService as any, network);
 
     const psbtResult = await psbtBuilder.buildClaimPsbt({
       address,
@@ -340,8 +342,9 @@ claimRouter.post("/complete", validateBody(completeClaimSchema), async (c) => {
     claimLogger.info("Complete request", { claimId });
 
     // 1. Finalize PSBT and extract TX
-    const mempoolService = initMempoolService("testnet4", c.env.CACHE || null);
-    const psbtBuilder = createPsbtBuilder(mempoolService as any, "testnet4");
+    const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
+    const mempoolService = initMempoolService(network, c.env.CACHE || null);
+    const psbtBuilder = createPsbtBuilder(mempoolService as any, network);
 
     const finalizeResult = await psbtBuilder.finalizePsbt(signedPsbtBase64);
 
