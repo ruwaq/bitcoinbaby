@@ -24,7 +24,9 @@ import {
   validateParams,
   bitcoinAddressSchema,
   miningProofSchema,
+  rateLimits,
 } from "../lib/middleware";
+import { constantTimeEqual } from "../lib/encoding";
 
 export const balanceRouter = new Hono<{ Bindings: Env }>();
 
@@ -61,9 +63,12 @@ balanceRouter.get(
 
 /**
  * POST /api/balance/:address/credit - Credit mining reward
+ *
+ * Rate limited: 60 req/min per address to prevent abuse
  */
 balanceRouter.post(
   "/:address/credit",
+  rateLimits.miningCredit,
   validateParams(addressParamSchema),
   validateBody(miningProofSchema),
   async (c) => {
@@ -120,7 +125,11 @@ balanceRouter.delete(
     // Require admin key for destructive operation
     const adminKey = c.req.header("X-Admin-Key");
     const expectedKey = c.env.ADMIN_KEY;
-    if (!expectedKey || adminKey !== expectedKey) {
+    if (
+      !expectedKey ||
+      !adminKey ||
+      !constantTimeEqual(adminKey, expectedKey)
+    ) {
       return errorResponse(c, "Unauthorized - admin key required", 401);
     }
 

@@ -91,15 +91,23 @@ const nftRegisterSchema = z.object({
 // ADMIN AUTH MIDDLEWARE
 // =============================================================================
 
+import { constantTimeEqual } from "../lib/encoding";
+
 /**
  * Middleware to verify admin authentication
+ * Uses constant-time comparison to prevent timing attacks
  */
 const requireAdmin = createMiddleware<{ Bindings: Env }>(async (c, next) => {
   const adminKey = c.req.header("X-Admin-Key");
   const expectedKey = c.env.ADMIN_KEY;
 
-  // Require admin key - block if not configured or doesn't match
-  if (!expectedKey || adminKey !== expectedKey) {
+  // Require admin key - block if not configured
+  if (!expectedKey || !adminKey) {
+    return errorResponse(c, "Unauthorized", 401);
+  }
+
+  // Use constant-time comparison to prevent timing attacks
+  if (!constantTimeEqual(adminKey, expectedKey)) {
     return errorResponse(c, "Unauthorized", 401);
   }
 

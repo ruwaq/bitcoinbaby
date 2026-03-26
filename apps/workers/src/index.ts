@@ -105,8 +105,12 @@ app.use("*", async (c, next) => {
   await next();
 });
 
+// Metrics middleware (must be after request ID)
+import { metricsMiddleware } from "./lib/middleware";
+app.use("*", metricsMiddleware);
+
 // =============================================================================
-// HEALTH & STATUS
+// HEALTH & STATUS & METRICS
 // =============================================================================
 
 app.get("/", (c) => {
@@ -163,6 +167,23 @@ app.get("/health", async (c) => {
   );
 });
 
+// Metrics endpoint (JSON summary)
+import { metrics } from "./lib/metrics";
+
+app.get("/metrics", (c) => {
+  return c.json({
+    success: true,
+    data: metrics.summary(),
+    timestamp: Date.now(),
+  });
+});
+
+// Prometheus-compatible metrics endpoint
+app.get("/metrics/prometheus", (c) => {
+  c.header("Content-Type", "text/plain; charset=utf-8");
+  return c.text(metrics.toPrometheus());
+});
+
 // =============================================================================
 // MOUNT MODULAR ROUTERS
 // =============================================================================
@@ -185,7 +206,7 @@ app.route("/api/admin", adminRouter);
 // Transaction history
 app.route("/api/history", historyRouter);
 
-// Claim system (user-paid settlement)
+// Claim system - Server-Assisted (simplified UX)
 app.route("/api/claim", claimRouter);
 
 // Engagement tracking (daily login, baby care, play time)

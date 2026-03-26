@@ -31,6 +31,7 @@ import type {
   FeeEstimate,
 } from "../lib/types";
 import { fetchWithTimeout, TimeoutError, EXTERNAL_API } from "../lib/helpers";
+import { constantTimeEqual } from "../lib/encoding";
 
 // Batch ready for external signing
 interface BatchForSigning {
@@ -716,9 +717,12 @@ export class WithdrawPoolDO extends DurableObject<Env> {
    * Requires ADMIN_KEY header for authentication.
    */
   private handleGetReadyBatches(request: Request): Response {
-    // Verify admin key
+    // Verify admin key with constant-time comparison
     const adminKey = request.headers.get("X-Admin-Key");
-    if (this.env.ADMIN_KEY && adminKey !== this.env.ADMIN_KEY) {
+    if (
+      this.env.ADMIN_KEY &&
+      (!adminKey || !constantTimeEqual(adminKey, this.env.ADMIN_KEY))
+    ) {
       return this.errorResponse("Unauthorized", 401);
     }
 
@@ -823,9 +827,12 @@ export class WithdrawPoolDO extends DurableObject<Env> {
     request: Request,
     batchId: string,
   ): Promise<Response> {
-    // Verify admin key
+    // Verify admin key with constant-time comparison
     const adminKey = request.headers.get("X-Admin-Key");
-    if (this.env.ADMIN_KEY && adminKey !== this.env.ADMIN_KEY) {
+    if (
+      this.env.ADMIN_KEY &&
+      (!adminKey || !constantTimeEqual(adminKey, this.env.ADMIN_KEY))
+    ) {
       return this.errorResponse("Unauthorized", 401);
     }
 
