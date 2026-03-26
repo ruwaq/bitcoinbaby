@@ -645,10 +645,13 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       );
     }
 
-    // Get proof aggregator
-    const serverSecret = this.env.ADMIN_KEY;
+    // Get proof aggregator - prefer CLAIM_SECRET_KEY for better security separation
+    const serverSecret = this.env.CLAIM_SECRET_KEY || this.env.ADMIN_KEY;
     if (!serverSecret) {
-      return this.errorResponse("Server not configured for claims", 500);
+      return this.errorResponse(
+        "Server not configured for claims (missing CLAIM_SECRET_KEY)",
+        500,
+      );
     }
 
     const aggregator = getProofAggregator(serverSecret);

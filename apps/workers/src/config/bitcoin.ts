@@ -14,9 +14,49 @@
 export type BitcoinNetwork = "mainnet" | "testnet" | "testnet4";
 
 /**
- * Default network for development
+ * Default network for development (fallback only)
  */
 export const DEFAULT_NETWORK: BitcoinNetwork = "testnet4";
+
+/**
+ * Get Bitcoin network based on environment
+ * CRITICAL: Production MUST use mainnet, development uses testnet4
+ */
+export function getNetworkForEnvironment(
+  environment: string | undefined,
+): BitcoinNetwork {
+  if (environment === "production") {
+    return "mainnet";
+  }
+  return "testnet4";
+}
+
+/**
+ * Validate that address matches expected network
+ * Throws if mismatch detected (prevents sending to wrong network)
+ */
+export function validateAddressNetwork(
+  address: string,
+  expectedNetwork: BitcoinNetwork,
+): void {
+  const isMainnet = address.startsWith("bc1");
+  const isTestnet = address.startsWith("tb1");
+
+  if (expectedNetwork === "mainnet" && !isMainnet) {
+    throw new Error(
+      `CRITICAL: Expected mainnet address (bc1...) but got testnet address: ${address.slice(0, 10)}...`,
+    );
+  }
+
+  if (
+    (expectedNetwork === "testnet" || expectedNetwork === "testnet4") &&
+    !isTestnet
+  ) {
+    throw new Error(
+      `CRITICAL: Expected testnet address (tb1...) but got mainnet address: ${address.slice(0, 10)}...`,
+    );
+  }
+}
 
 /**
  * Mempool.space API URLs by network

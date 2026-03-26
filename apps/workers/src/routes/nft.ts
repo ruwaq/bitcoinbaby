@@ -35,6 +35,7 @@ import {
 } from "../lib/middleware";
 import { nftLogger } from "../lib/logger";
 import { getNFTMintingServiceSimple } from "../services/nft-minting-simple";
+import { getNetworkForEnvironment, EXPLORER_URLS } from "../config/bitcoin";
 
 // =============================================================================
 // DETERMINISTIC RANDOM (from txid seed)
@@ -342,10 +343,12 @@ nftRouter.get("/counter", async (c) => {
  */
 nftRouter.get("/prover-health", async (c) => {
   try {
+    const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
     const mintingService = getNFTMintingServiceSimple({
-      proverUrl: "https://v11.charms.dev",
+      proverUrl: c.env.PROVER_URL || "https://v11.charms.dev",
       appId: c.env.NFT_APP_ID || "placeholder",
       appVk: c.env.NFT_APP_VK || "placeholder",
+      network,
     });
 
     const health = await mintingService.healthCheck();
@@ -645,10 +648,12 @@ nftRouter.post("/prove", validateBody(proveNftSchema), async (c) => {
     }
 
     // Get minting service (simple JSON format - like original)
+    const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
     const mintingService = getNFTMintingServiceSimple({
-      proverUrl: "https://v11.charms.dev",
+      proverUrl: c.env.PROVER_URL || "https://v11.charms.dev",
       appId: nftAppId,
       appVk: nftAppVk,
+      network,
     });
 
     nftLogger.info("Submitting NFT to prover", {
@@ -1170,12 +1175,14 @@ nftRouter.get("/all", async (c) => {
       if (forSale === "true" && !isListed) continue;
       if (forSale === "false" && isListed) continue;
 
+      const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
+      const explorerUrl = EXPLORER_URLS[network];
       allNFTs.push({
         ...nft,
         isListed,
         listingPrice: listingInfo?.price,
         listedAt: listingInfo?.listedAt,
-        blockchainUrl: `https://mempool.space/testnet4/tx/${nft.txid}`,
+        blockchainUrl: `${explorerUrl}/tx/${nft.txid}`,
       });
     }
 
