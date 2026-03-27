@@ -1,4 +1,56 @@
-# Workers Deployment Tracking
+# Workers Deployment Guide
+
+## Production Secrets Configuration
+
+Before deploying to mainnet, configure these secrets using Wrangler:
+
+```bash
+cd apps/workers
+
+# 1. REQUIRED: Admin authentication key (32+ chars)
+wrangler secret put ADMIN_KEY --env production
+
+# 2. REQUIRED: HMAC signing key for claims (32+ chars, separate from ADMIN_KEY)
+wrangler secret put CLAIM_SECRET_KEY --env production
+
+# 3. REQUIRED: Scrolls API key (from scrolls.dev)
+wrangler secret put SCROLLS_API_KEY --env production
+
+# 4. REQUIRED for withdrawals: Treasury wallet mnemonic (24 words BIP39)
+wrangler secret put BATCH_WALLET_SEED --env production
+```
+
+### Secret Requirements
+
+| Secret | Purpose | Format |
+|--------|---------|--------|
+| `ADMIN_KEY` | API authentication for admin endpoints | 32+ alphanumeric chars |
+| `CLAIM_SECRET_KEY` | HMAC-SHA256 signing for claim proofs | 32+ alphanumeric chars |
+| `SCROLLS_API_KEY` | Scrolls API access for token operations | From scrolls.dev |
+| `BATCH_WALLET_SEED` | Treasury wallet for batch withdrawals | 24 word BIP39 mnemonic |
+
+### Environment Variables (wrangler.toml)
+
+These are set in `wrangler.toml` and should be reviewed before production:
+
+```toml
+[env.production.vars]
+ENVIRONMENT = "production"           # Triggers mainnet mode
+PROVER_URL = "https://v11.charms.dev"
+# BABTC_APP_ID = "..."               # Set after token deployment
+```
+
+### Pre-Launch Checklist
+
+- [ ] All secrets configured via `wrangler secret put`
+- [ ] `ENVIRONMENT = "production"` set (enables mainnet)
+- [ ] KV namespace `PROOF_STORE` bound and working
+- [ ] Treasury address is dedicated mainnet address (not foundation)
+- [ ] BABTC token deployed and APP_ID configured
+- [ ] Genesis Babies NFT contract deployed
+- [ ] Test claim flow on testnet4 first
+
+---
 
 ## Current Production Version
 
