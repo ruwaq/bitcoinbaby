@@ -411,6 +411,16 @@ export {
   type ListingServiceOptions,
 } from "./marketplace";
 
+// Treasury Signer (External signing service)
+export {
+  TreasurySigner,
+  createTreasurySigner,
+  startTreasurySignerDaemon,
+  type SignerConfig,
+  type ReadyBatch,
+  type SigningResult,
+} from "./signer";
+
 // Inscription System (Genesis Babies NFTs on Bitcoin)
 export {
   // PNG Exporter
