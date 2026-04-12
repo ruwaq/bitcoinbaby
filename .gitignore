@@ -70,3 +70,6 @@ apps/web/public/workbox-*.js
 apps/web/public/workbox-*.js.map
 .vercel
 .env*.local
+
+# Rust build artifacts
+target/
