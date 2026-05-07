@@ -62,18 +62,27 @@ export function formatBytes(bytes: number): string {
 }
 
 /**
- * Format satoshis to BTC
+ * Format satoshis to BTC string with full precision (no floating-point loss)
+ * Uses BigInt arithmetic to avoid IEEE 754 precision issues with large values
  */
 export function formatBtc(satoshis: bigint | number, decimals = 8): string {
-  const sats = typeof satoshis === "bigint" ? Number(satoshis) : satoshis;
-  return (sats / 100_000_000).toFixed(decimals);
+  const sats = typeof satoshis === "bigint" ? satoshis : BigInt(Math.round(Number(satoshis)));
+  const btcWhole = sats / 100_000_000n;
+  const btcFraction = sats % 100_000_000n;
+  const isNegative = btcFraction < 0n;
+  const absFraction = isNegative ? -btcFraction : btcFraction;
+  const fractionStr = absFraction.toString().padStart(8, "0").slice(0, decimals);
+  const sign = isNegative || sats < 0n ? "-" : "";
+  if (decimals === 0) return `${sign}${btcWhole}`;
+  return `${sign}${btcWhole}.${fractionStr}`;
 }
 
 /**
- * Format satoshis with comma separators
+ * Format satoshis with locale separators
+ * Safe for large values: avoids Number overflow by using BigInt.toLocaleString
  */
 export function formatSatoshis(satoshis: bigint | number): string {
-  const sats = typeof satoshis === "bigint" ? satoshis : BigInt(satoshis);
+  const sats = typeof satoshis === "bigint" ? satoshis : BigInt(Math.round(Number(satoshis)));
   return sats.toLocaleString();
 }
 

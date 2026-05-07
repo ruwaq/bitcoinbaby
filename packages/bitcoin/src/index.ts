@@ -64,12 +64,6 @@ export {
   generateRandomMnemonic,
 } from "./wallet";
 
-// Charms integration (legacy - deprecated)
-export {
-  CharmsClient as LegacyCharmsClient,
-  type CharmsConfig,
-} from "./charms-legacy";
-
 // Charms Protocol (v2 + v10 + v11)
 export {
   // Types V2 (legacy)
@@ -316,6 +310,8 @@ export { Psbt } from "bitcoinjs-lib";
 // NFT Config
 export {
   GENESIS_BABIES_TESTNET4,
+  GENESIS_BABIES_MAINNET,
+  getGenesisBabiesConfig,
   isGenesisBabiesConfigured,
 } from "./config/testnet4";
 

@@ -6,6 +6,8 @@
  */
 
 import { claimLogger } from "../lib/logger";
+import type { IMempoolService } from "../interfaces/services";
+import type { BitcoinNetwork } from "../interfaces/types";
 
 // =============================================================================
 // TYPES
@@ -79,19 +81,23 @@ const RETRY_DELAY_MS = 1000;
 // MEMPOOL SERVICE
 // =============================================================================
 
-export class MempoolService {
+export class MempoolService implements IMempoolService {
   private baseUrl: string;
-  private network: string;
+  private _network: BitcoinNetwork;
   private kv: KVNamespace | null = null;
+
+  get network(): BitcoinNetwork {
+    return this._network;
+  }
 
   // In-memory fallback cache
   private memCache: Map<string, { data: unknown; expiresAt: number }> =
     new Map();
   private readonly MEM_CACHE_MAX_SIZE = 100;
 
-  constructor(network: "mainnet" | "testnet" | "testnet4" = "testnet4") {
+  constructor(network: BitcoinNetwork = "testnet4") {
     this.baseUrl = MEMPOOL_API_URLS[network];
-    this.network = network;
+    this._network = network;
   }
 
   /**

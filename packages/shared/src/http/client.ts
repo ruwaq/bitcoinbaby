@@ -347,24 +347,26 @@ export class HttpClient {
     if (this.isProcessing) return;
     this.isProcessing = true;
 
-    const minInterval = 1000 / this.config.rateLimitPerSecond;
+    try {
+      const minInterval = 1000 / this.config.rateLimitPerSecond;
 
-    while (this.requestQueue.length > 0) {
-      const now = Date.now();
-      const elapsed = now - this.lastRequestTime;
+      while (this.requestQueue.length > 0) {
+        const now = Date.now();
+        const elapsed = now - this.lastRequestTime;
 
-      if (elapsed < minInterval) {
-        await this.sleep(minInterval - elapsed);
+        if (elapsed < minInterval) {
+          await this.sleep(minInterval - elapsed);
+        }
+
+        const request = this.requestQueue.shift();
+        if (request) {
+          this.lastRequestTime = Date.now();
+          await request();
+        }
       }
-
-      const request = this.requestQueue.shift();
-      if (request) {
-        this.lastRequestTime = Date.now();
-        await request();
-      }
+    } finally {
+      this.isProcessing = false;
     }
-
-    this.isProcessing = false;
   }
 
   /**

@@ -5,7 +5,15 @@
   "pnpm": {
     "overrides": {
       "minimatch": ">=9.0.6",
-      "tar": ">=7.5.8"
+      "tar": ">=7.5.11",
+      "protobufjs": ">=7.5.5",
+      "rollup": ">=4.59.0",
+      "flatted": ">=3.4.0",
+      "undici": ">=7.24.0",
+      "picomatch": ">=4.0.4",
+      "@xmldom/xmldom": ">=0.8.12",
+      "underscore": ">=1.13.8",
+      "vite": ">=7.3.2"
     }
   },
   "scripts": {

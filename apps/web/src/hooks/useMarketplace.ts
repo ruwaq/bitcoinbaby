@@ -16,6 +16,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getApiClient,
   useWalletStore,
+  useNetworkStore,
   type NFTListingWithNFT,
 } from "@bitcoinbaby/core";
 import {
@@ -24,7 +25,7 @@ import {
   createCharmsClient,
   getRoyaltyAddress,
   MARKETPLACE_CONFIG,
-  GENESIS_BABIES_TESTNET4,
+  getGenesisBabiesConfig,
   Psbt,
 } from "@bitcoinbaby/bitcoin";
 import { useFeeEstimate } from "./useFeeEstimate";
@@ -111,18 +112,24 @@ export function useMarketplace(): UseMarketplaceReturn {
   const signPsbt = useWalletStore((s) => s.signPsbt);
   const isWalletConnected = Boolean(wallet?.address);
 
+  // Network
+  const { network, config } = useNetworkStore();
+
+  // Network-aware app config
+  const genesisBabiesConfig = getGenesisBabiesConfig(network);
+
   // Services
   const listingService = useMemo(
-    () => createListingService({ network: "testnet4" }),
-    [],
+    () => createListingService({ network }),
+    [network],
   );
   const mempoolClient = useMemo(
-    () => createMempoolClient({ network: "testnet4" }),
-    [],
+    () => createMempoolClient({ network }),
+    [network],
   );
   const charmsClient = useMemo(
-    () => createCharmsClient({ network: "testnet4" }),
-    [],
+    () => createCharmsClient({ network: config.scrolls }),
+    [config.scrolls],
   );
 
   // Fee estimates for dynamic fee rate
@@ -178,7 +185,7 @@ export function useMarketplace(): UseMarketplaceReturn {
         // 1. Get NFT UTXO from Charms extraction
         const charms = await charmsClient.extractCharmsForWallet(
           wallet.address,
-          GENESIS_BABIES_TESTNET4.appId,
+          genesisBabiesConfig.appId,
         );
 
         const nftCharm = charms.find(
@@ -254,7 +261,7 @@ export function useMarketplace(): UseMarketplaceReturn {
         setIsProcessing(false);
       }
     },
-    [wallet, signPsbt, queryClient, listingService, charmsClient],
+    [wallet, signPsbt, queryClient, listingService, charmsClient, genesisBabiesConfig],
   );
 
   /**

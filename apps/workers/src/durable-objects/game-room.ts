@@ -423,6 +423,9 @@ export class GameRoomDO extends DurableObject<Env> {
     this.ydoc.destroy();
     this.ydoc = new Y.Doc();
 
+    // Reset stateLoaded so loadState will re-run for the new document
+    this.stateLoaded = false;
+
     // Reinitialize default state
     this.initializeDefaultState();
 

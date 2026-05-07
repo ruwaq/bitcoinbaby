@@ -294,15 +294,11 @@ export function createPersistedStore<T extends object>(
 export function createSelectors<S extends StoreApi<object>>(store: S) {
   type State = ReturnType<S["getState"]>;
 
-  const selectors: Record<string, () => unknown> = {};
+  const selectors: Partial<Record<string, () => unknown>> = {};
 
   for (const key of Object.keys(store.getState())) {
-    selectors[key] = () =>
-      (
-        store as unknown as {
-          subscribe: (selector: (s: State) => unknown) => unknown;
-        }
-      ).subscribe((state: State) => state[key as keyof State]);
+    const stateKey = key as string & keyof State;
+    selectors[key] = () => (store.getState() as Record<string, unknown>)[stateKey];
   }
 
   return { use: selectors as { [K in keyof State]: () => State[K] } };

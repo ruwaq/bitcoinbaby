@@ -86,14 +86,16 @@ export async function rawTxToPsbt(
   fundingUtxo: FundingUtxo,
   ownerAddress: string,
   mempoolClient: MempoolClient,
+  network?: bitcoin.Network,
 ): Promise<string> {
-  const network = bitcoin.networks.testnet; // testnet4 uses testnet params
+  // Default to testnet for backward compatibility, but allow mainnet override
+  const net = network ?? bitcoin.networks.testnet;
 
   // Parse the raw transaction
   const tx = bitcoin.Transaction.fromHex(rawTxHex);
 
   // Create a new PSBT
-  const psbt = new bitcoin.Psbt({ network });
+  const psbt = new bitcoin.Psbt({ network: net });
 
   // Get the previous transaction to extract witnessUtxo
   const prevTxHex = await mempoolClient.getTransactionHex(fundingUtxo.txid);

@@ -10,6 +10,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createMempoolClient, type FeeEstimates } from "@bitcoinbaby/bitcoin";
+import { useNetworkStore } from "@bitcoinbaby/core";
 
 // =============================================================================
 // TYPES
@@ -48,10 +49,13 @@ const DEFAULT_FEES: FeeEstimates = {
 // =============================================================================
 
 export function useFeeEstimate(): UseFeeEstimateReturn {
+  // Network
+  const { network } = useNetworkStore();
+
   // Mempool client
   const mempoolClient = useMemo(
-    () => createMempoolClient({ network: "testnet4" }),
-    [],
+    () => createMempoolClient({ network }),
+    [network],
   );
 
   // Query for fee estimates

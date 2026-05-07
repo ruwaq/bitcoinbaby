@@ -421,7 +421,7 @@ describe("createNFTLevelUpSpell", () => {
 
     // Should have 2 outputs: NFT and remaining tokens
     expect(spell.outs).toHaveLength(2);
-    expect(spell.outs[1].charms.$01).toBe(Number(remaining));
+    expect(spell.outs[1].charms.$01).toBe(remaining);
   });
 
   it("should not return tokens if exact amount", () => {

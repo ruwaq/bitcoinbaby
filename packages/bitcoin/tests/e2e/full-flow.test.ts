@@ -134,9 +134,9 @@ describe("E2E: Token Minting Flow", () => {
         workProofHash: "abcdef123456",
       });
 
-      expect(spell.outs[0].charms.$00).toBe(Number(reward.minerShare));
-      expect(spell.outs[1].charms.$00).toBe(Number(reward.devShare));
-      expect(spell.outs[2].charms.$00).toBe(Number(reward.stakingShare));
+      expect(spell.outs[0].charms.$00).toBe(reward.minerShare);
+      expect(spell.outs[1].charms.$00).toBe(reward.devShare);
+      expect(spell.outs[2].charms.$00).toBe(reward.stakingShare);
     });
   });
 
@@ -394,7 +394,7 @@ describe("E2E: Mining → XP → Evolution Cycle", () => {
 
       // Should have NFT output + token change output
       expect(spell.outs).toHaveLength(2);
-      expect(spell.outs[1].charms.$01).toBe(Number(extraTokens));
+      expect(spell.outs[1].charms.$01).toBe(extraTokens);
     });
   });
 });

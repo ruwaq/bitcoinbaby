@@ -358,6 +358,10 @@ export class AIWorkIntegration {
    * Cleanup resources
    */
   terminate(): void {
+    // Release GPU/WebAssembly memory before dereferencing the engine
+    if (this.engine && typeof this.engine.dispose === "function") {
+      this.engine.dispose();
+    }
     this.engine = null;
     this.isInitializing = false;
     this.initPromise = null;

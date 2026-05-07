@@ -23,14 +23,15 @@ import {
   XP_REQUIREMENTS,
   canLevelUp,
   formatTokenAmount,
-  GENESIS_BABIES_TESTNET4,
-  BABTC_TESTNET4,
+  getGenesisBabiesConfig,
+  getDeploymentConfig,
   type BabyNFTState,
 } from "@bitcoinbaby/bitcoin";
 import {
   useWalletStore,
   usePendingTxStore,
   useNFTMinting,
+  useNetworkStore,
   getApiClient,
 } from "@bitcoinbaby/core";
 
@@ -75,30 +76,37 @@ export function useEvolution(): UseEvolutionReturn {
   const wallet = useWalletStore((s) => s.wallet);
   const signPsbt = useWalletStore((s) => s.signPsbt);
 
+  // Network
+  const { network, config } = useNetworkStore();
+
+  // Network-aware app configs
+  const genesisBabiesConfig = getGenesisBabiesConfig(network);
+  const babtcConfig = getDeploymentConfig(network);
+
   // Pending transactions
   const addTransaction = usePendingTxStore((s) => s.addTransaction);
   const startTracking = usePendingTxStore((s) => s.startTracking);
 
   // Clients
   const charmsClient = useMemo(
-    () => createCharmsClient({ network: "testnet4" }),
-    [],
+    () => createCharmsClient({ network: config.scrolls }),
+    [config.scrolls],
   );
 
   const mempoolClient = useMemo(
-    () => createMempoolClient({ network: "testnet4" }),
-    [],
+    () => createMempoolClient({ network }),
+    [network],
   );
 
   // NFT Minting hook (has levelUp method)
   const { levelUp, checkCanLevelUp } = useNFTMinting({
     ownerAddress: wallet?.address ?? "",
     ownerPublicKey: wallet?.publicKey ?? "",
-    nftAppId: GENESIS_BABIES_TESTNET4.appId,
-    nftAppVk: GENESIS_BABIES_TESTNET4.appVk,
-    tokenAppId: BABTC_TESTNET4.appId,
-    tokenAppVk: BABTC_TESTNET4.appVk,
-    network: "testnet4",
+    nftAppId: genesisBabiesConfig.appId,
+    nftAppVk: genesisBabiesConfig.appVk,
+    tokenAppId: babtcConfig.appId,
+    tokenAppVk: babtcConfig.appVk,
+    network: config.scrolls,
   });
 
   /**
@@ -162,7 +170,7 @@ export function useEvolution(): UseEvolutionReturn {
         console.log(`[Evolution] Finding NFT UTXO for token #${nft.tokenId}`);
         const charms = await charmsClient.extractCharmsForWallet(
           wallet.address,
-          GENESIS_BABIES_TESTNET4.appId,
+          genesisBabiesConfig.appId,
         );
 
         const nftCharm = charms.find(
@@ -193,7 +201,7 @@ export function useEvolution(): UseEvolutionReturn {
         );
 
         const tokenCharms = charms.filter(
-          (c) => c.appId === BABTC_TESTNET4.appId && c.appType === "t",
+          (c) => c.appId === babtcConfig.appId && c.appType === "t",
         );
 
         if (tokenCharms.length === 0) {
@@ -291,6 +299,8 @@ export function useEvolution(): UseEvolutionReturn {
       getEvolutionCost,
       addTransaction,
       startTracking,
+      genesisBabiesConfig,
+      babtcConfig,
     ],
   );
 

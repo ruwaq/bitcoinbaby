@@ -357,9 +357,9 @@ describe("createTokenMintSpell", () => {
     const spell = createTokenMintSpell(defaultParams);
     const reward = calculateMiningReward(defaultParams.leadingZeros);
 
-    expect(spell.outs[0].charms.$00).toBe(Number(reward.minerShare));
-    expect(spell.outs[1].charms.$00).toBe(Number(reward.devShare));
-    expect(spell.outs[2].charms.$00).toBe(Number(reward.stakingShare));
+    expect(spell.outs[0].charms.$00).toBe(reward.minerShare);
+    expect(spell.outs[1].charms.$00).toBe(reward.devShare);
+    expect(spell.outs[2].charms.$00).toBe(reward.stakingShare);
   });
 });
 
@@ -396,13 +396,13 @@ describe("createTokenTransferSpell", () => {
 
   it("should include input charm amount", () => {
     const spell = createTokenTransferSpell(defaultParams);
-    expect(spell.ins[0].charms.$00).toBe(Number(defaultParams.fromAmount));
+    expect(spell.ins[0].charms.$00).toBe(defaultParams.fromAmount);
   });
 
   it("should create recipient output with correct amount", () => {
     const spell = createTokenTransferSpell(defaultParams);
     expect(spell.outs[0].address).toBe(defaultParams.toAddress);
-    expect(spell.outs[0].charms.$00).toBe(Number(defaultParams.toAmount));
+    expect(spell.outs[0].charms.$00).toBe(defaultParams.toAmount);
   });
 
   it("should create change output when there is change", () => {
@@ -411,7 +411,7 @@ describe("createTokenTransferSpell", () => {
 
     expect(spell.outs).toHaveLength(2);
     expect(spell.outs[1].address).toBe(defaultParams.changeAddress);
-    expect(spell.outs[1].charms.$00).toBe(Number(expectedChange));
+    expect(spell.outs[1].charms.$00).toBe(expectedChange);
   });
 
   it("should not create change output when exact amount", () => {
@@ -431,5 +431,17 @@ describe("createTokenTransferSpell", () => {
     for (const out of spell.outs) {
       expect(out.sats).toBe(546);
     }
+  });
+
+  it("should throw when fromAmount < toAmount", () => {
+    const underflowParams = {
+      ...defaultParams,
+      fromAmount: 100n,
+      toAmount: 200n,
+    };
+
+    expect(() => createTokenTransferSpell(underflowParams)).toThrow(
+      /Insufficient funds/,
+    );
   });
 });

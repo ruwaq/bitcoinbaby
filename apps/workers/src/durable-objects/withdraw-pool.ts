@@ -316,7 +316,7 @@ export class WithdrawPoolDO extends DurableObject<Env> {
 
         case "DELETE":
           if (action === "reset") {
-            return this.handleFullReset();
+            return this.handleFullReset(request);
           }
           break;
       }
@@ -1066,7 +1066,13 @@ export class WithdrawPoolDO extends DurableObject<Env> {
    * DELETE /pool/{poolType}/reset - Full reset of pool data
    * Drops and recreates all tables. Use with caution!
    */
-  private handleFullReset(): Response {
+  private handleFullReset(request: Request): Response {
+    // Auth check: full reset is destructive, require admin key
+    const adminKey = request.headers.get("X-Admin-Key");
+    if (!adminKey || !constantTimeEqual(adminKey, this.env.ADMIN_KEY)) {
+      return this.errorResponse("Unauthorized: admin key required for full reset", 401);
+    }
+
     // Drop all tables
     this.sql.exec("DROP TABLE IF EXISTS withdraw_requests");
     this.sql.exec("DROP TABLE IF EXISTS batch_transactions");

@@ -106,12 +106,22 @@ export const satoshiSchema = z.union([
 ]);
 
 /**
- * BTC amount (decimal string)
+ * BTC amount (decimal string) - converted to satoshis as BigInt
+ * Uses string-based conversion to avoid IEEE 754 floating-point precision loss
+ * (e.g., parseFloat("0.3") * 100_000_000 = 29999999.999999996, not 30000000)
  */
 export const btcAmountSchema = z
   .string()
   .regex(/^\d+(\.\d{1,8})?$/, "Invalid BTC amount format")
-  .transform((val) => BigInt(Math.round(parseFloat(val) * 100_000_000)));
+  .refine((val) => val !== "0" && val !== "00" && !/^0+$/.test(val), "Amount must be greater than zero")
+  .transform((val) => {
+    const [wholeStr = "", fractionStr = ""] = val.split(".");
+    const whole = BigInt(wholeStr);
+    const fraction = fractionStr
+      ? BigInt(fractionStr.padEnd(8, "0").slice(0, 8))
+      : 0n;
+    return whole * 100_000_000n + fraction;
+  });
 
 /**
  * Fee rate in sat/vB

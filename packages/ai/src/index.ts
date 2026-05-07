@@ -7,6 +7,3 @@ export {
   type AIResult,
   type AIProof,
 } from "./engine";
-
-// @deprecated - Use AIEngine instead. Kept for backwards compatibility.
-export { ModelLoader } from "./model-loader";

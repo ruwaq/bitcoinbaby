@@ -161,6 +161,9 @@ export class TransactionBuilder {
     targetAmount: number,
     extraOutputs: number = 0,
   ): CoinSelection {
+    // SECURITY: Filter out spent UTXOs to prevent double-spending
+    const availableUtxos = utxos.filter((u) => !u.status?.spent);
+
     // Estimate fee based on actual UTXO types
     const estimateFee = (selectedUtxos: TxUTXO[]): number => {
       const inputVbytes = selectedUtxos.reduce(
@@ -181,7 +184,7 @@ export class TransactionBuilder {
 
     // Try Branch & Bound first for exact match or minimal waste
     const bnbResult = this.branchAndBoundSelect(
-      utxos,
+      availableUtxos,
       targetAmount,
       estimateFee,
       changeCost,
@@ -212,7 +215,7 @@ export class TransactionBuilder {
 
     // Fallback to greedy selection (largest first)
     log.debug("BnB failed, falling back to greedy selection");
-    return this.greedySelect(utxos, targetAmount, estimateFee);
+    return this.greedySelect(availableUtxos, targetAmount, estimateFee);
   }
 
   /**

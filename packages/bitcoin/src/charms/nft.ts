@@ -413,6 +413,12 @@ export interface NFTLevelUpParams {
  * Generate level up spell (burns tokens, increases level)
  */
 export function createNFTLevelUpSpell(params: NFTLevelUpParams): SpellV2 {
+  if (params.currentState.level >= GENESIS_BABIES_CONFIG.maxLevel) {
+    throw new Error(
+      `NFT is already at max level (${GENESIS_BABIES_CONFIG.maxLevel}). Cannot level up further.`,
+    );
+  }
+
   const nftAppRef = `n/${params.nftAppId}/${params.nftAppVk}`;
   const tokenAppRef = `t/${params.tokenAppId}/${params.tokenAppVk}`;
 
@@ -442,7 +448,7 @@ export function createNFTLevelUpSpell(params: NFTLevelUpParams): SpellV2 {
     outs.push({
       address: params.ownerAddress,
       charms: {
-        $01: Number(remainingTokens),
+        $01: remainingTokens,
       },
       sats: 546,
     });
@@ -466,7 +472,7 @@ export function createNFTLevelUpSpell(params: NFTLevelUpParams): SpellV2 {
       {
         utxo_id: `${params.tokenUtxo.txid}:${params.tokenUtxo.vout}`,
         charms: {
-          $01: Number(params.tokenAmount),
+          $01: params.tokenAmount,
         },
       },
     ],

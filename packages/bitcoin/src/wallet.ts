@@ -399,14 +399,15 @@ export class BitcoinWallet {
       throw new Error("Failed to tweak private key");
     }
 
-    // If the tweaked pubkey has odd parity, we need to negate the tweaked private key
+    // BIP-340: If the tweaked public key has odd Y parity, negate the private key
+    // Per BIP-340 section "Signing": if has_even_y(P) == false, negate the secret key
+    let signingKey = tweakedPrivateKey;
     if (tweakResult.parity === 1) {
-      // Note: The private key is already correct for the tweaked point
-      // No additional negation needed here - parity is just informational
+      signingKey = ecc.privateNegate(tweakedPrivateKey);
     }
 
     // SECURITY: Store as Uint8Array so we can zero it later
-    const tweakedKeyArray = new Uint8Array(tweakedPrivateKey);
+    const tweakedKeyArray = new Uint8Array(signingKey);
 
     return {
       signer: {

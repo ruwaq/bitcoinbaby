@@ -13,6 +13,8 @@ export {
   requireBABTCConfigured,
   // Genesis Babies NFT Config
   GENESIS_BABIES_TESTNET4,
+  GENESIS_BABIES_MAINNET,
+  getGenesisBabiesConfig,
   isGenesisBabiesConfigured,
   // Mining Config
   MINING_CONFIG_TESTNET4,

@@ -16,6 +16,9 @@ import { BitcoinWallet } from "../wallet";
 import type { BitcoinNetwork } from "../types";
 import { CharmsProverClient, type ProverResponse } from "../charms/prover";
 import type { SpellV10 } from "../charms/types";
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("TreasurySigner");
 
 // =============================================================================
 // TYPES
@@ -105,11 +108,9 @@ export class TreasurySigner {
   async initialize(): Promise<{ address: string }> {
     const walletInfo = await this.wallet.fromMnemonic(this.config.mnemonic);
     this.treasuryAddress = walletInfo.address;
-    console.log(
-      `[TreasurySigner] Initialized with address: ${walletInfo.address}`,
-    );
-    console.log(`[TreasurySigner] Network: ${this.config.network}`);
-    console.log(`[TreasurySigner] Prover: ${this.config.proverUrl}`);
+    log.info(`Initialized with address: ${walletInfo.address}`);
+    log.info(`Network: ${this.config.network}`);
+    log.info(`Prover: ${this.config.proverUrl}`);
     return { address: walletInfo.address };
   }
 
@@ -118,15 +119,15 @@ export class TreasurySigner {
    */
   async start(): Promise<void> {
     if (this.isRunning) {
-      console.warn("[TreasurySigner] Already running");
+      log.warn("Already running");
       return;
     }
 
     await this.initialize();
     this.isRunning = true;
 
-    console.log(
-      `[TreasurySigner] Starting daemon (poll every ${this.config.pollInterval}ms)`,
+    log.info(
+      `Starting daemon (poll every ${this.config.pollInterval}ms)`,
     );
 
     // Initial poll
@@ -147,7 +148,7 @@ export class TreasurySigner {
       this.pollTimer = null;
     }
     this.isRunning = false;
-    console.log("[TreasurySigner] Stopped");
+    log.info("Stopped");
   }
 
   /**
@@ -160,28 +161,28 @@ export class TreasurySigner {
       const batches = await this.fetchReadyBatches();
 
       if (batches.length === 0) {
-        console.log("[TreasurySigner] No batches ready");
+        log.info("No batches ready");
         return results;
       }
 
-      console.log(`[TreasurySigner] Found ${batches.length} ready batches`);
+      log.info(`Found ${batches.length} ready batches`);
 
       for (const batch of batches) {
         const result = await this.processBatch(batch);
         results.push(result);
 
         if (result.success) {
-          console.log(
-            `[TreasurySigner] Batch ${batch.id} completed: ${result.txid}`,
+          log.info(
+            `Batch ${batch.id} completed: ${result.txid}`,
           );
         } else {
-          console.error(
-            `[TreasurySigner] Batch ${batch.id} failed: ${result.error}`,
+          log.error(
+            `Batch ${batch.id} failed: ${result.error}`,
           );
         }
       }
     } catch (error) {
-      console.error("[TreasurySigner] Poll error:", error);
+      log.error("Poll error:", { error });
     }
 
     return results;
@@ -203,7 +204,7 @@ export class TreasurySigner {
       );
 
       if (!response.ok) {
-        console.error(`[TreasurySigner] API error: ${response.status}`);
+        log.error(`API error: ${response.status}`);
         return [];
       }
 
@@ -214,7 +215,7 @@ export class TreasurySigner {
 
       return data.success ? data.data.batches : [];
     } catch (error) {
-      console.error("[TreasurySigner] Fetch error:", error);
+      log.error("Fetch error:", { error });
       return [];
     }
   }
@@ -229,9 +230,9 @@ export class TreasurySigner {
     };
 
     try {
-      console.log(`[TreasurySigner] Processing batch ${batch.id}`);
-      console.log(`  Recipients: ${batch.recipients.length}`);
-      console.log(`  Total: ${batch.totalAmount} tokens`);
+      log.info(`Processing batch ${batch.id}`);
+      log.info(`  Recipients: ${batch.recipients.length}`);
+      log.info(`  Total: ${batch.totalAmount} tokens`);
 
       // 1. Get prepared spell from API
       const prepareResponse = await fetch(
@@ -269,18 +270,18 @@ export class TreasurySigner {
       }
 
       // 3. Broadcast commit transaction first
-      console.log("[TreasurySigner] Broadcasting commit transaction...");
+      log.info("Broadcasting commit transaction...");
       const commitTxid = await this.broadcastTransaction(signedTxs.commitTxHex);
 
       if (!commitTxid) {
         result.error = "Commit broadcast failed";
         return result;
       }
-      console.log(`[TreasurySigner] Commit TX: ${commitTxid}`);
+      log.info(`Commit TX: ${commitTxid}`);
 
       // 4. Wait a moment for commit to propagate, then broadcast spell
       await this.sleep(2000);
-      console.log("[TreasurySigner] Broadcasting spell transaction...");
+      log.info("Broadcasting spell transaction...");
       const spellTxid = await this.broadcastTransaction(signedTxs.spellTxHex);
 
       if (!spellTxid) {
@@ -288,7 +289,7 @@ export class TreasurySigner {
         result.txid = commitTxid; // Partial success
         return result;
       }
-      console.log(`[TreasurySigner] Spell TX: ${spellTxid}`);
+      log.info(`Spell TX: ${spellTxid}`);
 
       // Use spell txid as the main transaction id
       const txid = spellTxid;
@@ -339,11 +340,11 @@ export class TreasurySigner {
     spell: Record<string, unknown>,
   ): Promise<{ commitTxHex: string; spellTxHex: string } | null> {
     try {
-      console.log("[TreasurySigner] Submitting spell to prover...");
+      log.info("Submitting spell to prover...");
 
       // Validate spell has required fields
       if (!spell.version || !spell.apps || !spell.ins || !spell.outs) {
-        console.error("[TreasurySigner] Invalid spell structure");
+        log.error("Invalid spell structure");
         return null;
       }
 
@@ -352,9 +353,9 @@ export class TreasurySigner {
         spell as unknown as SpellV10,
       );
 
-      console.log("[TreasurySigner] Prover returned transactions");
-      console.log(`  Commit TX: ${proverResponse.commitTx.slice(0, 40)}...`);
-      console.log(`  Spell TX: ${proverResponse.spellTx.slice(0, 40)}...`);
+      log.info("Prover returned transactions");
+      log.info(`  Commit TX: ${proverResponse.commitTx.slice(0, 40)}...`);
+      log.info(`  Spell TX: ${proverResponse.spellTx.slice(0, 40)}...`);
 
       // For transfer spells, the prover returns transactions that need
       // the treasury inputs signed. The signing flow depends on whether
@@ -371,7 +372,7 @@ export class TreasurySigner {
         spellTxHex: proverResponse.spellTx,
       };
     } catch (error) {
-      console.error("[TreasurySigner] Spell signing failed:", error);
+      log.error("Spell signing failed:", { error });
       return null;
     }
   }
@@ -396,13 +397,13 @@ export class TreasurySigner {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[TreasurySigner] Broadcast error: ${errorText}`);
+        log.error(`Broadcast error: ${errorText}`);
         return null;
       }
 
       return await response.text();
     } catch (error) {
-      console.error("[TreasurySigner] Broadcast error:", error);
+      log.error("Broadcast error:", { error });
       return null;
     }
   }

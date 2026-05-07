@@ -193,7 +193,7 @@ export interface SpellV11Transaction {
  * Keys are app indexes ("0", "1", etc.) from app_public_inputs
  * Values are amounts (number) for tokens or state objects for NFTs
  */
-export type SpellV11Output = Record<string, number | Record<string, unknown>>;
+export type SpellV11Output = Record<string, number | bigint | Record<string, unknown>>;
 
 export interface SpellV11CoinOutput {
   /** Amount in satoshis */
@@ -474,21 +474,21 @@ export function createPoWMintSpellV9(params: PoWMintSpellParams): SpellV9 {
       {
         address: params.minerAddress,
         charms: {
-          $01: Number(params.minerReward),
+          $01: params.minerReward,
         },
         sats: MIN_SPELL_OUTPUT_SATS,
       },
       {
         address: params.devAddress,
         charms: {
-          $01: Number(params.devReward),
+          $01: params.devReward,
         },
         sats: MIN_SPELL_OUTPUT_SATS,
       },
       {
         address: params.stakingAddress,
         charms: {
-          $01: Number(params.stakingReward),
+          $01: params.stakingReward,
         },
         sats: MIN_SPELL_OUTPUT_SATS,
       },
@@ -536,7 +536,7 @@ export function createMiningMintSpellV10(
       {
         address: params.minerAddress,
         charms: {
-          $01: Number(params.mintAmount), // Token amount as number
+          $01: params.mintAmount, // BigInt preserves full precision
         },
         sats: MIN_SPELL_OUTPUT_SATS,
       },
@@ -556,6 +556,12 @@ export function createTokenTransferSpellV10(params: {
   toAmount: bigint;
   changeAddress: string;
 }): SpellV10 {
+  if (params.fromAmount < params.toAmount) {
+    throw new Error(
+      `Insufficient funds: fromAmount (${params.fromAmount}) < toAmount (${params.toAmount})`,
+    );
+  }
+
   const appRef = createAppReference("t", params.appId, params.appVk);
   const changeAmount = params.fromAmount - params.toAmount;
 
@@ -563,7 +569,7 @@ export function createTokenTransferSpellV10(params: {
     {
       address: params.toAddress,
       charms: {
-        $01: Number(params.toAmount),
+        $01: params.toAmount,
       },
       sats: DUST_LIMIT,
     },
@@ -573,7 +579,7 @@ export function createTokenTransferSpellV10(params: {
     outs.push({
       address: params.changeAddress,
       charms: {
-        $01: Number(changeAmount),
+        $01: changeAmount,
       },
       sats: DUST_LIMIT,
     });
@@ -588,7 +594,7 @@ export function createTokenTransferSpellV10(params: {
       {
         utxo_id: `${params.fromUtxo.txid}:${params.fromUtxo.vout}`,
         charms: {
-          $01: Number(params.fromAmount),
+          $01: params.fromAmount,
         },
       },
     ],
@@ -673,7 +679,7 @@ export function createBatchTransferSpellV10(
   const ins: SpellV10Input[] = params.sourceUtxos.map((utxo) => ({
     utxo_id: `${utxo.txid}:${utxo.vout}`,
     charms: {
-      $01: Number(utxo.amount),
+      $01: utxo.amount,
     },
   }));
 
@@ -681,7 +687,7 @@ export function createBatchTransferSpellV10(
   const outs: SpellV10Output[] = params.recipients.map((recipient) => ({
     address: recipient.address,
     charms: {
-      $01: Number(recipient.amount),
+      $01: recipient.amount,
     },
     sats: DUST_LIMIT,
   }));
@@ -691,7 +697,7 @@ export function createBatchTransferSpellV10(
     outs.push({
       address: params.changeAddress,
       charms: {
-        $01: Number(changeAmount),
+        $01: changeAmount,
       },
       sats: DUST_LIMIT,
     });

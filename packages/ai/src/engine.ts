@@ -162,7 +162,9 @@ export class AIEngine {
       output,
       computeTime,
       proof,
-      verified: true,
+      // Verification MUST be performed server-side by re-executing the inference
+      // and comparing outputs. Client-side verification is not trustworthy.
+      verified: false,
     };
   }
 
@@ -232,8 +234,12 @@ export class AIEngine {
   }
 
   /**
-   * Verify a proof is valid
-   * Can be used by verifiers to check work
+   * Verify a proof's structural integrity (hash match only).
+   *
+   * IMPORTANT: This only checks that the proof data has not been tampered
+   * with (the hash matches). It does NOT verify that the AI computation
+   * was actually performed correctly. Full verification requires server-side
+   * re-execution of the inference to compare outputs.
    */
   async verifyProof(proofString: string): Promise<boolean> {
     try {
@@ -246,6 +252,27 @@ export class AIEngine {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Dispose of GPU/WebAssembly resources held by pipelines.
+   *
+   * Transformers.js pipelines allocate tensors (WebGPU/WebGL/WASM memory)
+   * that are NOT garbage-collected. Without calling dispose(), these
+   * resources leak — especially critical on mobile devices with limited
+   * GPU memory.
+   */
+  dispose(): void {
+    if (this.classificationPipeline) {
+      this.classificationPipeline.dispose();
+      this.classificationPipeline = null;
+    }
+    if (this.embeddingPipeline) {
+      this.embeddingPipeline.dispose();
+      this.embeddingPipeline = null;
+    }
+    this.isInitialized = false;
+    console.log("[AIEngine] Disposed — GPU memory released");
   }
 
   /**

@@ -168,6 +168,35 @@ export const GENESIS_BABIES_TESTNET4 = {
 } as const;
 
 /**
+ * Mainnet Genesis Babies NFT App Configuration
+ *
+ * STATUS: NOT DEPLOYED
+ * WARNING: Deploy to mainnet only after thorough testnet4 testing
+ */
+export const GENESIS_BABIES_MAINNET = {
+  network: "mainnet" as const,
+  appId: "not_deployed",
+  appVk: "not_deployed",
+  name: "Genesis Babies",
+  symbol: "GBABY",
+  maxSupply: 10_000,
+  priceSats: 50_000n,
+  treasuryAddress: "",
+  isPlaceholder: true,
+} as const;
+
+/**
+ * Get Genesis Babies config for a network
+ */
+export function getGenesisBabiesConfig(
+  network: "testnet4" | "mainnet" = "testnet4",
+) {
+  return network === "mainnet"
+    ? GENESIS_BABIES_MAINNET
+    : GENESIS_BABIES_TESTNET4;
+}
+
+/**
  * Check if Genesis Babies NFT is configured
  */
 export function isGenesisBabiesConfigured(): boolean {

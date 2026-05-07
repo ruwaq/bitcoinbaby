@@ -108,6 +108,11 @@ export const BABTC_CONFIG = {
   },
 
   // Addresses - Configured via environment variables
+  // WARNING: These addresses receive 5% of mining rewards each.
+  // The NEXT_PUBLIC_ prefix means they are exposed to the client bundle.
+  // For mainnet deployment, these MUST be replaced with proper server-side
+  // configuration (e.g., via environment variables that are NOT NEXT_PUBLIC_)
+  // to prevent tampering and ensure correct reward distribution.
   addresses: {
     devFund:
       process.env.NEXT_PUBLIC_DEV_FUND_ADDRESS ||
@@ -120,6 +125,26 @@ export const BABTC_CONFIG = {
       "tb1pjnkc6432y0muu7r0mwrxj0sc8y9kaq7dsh477xfuk5faannhe9psxkkqmc",
   },
 } as const;
+
+/**
+ * Runtime check: warn if hardcoded testnet addresses are used on mainnet.
+ * Testnet addresses start with "tb1" while mainnet addresses start with "bc1".
+ */
+if (
+  typeof process !== "undefined" &&
+  process.env.NODE_ENV === "production" &&
+  process.env.BITCOIN_NETWORK !== "testnet4" &&
+  process.env.BITCOIN_NETWORK !== "testnet"
+) {
+  const { devFund, stakingPool } = BABTC_CONFIG.addresses;
+  if (devFund.startsWith("tb1") || stakingPool.startsWith("tb1")) {
+    console.warn(
+      "[BABTC] WARNING: Testnet addresses detected in production/mainnet environment. " +
+        "Replace NEXT_PUBLIC_DEV_FUND_ADDRESS and NEXT_PUBLIC_STAKING_POOL_ADDRESS " +
+        "with mainnet addresses before deploying to production.",
+    );
+  }
+}
 
 // =============================================================================
 // TOKEN TYPES
@@ -322,6 +347,51 @@ export function parseTokenAmount(
   return BigInt(whole + paddedFraction);
 }
 
+/**
+ * Convert a BigInt value to a big-endian Uint8Array of bytes.
+ *
+ * Use this when a binary protocol requires byte encoding instead of
+ * Number(), which loses precision for values exceeding 2^53 - 1.
+ * Each byte is extracted via bitwise AND with 0xff, avoiding any
+ * intermediate Number conversion that could truncate large values.
+ *
+ * @param value - Non-negative BigInt value to convert
+ * @param byteLength - Optional fixed output length (pads with leading zeros,
+ *   throws if value requires more bytes than specified)
+ * @returns Uint8Array of the value in big-endian byte order
+ */
+export function bigIntToBytes(value: bigint, byteLength?: number): Uint8Array {
+  if (value < 0n) {
+    throw new Error("Cannot convert negative BigInt to bytes");
+  }
+
+  if (byteLength !== undefined) {
+    const bytes = new Uint8Array(byteLength);
+    let v = value;
+    for (let i = byteLength - 1; i >= 0; i--) {
+      bytes[i] = Number(v & 0xffn);
+      v >>= 8n;
+    }
+    if (v > 0n) {
+      throw new Error(
+        `BigInt value ${value} requires more than ${byteLength} bytes`,
+      );
+    }
+    return bytes;
+  }
+
+  // Auto-detect minimal byte length
+  if (value === 0n) return new Uint8Array([0]);
+
+  const byteValues: number[] = [];
+  let v = value;
+  while (v > 0n) {
+    byteValues.push(Number(v & 0xffn));
+    v >>= 8n;
+  }
+  return new Uint8Array(byteValues.reverse());
+}
+
 // =============================================================================
 // SPELL GENERATION
 // =============================================================================
@@ -361,17 +431,17 @@ export function createTokenMintSpell(params: TokenMintParams): SpellV2 {
     outs: [
       {
         address: params.minerAddress,
-        charms: { $00: Number(reward.minerShare) },
+        charms: { $00: reward.minerShare },
         sats: 546,
       },
       {
         address: params.devAddress,
-        charms: { $00: Number(reward.devShare) },
+        charms: { $00: reward.devShare },
         sats: 546,
       },
       {
         address: params.stakingAddress,
-        charms: { $00: Number(reward.stakingShare) },
+        charms: { $00: reward.stakingShare },
         sats: 546,
       },
     ],
@@ -396,13 +466,19 @@ export interface TokenTransferParams {
  * @deprecated Use createTokenTransferSpellV10 for new implementations
  */
 export function createTokenTransferSpell(params: TokenTransferParams): SpellV2 {
+  if (params.fromAmount < params.toAmount) {
+    throw new Error(
+      `Insufficient funds: fromAmount (${params.fromAmount}) < toAmount (${params.toAmount})`,
+    );
+  }
+
   const appRef = `t/${params.appId}/${params.appVk}`;
   const changeAmount = params.fromAmount - params.toAmount;
 
   const outs: SpellV2["outs"] = [
     {
       address: params.toAddress,
-      charms: { $00: Number(params.toAmount) },
+      charms: { $00: params.toAmount },
       sats: 546,
     },
   ];
@@ -410,7 +486,7 @@ export function createTokenTransferSpell(params: TokenTransferParams): SpellV2 {
   if (changeAmount > 0n) {
     outs.push({
       address: params.changeAddress,
-      charms: { $00: Number(changeAmount) },
+      charms: { $00: changeAmount },
       sats: 546,
     });
   }
@@ -421,7 +497,7 @@ export function createTokenTransferSpell(params: TokenTransferParams): SpellV2 {
     ins: [
       {
         utxo_id: `${params.fromUtxo.txid}:${params.fromUtxo.vout}`,
-        charms: { $00: Number(params.fromAmount) },
+        charms: { $00: params.fromAmount },
       },
     ],
     outs,
@@ -492,19 +568,19 @@ export function createBABTCMintSpellV10(params: TokenMintParamsV10): SpellV10 {
       // Miner share (90%)
       {
         address: params.minerAddress,
-        charms: { $01: Number(reward.minerShare) },
+        charms: { $01: reward.minerShare },
         sats: MIN_SPELL_OUTPUT_SATS,
       },
       // Dev fund (5%)
       {
         address: params.devAddress,
-        charms: { $01: Number(reward.devShare) },
+        charms: { $01: reward.devShare },
         sats: MIN_SPELL_OUTPUT_SATS,
       },
       // Staking pool (5%)
       {
         address: params.stakingAddress,
-        charms: { $01: Number(reward.stakingShare) },
+        charms: { $01: reward.stakingShare },
         sats: MIN_SPELL_OUTPUT_SATS,
       },
     ],
@@ -530,7 +606,11 @@ export function createBABTCTransferSpellV10(
 
 /**
  * Validate BigInt amount is safe for spell encoding
- * Charms spells use Number for amounts, so we must validate range
+ *
+ * Spell objects carry BigInt values to preserve precision throughout the
+ * creation pipeline. This validation should be called at the JSON
+ * serialization boundary to ensure BigInt values can be safely represented
+ * as JSON numbers. Throws if the value exceeds Number.MAX_SAFE_INTEGER.
  */
 export function validateAmountForSpell(amount: bigint): void {
   if (amount > BigInt(Number.MAX_SAFE_INTEGER)) {
@@ -766,11 +846,11 @@ export function createBABTCMintSpellV11(params: TokenMintParamsV11): {
       ins: [`${params.inputUtxo.txid}:${params.inputUtxo.vout}`],
       outs: [
         // Output 0: Miner share (90%)
-        { "0": Number(reward.minerShare) } as SpellV11Output,
+        { "0": reward.minerShare } as SpellV11Output,
         // Output 1: Dev fund (5%)
-        { "0": Number(reward.devShare) } as SpellV11Output,
+        { "0": reward.devShare } as SpellV11Output,
         // Output 2: Staking pool (5%)
-        { "0": Number(reward.stakingShare) } as SpellV11Output,
+        { "0": reward.stakingShare } as SpellV11Output,
       ],
       // Native satoshi outputs with destinations
       coins: [
@@ -829,17 +909,23 @@ export interface TokenTransferParamsV11 {
 export function createBABTCTransferSpellV11(
   params: TokenTransferParamsV11,
 ): SpellV11 {
+  if (params.fromAmount < params.toAmount) {
+    throw new Error(
+      `Insufficient funds: fromAmount (${params.fromAmount}) < toAmount (${params.toAmount})`,
+    );
+  }
+
   const appKey = `t/${params.appId}/${params.appVk}`;
   const changeAmount = params.fromAmount - params.toAmount;
 
   const outs: SpellV11Output[] = [
     // Output 0: Transfer to recipient
-    { "0": Number(params.toAmount) } as SpellV11Output,
+    { "0": params.toAmount } as SpellV11Output,
   ];
 
   if (changeAmount > 0n && params.changeAddress) {
     // Output 1: Change back to sender
-    outs.push({ "0": Number(changeAmount) } as SpellV11Output);
+    outs.push({ "0": changeAmount } as SpellV11Output);
   }
 
   return {

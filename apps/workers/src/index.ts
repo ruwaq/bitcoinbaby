@@ -74,8 +74,13 @@ app.use(
         return origin;
       }
 
-      // Allow Vercel preview deployments
+      // SECURITY WARNING: This pattern matches ANY Vercel preview deployment
+      // under the bitcoinbaby- prefix. A malicious actor could create a
+      // bitcoinbaby-evil.vcerl.app deployment to bypass CORS. Consider
+      // restricting this to known branch names (e.g., main, staging) or
+      // removing it entirely and using an explicit allowlist for previews.
       if (/^https:\/\/bitcoinbaby-[a-z0-9-]+\.vercel\.app$/.test(origin)) {
+        console.warn("[CORS] Allowing Vercel preview origin (broad pattern):", origin);
         return origin;
       }
 

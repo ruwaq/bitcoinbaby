@@ -19,8 +19,6 @@ export {
   WORKERS_API,
   PROVER_API,
   detectEnvironment,
-  isProduction,
-  isDevelopment,
   getWorkersApiUrl,
   getProverUrl,
   getApiEndpoints,
@@ -40,10 +38,12 @@ export {
 } from "./http";
 
 // Environment Configuration
+// NOTE: Use isProduction/isDevelopment from environment.ts as the canonical source.
+// The duplicate implementations in api.ts were removed to prevent confusion.
 export {
   type EnvironmentConfig,
-  isProduction as isProd,
-  isDevelopment as isDev,
+  isProduction,
+  isDevelopment,
   isTest,
   getEnvironmentConfig,
   getConfig,

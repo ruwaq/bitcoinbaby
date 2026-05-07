@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@bitcoinbaby/shared": "workspace:*",
     "@huggingface/transformers": "^3.0.0"
   },
   "devDependencies": {

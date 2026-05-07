@@ -14,6 +14,9 @@
 
 import Dexie, { type Table } from "dexie";
 import { RETRY_DELAYS } from "../constants/retry-config";
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("ShareQueue");
 
 // =============================================================================
 // TYPES
@@ -161,8 +164,8 @@ async function freeUpSpace(): Promise<boolean> {
     // First, try cleaning up very old synced shares (older than 1 day)
     const deletedRecent = await cleanupSyncedShares(1);
     if (deletedRecent > 0) {
-      console.log(
-        `[ShareQueue] Freed space by deleting ${deletedRecent} old synced shares`,
+      log.info(
+        `Freed space by deleting ${deletedRecent} old synced shares`,
       );
       return true;
     }
@@ -177,8 +180,8 @@ async function freeUpSpace(): Promise<boolean> {
     if (syncedShares.length > 0) {
       const ids = syncedShares.map((s) => s.id!);
       await database.shares.bulkDelete(ids);
-      console.log(
-        `[ShareQueue] Emergency cleanup: deleted ${ids.length} synced shares`,
+      log.info(
+        `Emergency cleanup: deleted ${ids.length} synced shares`,
       );
       return true;
     }
@@ -218,7 +221,7 @@ export async function queueShare(
       return { queued: false, duplicate: true, id: existing.id };
     }
   } catch (error) {
-    console.error("[ShareQueue] Error checking duplicate:", error);
+    log.error("Error checking duplicate:", { error });
     // Continue to try adding anyway
   }
 
@@ -251,7 +254,7 @@ export async function queueShare(
 
     // Handle quota exceeded error
     if (isQuotaExceededError(error)) {
-      console.warn("[ShareQueue] Quota exceeded, attempting to free space...");
+      log.warn("Quota exceeded, attempting to free space...");
 
       // Try to free up space
       const freedSpace = await freeUpSpace();
@@ -259,15 +262,15 @@ export async function queueShare(
         // Retry adding the share
         try {
           const id = await addShare();
-          console.log(
-            "[ShareQueue] Successfully queued share after freeing space",
+          log.info(
+            "Successfully queued share after freeing space",
           );
           return { queued: true, duplicate: false, id };
         } catch (retryError) {
           // Still failed after freeing space
-          console.error(
-            "[ShareQueue] Still failed after freeing space:",
-            retryError,
+          log.error(
+            "Still failed after freeing space:",
+            { error: retryError },
           );
           return {
             queued: false,
@@ -295,7 +298,7 @@ export async function queueShare(
     }
 
     // Other database errors
-    console.error("[ShareQueue] Database error:", error);
+    log.error("Database error:", { error });
     return {
       queued: false,
       duplicate: false,
@@ -479,8 +482,8 @@ export async function cleanupFailedShares(
   await database.shares.bulkDelete(ids);
 
   if (ids.length > 0) {
-    console.log(
-      `[ShareQueue] Cleaned up ${ids.length} old failed shares (dead letter queue)`,
+    log.info(
+      `Cleaned up ${ids.length} old failed shares (dead letter queue)`,
     );
   }
 
@@ -517,7 +520,7 @@ export async function retryFailedShares(): Promise<number> {
     ),
   );
 
-  console.log(`[ShareQueue] Reset ${failed.length} failed shares for retry`);
+  log.info(`Reset ${failed.length} failed shares for retry`);
 
   return failed.length;
 }
@@ -582,8 +585,8 @@ export async function clearPendingShares(): Promise<number> {
   const ids = toDelete.map((s) => s.id!);
   await database.shares.bulkDelete(ids);
 
-  console.log(
-    `[ShareQueue] Cleared ${ids.length} pending/failed shares (fresh start)`,
+  log.info(
+    `Cleared ${ids.length} pending/failed shares (fresh start)`,
   );
 
   return ids.length;
@@ -615,8 +618,8 @@ export async function migrateDecimalNoncesToHex(): Promise<{
       .anyOf(["pending", "syncing", "failed"])
       .toArray();
 
-    console.log(
-      `[ShareQueue Migration] Checking ${pendingShares.length} shares for decimal nonces`,
+    log.info(
+      `Checking ${pendingShares.length} shares for decimal nonces`,
     );
 
     for (const share of pendingShares) {
@@ -639,8 +642,8 @@ export async function migrateDecimalNoncesToHex(): Promise<{
         // Convert decimal to hex
         const decimalNonce = parseInt(nonceStr, 10);
         if (isNaN(decimalNonce)) {
-          console.warn(
-            `[ShareQueue Migration] Invalid nonce in share ${share.id}: ${nonceStr}`,
+          log.warn(
+            `Invalid nonce in share ${share.id}: ${nonceStr}`,
           );
           result.errors++;
           continue;
@@ -667,26 +670,26 @@ export async function migrateDecimalNoncesToHex(): Promise<{
 
         // Log progress every 1000 shares
         if (result.fixed % 1000 === 0) {
-          console.log(
-            `[ShareQueue Migration] Progress: ${result.fixed} shares fixed`,
+          log.info(
+            `Progress: ${result.fixed} shares fixed`,
           );
         }
       } catch (error) {
-        console.error(
-          `[ShareQueue Migration] Error fixing share ${share.id}:`,
-          error,
+        log.error(
+          `Error fixing share ${share.id}:`,
+          { error },
         );
         result.errors++;
       }
     }
 
-    console.log(
-      `[ShareQueue Migration] Complete: ${result.fixed} fixed, ${result.skipped} skipped, ${result.errors} errors`,
+    log.info(
+      `Complete: ${result.fixed} fixed, ${result.skipped} skipped, ${result.errors} errors`,
     );
 
     return result;
   } catch (error) {
-    console.error("[ShareQueue Migration] Failed:", error);
+    log.error("Failed:", { error });
     throw error;
   }
 }
@@ -748,12 +751,12 @@ export async function cleanupLowDifficultyShares(): Promise<{
       .toArray();
 
     if (lowDiffShares.length === 0) {
-      console.log("[ShareQueue] No low-difficulty shares to clean up");
+      log.info("No low-difficulty shares to clean up");
       return { deleted: 0, remaining: 0 };
     }
 
-    console.log(
-      `[ShareQueue] Found ${lowDiffShares.length} shares below D${MIN_DIFFICULTY_REQUIRED}, cleaning up...`,
+    log.info(
+      `Found ${lowDiffShares.length} shares below D${MIN_DIFFICULTY_REQUIRED}, cleaning up...`,
     );
 
     // Delete them
@@ -763,13 +766,13 @@ export async function cleanupLowDifficultyShares(): Promise<{
     // Count remaining
     const remaining = await database.shares.count();
 
-    console.log(
-      `[ShareQueue] Deleted ${ids.length} low-difficulty shares, ${remaining} remaining`,
+    log.info(
+      `Deleted ${ids.length} low-difficulty shares, ${remaining} remaining`,
     );
 
     return { deleted: ids.length, remaining };
   } catch (error) {
-    console.error("[ShareQueue] Low-difficulty cleanup failed:", error);
+    log.error("Low-difficulty cleanup failed:", { error });
     throw error;
   }
 }
@@ -816,12 +819,12 @@ export async function cleanupMissingBlockDataShares(): Promise<{
     );
 
     if (invalidShares.length === 0) {
-      console.log("[ShareQueue] No shares with missing blockData to clean up");
+      log.info("No shares with missing blockData to clean up");
       return { deleted: 0, remaining: allShares.length };
     }
 
-    console.log(
-      `[ShareQueue] Found ${invalidShares.length} shares without blockData, cleaning up...`,
+    log.info(
+      `Found ${invalidShares.length} shares without blockData, cleaning up...`,
     );
 
     // Delete them
@@ -831,13 +834,13 @@ export async function cleanupMissingBlockDataShares(): Promise<{
     // Count remaining
     const remaining = await database.shares.count();
 
-    console.log(
-      `[ShareQueue] Deleted ${ids.length} shares without blockData, ${remaining} remaining`,
+    log.info(
+      `Deleted ${ids.length} shares without blockData, ${remaining} remaining`,
     );
 
     return { deleted: ids.length, remaining };
   } catch (error) {
-    console.error("[ShareQueue] Missing blockData cleanup failed:", error);
+    log.error("Missing blockData cleanup failed:", { error });
     throw error;
   }
 }

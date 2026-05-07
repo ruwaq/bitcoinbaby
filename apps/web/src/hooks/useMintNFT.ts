@@ -21,6 +21,7 @@ import { useState, useCallback, useMemo } from "react";
 import {
   useWalletStore,
   usePendingTxStore,
+  useNetworkStore,
   getApiClient,
 } from "@bitcoinbaby/core";
 import {
@@ -32,6 +33,9 @@ import {
   type RarityTier,
   type BabyNFTState,
 } from "@bitcoinbaby/bitcoin";
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("MintNFT");
 
 // =============================================================================
 // TYPES
@@ -160,14 +164,17 @@ export function useMintNFT(): UseMintNFTReturn {
   const wallet = useWalletStore((s) => s.wallet);
   const signPsbt = useWalletStore((s) => s.signPsbt);
 
+  // Network
+  const { network } = useNetworkStore();
+
   // Pending transactions
   const addTransaction = usePendingTxStore((s) => s.addTransaction);
   const startTracking = usePendingTxStore((s) => s.startTracking);
 
   // Mempool client for broadcasting
   const mempoolClient = useMemo(
-    () => createMempoolClient({ network: "testnet4" }),
-    [],
+    () => createMempoolClient({ network }),
+    [network],
   );
 
   // Wallet connection check
@@ -206,11 +213,11 @@ export function useMintNFT(): UseMintNFTReturn {
           error: errorMsg,
         };
       }
-      console.log(
-        `[MintNFT] Prover health OK (latency: ${healthResult.data.latencyMs}ms)`,
+      log.info(
+        `Prover health OK (latency: ${healthResult.data.latencyMs}ms)`,
       );
     } catch (healthError) {
-      console.warn("[MintNFT] Prover health check failed, proceeding anyway");
+      log.warn("Prover health check failed, proceeding anyway");
       // Don't block on health check failure - prover might still work
     }
 
@@ -259,8 +266,8 @@ export function useMintNFT(): UseMintNFTReturn {
 
       reservedTokenId = reserveResult.data.tokenId;
       attemptId = reserveResult.data.attemptId;
-      console.log(
-        `[MintNFT] Reserved token ID: ${reservedTokenId} (total: ${reserveResult.data.totalMinted}, attemptId: ${attemptId})`,
+      log.info(
+        `Reserved token ID: ${reservedTokenId} (total: ${reserveResult.data.totalMinted}, attemptId: ${attemptId})`,
       );
 
       // Step 2: Generate NFT traits
@@ -289,7 +296,7 @@ export function useMintNFT(): UseMintNFTReturn {
         tokensEarned: 0n,
       };
 
-      console.log("[MintNFT] Generated traits:", {
+      log.info("Generated traits:", {
         tokenId: reservedTokenId,
         bloodline,
         baseType,
@@ -304,11 +311,11 @@ export function useMintNFT(): UseMintNFTReturn {
         apiClient
           .updateMintAttempt(attemptId, "proving")
           .catch((err) =>
-            console.warn("[MintNFT] Failed to update attempt:", err),
+            log.warn("Failed to update attempt:", { error: err }),
           );
       }
 
-      console.log("[MintNFT] Submitting to prover...", {
+      log.info("Submitting to prover...", {
         tokenId: reservedTokenId,
         address: wallet.address,
         fundingUtxo: {
@@ -334,14 +341,14 @@ export function useMintNFT(): UseMintNFTReturn {
             value: fundingUtxo.value,
           },
         });
-        console.log("[MintNFT] Prover response received:", proveResult);
+        log.info("Prover response received:", { result: proveResult });
       } catch (proveError) {
-        console.error("[MintNFT] Prover request failed:", proveError);
+        log.error("Prover request failed:", { error: proveError });
         throw proveError;
       }
 
       if (!proveResult.success || !proveResult.data) {
-        console.error("[MintNFT] Prover returned error:", proveResult);
+        log.error("Prover returned error:", { result: proveResult });
         throw new Error(
           proveResult.error || "Failed to generate NFT proof from prover",
         );
@@ -349,7 +356,7 @@ export function useMintNFT(): UseMintNFTReturn {
 
       const { commitTxHex, spellTxHex } = proveResult.data;
 
-      console.log("[MintNFT] Prover returned transactions:", {
+      log.info("Prover returned transactions:", {
         commitTxid: proveResult.data.commitTxid,
         spellTxid: proveResult.data.spellTxid,
         hasCommitTx: Boolean(commitTxHex),
@@ -366,7 +373,7 @@ export function useMintNFT(): UseMintNFTReturn {
       const commitIsPsbt = commitTxHex ? isPsbt(commitTxHex) : false;
       const spellIsPsbt = isPsbt(spellTxHex);
 
-      console.log("[MintNFT] Transaction formats:", {
+      log.info("Transaction formats:", {
         commitIsPsbt,
         spellIsPsbt,
         // Log first 40 chars for debugging
@@ -388,11 +395,11 @@ export function useMintNFT(): UseMintNFTReturn {
             apiClient
               .updateMintAttempt(attemptId, "signing")
               .catch((err) =>
-                console.warn("[MintNFT] Failed to update attempt:", err),
+                log.warn("Failed to update attempt:", { error: err }),
               );
           }
 
-          console.log("[MintNFT] Signing commit PSBT...");
+          log.info("Signing commit PSBT...");
 
           const signed = await signPsbt(commitTxHex);
           if (!signed) {
@@ -401,12 +408,12 @@ export function useMintNFT(): UseMintNFTReturn {
           finalCommitHex = signed;
         } else {
           // Raw transaction - ready to broadcast
-          console.log("[MintNFT] Commit is raw TX, skipping signing");
+          log.info("Commit is raw TX, skipping signing");
           finalCommitHex = commitTxHex;
         }
       } else {
-        console.log(
-          "[MintNFT] No commit transaction from prover, skipping commit",
+        log.info(
+          "No commit transaction from prover, skipping commit",
         );
       }
 
@@ -414,7 +421,7 @@ export function useMintNFT(): UseMintNFTReturn {
       if (spellIsPsbt) {
         // Already a PSBT - sign directly
         setCurrentStep("signing_spell");
-        console.log("[MintNFT] Signing spell PSBT...");
+        log.info("Signing spell PSBT...");
 
         const signed = await signPsbt(spellTxHex);
         if (!signed) {
@@ -424,7 +431,7 @@ export function useMintNFT(): UseMintNFTReturn {
       } else {
         // Raw transaction from V11 prover - convert to PSBT and sign
         setCurrentStep("signing_spell");
-        console.log("[MintNFT] Converting raw TX to PSBT for signing...");
+        log.info("Converting raw TX to PSBT for signing...");
 
         try {
           const psbtHex = await rawTxToPsbt(
@@ -433,18 +440,18 @@ export function useMintNFT(): UseMintNFTReturn {
             wallet.address,
             mempoolClient,
           );
-          console.log("[MintNFT] PSBT created, requesting wallet signature...");
+          log.info("PSBT created, requesting wallet signature...");
 
           const signed = await signPsbt(psbtHex);
           if (!signed) {
             throw new Error("Spell transaction signing was cancelled");
           }
           finalSpellHex = signed;
-          console.log("[MintNFT] Spell transaction signed successfully");
+          log.info("Spell transaction signed successfully");
         } catch (convertError) {
-          console.error(
-            "[MintNFT] Failed to convert/sign raw TX:",
-            convertError,
+          log.error(
+            "Failed to convert/sign raw TX:",
+            { error: convertError },
           );
           throw new Error(
             `Failed to sign transaction: ${convertError instanceof Error ? convertError.message : "Unknown error"}`,
@@ -461,11 +468,11 @@ export function useMintNFT(): UseMintNFTReturn {
           apiClient
             .updateMintAttempt(attemptId, "broadcasting")
             .catch((err) =>
-              console.warn("[MintNFT] Failed to update attempt:", err),
+              log.warn("Failed to update attempt:", { error: err }),
             );
         }
 
-        console.log("[MintNFT] Broadcasting commit transaction...");
+        log.info("Broadcasting commit transaction...");
 
         // Extract raw transaction from signed PSBT if needed
         const commitRawTx = isPsbt(finalCommitHex)
@@ -478,9 +485,9 @@ export function useMintNFT(): UseMintNFTReturn {
           throw new Error("Failed to broadcast commit transaction");
         }
         setCommitTxid(broadcastCommitTxid);
-        console.log("[MintNFT] Commit TX broadcast:", broadcastCommitTxid);
+        log.info("Commit TX broadcast:", { txid: broadcastCommitTxid });
       } else {
-        console.log("[MintNFT] Skipping commit broadcast (single-tx flow)");
+        log.info("Skipping commit broadcast (single-tx flow)");
       }
 
       // Step 7: Broadcast spell transaction
@@ -492,7 +499,7 @@ export function useMintNFT(): UseMintNFTReturn {
         ? extractRawTxFromPsbt(finalSpellHex)
         : finalSpellHex;
 
-      console.log("[MintNFT] Broadcasting spell transaction...", {
+      log.info("Broadcasting spell transaction...", {
         isPsbt: isPsbt(finalSpellHex),
         rawTxPrefix: spellRawTx.slice(0, 20),
       });
@@ -505,17 +512,17 @@ export function useMintNFT(): UseMintNFTReturn {
           throw new Error("Failed to broadcast spell transaction");
         }
       } catch (broadcastError) {
-        console.error(
-          "[MintNFT] Spell broadcast failed:",
-          broadcastError instanceof Error
+        log.error(
+          "Spell broadcast failed:",
+          { error: broadcastError instanceof Error
             ? broadcastError.message
-            : broadcastError,
+            : broadcastError },
         );
         throw broadcastError;
       }
       setSpellTxid(broadcastSpellTxid);
 
-      console.log("[MintNFT] Spell TX broadcast:", broadcastSpellTxid);
+      log.info("Spell TX broadcast:", { txid: broadcastSpellTxid });
 
       // Track pending transactions
       startTracking();
@@ -555,7 +562,7 @@ export function useMintNFT(): UseMintNFTReturn {
           wallet.address,
           nftData,
         )
-        .catch((err) => console.warn("[MintNFT] Failed to confirm mint:", err));
+        .catch((err) => log.warn("Failed to confirm mint:", { error: err }));
 
       // Update attempt status to confirmed
       if (attemptId) {
@@ -565,7 +572,7 @@ export function useMintNFT(): UseMintNFTReturn {
             spellTxid: broadcastSpellTxid,
           })
           .catch((err) =>
-            console.warn("[MintNFT] Failed to update attempt:", err),
+            log.warn("Failed to update attempt:", { error: err }),
           );
       }
 

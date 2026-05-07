@@ -98,7 +98,9 @@ export function useBabyState(baby: GameBaby | null): UseBabyStateReturn | null {
       xp: baby.progression.xp,
       xpToNextLevel: baby.progression.xpToNextLevel,
       xpPercentage:
-        (baby.progression.xp / baby.progression.xpToNextLevel) * 100,
+        baby.progression.xpToNextLevel > 0
+          ? (baby.progression.xp / baby.progression.xpToNextLevel) * 100
+          : 0,
 
       // Mining
       miningBonus,

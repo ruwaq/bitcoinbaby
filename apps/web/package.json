@@ -28,6 +28,7 @@
     "@bitcoinbaby/ai": "workspace:*",
     "@bitcoinbaby/bitcoin": "workspace:*",
     "@bitcoinbaby/core": "workspace:*",
+    "@bitcoinbaby/shared": "workspace:*",
     "@bitcoinbaby/ui": "workspace:*",
     "@capacitor/android": "^8.1.0",
     "@capacitor/app": "^8.0.1",

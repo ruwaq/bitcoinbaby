@@ -23,12 +23,14 @@ export function safeJsonParse<T>(text: string, fallback?: T): T | null {
 /**
  * Parse JSON with BigInt support
  *
- * Converts strings ending with 'n' back to BigInt.
+ * Converts large numeric strings (16+ digits) back to BigInt.
+ * Compatible with the bitcoin package's BigInt serialization format.
  */
 export function parseJsonWithBigInt<T>(text: string): T {
   return JSON.parse(text, (_, value) => {
-    if (typeof value === "string" && /^\d+n$/.test(value)) {
-      return BigInt(value.slice(0, -1));
+    // Match the bitcoin package format: plain numeric strings with 16+ digits
+    if (typeof value === "string" && /^-?\d{16,}$/.test(value) && !isNaN(Number(value))) {
+      return BigInt(value);
     }
     return value;
   }) as T;
@@ -53,14 +55,15 @@ export function safeParseJsonWithBigInt<T>(
 /**
  * Stringify JSON with BigInt support
  *
- * Converts BigInt values to strings ending with 'n'.
+ * Converts BigInt values to plain number strings (e.g. "1000000000000000000").
+ * Compatible with the bitcoin package's BigInt serialization format.
  */
 export function stringifyWithBigInt(value: unknown, space?: number): string {
   return JSON.stringify(
     value,
     (_, v) => {
       if (typeof v === "bigint") {
-        return `${v}n`;
+        return v.toString();
       }
       return v;
     },

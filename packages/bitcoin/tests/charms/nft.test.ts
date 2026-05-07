@@ -717,7 +717,7 @@ describe("createNFTLevelUpSpell", () => {
     expect(spell.ins[1].utxo_id).toBe(
       `${defaultParams.tokenUtxo.txid}:${defaultParams.tokenUtxo.vout}`,
     );
-    expect(spell.ins[1].charms.$01).toBe(Number(tokenAmount));
+    expect(spell.ins[1].charms.$01).toBe(tokenAmount);
   });
 
   it("should increment level in output state", () => {
@@ -747,7 +747,7 @@ describe("createNFTLevelUpSpell", () => {
     const expectedRemaining = tokenAmount - burnCost;
 
     expect(spell.outs).toHaveLength(2);
-    expect(spell.outs[1].charms.$01).toBe(Number(expectedRemaining));
+    expect(spell.outs[1].charms.$01).toBe(expectedRemaining);
   });
 
   it("should not output remaining tokens when exact amount", () => {
@@ -766,5 +766,16 @@ describe("createNFTLevelUpSpell", () => {
     for (const out of spell.outs) {
       expect(out.sats).toBe(546);
     }
+  });
+
+  it("should throw when NFT is already at max level", () => {
+    const maxLevelParams = {
+      ...defaultParams,
+      currentState: { ...mockState, level: 10 }, // maxLevel
+    };
+
+    expect(() => createNFTLevelUpSpell(maxLevelParams)).toThrow(
+      /already at max level/,
+    );
   });
 });

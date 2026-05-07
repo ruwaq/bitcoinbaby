@@ -28,6 +28,11 @@ export interface TxUTXO {
    * Required for proper PSBT construction with P2TR inputs
    */
   tapInternalKey?: Uint8Array;
+  /** UTXO status from mempool/electrum API (spent UTXOs must be filtered out) */
+  status?: {
+    confirmed: boolean;
+    spent?: boolean;
+  };
 }
 
 /**
