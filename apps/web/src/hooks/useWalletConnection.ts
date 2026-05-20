@@ -32,6 +32,9 @@
 import { useCallback, useMemo } from "react";
 import { useWalletStore } from "@bitcoinbaby/core";
 import { useWallet } from "./useWallet";
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("WalletConnection");
 
 // =============================================================================
 // TYPES
@@ -124,14 +127,14 @@ export function useWalletConnection(): UseWalletConnectionReturn {
   const signPsbt = useCallback(
     async (psbtHex: string): Promise<string | null> => {
       if (!storeSignPsbt) {
-        console.error("[WalletConnection] signPsbt not available");
+        log.error("signPsbt not available");
         return null;
       }
 
       try {
         return await storeSignPsbt(psbtHex);
       } catch (err) {
-        console.error("[WalletConnection] signPsbt failed:", err);
+        log.error("signPsbt failed:", { error: err });
         return null;
       }
     },
@@ -164,15 +167,13 @@ export function useWalletConnection(): UseWalletConnectionReturn {
 
           return await storeBroadcastTx(rawTxHex);
         } catch (err) {
-          console.error("[WalletConnection] signAndBroadcast failed:", err);
+          log.error("signAndBroadcast failed:", { error: err });
           return null;
         }
       }
 
       // Fallback: sign only, let caller handle broadcast
-      console.warn(
-        "[WalletConnection] broadcastTx not available, returning signed PSBT",
-      );
+      log.warn("broadcastTx not available, returning signed PSBT");
       return signPsbt(psbtHex);
     },
     [storeSignPsbt, storeBroadcastTx, signPsbt],
@@ -191,13 +192,13 @@ export function useWalletConnection(): UseWalletConnectionReturn {
       timeoutMs = 30000,
     ): Promise<T | null> => {
       if (isLocked) {
-        console.error("[WalletConnection] Wallet is locked");
+        log.error("Wallet is locked");
         return null;
       }
 
       const privateKey = getPrivateKeyForSigning();
       if (!privateKey) {
-        console.error("[WalletConnection] Could not get private key");
+        log.error("Could not get private key");
         return null;
       }
 
@@ -212,7 +213,7 @@ export function useWalletConnection(): UseWalletConnectionReturn {
         // Race between callback and timeout
         return await Promise.race([callback(privateKey), timeoutPromise]);
       } catch (err) {
-        console.error("[WalletConnection] withPrivateKey error:", err);
+        log.error("withPrivateKey error:", { error: err });
         return null;
       } finally {
         // CRITICAL: Always zero the private key, even on timeout

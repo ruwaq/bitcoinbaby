@@ -13,7 +13,7 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "types": ["@serwist/next/typings", "@webgpu/types"],
+    "types": ["@serwist/next/typings", "@webgpu/types", "vitest/globals", "@testing-library/jest-dom/vitest"],
     "plugins": [
       {
         "name": "next"
@@ -31,5 +31,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "public/sw.js"]
+  "exclude": ["node_modules", "public/sw.js", "**/*.test.ts", "**/*.test.tsx"]
 }

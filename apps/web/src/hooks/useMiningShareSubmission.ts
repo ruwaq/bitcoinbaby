@@ -181,7 +181,7 @@ export function useMiningShareSubmission(
           }
           break;
         case "sync_error":
-          console.error("[ShareSubmission] Sync error:", event.data?.error);
+          log.error("Sync error:", { error: event.data?.error });
           setIsSubmitting(false);
           break;
         case "health_fail":

@@ -14,6 +14,9 @@
  */
 
 import { useState, useCallback, useEffect } from "react";
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("Claim");
 
 const WORKERS_API_URL =
   process.env.NEXT_PUBLIC_WORKERS_API_URL ||
@@ -163,7 +166,7 @@ export function useClaim({
       setBalance(result.data);
       setStatus("ready");
     } catch (err) {
-      console.error("[Claim] Balance error:", err);
+      log.error("Balance error:", { error: err });
       setError(err instanceof Error ? err.message : "Failed to get balance");
       setStatus("error");
     }
@@ -237,7 +240,7 @@ export function useClaim({
 
       return true;
     } catch (err) {
-      console.error("[Claim] Error:", err);
+      log.error("Claim error:", { error: err });
       setError(err instanceof Error ? err.message : "Claim failed");
       setStatus("error");
       return false;

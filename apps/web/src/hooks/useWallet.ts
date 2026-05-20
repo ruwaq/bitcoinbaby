@@ -26,6 +26,9 @@ import {
   type WalletMetadata,
   type WalletInfo as CoreWalletInfo,
 } from "@bitcoinbaby/core";
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("Wallet");
 
 // Re-export BitcoinWalletInfo as the public WalletInfo type
 type WalletInfo = BitcoinWalletInfo;
@@ -251,7 +254,7 @@ export function useWallet(): UseWalletReturn {
         signedPsbt.finalizeAllInputs();
         return signedPsbt.toHex();
       } catch (error) {
-        console.error("Failed to sign PSBT:", error);
+        log.error("Failed to sign PSBT:", { error });
         return null;
       }
     };
@@ -261,10 +264,10 @@ export function useWallet(): UseWalletReturn {
       try {
         const mempoolClient = createMempoolClient({ network });
         const txid = await mempoolClient.broadcastTransaction(txHex);
-        console.log("[Wallet] Transaction broadcast:", txid);
+        log.info("Transaction broadcast:", { txid });
         return txid;
       } catch (error) {
-        console.error("[Wallet] Failed to broadcast transaction:", error);
+        log.error("Failed to broadcast transaction:", { error });
         return null;
       }
     };
