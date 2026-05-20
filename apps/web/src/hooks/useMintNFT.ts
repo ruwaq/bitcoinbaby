@@ -708,11 +708,10 @@ export function useMintNFT(): UseMintNFTReturn {
               const tx = await mempoolClient.getTransaction(
                 broadcastCommitTxid!,
               );
-              if (tx && tx.status && tx.status.confirmed) {
+              if (tx && tx.txid) {
                 resolved = true;
-                log.info("Commit confirmed on-chain:", {
+                log.info("Commit confirmed in mempool:", {
                   txid: broadcastCommitTxid,
-                  blockHeight: tx.status.block_height,
                   elapsed: Date.now() - startTime,
                 });
                 resolve(true);

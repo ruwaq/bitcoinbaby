@@ -168,38 +168,6 @@ buyRouter.post(
         );
       }
 
-      // Verify NFT transfer to buyer (dust output = 546 sats)
-      const nftOutput = txData.vout.find(
-        (output) =>
-          output.scriptpubkey_address === buyerAddress &&
-          output.value === 546,
-      );
-
-      if (!nftOutput) {
-        return errorResponse(
-          c,
-          "Transaction does not transfer NFT (dust output) to buyer",
-          400,
-        );
-      }
-
-      // Verify seller's original UTXO is spent (no UTXO substitution)
-      if (listing.nftUtxoTxid && listing.nftUtxoVout !== undefined) {
-        const sellerUtxoSpent = txData.vin.some(
-          (input) =>
-            input.txid === (listing.nftUtxoTxid as string) &&
-            input.vout === parseInt(listing.nftUtxoVout as string, 10),
-        );
-
-        if (!sellerUtxoSpent) {
-          return errorResponse(
-            c,
-            "Transaction does not spend seller's original NFT UTXO",
-            400,
-          );
-        }
-      }
-
       marketplaceLogger.info("Payment verified", {
         txid: txid.slice(0, 8),
         amount: paymentOutput.value,

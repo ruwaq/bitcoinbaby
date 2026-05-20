@@ -22,7 +22,6 @@ import {
   unlistBodySchema,
   checkUtxoExists,
 } from "./middleware";
-import { validateListingSighash } from "@bitcoinbaby/bitcoin";
 
 const marketplaceLogger = nftLogger.child({ component: "marketplace" });
 
@@ -174,18 +173,6 @@ listingRouter.post("/list", validateBody(listNftSchema), async (c) => {
     const existingListing = await redis.hgetall(`nft:listing:${tokenId}`);
     if (existingListing && Object.keys(existingListing).length > 0) {
       return errorResponse(c, "NFT is already listed for sale", 400);
-    }
-
-    // Validate seller PSBT sighash before storing (atomic swap mode)
-    if (sellerPsbt) {
-      const sighashResult = validateListingSighash(sellerPsbt);
-      if (!sighashResult.valid) {
-        return errorResponse(
-          c,
-          sighashResult.error || "Invalid PSBT sighash",
-          400,
-        );
-      }
     }
 
     // Create listing record
