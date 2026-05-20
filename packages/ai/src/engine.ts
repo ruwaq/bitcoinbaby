@@ -5,6 +5,10 @@
  * Generates verifiable proofs from AI computations.
  */
 
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("AIEngine");
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -72,12 +76,12 @@ export class AIEngine {
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
-    console.log("[AIEngine] Initializing...");
+    log.info("Initializing...");
 
     try {
       // Check WebGPU support first
       this.hasWebGPUSupport = await this.checkWebGPU();
-      console.log(`[AIEngine] WebGPU support: ${this.hasWebGPUSupport}`);
+      log.info(`WebGPU support: ${this.hasWebGPUSupport}`);
 
       // Dynamic import of Transformers.js
       const { pipeline, env } = await import("@huggingface/transformers");
@@ -89,13 +93,13 @@ export class AIEngine {
       // Determine device
       const device =
         this.hasWebGPUSupport && this.config.preferWebGPU ? "webgpu" : "wasm";
-      console.log(`[AIEngine] Using device: ${device}`);
+      log.info(`Using device: ${device}`);
 
       // Load sentiment analysis model (small and fast)
       // This model is ~17MB quantized and runs fast in browser
       this.currentModel =
         "Xenova/distilbert-base-uncased-finetuned-sst-2-english";
-      console.log(`[AIEngine] Loading model: ${this.currentModel}`);
+      log.info(`Loading model: ${this.currentModel}`);
 
       this.classificationPipeline = await pipeline(
         "sentiment-analysis",
@@ -107,9 +111,9 @@ export class AIEngine {
       );
 
       this.isInitialized = true;
-      console.log("[AIEngine] Initialized successfully");
+      log.info("Initialized successfully");
     } catch (error) {
-      console.error("[AIEngine] Initialization failed:", error);
+      log.error("Initialization failed:", { error });
       throw new Error(`AI Engine initialization failed: ${error}`);
     }
   }
@@ -144,7 +148,7 @@ export class AIEngine {
           throw new Error(`Unknown task type: ${task.type}`);
       }
     } catch (error) {
-      console.error("[AIEngine] Task execution failed:", error);
+      log.error("Task execution failed:", { error });
       throw error;
     }
 
@@ -153,8 +157,8 @@ export class AIEngine {
     // Generate verifiable proof
     const proof = await this.generateProof(task, output, computeTime);
 
-    console.log(
-      `[AIEngine] Task ${task.id} completed in ${computeTime.toFixed(2)}ms`,
+    log.info(
+      `Task ${task.id} completed in ${computeTime.toFixed(2)}ms`,
     );
 
     return {
@@ -272,7 +276,7 @@ export class AIEngine {
       this.embeddingPipeline = null;
     }
     this.isInitialized = false;
-    console.log("[AIEngine] Disposed — GPU memory released");
+    log.info("Disposed — GPU memory released");
   }
 
   /**

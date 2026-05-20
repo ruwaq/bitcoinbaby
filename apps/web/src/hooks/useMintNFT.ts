@@ -17,7 +17,7 @@
 
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import {
   useWalletStore,
   usePendingTxStore,
@@ -36,6 +36,131 @@ import {
 import { createLogger } from "@bitcoinbaby/shared";
 
 const log = createLogger("MintNFT");
+
+// =============================================================================
+// CONFIGURABLE TIMEOUT
+// =============================================================================
+
+const CONFIRMATION_TIMEOUT_MS =
+  (typeof process !== "undefined" && process.env?.CONFIRMATION_TIMEOUT_MS
+    ? parseInt(process.env.CONFIRMATION_TIMEOUT_MS, 10)
+    : 600000) || 600000;
+
+// =============================================================================
+// PERSISTENT CONFIRMATION QUEUE (localStorage)
+// =============================================================================
+
+interface PendingConfirmation {
+  tokenId: number;
+  spellTxid: string;
+  address: string;
+  nftData: {
+    dna: string;
+    bloodline: string;
+    baseType: string;
+    rarityTier: string;
+    level: number;
+    xp: number;
+    totalXp: number;
+    workCount: number;
+    evolutionCount: number;
+  };
+  attemptId: string | null;
+  commitTxid: string | null;
+  timestamp: number;
+  retryCount: number;
+}
+
+const CONFIRMATION_QUEUE_KEY = "bb_pending_confirmations";
+
+function loadConfirmationQueue(): PendingConfirmation[] {
+  try {
+    const raw = localStorage.getItem(CONFIRMATION_QUEUE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as PendingConfirmation[];
+  } catch {
+    return [];
+  }
+}
+
+function saveConfirmationQueue(queue: PendingConfirmation[]): void {
+  try {
+    localStorage.setItem(CONFIRMATION_QUEUE_KEY, JSON.stringify(queue));
+  } catch {
+    // localStorage full or unavailable - log but don't throw
+    log.warn("Failed to persist confirmation queue");
+  }
+}
+
+/**
+ * Retry a single pending confirmation with exponential backoff.
+ * Returns true if successful, false if should remain queued.
+ */
+async function retryConfirmation(
+  apiClient: ReturnType<typeof getApiClient>,
+  item: PendingConfirmation,
+): Promise<boolean> {
+  const { tokenId, spellTxid, address, nftData, attemptId, commitTxid } = item;
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await apiClient.confirmNFTMint(tokenId, spellTxid, address, nftData);
+      if (attemptId) {
+        await apiClient.updateMintAttempt(attemptId, "confirmed", {
+          commitTxid: commitTxid || undefined,
+          spellTxid,
+        });
+      }
+      log.info(`Retry confirmation succeeded for token ${tokenId}:`, {
+        attempt: attempt + 1,
+      });
+      return true;
+    } catch (err) {
+      lastError = err;
+      if (attempt < 2) {
+        const delay = 2000 * 2 ** attempt; // 2s, 4s, 8s
+        log.warn(
+          `Retry confirmation attempt ${attempt + 1}/3 failed for token ${tokenId}, retrying in ${delay}ms`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  log.error(`All retry attempts failed for token ${tokenId}:`, {
+    error: lastError,
+  });
+  return false;
+}
+
+/**
+ * Process the persistent confirmation queue (called on app load and after new mints).
+ * Items that succeed are removed. Items that exhaust all retries are kept for next load.
+ */
+async function processConfirmationQueue(): Promise<void> {
+  const queue = loadConfirmationQueue();
+  if (queue.length === 0) return;
+
+  log.info(`Processing ${queue.length} pending confirmations from queue`);
+  const apiClient = getApiClient();
+  const remaining: PendingConfirmation[] = [];
+
+  for (const item of queue) {
+    const success = await retryConfirmation(apiClient, item);
+    if (!success) {
+      const updated = { ...item, retryCount: item.retryCount + 1 };
+      remaining.push(updated);
+    }
+  }
+
+  saveConfirmationQueue(remaining);
+  if (remaining.length > 0) {
+    log.warn(
+      `${remaining.length} confirmations still pending after retry`,
+    );
+  }
+}
 
 // =============================================================================
 // TYPES
@@ -67,6 +192,7 @@ export type MintStep =
 export interface UseMintNFTReturn {
   isLoading: boolean;
   error: string | null;
+  suggestedAction: string | null;
   lastMinted: BabyNFTState | null;
   /** Spell transaction ID (NFT location) - also aliased as txid */
   spellTxid: string | null;
@@ -151,10 +277,81 @@ function extractRawTxFromPsbt(psbtHex: string): string {
 // HOOK
 // =============================================================================
 
+/**
+ * Map raw error messages to user-friendly suggested actions.
+ * Helps guide users toward resolution instead of just showing raw errors.
+ */
+function getSuggestedAction(errorMessage: string): string {
+  const lower = errorMessage.toLowerCase();
+
+  if (
+    lower.includes("no utxos") ||
+    lower.includes("fund your wallet") ||
+    lower.includes("no utxo")
+  ) {
+    return "Fund your wallet first — you need at least 2,000 sats to cover fees.";
+  }
+
+  if (
+    lower.includes("cancelled") ||
+    lower.includes("rejected") ||
+    lower.includes("denied")
+  ) {
+    return "Transaction was cancelled. Try again when you're ready to sign.";
+  }
+
+  if (
+    lower.includes("prover") ||
+    lower.includes("unavailable") ||
+    lower.includes("health")
+  ) {
+    return "Charms prover is temporarily unavailable. Please wait a few minutes and try again.";
+  }
+
+  if (
+    lower.includes("broadcast") ||
+    lower.includes("mempool") ||
+    lower.includes("network")
+  ) {
+    return "Network issue detected. Check your connection and mempool status, then try again.";
+  }
+
+  if (
+    lower.includes("timeout") ||
+    lower.includes("timed out") ||
+    lower.includes("confirmation")
+  ) {
+    return "Transaction is taking longer than expected. Check the mempool for your transaction, or try minting again.";
+  }
+
+  if (
+    lower.includes("max supply") ||
+    lower.includes("reserve") ||
+    lower.includes("supply")
+  ) {
+    return "NFT supply may be exhausted. Check the explorer to see available NFTs.";
+  }
+
+  if (lower.includes("wallet") || lower.includes("connect")) {
+    return "Connect your wallet first, then try minting again.";
+  }
+
+  if (lower.includes("insufficient") || lower.includes("balance")) {
+    return "Insufficient balance. Add funds to your wallet and try again.";
+  }
+
+  if (lower.includes("sign") || lower.includes("psbt")) {
+    return "Transaction signing failed. Make sure your wallet supports PSBT signing.";
+  }
+
+  return "Try again. If the issue persists, check your wallet balance and connection.";
+}
+
 export function useMintNFT(): UseMintNFTReturn {
   // State
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestedAction, setSuggestedAction] = useState<string | null>(null);
   const [lastMinted, setLastMinted] = useState<BabyNFTState | null>(null);
   const [spellTxid, setSpellTxid] = useState<string | null>(null);
   const [commitTxid, setCommitTxid] = useState<string | null>(null);
@@ -179,6 +376,13 @@ export function useMintNFT(): UseMintNFTReturn {
 
   // Wallet connection check
   const isWalletConnected = Boolean(wallet?.address && signPsbt);
+
+  // Process any pending confirmations from previous sessions on mount
+  useEffect(() => {
+    processConfirmationQueue().catch((err) =>
+      log.warn("Failed to process confirmation queue:", { error: err }),
+    );
+  }, []);
 
   /**
    * Mint NFT using Charms Prover
@@ -206,6 +410,7 @@ export function useMintNFT(): UseMintNFTReturn {
           healthResult.data?.error ||
           "Charms prover is currently unavailable. Please try again later.";
         setError(errorMsg);
+        setSuggestedAction(getSuggestedAction(errorMsg));
         setCurrentStep("error");
         setIsLoading(false);
         return {
@@ -486,6 +691,64 @@ export function useMintNFT(): UseMintNFTReturn {
         }
         setCommitTxid(broadcastCommitTxid);
         log.info("Commit TX broadcast:", { txid: broadcastCommitTxid });
+
+        // C1 FIX: Wait for commit confirmation before broadcasting spell.
+        // Without this, the spell references a UTXO that may not exist yet in
+        // the mempool — resulting in a rejected spell or orphan risk.
+        log.info(
+          `Polling for commit confirmation (timeout: ${CONFIRMATION_TIMEOUT_MS}ms)...`,
+        );
+        const commitConfirmed = await new Promise<boolean>((resolve) => {
+          const startTime = Date.now();
+          let resolved = false;
+
+          const poll = async () => {
+            if (resolved) return;
+            try {
+              const tx = await mempoolClient.getTransaction(
+                broadcastCommitTxid!,
+              );
+              if (tx && tx.txid) {
+                resolved = true;
+                log.info("Commit confirmed in mempool:", {
+                  txid: broadcastCommitTxid,
+                  elapsed: Date.now() - startTime,
+                });
+                resolve(true);
+                return;
+              }
+            } catch {
+              // Transaction not found yet — this is expected during polling
+            }
+
+            if (Date.now() - startTime >= CONFIRMATION_TIMEOUT_MS) {
+              resolved = true;
+              log.error("Commit confirmation timed out:", {
+                txid: broadcastCommitTxid,
+                elapsed: Date.now() - startTime,
+              });
+              resolve(false);
+              return;
+            }
+
+            // Exponential backoff polling: 1s, 2s, 4s, 8s, 16s (capped)
+            const elapsed = Date.now() - startTime;
+            const nextDelay = Math.min(
+              Math.max(1000, elapsed / 2),
+              16000,
+            );
+            setTimeout(poll, nextDelay);
+          };
+
+          // Start first poll after 1 second (give mempool time to propagate)
+          setTimeout(poll, 1000);
+        });
+
+        if (!commitConfirmed) {
+          throw new Error(
+            `Commit transaction ${broadcastCommitTxid} not confirmed in mempool after ${CONFIRMATION_TIMEOUT_MS}ms`,
+          );
+        }
       } else {
         log.info("Skipping commit broadcast (single-tx flow)");
       }
@@ -542,7 +805,14 @@ export function useMintNFT(): UseMintNFTReturn {
       // Step 8: Confirm the mint with server
       setCurrentStep("confirming");
 
-      const nftData = {
+      // C2 FIX: Robust confirmation with retry + persistent fallback queue.
+      // If confirmNFTMint or updateMintAttempt fail (network error, server
+      // restart, etc.), we retry with exponential backoff, and if all retries
+      // are exhausted we queue the confirmation in localStorage so it can be
+      // retried on the next app load.
+
+      // Build confirmation payload
+      const confirmationNftData = {
         dna: nftState.dna,
         bloodline: nftState.bloodline,
         baseType: nftState.baseType,
@@ -554,27 +824,35 @@ export function useMintNFT(): UseMintNFTReturn {
         evolutionCount: nftState.evolutionCount,
       };
 
-      // Non-blocking confirmation
-      apiClient
-        .confirmNFTMint(
-          reservedTokenId,
-          broadcastSpellTxid,
-          wallet.address,
-          nftData,
-        )
-        .catch((err) => log.warn("Failed to confirm mint:", { error: err }));
+      const pendingItem: PendingConfirmation = {
+        tokenId: reservedTokenId,
+        spellTxid: broadcastSpellTxid,
+        address: wallet.address,
+        nftData: confirmationNftData,
+        attemptId: attemptId || null,
+        commitTxid: broadcastCommitTxid || null,
+        timestamp: Date.now(),
+        retryCount: 0,
+      };
 
-      // Update attempt status to confirmed
-      if (attemptId) {
-        apiClient
-          .updateMintAttempt(attemptId, "confirmed", {
-            commitTxid: broadcastCommitTxid || undefined,
-            spellTxid: broadcastSpellTxid,
-          })
-          .catch((err) =>
-            log.warn("Failed to update attempt:", { error: err }),
+      // Fire non-blocking confirmation with retry + persistent queue
+      (async () => {
+        const success = await retryConfirmation(apiClient, pendingItem);
+        if (!success) {
+          // All retries exhausted — persist for next app load
+          log.warn(
+            "NFT minted on blockchain but server sync pending (queued for retry):",
+            { tokenId: reservedTokenId, spellTxid: broadcastSpellTxid },
           );
-      }
+          const queue = loadConfirmationQueue();
+          queue.push(pendingItem);
+          saveConfirmationQueue(queue);
+          // TODO: surface this warning to the user via some UI mechanism
+          // (e.g. toast: "NFT minted on blockchain but server sync pending")
+        } else {
+          log.info("Confirmation succeeded:", { tokenId: reservedTokenId });
+        }
+      })();
 
       // Clear reservedTokenId on success (no cleanup needed)
       reservedTokenId = null;
@@ -593,6 +871,7 @@ export function useMintNFT(): UseMintNFTReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Mint failed";
       setError(message);
+      setSuggestedAction(getSuggestedAction(message));
       setCurrentStep("error");
 
       // Update attempt status to failed
@@ -600,21 +879,21 @@ export function useMintNFT(): UseMintNFTReturn {
         apiClient
           .updateMintAttempt(attemptId, "failed", { error: message })
           .catch((updateErr) =>
-            console.warn("[MintNFT] Failed to update attempt:", updateErr),
+            log.warn("Failed to update attempt:", { error: updateErr }),
           );
       }
 
       // Release reserved token ID if mint failed after reservation
       if (reservedTokenId !== null) {
-        console.log(
-          `[MintNFT] Releasing reserved token ID ${reservedTokenId} due to error`,
+        log.info(
+          `Releasing reserved token ID ${reservedTokenId} due to error`,
         );
         apiClient
           .releaseNFT(reservedTokenId)
           .catch((releaseErr) =>
-            console.warn(
-              `[MintNFT] Failed to release token ${reservedTokenId}:`,
-              releaseErr,
+            log.warn(
+              `Failed to release token ${reservedTokenId}:`,
+              { error: releaseErr },
             ),
           );
       }
@@ -631,6 +910,7 @@ export function useMintNFT(): UseMintNFTReturn {
   const reset = useCallback(() => {
     setIsLoading(false);
     setError(null);
+    setSuggestedAction(null);
     setLastMinted(null);
     setSpellTxid(null);
     setCommitTxid(null);
@@ -640,6 +920,7 @@ export function useMintNFT(): UseMintNFTReturn {
   return {
     isLoading,
     error,
+    suggestedAction,
     lastMinted,
     spellTxid,
     txid: spellTxid, // Alias for backward compatibility

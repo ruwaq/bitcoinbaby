@@ -834,6 +834,43 @@ export class BitcoinBabyClient {
   }
 
   /**
+   * Request virtual NFT evolution (Phase 1 — debits virtual BABTC)
+   *
+   * Server-side evolution that deducts virtual BALANCE without requiring
+   * an on-chain transaction. Returns updated NFT state.
+   */
+  async evolveNFT(
+    tokenId: number,
+    address: string,
+    currentLevel: number,
+  ): Promise<
+    ApiResponse<{
+      nft: NFTRecord;
+      evolutionCost: string;
+      previousLevel: number;
+      newLevel: number;
+    }>
+  > {
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/nft/evolve`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tokenId, address, currentLevel }),
+      },
+      0, // No retries — server handles idempotency
+    );
+    return response.json() as Promise<
+      ApiResponse<{
+        nft: NFTRecord;
+        evolutionCost: string;
+        previousLevel: number;
+        newLevel: number;
+      }>
+    >;
+  }
+
+  /**
    * Confirm on-chain evolution transaction
    *
    * Called after a client broadcasts an evolution transaction to the blockchain.

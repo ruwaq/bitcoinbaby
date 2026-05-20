@@ -34,6 +34,9 @@ import {
   useNetworkStore,
   getApiClient,
 } from "@bitcoinbaby/core";
+import { createLogger, getPhaseConfig } from "@bitcoinbaby/shared";
+
+const log = createLogger("Evolution");
 
 // =============================================================================
 // TYPES
@@ -61,6 +64,149 @@ export interface UseEvolutionReturn {
   getXPRequired: (nft: BabyNFTState) => number;
   /** Clear error state */
   clearError: () => void;
+}
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+const EVOLUTION_CONFIRM_STORAGE_KEY = "bb_evolution_pending_confirmations";
+
+/** Maximum retry attempts for server confirmation */
+const MAX_CONFIRM_RETRIES = 3;
+/** Base delay in ms for exponential backoff */
+const CONFIRM_RETRY_BASE_MS = 2000;
+
+interface PendingEvolutionConfirmation {
+  tokenId: number;
+  txid: string;
+  newLevel: number;
+  address: string;
+  timestamp: number;
+}
+
+/**
+ * Retry confirmEvolution with exponential backoff.
+ * On persistent failure, queues the confirmation in localStorage for
+ * retry on next app load.
+ */
+async function confirmEvolutionWithRetry(
+  tokenId: number,
+  txid: string,
+  newLevel: number,
+  address: string,
+): Promise<boolean> {
+  const apiClient = getApiClient();
+
+  for (let attempt = 1; attempt <= MAX_CONFIRM_RETRIES; attempt++) {
+    try {
+      const result = await apiClient.confirmEvolution(
+        tokenId,
+        txid,
+        newLevel,
+        address,
+      );
+      if (result.success) {
+        return true;
+      }
+      log.warn(
+        `Server confirm failed (attempt ${attempt}/${MAX_CONFIRM_RETRIES}):`,
+        { error: result.error },
+      );
+    } catch (err) {
+      log.warn(
+        `Server notification failed (attempt ${attempt}/${MAX_CONFIRM_RETRIES}):`,
+        { error: err },
+      );
+    }
+
+    if (attempt < MAX_CONFIRM_RETRIES) {
+      const delay = CONFIRM_RETRY_BASE_MS * Math.pow(2, attempt - 1);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  // All retries exhausted — queue for later retry in localStorage
+  log.warn(
+    `Server confirmation exhausted all ${MAX_CONFIRM_RETRIES} retries. Queuing for later.`,
+  );
+  queueFailedConfirmation({ tokenId, txid, newLevel, address, timestamp: Date.now() });
+  return false;
+}
+
+/**
+ * Queue a failed confirmation in localStorage for retry on next app load.
+ */
+function queueFailedConfirmation(confirmation: PendingEvolutionConfirmation): void {
+  try {
+    const stored = localStorage.getItem(EVOLUTION_CONFIRM_STORAGE_KEY);
+    const queue: PendingEvolutionConfirmation[] = stored
+      ? JSON.parse(stored)
+      : [];
+    // Avoid duplicates by txid
+    if (!queue.some((c) => c.txid === confirmation.txid)) {
+      queue.push(confirmation);
+      localStorage.setItem(
+        EVOLUTION_CONFIRM_STORAGE_KEY,
+        JSON.stringify(queue),
+      );
+    }
+  } catch {
+    // localStorage may be unavailable (SSR, private browsing, etc.)
+  }
+}
+
+// =============================================================================
+// VIRTUAL EVOLUTION (Phase 1)
+// =============================================================================
+
+/**
+ * Execute a virtual (server-side) evolution.
+ *
+ * Used in Phase 1 when mining is disabled. Calls POST /api/nft/evolve which:
+ * 1. Validates ownership and level
+ * 2. Checks virtual BABTC balance in VirtualBalanceDO
+ * 3. Debits the evolution cost
+ * 4. Updates NFT level in Redis
+ *
+ * No wallet, no on-chain transactions, no PSBT signing required.
+ *
+ * @param nft - The NFT to evolve
+ * @param ownerAddress - The owner's Bitcoin address (for server ownership validation)
+ */
+async function evolveVirtual(nft: BabyNFTState, ownerAddress: string): Promise<EvolutionResult> {
+  const apiClient = getApiClient();
+
+  try {
+    log.info(`Virtual evolution for NFT #${nft.tokenId} (level ${nft.level} → ${nft.level + 1})`);
+
+    const result = await apiClient.evolveNFT(
+      nft.tokenId,
+      ownerAddress,
+      nft.level,
+    );
+
+    if (!result.success) {
+      const errorMsg = result.error || "Virtual evolution failed";
+      log.error(errorMsg);
+      return { success: false, error: errorMsg };
+    }
+
+    const { newLevel, evolutionCost } = result.data!;
+    log.info(
+      `NFT #${nft.tokenId} evolved to level ${newLevel} (cost: ${evolutionCost} BABTC)`,
+    );
+
+    return {
+      success: true,
+      newLevel,
+      txid: undefined, // No blockchain txid for virtual evolution
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Virtual evolution failed";
+    log.error("Virtual evolution error:", { message });
+    return { success: false, error: message };
+  }
 }
 
 // =============================================================================
@@ -141,9 +287,31 @@ export function useEvolution(): UseEvolutionReturn {
 
   /**
    * Execute evolution
+   *
+   * In Phase 1 (mining disabled): uses virtual evolution via API — debits
+   * virtual BABTC server-side without requiring on-chain transactions.
+   *
+   * In Phase 2+ (mining enabled): uses on-chain PSBT flow with real BABTC.
    */
   const evolve = useCallback(
     async (nft: BabyNFTState): Promise<EvolutionResult> => {
+      // ── Phase 1: Virtual Evolution ──
+      const phaseConfig = getPhaseConfig();
+      const useVirtual = phaseConfig.features.nftEvolution && !phaseConfig.features.mining;
+
+      if (useVirtual) {
+        // Virtual evolution doesn't need a full wallet but we need an owner address
+        const ownerAddr = wallet?.address;
+        if (!ownerAddr) {
+          return {
+            success: false,
+            error: "Please connect your wallet first (address needed for ownership validation)",
+          };
+        }
+        return evolveVirtual(nft, ownerAddr);
+      }
+
+      // ── Phase 2+: On-chain Evolution ──
       // Require wallet
       if (!wallet?.address || !signPsbt) {
         return {
@@ -167,7 +335,7 @@ export function useEvolution(): UseEvolutionReturn {
 
       try {
         // 1. Get NFT UTXO from Charms
-        console.log(`[Evolution] Finding NFT UTXO for token #${nft.tokenId}`);
+        log.info(`Finding NFT UTXO for token #${nft.tokenId}`);
         const charms = await charmsClient.extractCharmsForWallet(
           wallet.address,
           genesisBabiesConfig.appId,
@@ -190,14 +358,14 @@ export function useEvolution(): UseEvolutionReturn {
           txid: nftCharm.txid,
           vout: nftCharm.vout,
         };
-        console.log(
-          `[Evolution] Found NFT UTXO: ${nftUtxo.txid}:${nftUtxo.vout}`,
+        log.info(
+          `Found NFT UTXO: ${nftUtxo.txid}:${nftUtxo.vout}`,
         );
 
         // 2. Get token UTXOs
         const tokenCost = getEvolutionCost(nft);
-        console.log(
-          `[Evolution] Evolution cost: ${formatTokenAmount(tokenCost)} BABTC`,
+        log.info(
+          `Evolution cost: ${formatTokenAmount(tokenCost)} BABTC`,
         );
 
         const tokenCharms = charms.filter(
@@ -215,17 +383,41 @@ export function useEvolution(): UseEvolutionReturn {
           );
         }
 
-        // Use first token UTXO (simplified - could optimize coin selection)
+        // Coin selection: sort UTXOs by amount descending, then pick the
+        // smallest UTXO that meets or exceeds the cost. If no single UTXO
+        // is large enough, use the largest one as best-effort fallback.
+        const sortedTokenCharms = [...tokenCharms].sort(
+          (a, b) => (b.amount > a.amount ? 1 : b.amount < a.amount ? -1 : 0),
+        );
+
+        // Find smallest UTXO that meets or exceeds the cost (iterate reversed)
+        let selectedCharm = sortedTokenCharms[sortedTokenCharms.length - 1]; // smallest
+        for (let i = sortedTokenCharms.length - 1; i >= 0; i--) {
+          if (sortedTokenCharms[i].amount >= tokenCost) {
+            selectedCharm = sortedTokenCharms[i];
+            break;
+          }
+        }
+
+        if (selectedCharm.amount < tokenCost) {
+          log.warn(
+            `No single UTXO has enough tokens (need ${formatTokenAmount(tokenCost)}). ` +
+              `Using largest UTXO (${formatTokenAmount(sortedTokenCharms[0].amount)}). ` +
+              `Consider consolidating tokens.`,
+          );
+          selectedCharm = sortedTokenCharms[0];
+        }
+
         const tokenUtxo = {
-          txid: tokenCharms[0].txid,
-          vout: tokenCharms[0].vout,
+          txid: selectedCharm.txid,
+          vout: selectedCharm.vout,
         };
-        console.log(
-          `[Evolution] Using token UTXO: ${tokenUtxo.txid}:${tokenUtxo.vout}`,
+        log.info(
+          `Using token UTXO: ${tokenUtxo.txid}:${tokenUtxo.vout} (${formatTokenAmount(selectedCharm.amount)})`,
         );
 
         // 3. Create PSBT via levelUp
-        console.log(`[Evolution] Creating evolution PSBT...`);
+        log.info(`Creating evolution PSBT...`);
         const result = await levelUp(nft, nftUtxo, tokenUtxo, totalTokens);
 
         if (!result.success || !result.psbt) {
@@ -235,16 +427,35 @@ export function useEvolution(): UseEvolutionReturn {
         }
 
         // 4. Sign PSBT with wallet
-        console.log(`[Evolution] Signing PSBT...`);
+        log.info(`Signing PSBT...`);
         const signedPsbtHex = await signPsbt(result.psbt);
         if (!signedPsbtHex) {
           throw new Error("Transaction was cancelled or failed to sign");
         }
 
         // 5. Extract and broadcast
-        console.log(`[Evolution] Broadcasting transaction...`);
-        const signedPsbt = Psbt.fromBase64(signedPsbtHex);
-        const rawTxHex = signedPsbt.extractTransaction().toHex();
+        log.info(`Broadcasting transaction...`);
+
+        // Detect PSBT format: hex vs base64 (uses PSBT magic bytes)
+        // Hex: "70736274ff" | Base64: "cHNidP8"
+        const isHexPsbt =
+          signedPsbtHex.toLowerCase().startsWith("70736274ff");
+        const isBase64Psbt = signedPsbtHex.startsWith("cHNidP8");
+        const isPsbtFormat = isHexPsbt || isBase64Psbt;
+
+        let rawTxHex: string;
+        if (isPsbtFormat) {
+          const signedPsbt = isHexPsbt
+            ? Psbt.fromHex(signedPsbtHex)
+            : Psbt.fromBase64(signedPsbtHex);
+          signedPsbt.finalizeAllInputs();
+          rawTxHex = signedPsbt.extractTransaction().toHex();
+        } else {
+          // Wallet returned a raw transaction directly (already finalized)
+          rawTxHex = signedPsbtHex;
+          log.info("Wallet returned raw tx (not PSBT), broadcasting directly");
+        }
+
         const txid = await mempoolClient.broadcastTransaction(rawTxHex);
 
         if (!txid) {
@@ -259,22 +470,20 @@ export function useEvolution(): UseEvolutionReturn {
           `Genesis Baby #${nft.tokenId} evolved to level ${nft.level + 1}`,
         );
 
-        // 7. Notify server of evolution (non-blocking)
+        // 7. Notify server of evolution (with retry and exponential backoff)
         const newLevel = nft.level + 1;
-        getApiClient()
-          .confirmEvolution(nft.tokenId, txid, newLevel, wallet.address)
-          .then((result) => {
-            if (result.success) {
-              console.log(`[Evolution] Server confirmed level ${newLevel}`);
-            } else {
-              console.warn(`[Evolution] Server confirm failed:`, result.error);
-            }
-          })
-          .catch((err) => {
-            console.warn(`[Evolution] Server notification failed:`, err);
-          });
+        confirmEvolutionWithRetry(
+          nft.tokenId,
+          txid,
+          newLevel,
+          wallet.address,
+        ).then((confirmed) => {
+          if (confirmed) {
+            log.info(`Server confirmed level ${newLevel}`);
+          }
+        });
 
-        console.log(`[Evolution] Success! TXID: ${txid}`);
+        log.info(`Success! TXID: ${txid}`);
         return {
           success: true,
           txid,
@@ -283,7 +492,7 @@ export function useEvolution(): UseEvolutionReturn {
       } catch (err) {
         const message = err instanceof Error ? err.message : "Evolution failed";
         setError(message);
-        console.error("[Evolution] Error:", message);
+        log.error("Error:", { message });
         return { success: false, error: message };
       } finally {
         setIsEvolving(false);

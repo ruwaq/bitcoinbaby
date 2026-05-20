@@ -57,6 +57,7 @@ export interface UseNFTsReturn {
     }>;
     isLoading: boolean;
     error: string | null;
+    suggestedAction: string | null;
     lastMinted: BabyNFTState | null;
     txid: string | null;
     commitTxid: string | null;
@@ -160,6 +161,7 @@ export function useNFTs(): UseNFTsReturn {
   const {
     isLoading: isMinting,
     error: mintError,
+    suggestedAction: mintSuggestedAction,
     lastMinted,
     txid,
     commitTxid,
@@ -292,6 +294,7 @@ export function useNFTs(): UseNFTsReturn {
       mint,
       isLoading: isMinting,
       error: mintError,
+      suggestedAction: mintSuggestedAction,
       lastMinted,
       txid,
       commitTxid,

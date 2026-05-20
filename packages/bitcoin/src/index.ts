@@ -404,6 +404,7 @@ export {
   ListingService,
   ListingError,
   createListingService,
+  validateListingSighash,
   type ListingServiceOptions,
 } from "./marketplace";
 

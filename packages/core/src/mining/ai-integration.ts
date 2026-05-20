@@ -140,13 +140,16 @@ export class AIWorkIntegration {
     try {
       log.debug("Loading AI package...");
 
-      // Use dynamic import with variable to prevent webpack from bundling
-      // This ensures the AI package is truly optional and loaded at runtime only
-      const packageName = "@bitcoinbaby/ai";
-      // eslint-disable-next-line @typescript-eslint/no-implied-eval
-      const importFn = new Function("p", "return import(p)");
-      const aiModule = await (importFn as (p: string) => Promise<any>)(
-        packageName,
+      // Dynamic import — AI package is optional and loaded at runtime only.
+      // Uses a variable to prevent bundlers from statically resolving the import.
+      // This replaces the previous new Function() pattern which was a code
+      // injection vector. The package name is a hardcoded constant, so this
+      // is safe — but if it ever becomes configurable, add whitelist validation.
+      const packageName = "@bitcoinbaby/ai" as const;
+      const aiModule = await import(
+        /* webpackIgnore: true */
+        /* @vite-ignore */
+        packageName
       );
       const { AIEngine } = aiModule;
 

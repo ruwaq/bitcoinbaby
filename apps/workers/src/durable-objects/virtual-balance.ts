@@ -216,6 +216,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
 
         case "POST":
           if (action === "credit") return this.handleCreditMining(request);
+          if (action === "faucet") return this.handleFaucetCredit(request);
           if (action === "reserve") return this.handleReserveWithdraw(request);
           if (action === "confirm-withdraw")
             return this.handleConfirmWithdraw(request);
@@ -549,6 +550,53 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         deducted: amount.toString(),
         newBalance: balance.virtualBalance.toString(),
         reason: body.reason,
+      },
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Faucet credit handler (Phase 1)
+   *
+   * Credits BABTC tokens from the faucet with no proof required.
+   * Used in Phase 1 before mining is active so users can evolve NFTs.
+   */
+  private async handleFaucetCredit(request: Request): Promise<Response> {
+    if (!this.address) return this.errorResponse("Address required", 400);
+
+    const body = (await request.json()) as { amount: string };
+    if (!body.amount) {
+      return this.errorResponse("Amount is required", 400);
+    }
+
+    const amount = BigInt(body.amount);
+    if (amount <= 0n) {
+      return this.errorResponse("Amount must be positive", 400);
+    }
+
+    const balance = this.balanceRepo.getOrCreate(this.address);
+
+    // Credit to both virtual balance and total mined
+    balance.virtualBalance += amount;
+    balance.totalMined += amount;
+    this.balanceRepo.update(balance);
+
+    balanceLogger.info("Faucet credited", {
+      amount: amount.toString(),
+      address: this.address,
+      newBalance: balance.virtualBalance.toString(),
+      totalMined: balance.totalMined.toString(),
+    });
+
+    // Update leaderboard async
+    this.updateLeaderboardAsync(this.address, balance.totalMined);
+
+    return Response.json({
+      success: true,
+      data: {
+        credited: amount.toString(),
+        newBalance: balance.virtualBalance.toString(),
+        totalMined: balance.totalMined.toString(),
       },
       timestamp: Date.now(),
     });

@@ -56,6 +56,7 @@ async function resetAllData() {
   // Reload
   window.location.reload();
 }
+import { getPhaseConfig } from "@bitcoinbaby/shared";
 import { AppHeader } from "./AppHeader";
 import { TabNavigation, type TabType } from "./TabNavigation";
 import { TestnetBanner } from "./TestnetBanner";
@@ -224,9 +225,18 @@ function AppShellInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Get tab from URL or default to "token"
+  // Phase configuration
+  const phaseConfig = getPhaseConfig();
+
+  // Get tab from URL or default from phase config
   const urlTab = searchParams.get("tab") as TabType | null;
-  const [activeTab, setActiveTab] = useState<TabType>(urlTab || "token");
+  const defaultTab = phaseConfig.defaultTab;
+
+  // Validate urlTab is in visibleTabs, fall back to defaultTab
+  const isValidUrlTab = urlTab && phaseConfig.visibleTabs.includes(urlTab);
+  const initialTab = isValidUrlTab ? urlTab : defaultTab;
+
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
 
   // Reset confirmation modal state
   const [showResetModal, setShowResetModal] = useState(false);
@@ -241,20 +251,20 @@ function AppShellInner() {
     (tab: TabType) => {
       setActiveTab(tab);
       // Update URL without full navigation
-      const url = tab === "token" ? "/" : `/?tab=${tab}`;
+      const url = tab === defaultTab ? "/" : `/?tab=${tab}`;
       router.push(url, { scroll: false });
     },
-    [router],
+    [router, defaultTab],
   );
 
   // Sync tab from URL changes (back/forward navigation)
   useEffect(() => {
     if (urlTab && urlTab !== activeTab) {
       startTransition(() => setActiveTab(urlTab));
-    } else if (!urlTab && activeTab !== "token") {
-      startTransition(() => setActiveTab("token"));
+    } else if (!urlTab && activeTab !== defaultTab) {
+      startTransition(() => setActiveTab(defaultTab));
     }
-  }, [urlTab, activeTab]);
+  }, [urlTab, activeTab, defaultTab]);
 
   // Quick navigation handlers
   const goToMining = useCallback(
@@ -275,7 +285,11 @@ function AppShellInner() {
       <AppHeader onMiningClick={goToMining} onWalletClick={goToWallet} />
 
       {/* Tab Navigation */}
-      <TabNavigation activeTab={activeTab} onTabChange={handleTabChange} />
+      <TabNavigation
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        visibleTabs={phaseConfig.visibleTabs}
+      />
 
       {/* Content Area */}
       <main className="flex-1 overflow-auto">

@@ -7,7 +7,7 @@
 
 import { claimLogger } from "../lib/logger";
 import type { IMempoolService } from "../interfaces/services";
-import type { BitcoinNetwork } from "../interfaces/types";
+import type { BitcoinNetwork } from "../config/bitcoin";
 
 // =============================================================================
 // TYPES
@@ -434,7 +434,7 @@ export class MempoolService implements IMempoolService {
   /**
    * Get recommended fee rates (cached)
    */
-  async getFeeRates(): Promise<FeeRates> {
+  async getFeeEstimates(): Promise<FeeRates> {
     const cacheKey = this.cacheKey("fees", "recommended");
 
     const cached = await this.getFromCache<FeeRates>(cacheKey);
@@ -539,7 +539,7 @@ export function getMempoolService(
 export function initMempoolService(
   network: "mainnet" | "testnet" | "testnet4",
   kv: KVNamespace | null,
-): MempoolService {
+): IMempoolService {
   const service = getMempoolService(network);
   service.setKV(kv);
   return service;

@@ -136,6 +136,7 @@ export function NFTsSection() {
           <NFTCollectionView
             nfts={collection.nfts}
             isLoading={collection.isLoading}
+            error={collection.error}
             selectedNFT={selectedNFT}
             onSelectNFT={handleSelectNFT}
             onClearSelection={() => setSelectedNFT(null)}
@@ -145,6 +146,7 @@ export function NFTsSection() {
             onEvolve={handleEvolve}
             onList={handleListNFT}
             onMintClick={handleMintTabClick}
+            onRetry={collection.refresh}
             formattedPrice={minting.price.formatted}
             pendingTransactions={pendingTransactions}
             onRefreshTransactions={refreshTransactions}

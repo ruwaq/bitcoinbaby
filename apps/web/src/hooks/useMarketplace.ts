@@ -27,6 +27,7 @@ import {
   MARKETPLACE_CONFIG,
   getGenesisBabiesConfig,
   Psbt,
+  validateListingSighash,
 } from "@bitcoinbaby/bitcoin";
 import { useFeeEstimate } from "./useFeeEstimate";
 
@@ -231,6 +232,12 @@ export function useMarketplace(): UseMarketplaceReturn {
         const signedPsbt = await signPsbt(listingResult.psbt);
         if (!signedPsbt) {
           throw new Error("Failed to sign listing PSBT");
+        }
+
+        // 3b. Validate that wallet signed with correct sighash
+        const sighashValidation = validateListingSighash(signedPsbt);
+        if (!sighashValidation.valid) {
+          throw new Error(sighashValidation.error);
         }
 
         // 4. Send to server

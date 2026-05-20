@@ -66,3 +66,17 @@ export {
   getStreakMultiplier,
   VARDIFF_CONFIG,
 } from "./mining";
+
+// Phase Configuration
+export {
+  PHASES,
+  PHASE_FEATURES,
+  type Phase,
+  type PhaseConfig,
+  type PhaseFeatures,
+  type TabType,
+  type PhaseGateResult,
+  getPhaseConfig,
+  usePhase,
+  phaseGate,
+} from "./phases";

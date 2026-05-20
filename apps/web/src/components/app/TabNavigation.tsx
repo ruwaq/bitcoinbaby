@@ -30,13 +30,20 @@ interface TabNavigationProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
   className?: string;
+  /** Optional: limit visible tabs to this subset. If undefined, show all. */
+  visibleTabs?: TabType[];
 }
 
 export function TabNavigation({
   activeTab,
   onTabChange,
   className,
+  visibleTabs,
 }: TabNavigationProps) {
+  const visible = visibleTabs
+    ? TABS.filter((tab) => visibleTabs.includes(tab.id))
+    : TABS;
+
   return (
     <nav
       className={clsx(
@@ -44,7 +51,7 @@ export function TabNavigation({
         className,
       )}
     >
-      {TABS.map((tab) => {
+      {visible.map((tab) => {
         const isActive = activeTab === tab.id;
 
         return (

@@ -68,6 +68,12 @@ PROVER_URL = "https://v11.charms.dev"
 CHARMS_PROVER_URL = "https://v11.charms.dev"
 # Scrolls API for token balances
 SCROLLS_API_URL = "https://scrolls.charms.dev"
+# Phase configuration — controls which features are active
+# Phase 1: NFTs + Faucet, Phase 2: + Mining, Phase 3: + Game
+PHASE = "1"
+# BABTC Faucet (Phase 1 — virtual tokens for NFT evolution)
+FAUCET_AMOUNT = "5"
+FAUCET_MAX_TOTAL = "50"
 # BABTC Token configuration
 # APP_ID = SHA256 of genesis UTXO - update after V2 contract deployment
 BABTC_APP_ID = "87b5ecfb4c8e2d5f3a6e9b1c7d4f2a8e5b3c6d9f1a4e7b2c5d8f3a6e9b1c7d4f"
@@ -115,6 +121,11 @@ ENVIRONMENT = "production"
 MIN_WITHDRAW_AMOUNT = "100"
 POOL_PERIOD_DAYS = "7"
 MAX_FEE_RATE_SAT_VB = "5"
+# Phase configuration
+PHASE = "1"
+# BABTC Faucet
+FAUCET_AMOUNT = "5"
+FAUCET_MAX_TOTAL = "50"
 # Charms Prover API (v11 - hosted prover)
 PROVER_URL = "https://v11.charms.dev"
 CHARMS_PROVER_URL = "https://v11.charms.dev"

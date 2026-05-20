@@ -165,7 +165,7 @@ claimRouter.get(
       validateAddressNetwork(address, network);
       const mempoolService = initMempoolService(network, c.env.CACHE || null);
       const utxos = await mempoolService.getAddressUtxos(address);
-      const feeRates = await mempoolService.getFeeRates();
+      const feeRates = await mempoolService.getFeeEstimates();
 
       // 3. Calculate funding status
       const feeRate = feeRates.hourFee || DEFAULT_FEE_RATE;
@@ -281,7 +281,7 @@ claimRouter.post("/execute", validateBody(executeClaimSchema), async (c) => {
     // 2. Build PSBT
     const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
     const mempoolService = initMempoolService(network, c.env.CACHE || null);
-    const psbtBuilder = createPsbtBuilder(mempoolService as any, network);
+    const psbtBuilder = createPsbtBuilder(mempoolService, network);
 
     const psbtResult = await psbtBuilder.buildClaimPsbt({
       address,
@@ -344,7 +344,7 @@ claimRouter.post("/complete", validateBody(completeClaimSchema), async (c) => {
     // 1. Finalize PSBT and extract TX
     const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
     const mempoolService = initMempoolService(network, c.env.CACHE || null);
-    const psbtBuilder = createPsbtBuilder(mempoolService as any, network);
+    const psbtBuilder = createPsbtBuilder(mempoolService, network);
 
     const finalizeResult = await psbtBuilder.finalizePsbt(signedPsbtBase64);
 
@@ -395,21 +395,49 @@ claimRouter.post("/complete", validateBody(completeClaimSchema), async (c) => {
 });
 
 /**
- * GET /api/claim/status/:claimId
+ * GET /api/claim/status/:claimId?address=<addr>
  *
- * Poll claim status.
+ * Poll claim status from the VirtualBalanceDO.
+ * Requires address query param because DO is scoped per-address.
  */
 claimRouter.get("/status/:claimId", async (c) => {
   const { claimId } = c.req.param();
+  const address = c.req.query("address");
+
+  if (!address) {
+    return errorResponse(c, "Address query parameter required", 400);
+  }
 
   try {
+    const stub = getVirtualBalanceStub(c.env, address);
+    const doResponse = await forwardToDO(
+      stub,
+      `/balance/${address}/claim-status/${claimId}`,
+      { method: "GET" },
+    );
+
+    if (!doResponse.ok) {
+      const body = await doResponse.json() as { error?: string };
+      return errorResponse(
+        c,
+        body.error || "Claim not found",
+        doResponse.status as 400 | 404 | 500,
+      );
+    }
+
+    const data = await doResponse.json() as {
+      success: boolean;
+      data: { id: string; status: string; claimTxid?: string; mintTxid?: string };
+    };
+
     return successResponse(c, {
       claimId,
-      status: "processing",
-      message: "Waiting for confirmation...",
+      status: data.data.status,
+      claimTxid: data.data.claimTxid,
+      mintTxid: data.data.mintTxid,
     });
   } catch (error) {
-    claimLogger.error("Status error", { claimId, error });
+    claimLogger.error("Status error", { claimId, address, error });
     return errorResponse(c, "Failed to get claim status", 500);
   }
 });

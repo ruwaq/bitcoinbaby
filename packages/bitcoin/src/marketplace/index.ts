@@ -36,5 +36,6 @@ export {
   ListingService,
   ListingError,
   createListingService,
+  validateListingSighash,
   type ListingServiceOptions,
 } from "./listing-service";

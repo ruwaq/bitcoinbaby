@@ -32,6 +32,7 @@ import {
   gameRouter,
   claimRouter,
   engagementRouter,
+  faucetRouter,
 } from "./routes";
 
 // Re-export Durable Objects
@@ -115,6 +116,12 @@ import { metricsMiddleware } from "./lib/middleware";
 app.use("*", metricsMiddleware);
 
 // =============================================================================
+// PHASE GATING - Apply before mounting gated routes
+// =============================================================================
+
+import { phaseGate } from "./lib/middleware";
+
+// =============================================================================
 // HEALTH & STATUS & METRICS
 // =============================================================================
 
@@ -193,6 +200,13 @@ app.get("/metrics/prometheus", (c) => {
 // MOUNT MODULAR ROUTERS
 // =============================================================================
 
+// Apply phase gating to feature routers
+// Phase 2+: claims, leaderboard
+claimRouter.use("*", phaseGate(2));
+leaderboardRouter.use("*", phaseGate(2));
+// Phase 3+: game
+gameRouter.use("*", phaseGate(3));
+
 // Balance management
 app.route("/api/balance", balanceRouter);
 
@@ -216,6 +230,9 @@ app.route("/api/claim", claimRouter);
 
 // Engagement tracking (daily login, baby care, play time)
 app.route("/api/engagement", engagementRouter);
+
+// BABTC Faucet (Phase 1)
+app.route("/api/faucet", faucetRouter);
 
 // =============================================================================
 // SCHEDULED TASKS (Cron)

@@ -440,8 +440,11 @@ export class BitcoinWallet {
       secureErase(this.wallet.privateKey);
       // Clear mnemonic string (can't truly erase strings in JS)
       if (this.wallet.mnemonic) {
-        // Replace with garbage
-        (this.wallet as any).mnemonic = "x".repeat(this.wallet.mnemonic.length);
+        // Overwrite mnemonic chars in an array to help GC (strings immutable in JS)
+        const buf = Array.from(this.wallet.mnemonic);
+        buf.fill('x');
+        (this.wallet as unknown as { mnemonic: string }).mnemonic = buf.join('');
+        this.wallet.mnemonic = undefined as unknown as string;
       }
       this.wallet = null;
     }

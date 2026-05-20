@@ -15,6 +15,8 @@
 
 import { useCallback } from "react";
 import { useWalletDashboard } from "@/hooks/features";
+import { FaucetCard } from "@/components/features/faucet/FaucetCard";
+import { getPhaseConfig } from "@bitcoinbaby/shared";
 import {
   NetworkSwitcher,
   NetworkBadge,
@@ -150,6 +152,11 @@ export function WalletSection() {
                 nftCount={balances.nftBoost.nftCount}
                 boostLoading={balances.nftBoost.loading}
               />
+
+              {/* Faucet (Phase 1 — BABTC for NFT evolution) */}
+              {getPhaseConfig().features.babtcFaucet && (
+                <FaucetCard address={wallet.address} />
+              )}
 
               {balances.btc.lastUpdated && (
                 <p className="font-pixel text-pixel-2xs text-pixel-text-muted text-center">

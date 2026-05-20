@@ -236,7 +236,7 @@ function render(){
 
   // SECURITY: Sanitize SVG before injecting into DOM to prevent XSS.
   // Even though SVG is built via esc()/el() helpers, sanitize as defense-in-depth.
-  var DANGEROUS=/<script|javascript:|on\\w+\\s*=|<iframe|<object|<embed|<form|expression\\s*\\(|url\\s*\\(\\s*['"]?\\s*data:/i;
+  var DANGEROUS=/<script|javascript:|on\w+\s*=|<iframe|<object|<embed|<form|expression\s*\(|url\s*\(\s*['"]?\s*data:/i;
   if(DANGEROUS.test(svg)){throw new Error('SVG contains dangerous content');}
 
   // Apply to SVG element

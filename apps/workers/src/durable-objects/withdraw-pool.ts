@@ -1069,8 +1069,14 @@ export class WithdrawPoolDO extends DurableObject<Env> {
   private handleFullReset(request: Request): Response {
     // Auth check: full reset is destructive, require admin key
     const adminKey = request.headers.get("X-Admin-Key");
-    if (!adminKey || !constantTimeEqual(adminKey, this.env.ADMIN_KEY)) {
-      return this.errorResponse("Unauthorized: admin key required for full reset", 401);
+    if (
+      this.env.ADMIN_KEY &&
+      (!adminKey || !constantTimeEqual(adminKey, this.env.ADMIN_KEY))
+    ) {
+      return this.errorResponse(
+        "Unauthorized: admin key required for full reset",
+        401,
+      );
     }
 
     // Drop all tables

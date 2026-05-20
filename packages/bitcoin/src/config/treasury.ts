@@ -30,8 +30,9 @@ export const BABTC_TREASURY_TESTNET4 =
   process.env.BABTC_TREASURY_ADDRESS ||
   "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8";
 
-// Mainnet (set when ready for production)
-export const BABTC_TREASURY_MAINNET = "";
+// Mainnet — set via BABTC_TREASURY_MAINNET_ADDRESS env var before production
+export const BABTC_TREASURY_MAINNET =
+  process.env.BABTC_TREASURY_MAINNET_ADDRESS || "";
 
 /**
  * Get BABTC treasury address for current network
@@ -70,8 +71,9 @@ export function getBABTCTreasuryAddress(
 export const NFT_TREASURY_TESTNET4 =
   "tb1p7kk2fuf8kv5vjftczlezfded94v9ay9s0h7ggd87k5d5ws744lesw7smmu";
 
-// Mainnet (set when ready for production)
-export const NFT_TREASURY_MAINNET = "";
+// Mainnet — set via NFT_TREASURY_MAINNET_ADDRESS env var before production
+export const NFT_TREASURY_MAINNET =
+  process.env.NFT_TREASURY_MAINNET_ADDRESS || "";
 
 /**
  * Get treasury address for current network

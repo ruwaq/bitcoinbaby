@@ -52,6 +52,13 @@ export interface Env {
   // Genesis Babies NFT configuration
   NFT_APP_ID?: string;
   NFT_APP_VK?: string;
+
+  // Phase configuration
+  PHASE?: string;
+
+  // Faucet configuration (Phase 1)
+  FAUCET_AMOUNT?: string;
+  FAUCET_MAX_TOTAL?: string;
 }
 
 // =============================================================================

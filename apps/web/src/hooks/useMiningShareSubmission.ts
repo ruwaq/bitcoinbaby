@@ -24,7 +24,10 @@ import {
   getQueueStats,
   type SyncEvent,
 } from "@bitcoinbaby/core";
+import { createLogger } from "@bitcoinbaby/shared";
 import { useMiningSubmitter } from "./useMiningSubmitter";
+
+const log = createLogger("ShareSubmission");
 
 // =============================================================================
 // TYPES
@@ -139,20 +142,19 @@ export function useMiningShareSubmission(
   // Initialize SyncManager and load persisted queue stats
   useEffect(() => {
     if (!address) {
-      console.debug("[ShareSubmission] No address available, waiting...");
+      log.debug("[ShareSubmission] No address available, waiting...");
       return;
     }
 
-    console.debug(
-      "[ShareSubmission] Starting SyncManager for:",
-      address.slice(0, 12),
-    );
+    log.debug("[ShareSubmission] Starting SyncManager", {
+      address: address.slice(0, 12),
+    });
     const syncManager = syncManagerRef.current;
     syncManager.start(address);
 
     // Load initial stats from IndexedDB
     getQueueStats(address).then((stats) => {
-      console.debug("[ShareSubmission] Queue stats:", stats);
+      log.debug("[ShareSubmission] Queue stats", { stats });
       setPendingShares(stats.pending + stats.syncing);
       setFailedShares(stats.failed);
       setSubmittedShares(stats.synced);
@@ -160,7 +162,7 @@ export function useMiningShareSubmission(
 
     // Subscribe to sync events
     const unsubscribe = syncManager.subscribe((event: SyncEvent) => {
-      console.debug("[ShareSubmission] Sync event:", event.type, event.data);
+      log.debug("[ShareSubmission] Sync event", { type: event.type, data: event.data });
       switch (event.type) {
         case "sync_start":
           setIsSubmitting(true);
@@ -183,13 +185,12 @@ export function useMiningShareSubmission(
           setIsSubmitting(false);
           break;
         case "health_fail":
-          console.warn(
-            "[ShareSubmission] API health check failed:",
-            event.data?.error,
-          );
+          log.warn("[ShareSubmission] API health check failed", {
+            error: event.data?.error,
+          });
           break;
         case "health_ok":
-          console.debug("[ShareSubmission] API health restored");
+          log.debug("[ShareSubmission] API health restored");
           break;
       }
     });
@@ -257,10 +258,9 @@ export function useMiningShareSubmission(
 
     // Validate share has required data for server validation
     if (!share.blockData) {
-      console.warn(
-        "[ShareSubmission] Share missing blockData, cannot submit:",
-        share.hash.slice(0, 16),
-      );
+      log.warn("[ShareSubmission] Share missing blockData, cannot submit", {
+        hash: share.hash.slice(0, 16),
+      });
       // Notify user that share was rejected (deferred to avoid cascading renders)
       queueMicrotask(() =>
         addNotification({
@@ -298,10 +298,9 @@ export function useMiningShareSubmission(
           });
         } else if (duplicate) {
           // Debug only - duplicates are expected during normal operation
-          console.debug(
-            "[ShareSubmission] Duplicate share ignored:",
-            share.hash.slice(0, 8),
-          );
+          log.debug("[ShareSubmission] Duplicate share ignored", {
+            hash: share.hash.slice(0, 8),
+          });
         }
       })
       .catch(() => {

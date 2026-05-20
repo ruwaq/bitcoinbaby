@@ -36,26 +36,8 @@ import {
 // DETERMINISTIC RANDOM (for NFT trait generation)
 // =============================================================================
 
-/**
- * Create a seeded random number generator based on txid.
- * Ensures NFT traits are deterministic and verifiable.
- */
-function createSeededRandom(seed: string): () => number {
-  const bytes: number[] = [];
-  for (let i = 0; i < seed.length; i += 2) {
-    bytes.push(parseInt(seed.slice(i, i + 2), 16) || 0);
-  }
-  let index = 0;
-  let state = bytes.reduce((a, b) => (a * 31 + b) >>> 0, 0);
-  return () => {
-    state ^= state << 13;
-    state ^= state >>> 17;
-    state ^= state << 5;
-    state = state >>> 0;
-    if (index < bytes.length) state = (state + bytes[index++]) >>> 0;
-    return state / 0xffffffff;
-  };
-}
+// Seeded RNG imported from shared library (was duplicated in nft routes)
+import { createSeededRandom } from "../lib/deterministic-random";
 
 export const adminRouter = new Hono<{ Bindings: Env }>();
 export const historyRouter = new Hono<{ Bindings: Env }>();

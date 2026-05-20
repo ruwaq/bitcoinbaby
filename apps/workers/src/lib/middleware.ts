@@ -544,3 +544,39 @@ export const securityHeaders = createMiddleware<{ Bindings: Env }>(
     );
   },
 );
+
+// =============================================================================
+// PHASE GATING MIDDLEWARE
+// =============================================================================
+
+/**
+ * Phase-gating middleware factory for Hono.
+ *
+ * Reads c.env.PHASE (default "1") and compares against minPhase.
+ * Returns 404 JSON if the current phase is below the minimum required,
+ * so features not yet launched are invisible rather than forbidden.
+ *
+ * @param minPhase - Minimum phase number required (1, 2, or 3)
+ * @returns Hono middleware that gates the route
+ *
+ * @example
+ * import { phaseGate } from "../lib/middleware";
+ * claimRouter.use("*", phaseGate(2));
+ */
+export function phaseGate(minPhase: number) {
+  return createMiddleware<{ Bindings: Env }>(async (c, next) => {
+    const currentPhase = parseInt(c.env.PHASE || "1", 10);
+    if (currentPhase >= minPhase) {
+      await next();
+      return;
+    }
+    return c.json<ApiResponse>(
+      {
+        success: false,
+        error: `This feature is not available in Phase ${currentPhase}. It will be enabled in Phase ${minPhase}.`,
+        timestamp: Date.now(),
+      },
+      404,
+    );
+  });
+}
