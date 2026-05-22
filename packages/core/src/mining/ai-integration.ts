@@ -31,7 +31,8 @@
  * ============================================================================
  */
 
-import { AITask, AIProof } from "./types";
+import { AITask, AIProof, AIStatus } from "./types";
+import type { AIProgressData } from "@bitcoinbaby/ai";
 
 /** AI Result definition (matches @bitcoinbaby/ai) */
 interface AIResult {
@@ -56,15 +57,6 @@ export interface AIWorkResult {
   proof?: string;
   computeTime?: number;
   error?: string;
-}
-
-export interface AIStatus {
-  available: boolean;
-  initialized: boolean;
-  hasWebGPU: boolean;
-  modelLoaded: string;
-  tasksCompleted: number;
-  lastError?: string;
 }
 
 export interface AIIntegrationConfig {
@@ -103,9 +95,18 @@ export class AIWorkIntegration {
   private tasksCompleted = 0;
   private lastError?: string;
   private shareCounter = 0;
+  
+  private modelState: "idle" | "loading" | "ready" | "error" = "idle";
+  private downloadProgress = 0;
+  private downloadDetails?: { file?: string; loaded?: number; total?: number };
+  private onStatusChange?: (status: AIStatus) => void;
 
-  constructor(config: Partial<AIIntegrationConfig> = {}) {
+  constructor(
+    config: Partial<AIIntegrationConfig> = {},
+    onStatusChange?: (status: AIStatus) => void,
+  ) {
     this.config = { ...defaultConfig, ...config };
+    this.onStatusChange = onStatusChange;
   }
 
   /**
@@ -127,21 +128,25 @@ export class AIWorkIntegration {
     }
   }
 
+  private notifyStatusChange(): void {
+    if (this.onStatusChange) {
+      this.onStatusChange(this.getStatus());
+    }
+  }
+
   private async _doInitialize(): Promise<void> {
     try {
       log.debug("Loading AI package...");
+      this.modelState = "loading";
+      this.downloadProgress = 0;
+      this.notifyStatusChange();
 
       // Dynamic import — AI package is optional and loaded at runtime only.
       // Uses a variable to prevent bundlers from statically resolving the import.
       // This replaces the previous new Function() pattern which was a code
       // injection vector. The package name is a hardcoded constant, so this
       // is safe — but if it ever becomes configurable, add whitelist validation.
-      const packageName = "@bitcoinbaby/ai" as const;
-      const aiModule = await import(
-        /* webpackIgnore: true */
-        /* @vite-ignore */
-        packageName
-      );
+      const aiModule = await import("@bitcoinbaby/ai");
       const { AIEngine } = aiModule;
 
       // Create and initialize the engine
@@ -151,14 +156,28 @@ export class AIWorkIntegration {
         maxConcurrentTasks: 1, // Keep it simple for mining integration
       });
 
-      await this.engine.initialize();
+      await this.engine.initialize((progressData: AIProgressData) => {
+        this.downloadProgress = progressData.progress;
+        this.downloadDetails = {
+          file: progressData.file,
+          loaded: progressData.loaded,
+          total: progressData.total,
+        };
+        this.notifyStatusChange();
+      });
+
+      this.modelState = "ready";
+      this.downloadProgress = 100;
       log.info("AI Engine initialized successfully");
+      this.notifyStatusChange();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown AI init error";
       log.warn("Failed to initialize AI", { error: message });
       this.lastError = message;
       this.engine = null;
+      this.modelState = "error";
+      this.notifyStatusChange();
       // Don't throw - AI is optional
     }
   }
@@ -302,6 +321,9 @@ export class AIWorkIntegration {
         modelLoaded: "",
         tasksCompleted: this.tasksCompleted,
         lastError: this.lastError,
+        modelState: this.modelState,
+        downloadProgress: this.downloadProgress,
+        downloadDetails: this.downloadDetails,
       };
     }
 
@@ -313,6 +335,9 @@ export class AIWorkIntegration {
       modelLoaded: engineStatus.modelLoaded,
       tasksCompleted: this.tasksCompleted,
       lastError: this.lastError,
+      modelState: this.modelState,
+      downloadProgress: this.downloadProgress,
+      downloadDetails: this.downloadDetails,
     };
   }
 

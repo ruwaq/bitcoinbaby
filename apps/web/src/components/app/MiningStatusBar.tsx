@@ -23,10 +23,7 @@ interface MiningStatusBarProps {
 }
 
 export function MiningStatusBar({ onClick, className }: MiningStatusBarProps) {
-  const { isRunning, isPaused, hashrate, shares } = useGlobalMining({
-    difficulty: MIN_DIFFICULTY,
-    minerAddress: "status-bar",
-  });
+  const { isRunning, isPaused, hashrate, shares } = useGlobalMining();
 
   const status = isRunning ? (isPaused ? "paused" : "mining") : "idle";
 

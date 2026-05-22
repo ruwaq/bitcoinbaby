@@ -32,6 +32,7 @@ export function AppHeader({
   return (
     <header
       className={clsx(
+        "sticky top-0 z-40 w-full",
         "flex items-center justify-between",
         "header-safe py-3 bg-pixel-bg-medium",
         "border-b-4 border-pixel-border",

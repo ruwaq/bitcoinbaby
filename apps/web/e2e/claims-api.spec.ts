@@ -11,7 +11,7 @@ import { test, expect } from "./fixtures";
 
 const API_URL =
   process.env.API_URL ||
-  "https://bitcoinbaby-api-prod.andeanlabs-58f.workers.dev";
+  "http://localhost:8787";
 
 // Test address (testnet4)
 const TEST_ADDRESS = "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx";

@@ -60,7 +60,7 @@ test.describe("NFT Mint Tab", () => {
     await page.goto("/?tab=nfts");
 
     // Look for mint button
-    const mintButton = page.getByRole("button", { name: /mint/i });
+    const mintButton = page.getByRole("button", { name: "Mint", exact: true });
     await expect(mintButton).toBeVisible({ timeout: 10000 });
   });
 

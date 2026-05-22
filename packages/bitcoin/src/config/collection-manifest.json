@@ -1,7 +1,7 @@
 {
   "network": "testnet4",
-  "spriteLibraryInscriptionId": "1cbd6ee3c417fe56a3ed6f69782594ac64acac30b9f7c010d7fc9eca2f2033e2i0",
-  "rendererInscriptionId": "4da1b9530fc560d0aff1e160e6d4485c7fb5c4f8f31fb551fa40c988b6205fd0i0",
-  "collectionParentInscriptionId": "bb0fd93acc973f5cd826cf298ac9ee5d7f6d0eb42d1f7e637c154d3840df44b4i0",
-  "deployedAt": "2026-05-21T11:26:38.675Z"
+  "spriteLibraryInscriptionId": "64b3884e8b339093869acbf17ef75f5a712be2fe64710704666717a99a6caee2i0",
+  "rendererInscriptionId": "5b008c9b221d24b437e348588873b8e033711e4e598fed599f59806ac9b1f926i0",
+  "collectionParentInscriptionId": "dbb29a7f94fc73df3a18628cbcc2abb54a80f949e8f653b73d9c55d957d52b50i0",
+  "deployedAt": "2026-05-22T16:54:59.933Z"
 }

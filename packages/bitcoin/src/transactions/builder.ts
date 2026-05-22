@@ -37,7 +37,17 @@ bitcoin.initEccLib(ecc);
 const NETWORKS: Record<BitcoinNetwork, bitcoin.Network> = {
   mainnet: bitcoin.networks.bitcoin,
   testnet: bitcoin.networks.testnet,
-  testnet4: bitcoin.networks.testnet,
+  testnet4: {
+    messagePrefix: "\x18Bitcoin Signed Message:\n",
+    bech32: "tb",
+    bip32: {
+      public: 0x043587cf,
+      private: 0x04358394,
+    },
+    pubKeyHash: 0x6f,
+    scriptHash: 0xc4,
+    wif: 0xef,
+  },
   regtest: bitcoin.networks.regtest,
 };
 

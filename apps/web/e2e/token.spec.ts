@@ -35,6 +35,8 @@ test.describe("Token Section UI", () => {
   });
 
   test("should display tokenomics section", async ({ page }) => {
+    // Open advanced tokenomics details
+    await page.getByText("ADVANCED TOKENOMICS & RESOURCES").click();
     // Should show tokenomics heading
     const tokenomics = page.getByRole("heading", { name: /TOKENOMICS/i });
     await expect(tokenomics).toBeVisible({ timeout: 10000 });
@@ -57,6 +59,8 @@ test.describe("Token Section UI", () => {
   });
 
   test("should show copy token URL button", async ({ page }) => {
+    // Open advanced tokenomics details
+    await page.getByText("ADVANCED TOKENOMICS & RESOURCES").click();
     // Should have copy button for token URL
     const copyButton = page.getByRole("button", { name: /copy.*url/i });
     await expect(copyButton).toBeVisible({ timeout: 10000 });

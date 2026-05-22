@@ -6,7 +6,7 @@
     "dev": "SERWIST_SUPPRESS_TURBOPACK_WARNING=1 next dev --webpack",
     "dev:pwa": "SERWIST_SUPPRESS_TURBOPACK_WARNING=1 next dev --webpack",
     "build": "next build --webpack",
-    "build:native": "BUILD_TARGET=native next build --webpack",
+    "build:native": "if [ -f src/proxy.ts ]; then mv src/proxy.ts src/proxy.ts.bak; fi; BUILD_TARGET=native next build --webpack; status=$?; if [ -f src/proxy.ts.bak ]; then mv src/proxy.ts.bak src/proxy.ts; fi; exit $status",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",

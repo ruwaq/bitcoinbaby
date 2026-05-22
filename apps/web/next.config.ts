@@ -18,6 +18,9 @@ const withSerwist = withSerwistInit({
 });
 
 const nextConfig: NextConfig = {
+  // Prevent Next.js from bundling native server packages
+  serverExternalPackages: ["onnxruntime-node", "sharp"],
+
   // Turbopack only for dev and SSR (not static export)
   ...(isNativeBuild ? {} : { turbopack: {} }),
 
@@ -48,6 +51,11 @@ const nextConfig: NextConfig = {
     config.experiments = {
       ...config.experiments,
       asyncWebAssembly: true,
+    };
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      sharp: false,
+      "onnxruntime-node": false,
     };
     return config;
   },

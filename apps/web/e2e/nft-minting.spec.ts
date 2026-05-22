@@ -9,7 +9,7 @@ import { test, expect } from "./fixtures";
 
 const API_URL =
   process.env.API_URL ||
-  "https://bitcoinbaby-api-prod.andeanlabs-58f.workers.dev";
+  "http://localhost:8787";
 
 const TEST_ADDRESS = "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx";
 
@@ -33,7 +33,7 @@ test.describe("NFT Tab", () => {
 
   test("should display mint button when on NFT tab", async ({ page }) => {
     // Look for mint-related elements
-    const mintButton = page.getByRole("button", { name: /Mint/i });
+    const mintButton = page.getByRole("button", { name: "Mint", exact: true });
     await expect(mintButton).toBeVisible({ timeout: 10000 });
   });
 });

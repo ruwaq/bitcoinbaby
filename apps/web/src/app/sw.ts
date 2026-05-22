@@ -42,6 +42,10 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: customRuntimeCaching,
+  precacheOptions: {
+    // Ignore all query parameters (like ?tab=mining) to match "/" in precache
+    ignoreURLParametersMatching: [/.*/],
+  },
   fallbacks: {
     entries: [
       {

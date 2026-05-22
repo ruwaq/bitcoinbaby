@@ -16,7 +16,13 @@ import type { NextRequest } from "next/server";
 function generateNonce(): string {
   const array = new Uint8Array(16);
   crypto.getRandomValues(array);
-  return Buffer.from(array).toString("base64");
+  // Convert Uint8Array to base64 safely without using Node's Buffer (which is not available in Edge Runtime)
+  let binary = "";
+  const len = array.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(array[i]);
+  }
+  return btoa(binary);
 }
 
 export function proxy(request: NextRequest) {
@@ -41,10 +47,9 @@ export function proxy(request: NextRequest) {
     ? `script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'`
     : `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'`;
 
-  // connect-src: in dev also allow localhost ports for HMR websockets
-  const connectSrc = isDev
-    ? "connect-src 'self' http://localhost:* ws://localhost:* https://mempool.space wss://mempool.space https://scrolls.charms.dev https://*.workers.dev https://charms-explorer-api.fly.dev https://v11.charms.dev"
-    : "connect-src 'self' https://mempool.space https://scrolls.charms.dev https://*.workers.dev wss://mempool.space https://charms-explorer-api.fly.dev https://v11.charms.dev";
+  // connect-src: allow localhost ports for local API worker development/testing
+  const connectSrc =
+    "connect-src 'self' http://localhost:* ws://localhost:* https://mempool.space wss://mempool.space https://scrolls.charms.dev https://*.workers.dev https://charms-explorer-api.fly.dev https://v11.charms.dev https://huggingface.co https://*.huggingface.co";
 
   const cspDirectives = [
     "default-src 'self'",

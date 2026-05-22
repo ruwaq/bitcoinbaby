@@ -27,6 +27,7 @@ import type {
   XPGainedEvent,
   AITask,
   AIProof,
+  AIStatus,
 } from "./types";
 import { MIN_DIFFICULTY } from "../tokenomics/constants";
 import { createLogger } from "@bitcoinbaby/shared";
@@ -58,6 +59,7 @@ export interface MiningManagerState {
   lastShare: MiningResult | null;
   error: string | null;
   sessionStartTime: number | null;
+  aiStatus: AIStatus | null;
 
   // Feature states
   isLeader: boolean;
@@ -119,6 +121,7 @@ class MiningManager {
     lastShare: null,
     error: null,
     sessionStartTime: null,
+    aiStatus: null,
     // Feature states
     isLeader: true,
     isWaitingForLeadership: false,
@@ -136,6 +139,16 @@ class MiningManager {
     if (this.orchestrator) {
       // Already initialized, just update config
       this.config = { ...this.config, ...config };
+      
+      // Update orchestrator config in real-time (especially minerAddress)
+      this.orchestrator.updateConfig({
+        minerAddress: config.minerAddress,
+        initialDifficulty: config.initialDifficulty,
+        preferWebGPU: config.preferWebGPU,
+        fallbackToCPU: config.fallbackToCPU,
+        throttleOnBattery: config.throttleOnBattery,
+        throttleWhenHidden: config.throttleWhenHidden,
+      });
       return;
     }
 
@@ -188,6 +201,11 @@ class MiningManager {
     // AI local task resolved event
     this.orchestrator.on("onAILocalTaskResolved", (proof, task) => {
       this.config.onAILocalTaskResolved?.(proof, task);
+    });
+
+    // AI status change event
+    this.orchestrator.on("onAIStatusChange", (aiStatus) => {
+      this.updateState({ aiStatus });
     });
 
     this.orchestrator.on("onStatusChange", (status) => {

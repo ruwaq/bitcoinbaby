@@ -55,11 +55,13 @@ function toStoreWalletInfo(info: BitcoinWalletInfo): CoreWalletInfo {
 interface WalletSingleton {
   instance: BitcoinWallet | null;
   info: WalletInfo | null;
+  network: SupportedNetwork | null;
 }
 
 const walletSingleton: WalletSingleton = {
   instance: null,
   info: null,
+  network: null,
 };
 
 // Custom event name for wallet singleton changes
@@ -78,9 +80,10 @@ function dispatchWalletChange(): void {
 /**
  * Store wallet in singleton (called when unlocking)
  */
-function setWalletSingleton(wallet: BitcoinWallet, info: WalletInfo): void {
+function setWalletSingleton(wallet: BitcoinWallet, info: WalletInfo, network: SupportedNetwork): void {
   walletSingleton.instance = wallet;
   walletSingleton.info = info;
+  walletSingleton.network = network;
   dispatchWalletChange();
 }
 
@@ -93,6 +96,7 @@ function clearWalletSingleton(): void {
   }
   walletSingleton.instance = null;
   walletSingleton.info = null;
+  walletSingleton.network = null;
   dispatchWalletChange();
 }
 
@@ -105,7 +109,7 @@ function lockWalletSingleton(): void {
     walletSingleton.instance.clear();
   }
   walletSingleton.instance = null;
-  // Keep walletSingleton.info so we can show "locked" state with address
+  // Keep walletSingleton.info and network so we can show "locked" state with address
   dispatchWalletChange();
 }
 
@@ -392,6 +396,13 @@ export function useWallet(): UseWalletReturn {
     // Update the reference for future comparisons
     initialNetworkRef.current = network;
 
+    // Check if the current network matches the network associated with the active wallet singleton.
+    // This avoids false locks when navigation/remounting happens and Zustand hasn't finished hydrating.
+    const singleton = getWalletSingleton();
+    if (singleton.network === network) {
+      return;
+    }
+
     if (walletRef.current && state.isLoaded && !state.isLocked) {
       // Network changed while unlocked - need to re-derive
       // For now, just lock the wallet to force re-unlock with new network
@@ -438,7 +449,7 @@ export function useWallet(): UseWalletReturn {
 
         // Update refs, state, and singleton
         walletRef.current = wallet;
-        setWalletSingleton(wallet, info);
+        setWalletSingleton(wallet, info, network);
 
         const metadata = await SecureStorage.getMetadata();
 
@@ -490,7 +501,7 @@ export function useWallet(): UseWalletReturn {
 
         // Update refs, state, and singleton
         walletRef.current = wallet;
-        setWalletSingleton(wallet, info);
+        setWalletSingleton(wallet, info, network);
 
         const metadata = await SecureStorage.getMetadata();
 
@@ -539,7 +550,7 @@ export function useWallet(): UseWalletReturn {
 
         // Update refs, state, and singleton
         walletRef.current = wallet;
-        setWalletSingleton(wallet, info);
+        setWalletSingleton(wallet, info, network);
 
         setState((prev) => ({
           ...prev,

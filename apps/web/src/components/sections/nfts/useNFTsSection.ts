@@ -17,7 +17,7 @@ export interface ListFeedback {
  */
 export function useNFTsSection() {
   // UI state
-  const [activeTab, setActiveTab] = useState<SubTab>("explorer");
+  const [activeTab, setActiveTab] = useState<SubTab>("collection");
   const [mintState, setMintState] = useState<MintState>("info");
   const [evolvingIds, setEvolvingIds] = useState<Set<number>>(new Set());
   const [listingIds, setListingIds] = useState<Set<number>>(new Set());
@@ -156,11 +156,6 @@ export function useNFTsSection() {
     setMintState("info");
   }, []);
 
-  const handleClaimTabClick = useCallback(() => {
-    setActiveTab("claim");
-    nfts.claiming.reset();
-  }, [nfts.claiming]);
-
   return {
     // State
     activeTab,
@@ -191,6 +186,5 @@ export function useNFTsSection() {
     handleEvolve,
     handleListNFT,
     handleMintTabClick,
-    handleClaimTabClick,
   };
 }

@@ -5,8 +5,8 @@
   "symbol": "GBABY",
   "description": "Colección dinámica y evolutiva en la cadena de Bitcoin, con boosts de minería interactivos y evolución de visuales en tiempo real.",
   "website": "https://bitcoinbaby.dev",
-  "logo_inscription_id": "bb0fd93acc973f5cd826cf298ac9ee5d7f6d0eb42d1f7e637c154d3840df44b4i0",
-  "renderer_inscription_id": "4da1b9530fc560d0aff1e160e6d4485c7fb5c4f8f31fb551fa40c988b6205fd0i0",
+  "logo_inscription_id": "dbb29a7f94fc73df3a18628cbcc2abb54a80f949e8f653b73d9c55d957d52b50i0",
+  "renderer_inscription_id": "5b008c9b221d24b437e348588873b8e033711e4e598fed599f59806ac9b1f926i0",
   "state_schema": {
     "dna": {
       "type": "string",

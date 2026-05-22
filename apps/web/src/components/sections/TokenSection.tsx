@@ -13,6 +13,8 @@
  */
 
 import { useUnifiedBalance, useWalletStore } from "@bitcoinbaby/core";
+import { pixelBorders } from "@bitcoinbaby/ui";
+import { useRouter } from "next/navigation";
 import {
   TokenHeader,
   TokenStats,
@@ -23,6 +25,8 @@ import {
 } from "../features/token";
 
 export function TokenSection() {
+  const router = useRouter();
+
   // Get wallet address from store
   const wallet = useWalletStore((s) => s.wallet);
   const address = wallet?.address || null;
@@ -39,7 +43,7 @@ export function TokenSection() {
 
   const handleClaim = async () => {
     // Navigate to wallet claim page for on-chain minting
-    window.location.href = "/wallet/claim";
+    router.push("/wallet/claim");
   };
 
   return (
@@ -63,14 +67,23 @@ export function TokenSection() {
         minClaim={minClaim}
       />
 
-      {/* Tokenomics */}
-      <TokenomicsCard />
+      {/* Advanced Tokenomics & Resources */}
+      <details className="mt-6 group">
+        <summary className={`font-pixel text-pixel-2xs bg-pixel-bg-medium ${pixelBorders.medium} p-4 text-pixel-text-muted hover:text-pixel-primary flex items-center justify-between cursor-pointer list-none [&::-webkit-details-marker]:hidden outline-none select-none`}>
+          <span>ADVANCED TOKENOMICS & RESOURCES</span>
+          <span className="transform group-open:rotate-180 transition-transform duration-200">▼</span>
+        </summary>
+        <div className="mt-6 flex flex-col gap-6">
+          {/* Tokenomics */}
+          <TokenomicsCard />
 
-      {/* Reward Table */}
-      <RewardTable />
+          {/* Reward Table */}
+          <RewardTable />
 
-      {/* Links */}
-      <TokenLinks />
+          {/* Links */}
+          <TokenLinks />
+        </div>
+      </details>
     </div>
   );
 }

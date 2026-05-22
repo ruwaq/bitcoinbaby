@@ -74,6 +74,13 @@ export class TreasurySignerService {
    * Initialize (validate configuration)
    */
   async initialize(): Promise<boolean> {
+    if (!this.env.BABTC_APP_VK) {
+      throw new Error("BABTC_APP_VK is not configured in the environment");
+    }
+    if (!this.env.BABTC_GENESIS) {
+      throw new Error("BABTC_GENESIS is not configured in the environment");
+    }
+
     if (!this.treasuryAddress) {
       signerLogger.warn("TREASURY_ADDRESS not configured", {});
       // Don't fail - just log warning. Address can be set later.
@@ -231,12 +238,13 @@ export class TreasurySignerService {
     treasuryUtxo: CharmsUTXO,
   ): Record<string, unknown> {
     // BABTC app reference
-    const appVk =
-      this.env.BABTC_APP_VK ||
-      "ab70796e62562b5245cf746d7ecf4b95b86df582921ae42ec2ceea25612807c6";
-    const genesis =
-      this.env.BABTC_GENESIS ||
-      "b3deba0743aeffd0e455ce442b1693107090341381e3d8bcc5f586667c3e8a81:0";
+    const appVk = this.env.BABTC_APP_VK;
+    const genesis = this.env.BABTC_GENESIS;
+
+    if (!appVk || !genesis) {
+      throw new Error("BABTC_APP_VK or BABTC_GENESIS is not configured in the environment");
+    }
+
     const appRef = `${appVk}@${genesis}`;
 
     // Build outputs for each recipient

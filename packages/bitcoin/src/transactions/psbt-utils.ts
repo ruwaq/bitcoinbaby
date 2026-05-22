@@ -69,6 +69,25 @@ function writeVarint(buffer: Buffer, n: number, offset: number): number {
   }
 }
 
+const TESTNET4_NETWORK: bitcoin.Network = {
+  messagePrefix: "\x18Bitcoin Signed Message:\n",
+  bech32: "tb",
+  bip32: {
+    public: 0x043587cf,
+    private: 0x04358394,
+  },
+  pubKeyHash: 0x6f,
+  scriptHash: 0xc4,
+  wif: 0xef,
+};
+
+const NETWORKS: Record<string, bitcoin.Network> = {
+  mainnet: bitcoin.networks.bitcoin,
+  testnet: bitcoin.networks.testnet,
+  testnet4: TESTNET4_NETWORK,
+  regtest: bitcoin.networks.regtest,
+};
+
 /**
  * Convert raw transaction hex to PSBT for wallet signing
  *
@@ -86,10 +105,17 @@ export async function rawTxToPsbt(
   fundingUtxo: FundingUtxo,
   ownerAddress: string,
   mempoolClient: BlockchainAPI,
-  network?: bitcoin.Network,
+  network?: bitcoin.Network | string,
 ): Promise<string> {
-  // Default to testnet for backward compatibility, but allow mainnet override
-  const net = network ?? bitcoin.networks.testnet;
+  // Default to testnet4 for backward compatibility, but allow override
+  let net: bitcoin.Network = TESTNET4_NETWORK;
+  if (network) {
+    if (typeof network === "string") {
+      net = NETWORKS[network] ?? TESTNET4_NETWORK;
+    } else {
+      net = network;
+    }
+  }
 
   // Parse the raw transaction
   const tx = bitcoin.Transaction.fromHex(rawTxHex);

@@ -644,6 +644,7 @@ export function useMintNFT(): UseMintNFTReturn {
             fundingUtxo,
             wallet.address,
             mempoolClient,
+            network,
           );
           log.info("PSBT created, requesting wallet signature...");
 

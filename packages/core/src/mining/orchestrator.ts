@@ -8,6 +8,7 @@ import type {
   XPGainedEvent,
   AITask,
   AIProof,
+  AIStatus,
 } from "./types";
 import { CPUMiner } from "./cpu-miner";
 import {
@@ -23,7 +24,6 @@ import { getApiClient } from "../api/client";
 const log = createLogger("Orchestrator");
 import {
   AIWorkIntegration,
-  type AIStatus,
   type AIWorkResult,
 } from "./ai-integration";
 
@@ -73,12 +73,21 @@ export class MiningOrchestrator {
 
     // Initialize AI integration if enabled
     if (this.config.enableAIPoUW) {
-      this.aiIntegration = new AIWorkIntegration({
+      this.aiIntegration = this.createAIIntegration();
+    }
+  }
+
+  private createAIIntegration(): AIWorkIntegration {
+    return new AIWorkIntegration(
+      {
         enabled: true,
         taskFrequency: this.config.aiTaskFrequency ?? 1,
         preferWebGPU: this.config.preferWebGPU,
-      });
-    }
+      },
+      (status) => {
+        this.events.onAIStatusChange?.(status);
+      },
+    );
   }
 
   /**
@@ -116,11 +125,7 @@ export class MiningOrchestrator {
       if (this.config.enableAIPoUW) {
         log.info("Initializing AI engine for PoUW...");
         if (!this.aiIntegration) {
-          this.aiIntegration = new AIWorkIntegration({
-            enabled: true,
-            taskFrequency: this.config.aiTaskFrequency ?? 1,
-            preferWebGPU: this.config.preferWebGPU,
-          });
+          this.aiIntegration = this.createAIIntegration();
         }
         await this.aiIntegration.initialize();
 
@@ -390,6 +395,34 @@ export class MiningOrchestrator {
   }
 
   /**
+   * Update orchestrator configuration dynamically
+   */
+  updateConfig(config: Partial<OrchestratorConfig>): void {
+    const oldAddress = this.config.minerAddress;
+    this.config = { ...this.config, ...config };
+
+    if (this.config.initialDifficulty < MIN_DIFFICULTY) {
+      this.config.initialDifficulty = MIN_DIFFICULTY;
+    }
+
+    if (config.initialDifficulty !== undefined) {
+      this.activeMiner?.setDifficulty(this.config.initialDifficulty);
+    }
+
+    // Pass the new address to active miner if it has a setter
+    if (this.config.minerAddress && this.activeMiner) {
+      this.activeMiner.setAddress?.(this.config.minerAddress);
+    }
+
+    if (oldAddress !== this.config.minerAddress) {
+      log.info("Miner configuration updated dynamically", {
+        oldAddress,
+        newAddress: this.config.minerAddress,
+      });
+    }
+  }
+
+  /**
    * Register event handlers
    */
   on<K extends keyof MinerEvents>(event: K, handler: MinerEvents[K]): void {
@@ -620,11 +653,7 @@ export class MiningOrchestrator {
   setAIEnabled(enabled: boolean): void {
     if (enabled && !this.aiIntegration) {
       // Create new AI integration
-      this.aiIntegration = new AIWorkIntegration({
-        enabled: true,
-        taskFrequency: this.config.aiTaskFrequency ?? 1,
-        preferWebGPU: this.config.preferWebGPU,
-      });
+      this.aiIntegration = this.createAIIntegration();
     } else if (this.aiIntegration) {
       this.aiIntegration.setEnabled(enabled);
     }
@@ -651,11 +680,7 @@ export class MiningOrchestrator {
    */
   async initializeAI(): Promise<void> {
     if (!this.aiIntegration) {
-      this.aiIntegration = new AIWorkIntegration({
-        enabled: true,
-        taskFrequency: this.config.aiTaskFrequency ?? 1,
-        preferWebGPU: this.config.preferWebGPU,
-      });
+      this.aiIntegration = this.createAIIntegration();
     }
     await this.aiIntegration.initialize();
   }
@@ -666,18 +691,19 @@ export class MiningOrchestrator {
   private async runAILoop(): Promise<void> {
     log.info("Starting AI PoUW loop...");
     const client = getApiClient();
-    const address = this.config.minerAddress;
-
-    if (!address) {
-      log.error("Cannot mine without a miner address");
-      this.events.onError?.(new Error("Miner address is required for PoUW"));
-      this.stop();
-      return;
-    }
 
     while (this.isRunning) {
       if (this.isPaused) {
         await new Promise((resolve) => setTimeout(resolve, 100));
+        continue;
+      }
+
+      const address = this.config.minerAddress;
+
+      // Validate address to avoid useless requests and console 400 errors (e.g. during wallet loading or status-bar placeholder)
+      if (!address || address === "status-bar" || address.length < 26) {
+        log.debug("Skipping JIT AI task fetch: Miner address is invalid, empty or status-bar placeholder", { address });
+        await new Promise((resolve) => setTimeout(resolve, 3000));
         continue;
       }
 

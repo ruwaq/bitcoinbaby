@@ -69,6 +69,22 @@ export interface SignedAIProof extends AIProof {
   signature: string;
 }
 
+export interface AIStatus {
+  available: boolean;
+  initialized: boolean;
+  hasWebGPU: boolean;
+  modelLoaded: string;
+  tasksCompleted: number;
+  lastError?: string;
+  modelState: "idle" | "loading" | "ready" | "error";
+  downloadProgress: number;
+  downloadDetails?: {
+    file?: string;
+    loaded?: number;
+    total?: number;
+  };
+}
+
 /**
  * Events emitted by miners
  */
@@ -81,6 +97,8 @@ export interface MinerEvents {
   onXPGained?: (event: XPGainedEvent) => void;
   /** Emitted when an AI local task has been successfully solved and needs signing */
   onAILocalTaskResolved?: (proof: AIProof, task: AITask) => void;
+  /** Emitted when the AI engine download/initialization status changes */
+  onAIStatusChange?: (status: AIStatus) => void;
 }
 
 /**

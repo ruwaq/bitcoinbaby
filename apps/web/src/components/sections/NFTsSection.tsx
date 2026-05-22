@@ -12,11 +12,11 @@ import {
   TransactionConfirmModal,
   SectionHeader,
   InfoBanner,
+  pixelBorders,
 } from "@bitcoinbaby/ui";
 import {
   NFTClaimFlow,
   NFTCollectionView,
-  NFTMarketplaceView,
   NFTExplorerView,
 } from "@/components/features/nft";
 import { SyncStatus, NFTTabNav, MintTabContent, useNFTsSection } from "./nfts";
@@ -58,7 +58,6 @@ export function NFTsSection() {
     handleEvolve,
     handleListNFT,
     handleMintTabClick,
-    handleClaimTabClick,
   } = useNFTsSection();
 
   return (
@@ -94,10 +93,8 @@ export function NFTsSection() {
           activeTab={activeTab}
           explorerCount={explorer.total}
           collectionCount={collection.nfts.length}
-          marketplaceCount={marketplace.listings.length}
           onTabChange={setActiveTab}
           onMintTabClick={handleMintTabClick}
-          onClaimTabClick={handleClaimTabClick}
         />
 
         {/* List Feedback Banner */}
@@ -155,59 +152,56 @@ export function NFTsSection() {
         )}
 
         {activeTab === "mint" && (
-          <MintTabContent
-            mintState={mintState}
-            currentStep={minting.currentStep}
-            isWalletConnected={minting.isWalletConnected}
-            formattedPrice={minting.price.formatted}
-            canMint={minting.canMint}
-            error={minting.error}
-            lastMinted={minting.lastMinted}
-            txid={minting.txid}
-            commitTxid={minting.commitTxid}
-            pendingTransactions={pendingTransactions}
-            mintAttempts={mintAttempts.attempts}
-            pendingMintAttempts={mintAttempts.pendingAttempts}
-            failedMintAttempts={mintAttempts.failedAttempts}
-            isLoadingAttempts={mintAttempts.isLoading}
-            hasPendingAttempts={mintAttempts.hasPending}
-            onRefreshAttempts={mintAttempts.refresh}
-            onClearFailedAttempts={mintAttempts.clearFailed}
-            onMintClick={handleMintClick}
-            onMintAnother={handleMintAnother}
-            onViewCollection={handleViewCollection}
-            onRefreshTransactions={refreshTransactions}
-            onClearCompletedTransactions={clearCompletedTransactions}
-          />
-        )}
+          <div className="flex flex-col gap-6">
+            <MintTabContent
+              mintState={mintState}
+              currentStep={minting.currentStep}
+              isWalletConnected={minting.isWalletConnected}
+              formattedPrice={minting.price.formatted}
+              canMint={minting.canMint}
+              error={minting.error}
+              lastMinted={minting.lastMinted}
+              txid={minting.txid}
+              commitTxid={minting.commitTxid}
+              pendingTransactions={pendingTransactions}
+              mintAttempts={mintAttempts.attempts}
+              pendingMintAttempts={mintAttempts.pendingAttempts}
+              failedMintAttempts={mintAttempts.failedAttempts}
+              isLoadingAttempts={mintAttempts.isLoading}
+              hasPendingAttempts={mintAttempts.hasPending}
+              onRefreshAttempts={mintAttempts.refresh}
+              onClearFailedAttempts={mintAttempts.clearFailed}
+              onMintClick={handleMintClick}
+              onMintAnother={handleMintAnother}
+              onViewCollection={handleViewCollection}
+              onRefreshTransactions={refreshTransactions}
+              onClearCompletedTransactions={clearCompletedTransactions}
+            />
 
-        {activeTab === "claim" && (
-          <NFTClaimFlow
-            isWalletConnected={minting.isWalletConnected}
-            claimTxid={claimTxid}
-            onClaimTxidChange={setClaimTxid}
-            isClaiming={claiming.isLoading}
-            claimError={claiming.error}
-            lastClaimed={claiming.lastClaimed}
-            onClaim={handleClaimNFT}
-            onClaimAnother={() => {
-              claiming.reset();
-              setClaimTxid("");
-            }}
-            onViewCollection={handleViewCollection}
-          />
-        )}
-
-        {activeTab === "marketplace" && (
-          <NFTMarketplaceView
-            listings={marketplace.listings}
-            isLoading={marketplace.isLoading}
-            currentUserAddress={walletAddress}
-            isProcessing={marketplace.isProcessing}
-            error={marketplace.error}
-            onBuy={marketplace.buyNFT}
-            onGoToCollection={() => setActiveTab("collection")}
-          />
+            {/* Collapsible Manual Claim Accordion */}
+            <details className="group">
+              <summary className={`font-pixel text-pixel-2xs bg-pixel-bg-medium ${pixelBorders.medium} p-4 text-pixel-text-muted hover:text-pixel-primary flex items-center justify-between cursor-pointer list-none [&::-webkit-details-marker]:hidden outline-none select-none`}>
+                <span>MANUAL CLAIM WORKFLOW</span>
+                <span className="transform group-open:rotate-180 transition-transform duration-200">▼</span>
+              </summary>
+              <div className="mt-4">
+                <NFTClaimFlow
+                  isWalletConnected={minting.isWalletConnected}
+                  claimTxid={claimTxid}
+                  onClaimTxidChange={setClaimTxid}
+                  isClaiming={claiming.isLoading}
+                  claimError={claiming.error}
+                  lastClaimed={claiming.lastClaimed}
+                  onClaim={handleClaimNFT}
+                  onClaimAnother={() => {
+                    claiming.reset();
+                    setClaimTxid("");
+                  }}
+                  onViewCollection={handleViewCollection}
+                />
+              </div>
+            </details>
+          </div>
         )}
 
         {/* Transaction Confirmation Modal */}

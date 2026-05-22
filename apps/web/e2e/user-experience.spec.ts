@@ -118,7 +118,7 @@ test.describe("NFT Section UX", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Should have mint button
-    const mintButton = page.getByRole("button", { name: /mint/i });
+    const mintButton = page.getByRole("button", { name: "Mint", exact: true });
     await expect(mintButton).toBeVisible({ timeout: 10000 });
   });
 
@@ -136,7 +136,7 @@ test.describe("NFT Section UX", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Mint button should be clickable
-    const mintButton = page.getByRole("button", { name: /mint/i });
+    const mintButton = page.getByRole("button", { name: "Mint", exact: true });
 
     if (await mintButton.isVisible()) {
       // Button should be enabled or show why it's disabled

@@ -37,7 +37,7 @@ test.describe("Tab Navigation", () => {
     await page.goto("/?tab=nfts");
 
     // Check NFT content is visible - look for mint button
-    await expect(page.getByRole("button", { name: /Mint/i })).toBeVisible({
+    await expect(page.getByRole("button", { name: "Mint", exact: true })).toBeVisible({
       timeout: 10000,
     });
   });

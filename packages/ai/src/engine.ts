@@ -14,6 +14,25 @@ const log = createLogger("AIEngine");
 // TYPES
 // =============================================================================
 
+export interface AIProgressData {
+  progress: number;
+  loaded: number;
+  total: number;
+  status: string;
+  file: string;
+  filesCount: number;
+  doneCount: number;
+}
+
+interface TransformersProgressEvent {
+  status: "initiate" | "downloading" | "done" | "progress";
+  name?: string;
+  file: string;
+  progress?: number;
+  loaded?: number;
+  total?: number;
+}
+
 export interface AITask {
   id: string;
   type: "text-generation" | "pouw";
@@ -75,7 +94,7 @@ export class AIEngine {
   /**
    * Initialize the engine with models
    */
-  async initialize(): Promise<void> {
+  async initialize(onProgress?: (progressData: AIProgressData) => void): Promise<void> {
     if (this.isInitialized) return;
 
     log.info("Initializing Gemma 4 E2B AI Engine...");
@@ -106,6 +125,61 @@ export class AIEngine {
       this.currentModel = "onnx-community/gemma-4-E2B-it-ONNX";
       log.info(`Loading model weights: ${this.currentModel}`);
 
+      const progressMap = new Map<string, { loaded: number; total: number; done: boolean }>();
+
+      const handleProgress = (data: TransformersProgressEvent) => {
+        if (!data || !data.file) return;
+
+        const file = data.file;
+
+        if (data.status === "initiate") {
+          progressMap.set(file, { loaded: 0, total: data.total || 0, done: false });
+        } else if (data.status === "progress" || data.status === "downloading") {
+          const current = progressMap.get(file) || { loaded: 0, total: 0, done: false };
+          progressMap.set(file, {
+            loaded: data.loaded ?? current.loaded,
+            total: data.total ?? current.total ?? data.loaded ?? 0,
+            done: false,
+          });
+        } else if (data.status === "done") {
+          const current = progressMap.get(file);
+          const total = data.total ?? current?.total ?? current?.loaded ?? 0;
+          progressMap.set(file, {
+            loaded: total,
+            total: total,
+            done: true,
+          });
+        }
+
+        // Calcular globales
+        let loadedSum = 0;
+        let totalSum = 0;
+        const filesCount = progressMap.size;
+        let doneCount = 0;
+
+        for (const val of progressMap.values()) {
+          loadedSum += val.loaded;
+          totalSum += val.total;
+          if (val.done) {
+            doneCount++;
+          }
+        }
+
+        const progress = totalSum > 0 ? (loadedSum / totalSum) * 100 : 0;
+
+        if (onProgress) {
+          onProgress({
+            progress: Math.min(100, Math.max(0, progress)),
+            loaded: loadedSum,
+            total: totalSum,
+            status: data.status,
+            file: data.file,
+            filesCount,
+            doneCount,
+          });
+        }
+      };
+
       // Safe cast of pipeline function to bypass TS2590 complex union type representation issue
       const pipelineFn = pipeline as unknown as (
         task: "text-generation",
@@ -113,6 +187,7 @@ export class AIEngine {
         options?: {
           device?: string;
           dtype?: string;
+          progress_callback?: (data: TransformersProgressEvent) => void;
         }
       ) => Promise<TextGenerationPipeline>;
 
@@ -122,6 +197,7 @@ export class AIEngine {
         {
           device,
           dtype: "q4", // Quantized in 4-bit (Safetensors ONNX format) for rapid WebGPU execution
+          progress_callback: handleProgress,
         },
       );
 

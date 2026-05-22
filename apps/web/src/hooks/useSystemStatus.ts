@@ -6,6 +6,9 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import { createLogger } from "@bitcoinbaby/shared";
+
+const log = createLogger("SystemStatus");
 
 // Workers API URL from environment or default
 const WORKERS_API_URL =
@@ -91,7 +94,8 @@ export function useSystemStatus(): UseSystemStatusResult {
           message: "Invalid response from API",
         });
       }
-    } catch {
+    } catch (error) {
+      log.error("Failed to fetch system status", { error });
       // Network error or API not available
       setError("Could not fetch system status");
       setHealth({

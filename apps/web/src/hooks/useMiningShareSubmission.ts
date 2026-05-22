@@ -408,8 +408,10 @@ export function useMiningShareSubmission(
     const cleanup = setInterval(() => {
       // Clean up old processed hashes (keep last 1000)
       if (processedSharesRef.current.size > 1000) {
-        const entries = Array.from(processedSharesRef.current);
+        const oldSet = processedSharesRef.current;
+        const entries = Array.from(oldSet);
         processedSharesRef.current = new Set(entries.slice(-500));
+        oldSet.clear();
       }
     }, 60000);
 
