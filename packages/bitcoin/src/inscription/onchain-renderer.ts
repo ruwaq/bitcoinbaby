@@ -470,7 +470,7 @@ function render(lib){
   }
 
   // SECURITY: Defense-in-depth — reject any SVG containing script injection patterns
-  var DANGEROUS=/(<script|javascript:|on[a-z]+\\s*=|href\\s*=\\s*['"]?\\s*(?:javascript:|data:)|<animate|<set|<handler|<discard|<iframe|<object|<embed|<foreignObject)/i;
+  const DANGEROUS = /(<script|javascript:|on[a-z]+\\s*=|href\\s*=\\s*['"]?\\s*(?:javascript:|data:)|<animate|<set|<handler|<discard|<iframe|<object|<embed|<foreignObject)/i;
   if(DANGEROUS.test(svg)){throw new Error('SVG contains dangerous content');}
 
   // Inject CSS palette vars + apply to SVG

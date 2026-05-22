@@ -1,5 +1,5 @@
 /**
- * Security Middleware - PRODUCTION
+ * Security Middleware (Proxy) - PRODUCTION
  *
  * Balanced CSP for Web3 applications:
  * - 'unsafe-inline' for Next.js hydration compatibility
@@ -49,7 +49,7 @@ export function proxy(request: NextRequest) {
 
   // connect-src: allow localhost ports for local API worker development/testing
   const connectSrc =
-    "connect-src 'self' http://localhost:* ws://localhost:* https://mempool.space wss://mempool.space https://scrolls.charms.dev https://*.workers.dev https://charms-explorer-api.fly.dev https://v11.charms.dev https://huggingface.co https://*.huggingface.co";
+    "connect-src 'self' http://localhost:* ws://localhost:* https://mempool.space wss://mempool.space https://scrolls.charms.dev https://*.workers.dev https://charms-explorer-api.fly.dev https://v11.charms.dev https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://*.xethub.hf.co https://cas-bridge.xethub.hf.co";
 
   const cspDirectives = [
     "default-src 'self'",
@@ -98,7 +98,7 @@ export function proxy(request: NextRequest) {
   return response;
 }
 
-// Apply middleware to all routes except static files and API
+// Apply proxy to all routes except static files and API
 export const config = {
   matcher: [
     /*

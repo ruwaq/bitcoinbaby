@@ -6,4 +6,5 @@ export {
   type AITask,
   type AIResult,
   type AIProof,
+  type AIProgressData,
 } from "./engine";

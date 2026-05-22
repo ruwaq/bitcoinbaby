@@ -19,6 +19,15 @@ interface MiningVisualizationProps {
   isRunning: boolean;
   isPaused: boolean;
   disabled: boolean;
+  aiStatus?: {
+    modelState: "idle" | "loading" | "ready" | "error";
+    downloadProgress: number;
+    downloadDetails?: {
+      file?: string;
+      loaded?: number;
+      total?: number;
+    };
+  } | null;
 
   // Hashrate
   hashrate: number;
@@ -40,6 +49,7 @@ export function MiningVisualization({
   isRunning,
   isPaused,
   disabled,
+  aiStatus,
   hashrate,
   effectiveHashrate,
   nftBoost,
@@ -95,6 +105,54 @@ export function MiningVisualization({
 
         {/* El Gimnasio Mental visualizer container */}
         <div className="relative w-full max-w-md h-40 bg-amber-950/20 border-4 border-amber-900/60 rounded-lg p-4 mb-6 overflow-hidden flex items-center justify-between select-none">
+          {/* Loading overlay */}
+          {aiStatus && aiStatus.modelState === "loading" && (
+            <div className="absolute inset-0 bg-amber-950/95 flex flex-col items-center justify-center p-4 z-20 font-pixel">
+              <div className="text-pixel-secondary text-pixel-2xs uppercase mb-2 animate-pulse text-center">
+                Loading Gemma AI Model...
+              </div>
+              
+              {/* Retro pixel progress bar */}
+              <div className="w-full max-w-[280px] border-4 border-amber-900/80 bg-black p-1 mb-2">
+                <div 
+                  className="bg-pixel-primary h-4 transition-all duration-300 ease-out" 
+                  style={{ width: `${aiStatus.downloadProgress || 0}%` }}
+                />
+              </div>
+
+              {/* Progress details */}
+              <div className="flex flex-col items-center text-pixel-text-muted text-pixel-3xs gap-1">
+                <span className="text-pixel-primary text-pixel-xs font-bold">
+                  {Math.round(aiStatus.downloadProgress || 0)}%
+                </span>
+                {aiStatus.downloadDetails && (
+                  <span className="text-center truncate max-w-[260px] text-amber-100/70">
+                    {aiStatus.downloadDetails.file && `${aiStatus.downloadDetails.file.split('/').pop()}: `}
+                    {aiStatus.downloadDetails.loaded ? (aiStatus.downloadDetails.loaded / (1024 * 1024)).toFixed(1) : 0}MB 
+                    {aiStatus.downloadDetails.total ? ` / ${(aiStatus.downloadDetails.total / (1024 * 1024)).toFixed(1)}MB` : ""}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Error overlay */}
+          {aiStatus && aiStatus.modelState === "error" && (
+            <div className="absolute inset-0 bg-red-950/95 flex flex-col items-center justify-center p-4 z-20 font-pixel text-center">
+              <div className="text-red-500 text-pixel-xs uppercase mb-2 font-bold animate-pulse">
+                AI LOAD ERROR!
+              </div>
+              <div className="text-pixel-text text-pixel-3xs mb-4 max-w-[280px] text-red-200/80">
+                Failed to download or initialize local Gemma model. Verify connection & CSP.
+              </div>
+              <button
+                onClick={onStart}
+                className="px-4 py-2 border-4 border-red-700 bg-red-900 hover:bg-red-800 text-white font-pixel text-pixel-2xs uppercase active:translate-y-0.5 active:border-b-2"
+              >
+                Retry Loading
+              </button>
+            </div>
+          )}
           {/* Left Book Shelf */}
           <div className="flex flex-col gap-2 text-xl opacity-80">
             <span>📚</span>

@@ -10,6 +10,7 @@ import {
   useThrottledValue,
   useBonusEngine,
   type WalletInfo,
+  type AIStatus,
 } from "@bitcoinbaby/core";
 
 /**
@@ -55,6 +56,7 @@ export interface UseMiningReturn {
     nftBoost: number;
     boostMultiplier: number;
     uptime: number;
+    aiStatus: AIStatus | null;
   };
 
   // Mining controls
@@ -257,6 +259,7 @@ export function useMining(options: UseMiningOptions = {}): UseMiningReturn {
       nftBoost: mining.nftBoost,
       boostMultiplier: mining.boostMultiplier,
       uptime,
+      aiStatus: mining.aiStatus,
     },
 
     controls: {

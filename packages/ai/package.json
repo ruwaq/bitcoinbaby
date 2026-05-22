@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@bitcoinbaby/shared": "workspace:*",
-    "@huggingface/transformers": "^3.0.0"
+    "@huggingface/transformers": "^4.2.0"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

@@ -77,16 +77,16 @@ const TECH_STACK: TechCard[] = [
   {
     id: "pouw",
     title: "Proof of Useful Work",
-    subtitle: "Your Energy Trains AI",
+    subtitle: "Your Device Runs Local AI",
     icon: "🧠",
     description:
-      "Mining energy is NOT wasted on meaningless algorithms. BitcoinBaby is building a system where every hash contributes to training collective artificial intelligence. Your computing power has PURPOSE.",
+      "Mining energy is NOT wasted on meaningless hash algorithms. In BitcoinBaby, you execute the Gemma 4 E2B model locally via WebGPU/ONNX. Every processed token contributes to training collective intelligence with cryptographic proofs.",
     features: [
-      "Mining that trains AI models",
-      "Every hash contributes to collective model",
-      "Cryptographic verification of work",
-      "Fair rewards for real contribution",
-      "System scalable to millions of users",
+      "Local inference running Gemma 4 E2B via WebGPU",
+      "100% deterministic results with Greedy Decoding",
+      "On-chain verification of AI processing",
+      "Frictionless onboarding (no local app installation)",
+      "Fair rewards in $BABY tokens and Genesis Baby XP",
     ],
     link: { label: "AI Roadmap", url: "#ai-roadmap" },
     highlight: true,
@@ -243,30 +243,21 @@ export default function TechnologyPage() {
           <div className="text-center">
             <div className="text-5xl mb-4">🧠</div>
             <h2 className="font-pixel text-lg text-purple-400 mb-4">
-              MINING THAT TRAINS ARTIFICIAL INTELLIGENCE
+              PROOF OF USEFUL WORK (PoUW) WITH LOCAL AI
             </h2>
             <p className="font-pixel-body text-sm text-pixel-text max-w-2xl mx-auto mb-4">
-              BitcoinBaby does not waste energy on meaningless algorithms. We
-              are building a system where{" "}
+              BitcoinBaby does not waste energy on meaningless SHA-256 hashes.
+              Our Proof of Useful Work system uses{" "}
               <span className="text-purple-400 font-semibold">
-                your computing power trains a collective AI
+                your GPU/CPU to execute Gemma 4 E2B locally
               </span>
-              . Every hash has purpose.
+              . Every token processed helps your Genesis Baby learn and generates cryptographic proof for on-chain rewards.
             </p>
             <div className="flex justify-center gap-4 mb-4">
-              <div className="px-4 py-2 bg-pixel-bg-dark border-2 border-purple-500/50 rounded">
-                <p className="font-pixel text-[8px] text-purple-400">PHASE 1</p>
-                <p className="font-pixel-body text-xs text-pixel-text">
-                  Traditional Mining
-                </p>
-              </div>
-              <div className="font-pixel text-pixel-text-muted self-center">
-                →
-              </div>
               <div className="px-4 py-2 bg-purple-500/20 border-2 border-purple-500 rounded">
-                <p className="font-pixel text-[8px] text-purple-400">PHASE 2</p>
+                <p className="font-pixel text-[8px] text-purple-400">AI ENGINE</p>
                 <p className="font-pixel-body text-xs text-pixel-text">
-                  AI Training
+                  Gemma 4 E2B via WebGPU
                 </p>
               </div>
             </div>
@@ -423,29 +414,28 @@ export default function TechnologyPage() {
               className={`p-6 bg-pixel-bg-medium ${pixelBorders.accent} ${pixelShadows.lg}`}
             >
               <h3 className="font-pixel text-sm text-pixel-primary mb-4">
-                FLUJO DE MINERIA V10
+                FLUJO DE MINERIA V10 (PoUW)
               </h3>
               <div className="space-y-3">
                 {[
-                  { step: 1, text: "Miner crea hash SHA-256", icon: "⛏️" },
-                  { step: 2, text: "Construye TX con OP_RETURN", icon: "📝" },
+                  { step: 1, text: "Obtencion de tarea JIT desde el pool", icon: "📥" },
+                  { step: 2, text: "Inferencia local de Gemma 4 E2B (WebGPU)", icon: "🧠" },
                   {
                     step: 3,
-                    text: "Broadcast y espera confirmacion",
-                    icon: "📡",
+                    text: "Generacion de prueba de inferencia determinista",
+                    icon: "🔐",
                   },
                   {
                     step: 4,
-                    text: "Obtiene Merkle proof de inclusion",
-                    icon: "🌳",
+                    text: "Envio de prueba a la blockchain/workers",
+                    icon: "📡",
                   },
                   {
                     step: 5,
-                    text: "Crea Spell con private_inputs",
-                    icon: "✨",
+                    text: "Validacion criptografica del trabajo",
+                    icon: "✅",
                   },
-                  { step: 6, text: "Scrolls co-firma transaccion", icon: "📜" },
-                  { step: 7, text: "Mint de $BABTC tokens", icon: "🪙" },
+                  { step: 6, text: "Mint de $BABTC y XP para tu Genesis Baby", icon: "🪙" },
                 ].map((item) => (
                   <div
                     key={item.step}

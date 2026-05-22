@@ -13,7 +13,7 @@ import { useState } from "react";
 import { HelpTooltip, pixelBorders } from "@bitcoinbaby/ui";
 
 interface RewardInfoPanelProps {
-  /** Current mining difficulty (leading zeros) */
+  /** Current mining difficulty (AI PoUW task complexity) */
   currentDifficulty?: number;
   /** Whether panel is expanded by default */
   defaultExpanded?: boolean;
@@ -101,8 +101,8 @@ export function RewardInfoPanel({
             </span>
           </button>
           <HelpTooltip
-            content="Rewards are based on mining difficulty (leading zeros). Harder work = more reward. No halving schedule."
-            title="BRO-style Rewards"
+            content="Rewards are based on AI PoUW complexity (measured by Gemma processing iterations). Harder AI tasks = more rewards. No halving schedule."
+            title="PoUW Rewards"
             size="sm"
           />
         </div>
@@ -111,7 +111,7 @@ export function RewardInfoPanel({
       {/* Summary row - always visible */}
       <div className="flex items-center justify-between mt-2 text-pixel-xs">
         <span className="text-pixel-text-muted">
-          D{currentDifficulty} Reward:
+          Gemma Task D{currentDifficulty} Reward:
         </span>
         <span className="font-pixel text-pixel-success">
           {formatReward(currentReward.minerShare)} $BABY
@@ -168,7 +168,7 @@ export function RewardInfoPanel({
 
           {/* Info text */}
           <div className="text-pixel-3xs text-pixel-text-muted italic">
-            Harder work (more leading zeros) = exponentially more reward
+            Higher AI task complexity (measured by LLM difficulty) = exponentially more reward
           </div>
         </div>
       )}

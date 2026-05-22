@@ -32,6 +32,7 @@
  */
 
 import { AITask, AIProof, AIStatus } from "./types";
+export { type AIStatus } from "./types";
 import type { AIProgressData } from "@bitcoinbaby/ai";
 
 /** AI Result definition (matches @bitcoinbaby/ai) */

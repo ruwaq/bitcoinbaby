@@ -153,6 +153,7 @@ export function MiningSection() {
           nftBoost={miner.nftBoost}
           minerType={miner.minerType}
           webgpuAvailable={capabilities?.webgpu}
+          aiStatus={miner.aiStatus}
           onStart={controls.start}
           onStop={controls.stop}
           onPause={controls.pause}

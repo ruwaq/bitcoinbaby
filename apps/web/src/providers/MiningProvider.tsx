@@ -65,6 +65,7 @@ export function MiningProvider({ children }: MiningProviderProps) {
     lastShare: null,
     error: null,
     sessionStartTime: null,
+    aiStatus: null,
     // Feature states
     isLeader: true,
     isWaitingForLeadership: false,

@@ -225,7 +225,7 @@ export class MockMempoolClient implements BlockchainAPI {
     const hex = this.txHexDb.get(txid);
     if (!hex) {
       // Return a dummy transaction hex if not found, to avoid crash on initial mock wallet setup
-      return "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0100f2052a010000000000000000";
+      return "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff00ffffffff0100f2052a010000000000000000";
     }
     return hex;
   }

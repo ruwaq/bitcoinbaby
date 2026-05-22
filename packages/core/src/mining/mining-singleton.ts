@@ -704,6 +704,7 @@ class MiningManager {
       lastShare: null,
       error: null,
       sessionStartTime: null,
+      aiStatus: null,
       isLeader: true,
       isWaitingForLeadership: false,
       wakeLockActive: false,
