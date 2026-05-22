@@ -32,8 +32,9 @@ export const nftRouter = new Hono<{ Bindings: Env }>();
 // Order matters: /listings must be before /:tokenId in confirmRouter,
 // but since each sub-router handles its own route namespace, Hono resolves correctly.
 nftRouter.route("/", reserveRouter);
-nftRouter.route("/", confirmRouter);
 nftRouter.route("/", evolveRouter);
 nftRouter.route("/", listingRouter);
 nftRouter.route("/", buyRouter);
 nftRouter.route("/", claimRouter);
+nftRouter.route("/", confirmRouter); // Mount last to prevent /:tokenId from stealing routes
+

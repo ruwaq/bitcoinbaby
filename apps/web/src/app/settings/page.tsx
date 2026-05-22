@@ -40,6 +40,7 @@ import {
   useChangePasswordModal,
 } from "@bitcoinbaby/core";
 import { NetworkSwitcher, LevelSprite } from "@bitcoinbaby/ui";
+import { getPhaseConfig } from "@bitcoinbaby/shared";
 import {
   SettingsCard,
   Toggle,
@@ -50,6 +51,8 @@ import {
 } from "./components";
 
 export default function SettingsPage() {
+  const phaseConfig = getPhaseConfig();
+  const isMiningEnabled = phaseConfig.features.mining;
   // Settings store
   const {
     mining,
@@ -125,6 +128,11 @@ export default function SettingsPage() {
         <div className="space-y-6">
           {/* Mining Settings */}
           <SettingsCard title="MINING">
+            {!isMiningEnabled && (
+              <div className="mb-6 p-3 bg-pixel-bg-dark border-2 border-pixel-warning text-pixel-warning font-pixel text-[8px] uppercase text-center leading-relaxed">
+                ⚠️ Locked &bull; Coming soon in Phase 2 (Mining)
+              </div>
+            )}
             <Select
               label="DIFFICULTY"
               description="Higher difficulty = harder to mine but more rewards"
@@ -138,6 +146,7 @@ export default function SettingsPage() {
                 { value: "hard" as MiningDifficulty, label: "Hard (20 bits)" },
               ]}
               onChange={setMiningDifficulty}
+              disabled={!isMiningEnabled}
             />
 
             <Select
@@ -150,6 +159,7 @@ export default function SettingsPage() {
                 { value: "gpu" as MinerTypePreference, label: "GPU (WebGPU)" },
               ]}
               onChange={setMinerType}
+              disabled={!isMiningEnabled}
             />
 
             <Toggle
@@ -157,6 +167,7 @@ export default function SettingsPage() {
               description="Automatically submit mining proofs to blockchain"
               checked={mining.autoSubmit}
               onChange={setAutoSubmit}
+              disabled={!isMiningEnabled}
             />
 
             <Toggle

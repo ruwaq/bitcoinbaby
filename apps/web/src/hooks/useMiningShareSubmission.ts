@@ -26,6 +26,8 @@ import {
 } from "@bitcoinbaby/core";
 import { createLogger } from "@bitcoinbaby/shared";
 import { useMiningSubmitter } from "./useMiningSubmitter";
+import { useWalletConnection } from "./useWalletConnection";
+import { sha256, signSchnorr, bytesToHex } from "@bitcoinbaby/bitcoin";
 
 const log = createLogger("ShareSubmission");
 
@@ -111,8 +113,7 @@ export function useMiningShareSubmission(
 ): UseMiningShareSubmissionReturn {
   const { strategy = "virtual-first", onNotification } = options;
 
-  // Subscribe to global mining (singleton - no extra overhead)
-  const mining = useGlobalMining();
+  const { withPrivateKey, publicKey } = useWalletConnection();
 
   // Get wallet address from global store (shared across all components)
   const wallet = useWalletStore((s) => s.wallet);
@@ -240,6 +241,89 @@ export function useMiningShareSubmission(
     syncManagerRef.current.forceSync();
   }, [isSubmitting]);
 
+  const handleAILocalTaskResolved = useCallback(
+    async (proof: any, task: any) => {
+      log.debug("[ShareSubmission] AI task resolved, starting main thread Schnorr signing", { taskId: proof.taskId });
+      if (!publicKey) {
+        log.error("[ShareSubmission] Cannot sign proof: Wallet not connected or no public key");
+        return;
+      }
+
+      const reward = calculateShareReward(proof.difficulty);
+
+      try {
+        const signedProof = await withPrivateKey(async (privateKey) => {
+          // Message format: taskId:output
+          const msgText = `${proof.taskId}:${proof.output}`;
+          const msgBytes = new TextEncoder().encode(msgText);
+          const msgHash = await sha256(msgBytes);
+
+          const sigBytes = await signSchnorr(msgHash, privateKey);
+          const sigHex = bytesToHex(sigBytes);
+
+          return {
+            publicKey,
+            signature: sigHex,
+          };
+        });
+
+        if (!signedProof) {
+          log.warn("[ShareSubmission] Private key signing failed (wallet locked or user rejected)");
+          return;
+        }
+
+        log.info("[ShareSubmission] AI Proof signed successfully, queueing to SyncManager", {
+          taskId: proof.taskId,
+          signature: signedProof.signature.substring(0, 10) + "...",
+        });
+
+        // Add to SyncManager as AI proof
+        const { queued, duplicate } = await syncManagerRef.current.addShare({
+          hash: proof.hash || proof.taskId,
+          nonce: 0,
+          difficulty: proof.difficulty,
+          blockData: "",
+          reward,
+          timestamp: proof.timestamp,
+          isAI: true,
+          taskId: proof.taskId,
+          taskType: proof.taskType,
+          inputPrompt: proof.inputPrompt,
+          seed: proof.seed,
+          output: proof.output,
+          computeTime: proof.computeTime,
+          modelId: proof.modelId,
+          publicKey: signedProof.publicKey,
+          signature: signedProof.signature,
+        });
+
+        if (queued) {
+          setPendingShares((prev) => prev + 1);
+          addNotification({
+            type: "success",
+            title: "Useful Work Found",
+            message: `Useful AI Task resolved (+${reward.toString()} $BABY)`,
+            reward,
+          });
+        } else if (duplicate) {
+          log.debug("[ShareSubmission] Duplicate AI proof ignored", {
+            taskId: proof.taskId,
+          });
+        }
+      } catch (err) {
+        log.error("[ShareSubmission] Error signing or queueing AI task", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    },
+    [publicKey, withPrivateKey, addNotification],
+  );
+
+  // Subscribe to global mining (singleton - no extra overhead)
+  const mining = useGlobalMining({
+    onAILocalTaskResolved: handleAILocalTaskResolved,
+  });
+
   /**
    * Watch for new shares from mining (uses real mining results)
    * Persists to IndexedDB via SyncManager for offline-first support
@@ -303,8 +387,16 @@ export function useMiningShareSubmission(
           });
         }
       })
-      .catch(() => {
-        // Share queue failed - will be retried by SyncManager
+      .catch((error) => {
+        log.error("[ShareSubmission] Failed to queue share", {
+          error: error instanceof Error ? error.message : String(error),
+          hash: share.hash.slice(0, 8),
+        });
+        addNotification({
+          type: "error",
+          title: "Share Queue Failed",
+          message: "Your share could not be saved. It will be retried automatically.",
+        });
       });
   }, [mining.lastShare, mining.isRunning, addNotification]);
 

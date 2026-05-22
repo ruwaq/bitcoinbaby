@@ -15,6 +15,8 @@ import type {
   BalanceResponse,
   CreditResponse,
   MiningProof,
+  AIProof,
+  PouwTaskResponse,
   PoolType,
   PoolStatusResponse,
   WithdrawRequest,
@@ -160,12 +162,22 @@ export class BitcoinBabyClient {
   }
 
   /**
+   * Get JIT useful work task for PoUW
+   */
+  async getPouwTask(address: string): Promise<ApiResponse<PouwTaskResponse>> {
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/pouw/${address}/task`,
+    );
+    return response.json() as Promise<ApiResponse<PouwTaskResponse>>;
+  }
+
+  /**
    * Credit mining reward to user's balance
    * Note: No retry on POST to prevent double-crediting
    */
   async creditMining(
     address: string,
-    proof: MiningProof,
+    proof: MiningProof | AIProof,
   ): Promise<ApiResponse<CreditResponse>> {
     const response = await fetchWithRetry(
       `${this.baseUrl}/api/balance/${address}/credit`,
@@ -1085,9 +1097,24 @@ let clientInstance: BitcoinBabyClient | null = null;
  */
 export function getApiClient(env?: Environment): BitcoinBabyClient {
   if (!clientInstance) {
-    // Always use production - Workers API is deployed on Cloudflare
-    // Development mode only used when explicitly requested
-    clientInstance = new BitcoinBabyClient(env ?? "production");
+    let resolvedEnv: Environment = "production";
+    
+    // Auto-detect development mode if running on localhost/127.0.0.1 or NEXT_PUBLIC_WORKERS_API_URL is configured
+    const hasNextPublicUrl = typeof process !== "undefined" && process?.env && process.env.NEXT_PUBLIC_WORKERS_API_URL;
+    const isLocalhost = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    
+    if (env) {
+      resolvedEnv = env;
+    } else if (hasNextPublicUrl || isLocalhost) {
+      resolvedEnv = "development";
+    }
+
+    clientInstance = new BitcoinBabyClient(resolvedEnv);
+
+    // Apply custom URL override if configured
+    if (typeof process !== "undefined" && process?.env && process.env.NEXT_PUBLIC_WORKERS_API_URL) {
+      clientInstance.setBaseUrl(process.env.NEXT_PUBLIC_WORKERS_API_URL);
+    }
   }
   return clientInstance;
 }

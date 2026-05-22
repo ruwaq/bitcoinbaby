@@ -11,7 +11,7 @@
 /**
  * Supported Bitcoin networks
  */
-export type BitcoinNetwork = "mainnet" | "testnet" | "testnet4";
+export type BitcoinNetwork = "mainnet" | "testnet" | "testnet4" | "regtest";
 
 /**
  * Default network for development (fallback only)
@@ -41,10 +41,11 @@ export function validateAddressNetwork(
 ): void {
   const isMainnet = address.startsWith("bc1");
   const isTestnet = address.startsWith("tb1");
+  const isRegtest = address.startsWith("bcrt1");
 
   if (expectedNetwork === "mainnet" && !isMainnet) {
     throw new Error(
-      `CRITICAL: Expected mainnet address (bc1...) but got testnet address: ${address.slice(0, 10)}...`,
+      `CRITICAL: Expected mainnet address (bc1...) but got address: ${address.slice(0, 10)}...`,
     );
   }
 
@@ -53,7 +54,13 @@ export function validateAddressNetwork(
     !isTestnet
   ) {
     throw new Error(
-      `CRITICAL: Expected testnet address (tb1...) but got mainnet address: ${address.slice(0, 10)}...`,
+      `CRITICAL: Expected testnet address (tb1...) but got address: ${address.slice(0, 10)}...`,
+    );
+  }
+
+  if (expectedNetwork === "regtest" && !isRegtest) {
+    throw new Error(
+      `CRITICAL: Expected regtest address (bcrt1...) but got address: ${address.slice(0, 10)}...`,
     );
   }
 }
@@ -65,6 +72,7 @@ export const MEMPOOL_API_URLS: Record<BitcoinNetwork, string> = {
   mainnet: "https://mempool.space/api",
   testnet: "https://mempool.space/testnet/api",
   testnet4: "https://mempool.space/testnet4/api",
+  regtest: "http://localhost:5000/api",
 };
 
 /**
@@ -74,6 +82,7 @@ export const EXPLORER_URLS: Record<BitcoinNetwork, string> = {
   mainnet: "https://mempool.space",
   testnet: "https://mempool.space/testnet",
   testnet4: "https://mempool.space/testnet4",
+  regtest: "http://localhost:5000",
 };
 
 // =============================================================================
@@ -87,6 +96,7 @@ export const REQUIRED_CONFIRMATIONS: Record<BitcoinNetwork, number> = {
   mainnet: 6,
   testnet: 1,
   testnet4: 1,
+  regtest: 1,
 };
 
 /**
@@ -212,6 +222,7 @@ export const ADDRESS_PREFIXES: Record<
   mainnet: { bech32: "bc1q", bech32m: "bc1p" },
   testnet: { bech32: "tb1q", bech32m: "tb1p" },
   testnet4: { bech32: "tb1q", bech32m: "tb1p" },
+  regtest: { bech32: "bcrt1q", bech32m: "bcrt1p" },
 };
 
 /**

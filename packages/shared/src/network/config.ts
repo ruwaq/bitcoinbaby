@@ -21,7 +21,7 @@ export type BitcoinJsNetwork = "mainnet" | "testnet" | "regtest";
  * Networks supported by BitcoinBaby
  * Note: testnet4 is Bitcoin's new testnet (2024+), uses same params as testnet
  */
-export type SupportedNetwork = "mainnet" | "testnet4";
+export type SupportedNetwork = "mainnet" | "testnet4" | "regtest";
 
 /**
  * Scrolls API network format
@@ -63,6 +63,11 @@ export const NETWORK_ENDPOINTS: Record<SupportedNetwork, NetworkEndpoints> = {
     explorerUrl: "https://mempool.space/testnet4",
     faucetUrl: "https://mempool.space/testnet4/faucet",
   },
+  regtest: {
+    mempoolApi: "http://localhost:5000/api",
+    scrollsApi: "http://localhost:8787",
+    explorerUrl: "http://localhost:5000",
+  },
 };
 
 // =============================================================================
@@ -81,9 +86,10 @@ export function normalizeNetwork(network: BitcoinNetwork): SupportedNetwork {
   switch (network) {
     case "mainnet":
       return "mainnet";
-    case "testnet":
     case "testnet4":
     case "regtest":
+      return network;
+    case "testnet":
       return "testnet4";
     default: {
       // Type guard for exhaustiveness
@@ -107,7 +113,9 @@ export function toScrollsNetwork(network: BitcoinNetwork): ScrollsNetwork {
  */
 export function toBitcoinJsNetwork(network: BitcoinNetwork): BitcoinJsNetwork {
   const normalized = normalizeNetwork(network);
-  return normalized === "mainnet" ? "mainnet" : "testnet";
+  if (normalized === "mainnet") return "mainnet";
+  if (normalized === "regtest") return "regtest";
+  return "testnet";
 }
 
 /**

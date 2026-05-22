@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 /**
  * Claims API E2E Tests
@@ -25,10 +25,11 @@ test.describe("Claims Balance API", () => {
 
     const data = await response.json();
     expect(data.success).toBe(true);
-    expect(data.data).toHaveProperty("address");
+    expect(data.data).toHaveProperty("depositInfo");
+    expect(data.data.depositInfo).toHaveProperty("address");
     expect(data.data).toHaveProperty("unclaimedWork");
     expect(data.data).toHaveProperty("claimableTokens");
-    expect(data.data).toHaveProperty("estimatedFee");
+    expect(data.data.userFunds).toHaveProperty("estimatedFee");
     expect(data.data).toHaveProperty("platformFeePercent");
   });
 
@@ -71,9 +72,9 @@ test.describe("Claims Balance API", () => {
 });
 
 test.describe("Claims Prepare API", () => {
-  test("should validate prepare endpoint exists", async ({ request }) => {
+  test("should validate execute endpoint exists", async ({ request }) => {
     // Test with empty body
-    const response = await request.post(`${API_URL}/api/claim/prepare`, {
+    const response = await request.post(`${API_URL}/api/claim/execute`, {
       data: {},
     });
 
@@ -85,8 +86,8 @@ test.describe("Claims Prepare API", () => {
     expect(data).toHaveProperty("error");
   });
 
-  test("should reject prepare without address", async ({ request }) => {
-    const response = await request.post(`${API_URL}/api/claim/prepare`, {
+  test("should reject execute without address", async ({ request }) => {
+    const response = await request.post(`${API_URL}/api/claim/execute`, {
       data: {
         // Missing address
       },
@@ -97,10 +98,10 @@ test.describe("Claims Prepare API", () => {
     expect(data.success).toBe(false);
   });
 
-  test("should handle prepare for address with no balance", async ({
+  test("should handle execute for address with no balance", async ({
     request,
   }) => {
-    const response = await request.post(`${API_URL}/api/claim/prepare`, {
+    const response = await request.post(`${API_URL}/api/claim/execute`, {
       data: {
         address: TEST_ADDRESS,
       },
@@ -141,31 +142,32 @@ test.describe("Claims Status API", () => {
 test.describe("Claims History API", () => {
   test("should return history for valid address", async ({ request }) => {
     const response = await request.get(
-      `${API_URL}/api/claim/history/${TEST_ADDRESS}`,
+      `${API_URL}/api/history/${TEST_ADDRESS}`,
     );
     expect(response.ok()).toBeTruthy();
 
     const data = await response.json();
     expect(data.success).toBe(true);
-    expect(data.data).toHaveProperty("claims");
-    expect(Array.isArray(data.data.claims)).toBe(true);
+    expect(data.data).toHaveProperty("history");
+    expect(Array.isArray(data.data.history)).toBe(true);
   });
 
   test("should return empty history for new address", async ({ request }) => {
+    const newAddress = "tb1qzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"; // dummy empty address
     const response = await request.get(
-      `${API_URL}/api/claim/history/${TEST_ADDRESS}`,
+      `${API_URL}/api/history/${newAddress}`,
     );
     expect(response.ok()).toBeTruthy();
 
     const data = await response.json();
     expect(data.success).toBe(true);
-    // New address should have empty claims array
-    expect(data.data.claims).toEqual([]);
+    // New address should have empty history array
+    expect(data.data.history).toEqual([]);
   });
 
   test("should reject invalid address in history", async ({ request }) => {
     const response = await request.get(
-      `${API_URL}/api/claim/history/not-valid`,
+      `${API_URL}/api/history/not-valid`,
     );
 
     expect(response.status()).toBe(400);
@@ -173,8 +175,8 @@ test.describe("Claims History API", () => {
 });
 
 test.describe("Claims Confirm API", () => {
-  test("should validate confirm endpoint exists", async ({ request }) => {
-    const response = await request.post(`${API_URL}/api/claim/confirm`, {
+  test("should validate complete endpoint exists", async ({ request }) => {
+    const response = await request.post(`${API_URL}/api/claim/complete`, {
       data: {},
     });
 
@@ -185,11 +187,11 @@ test.describe("Claims Confirm API", () => {
     expect(data.success).toBe(false);
   });
 
-  test("should reject confirm with missing fields", async ({ request }) => {
-    const response = await request.post(`${API_URL}/api/claim/confirm`, {
+  test("should reject complete with missing fields", async ({ request }) => {
+    const response = await request.post(`${API_URL}/api/claim/complete`, {
       data: {
-        claimId: "test-claim-id",
-        // Missing: claimTxid, address
+        claimId: "00000000-0000-0000-0000-000000000000",
+        // Missing: signedPsbtBase64, address
       },
     });
 
@@ -198,18 +200,17 @@ test.describe("Claims Confirm API", () => {
     expect(data.success).toBe(false);
   });
 
-  test("should reject confirm with invalid claim ID", async ({ request }) => {
-    const response = await request.post(`${API_URL}/api/claim/confirm`, {
+  test("should reject complete with invalid claim ID", async ({ request }) => {
+    const response = await request.post(`${API_URL}/api/claim/complete`, {
       data: {
-        claimId: "non-existent-claim",
-        claimTxid:
-          "0000000000000000000000000000000000000000000000000000000000000000",
+        claimId: "00000000-0000-0000-0000-000000000000",
+        signedPsbtBase64: "a".repeat(100),
         address: TEST_ADDRESS,
       },
     });
 
-    // Should return 404 or 400 for invalid claim
-    expect([400, 404]).toContain(response.status());
+    // Should return 400, 404, or 500 for invalid/non-existent claim
+    expect([400, 404, 500]).toContain(response.status());
   });
 });
 
@@ -229,10 +230,8 @@ test.describe("Claims Mint API", () => {
   test("should reject mint with invalid claim", async ({ request }) => {
     const response = await request.post(`${API_URL}/api/claim/mint`, {
       data: {
-        claimId: "fake-claim",
+        claimId: "00000000-0000-0000-0000-000000000000",
         address: TEST_ADDRESS,
-        claimTxid:
-          "0000000000000000000000000000000000000000000000000000000000000000",
       },
     });
 

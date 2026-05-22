@@ -58,6 +58,8 @@ export const MAX_DIFFICULTY = 32;
 // PROOF GENERATORS
 // =============================================================================
 
+let proofCounter = 0;
+
 /**
  * Generate a valid mining proof with specified difficulty
  *
@@ -72,7 +74,7 @@ export function generateValidProof(
   difficulty: number = MIN_DIFFICULTY,
 ): MockProof {
   const timestamp = Date.now();
-  const prefix = `block:${timestamp}`;
+  const prefix = `block:${timestamp}:${proofCounter++}`;
   let nonce = 0;
   let hash: string;
 

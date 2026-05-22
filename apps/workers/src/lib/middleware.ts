@@ -14,6 +14,7 @@ const apiLogger = new Logger("API");
 import {
   bitcoinAddressSchema as sharedBitcoinAddressSchema,
   miningProofSchema as sharedMiningProofSchema,
+  aiProofSchema as sharedAIProofSchema,
   poolTypeSchema as sharedPoolTypeSchema,
   leaderboardCategorySchema as sharedLeaderboardCategorySchema,
   leaderboardPeriodSchema as sharedLeaderboardPeriodSchema,
@@ -152,6 +153,7 @@ export function validateParams<T extends z.ZodType>(schema: T) {
 // Re-export validation schemas from shared package for consistency
 export const bitcoinAddressSchema = sharedBitcoinAddressSchema;
 export const miningProofSchema = sharedMiningProofSchema;
+export const aiProofSchema = sharedAIProofSchema;
 export const poolTypeSchema = sharedPoolTypeSchema;
 export const leaderboardCategorySchema = sharedLeaderboardCategorySchema;
 export const leaderboardPeriodSchema = sharedLeaderboardPeriodSchema;

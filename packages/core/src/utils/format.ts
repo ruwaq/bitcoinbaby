@@ -4,14 +4,14 @@
 
 /**
  * Format hashrate to human-readable string
- * @param h - Hashrate in H/s
- * @returns Formatted string like "1.5 GH/s", "250 MH/s", "100 KH/s", or "500 H/s"
+ * @param h - Speed in T/s
+ * @returns Formatted string like "1.5 MT/s", "250 KT/s", or "500 T/s"
  */
 export function formatHashrate(h: number): string {
-  if (h >= 1_000_000_000) return `${(h / 1_000_000_000).toFixed(2)} GH/s`;
-  if (h >= 1_000_000) return `${(h / 1_000_000).toFixed(2)} MH/s`;
-  if (h >= 1_000) return `${(h / 1_000).toFixed(2)} KH/s`;
-  return `${Math.floor(h)} H/s`;
+  if (h >= 1_000_000_000) return `${(h / 1_000_000_000).toFixed(2)} GT/s`;
+  if (h >= 1_000_000) return `${(h / 1_000_000).toFixed(2)} MT/s`;
+  if (h >= 1_000) return `${(h / 1_000).toFixed(2)} KT/s`;
+  return `${h.toFixed(1)} T/s`;
 }
 
 /**

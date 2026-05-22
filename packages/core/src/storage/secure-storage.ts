@@ -11,6 +11,8 @@
  * - Rate limiting on unlock attempts (brute force protection)
  */
 
+import type { SupportedNetwork } from "@bitcoinbaby/bitcoin";
+
 const DB_NAME = "bitcoinbaby-secure";
 const DB_VERSION = 1;
 const STORE_NAME = "wallet";
@@ -181,7 +183,7 @@ interface EncryptedWalletData {
   /** Timestamp when stored */
   createdAt: number;
   /** Network the wallet was created for */
-  network: "mainnet" | "testnet4";
+  network: SupportedNetwork;
 }
 
 /**
@@ -190,7 +192,7 @@ interface EncryptedWalletData {
 export interface WalletMetadata {
   exists: boolean;
   createdAt: number | null;
-  network: "mainnet" | "testnet4" | null;
+  network: SupportedNetwork | null;
   version: number;
 }
 
@@ -465,7 +467,7 @@ export const SecureStorage = {
   async storeMnemonic(
     mnemonic: string,
     password: string,
-    network: "mainnet" | "testnet4" = "testnet4",
+    network: SupportedNetwork = "testnet4",
   ): Promise<void> {
     if (!this.isAvailable()) {
       throw new Error("Secure storage is not available in this environment");

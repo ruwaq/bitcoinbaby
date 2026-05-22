@@ -18,7 +18,7 @@ import { usePlatform } from "@/hooks";
 import { MiningProvider } from "./MiningProvider";
 import { QueryProvider } from "./QueryProvider";
 import { AppInitializer } from "./AppInitializer";
-import { usePendingTxStore, cleanupStuckTransactions } from "@bitcoinbaby/core";
+import { usePendingTxStore, cleanupStuckTransactions, useWalletStore } from "@bitcoinbaby/core";
 import { ModalManager } from "@/components/overlays/ModalManager";
 
 interface RootProviderProps {
@@ -43,6 +43,52 @@ export function RootProvider({ children }: RootProviderProps) {
   // Wait for hydration to complete
   useEffect(() => {
     setIsHydrated(true);
+    if (typeof window !== "undefined") {
+      (window as any).__walletStore = useWalletStore;
+
+      // Clean up old service workers registered on localhost to avoid caching issues in development
+      if (window.location.hostname === "localhost" && "serviceWorker" in navigator && !navigator.webdriver) {
+        const swClearedKey = "sw-cleared-v1";
+        if (!sessionStorage.getItem(swClearedKey)) {
+          navigator.serviceWorker.getRegistrations().then(async (registrations) => {
+            if (registrations.length > 0) {
+              console.log(`[RootProvider] Found ${registrations.length} service worker registrations. Starting cleanup...`);
+              
+              // Unregister all service workers and wait for them to finish
+              const unregisterPromises = registrations.map((registration) => {
+                console.log("[RootProvider] Unregistering service worker:", registration.scope);
+                return registration.unregister().catch((err) => {
+                  console.error("[RootProvider] Failed to unregister service worker:", err);
+                  return false;
+                });
+              });
+              
+              await Promise.all(unregisterPromises);
+              
+              // Clear all caches and wait for completion
+              if ("caches" in window) {
+                try {
+                  const cacheKeys = await caches.keys();
+                  await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+                  console.log("[RootProvider] All caches deleted successfully.");
+                } catch (err) {
+                  console.error("[RootProvider] Failed to clear caches:", err);
+                }
+              }
+              
+              // Mark as cleared in sessionStorage before reloading
+              sessionStorage.setItem(swClearedKey, "true");
+              
+              console.log("[RootProvider] Cleanup finished. Reloading page...");
+              // Force reload to fetch fresh content
+              window.location.reload();
+            }
+          }).catch((err) => {
+            console.error("[RootProvider] Error fetching service worker registrations:", err);
+          });
+        }
+      }
+    }
   }, []);
 
   // Start transaction tracking after hydration
@@ -98,16 +144,17 @@ export function RootProvider({ children }: RootProviderProps) {
   // Determine if we should show loading state
   const isLoading = !isHydrated || (platform.isNative && !isCapacitorReady);
 
-  // Loading state during hydration and Capacitor init
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-pixel-bg-dark flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4 animate-pixel-float">&#128118;</div>
-          <div className="font-pixel text-pixel-primary text-xs animate-pulse">
-            Loading...
+      <div className="min-h-screen bg-pixel-bg-dark flex flex-col justify-between">
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-6xl mb-4 animate-pixel-float">&#128118;</div>
+            <div className="font-pixel text-pixel-primary text-xs animate-pulse">
+              Loading...
+            </div>
           </div>
-        </div>
+        </main>
       </div>
     );
   }

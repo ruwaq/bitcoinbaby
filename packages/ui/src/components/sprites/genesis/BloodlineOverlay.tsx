@@ -932,6 +932,16 @@ export const BloodlineOverlay: FC<BloodlineOverlayProps> = ({
     }
   };
 
+  // ── Glowing-eyes window: punches through hood/helm so rare eyes always show ──
+  // Only active for bloodlines that occlude the eye area (rogue hood, warrior helm)
+  const isOccludingBloodline = bloodline === "rogue" || bloodline === "warrior";
+  // Eye Y positions: canonical pixel-art eye row at y=10
+  const EYE_Y = 10;
+  const rogueEyeColor = "#ef4444"; // menacing red
+  const warriorEyeColor = "#22d3ee"; // steel cyan
+  const glowingEyeColor =
+    bloodline === "rogue" ? rogueEyeColor : warriorEyeColor;
+
   return (
     <svg
       width={size}
@@ -940,7 +950,58 @@ export const BloodlineOverlay: FC<BloodlineOverlayProps> = ({
       style={{ imageRendering: "pixelated" }}
       className="absolute inset-0 pointer-events-none"
     >
+      {/* SVG clipPath for eye-window punch-through */}
+      {isOccludingBloodline && (
+        <defs>
+          <clipPath id={`eyeWindow-${bloodline}`}>
+            {/* Left eye window */}
+            <rect x="10" y={EYE_Y - 1} width="4" height="3" />
+            {/* Right eye window */}
+            <rect x="18" y={EYE_Y - 1} width="4" height="3" />
+          </clipPath>
+        </defs>
+      )}
+
+      {/* Bloodline overlay (crown, helm, hood, aura, etc.) */}
       {renderBloodline()}
+
+      {/* Glowing eyes rendered OVER the bloodline overlay, clipped to eye windows */}
+      {isOccludingBloodline && (
+        <g clipPath={`url(#eyeWindow-${bloodline})`}>
+          {/* Iris glow — punches through hood/helm */}
+          <circle cx="12" cy={EYE_Y} r="1.8" fill={glowingEyeColor} opacity="0.92" />
+          <circle cx="20" cy={EYE_Y} r="1.8" fill={glowingEyeColor} opacity="0.92" />
+          {/* Specular highlight */}
+          <circle cx="11.5" cy={EYE_Y - 0.5} r="0.45" fill="#ffffff" opacity="0.9" />
+          <circle cx="19.5" cy={EYE_Y - 0.5} r="0.45" fill="#ffffff" opacity="0.9" />
+          {/* Outer glow ring */}
+          {animated && (
+            <>
+              <circle
+                cx="12"
+                cy={EYE_Y}
+                r="2.2"
+                fill="none"
+                stroke={glowingEyeColor}
+                strokeWidth="0.5"
+                opacity="0.5"
+                className="animate-nft-rune"
+              />
+              <circle
+                cx="20"
+                cy={EYE_Y}
+                r="2.2"
+                fill="none"
+                stroke={glowingEyeColor}
+                strokeWidth="0.5"
+                opacity="0.5"
+                className="animate-nft-rune"
+                style={{ animationDelay: "0.3s" }}
+              />
+            </>
+          )}
+        </g>
+      )}
     </svg>
   );
 };

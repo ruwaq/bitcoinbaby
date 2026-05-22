@@ -8,6 +8,7 @@
  */
 
 import { HelpTooltip } from "@bitcoinbaby/ui";
+import { getPhaseConfig } from "@bitcoinbaby/shared";
 import {
   MenuButton,
   SocialCard,
@@ -17,8 +18,19 @@ import {
 } from "./more";
 
 export function MoreSection() {
-  // All menu items navigate to dedicated pages
-  const menuItems = MENU_ITEMS;
+  const { features } = getPhaseConfig();
+
+  // Mark phase-gated items as locked
+  const menuItems = MENU_ITEMS.map((item) => {
+    if (item.id === "leaderboard" && !features.leaderboard) {
+      return {
+        ...item,
+        locked: true,
+        lockedLabel: "COMING SOON",
+      };
+    }
+    return item;
+  });
 
   return (
     <div className="p-4 md:p-8 bg-pixel-bg-dark">

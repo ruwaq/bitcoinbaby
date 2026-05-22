@@ -145,28 +145,6 @@ confirmRouter.get(
     }
   },
 );
-
-/**
- * GET /:tokenId - Get a single NFT by token ID
- */
-confirmRouter.get("/:tokenId", validateParams(tokenIdParamSchema), async (c) => {
-  const { tokenId } = c.get("validatedParams");
-
-  try {
-    const redis = getRedis(c.env);
-    const nftData = await redis.hgetall(`nft:minted:${tokenId}`);
-
-    if (!nftData || Object.keys(nftData).length === 0) {
-      return errorResponse(c, "NFT not found", 404);
-    }
-
-    return successResponse(c, parseNFTData(nftData, tokenId));
-  } catch (error) {
-    nftLogger.error("[NFT] Get single error:", error);
-    return errorResponse(c, "Failed to get NFT", 500);
-  }
-});
-
 // =============================================================================
 // NFT EXPLORER - Get all minted NFTs
 // =============================================================================
@@ -438,3 +416,25 @@ confirmRouter.post("/migrate-index", async (c) => {
     return errorResponse(c, "Failed to migrate index", 500);
   }
 });
+
+/**
+ * GET /:tokenId - Get a single NFT by token ID
+ */
+confirmRouter.get("/:tokenId", validateParams(tokenIdParamSchema), async (c) => {
+  const { tokenId } = c.get("validatedParams");
+
+  try {
+    const redis = getRedis(c.env);
+    const nftData = await redis.hgetall(`nft:minted:${tokenId}`);
+
+    if (!nftData || Object.keys(nftData).length === 0) {
+      return errorResponse(c, "NFT not found", 404);
+    }
+
+    return successResponse(c, parseNFTData(nftData, tokenId));
+  } catch (error) {
+    nftLogger.error("[NFT] Get single error:", error);
+    return errorResponse(c, "Failed to get NFT", 500);
+  }
+});
+

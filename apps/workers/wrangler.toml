@@ -54,6 +54,10 @@ crons = [
   "0 */6 * * *"
 ]
 
+# Cloudflare Workers AI binding for server-side verification and audits (Comentado para dev local)
+# [ai]
+# binding = "AI"
+
 # Environment variables
 [vars]
 ENVIRONMENT = "development"
@@ -70,7 +74,7 @@ CHARMS_PROVER_URL = "https://v11.charms.dev"
 SCROLLS_API_URL = "https://scrolls.charms.dev"
 # Phase configuration — controls which features are active
 # Phase 1: NFTs + Faucet, Phase 2: + Mining, Phase 3: + Game
-PHASE = "1"
+PHASE = "2"
 # BABTC Faucet (Phase 1 — virtual tokens for NFT evolution)
 FAUCET_AMOUNT = "5"
 FAUCET_MAX_TOTAL = "50"
@@ -122,7 +126,7 @@ MIN_WITHDRAW_AMOUNT = "100"
 POOL_PERIOD_DAYS = "7"
 MAX_FEE_RATE_SAT_VB = "5"
 # Phase configuration
-PHASE = "1"
+PHASE = "2"
 # BABTC Faucet
 FAUCET_AMOUNT = "5"
 FAUCET_MAX_TOTAL = "50"
@@ -150,6 +154,10 @@ PLATFORM_FEE_PERCENT = "20"
 NFT_APP_ID = "0000000000000000000000000000000000000000000000000000000000000000"
 # VK is SHA256 of the compiled WASM binary (genesis-babies contract)
 NFT_APP_VK = "04aab369e6cd3210fde734b175e09c599229548eda5c5b283c18630782583a61"
+
+# Production AI binding
+[env.production.ai]
+binding = "AI"
 
 # Production KV namespace (shared with development - same dedup across all envs)
 [[env.production.kv_namespaces]]

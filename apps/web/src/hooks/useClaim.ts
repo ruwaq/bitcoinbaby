@@ -222,6 +222,7 @@ export function useClaim({
         body: JSON.stringify({
           claimId: claimData.claimId,
           signedPsbtBase64: signedBase64,
+          address,
         }),
       });
 

@@ -307,7 +307,7 @@ async function hash256Hex(data: string): Promise<string> {
  * 4-7 = 01xx (1 zero)
  * 8-f = 1xxx (0 zeros)
  */
-function countLeadingZeroBits(hexString: string): number {
+export function countLeadingZeroBits(hexString: string): number {
   let zeroBits = 0;
 
   for (const char of hexString.toLowerCase()) {

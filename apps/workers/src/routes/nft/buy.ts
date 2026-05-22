@@ -147,6 +147,39 @@ buyRouter.post(
         );
       }
 
+      // Verify the atomic swap UTXO input and output for the NFT
+      const nftUtxoTxid = listing.nftUtxoTxid as string | undefined;
+      const nftUtxoVoutStr = listing.nftUtxoVout as string | undefined;
+
+      if (nftUtxoTxid && nftUtxoVoutStr !== undefined) {
+        const nftUtxoVout = parseInt(nftUtxoVoutStr, 10);
+        const spendsNftUtxo = txData.vin.some(
+          (input) => input.txid === nftUtxoTxid && input.vout === nftUtxoVout
+        );
+        if (!spendsNftUtxo) {
+          return errorResponse(
+            c,
+            "Transaction does not spend the listed NFT UTXO",
+            400
+          );
+        }
+      }
+
+      // Verify that the NFT (546 sats dust UTXO) is transferred to the buyer
+      const nftTransferOutput = txData.vout.find(
+        (output) =>
+          output.scriptpubkey_address === buyerAddress &&
+          output.value === 546
+      );
+
+      if (!nftTransferOutput) {
+        return errorResponse(
+          c,
+          "Transaction does not transfer the NFT UTXO (546 sats) to the buyer",
+          400
+        );
+      }
+
       // Verify payment to seller
       const paymentOutput = txData.vout.find(
         (output) => output.scriptpubkey_address === sellerAddress,

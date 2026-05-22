@@ -1,0 +1,68 @@
+stages:
+  - quality
+  - test
+  - deploy
+
+default:
+  image: node:20-alpine
+  before_script:
+    - corepack enable
+    - corepack prepare pnpm@10.11.0 --activate
+    - pnpm config set store-dir .pnpm-store
+    - pnpm install --frozen-lockfile
+
+cache:
+  key:
+    files:
+      - pnpm-lock.yaml
+  paths:
+    - .pnpm-store
+    - node_modules
+    - .turbo
+
+# --- QUALITY GATE STAGE ---
+
+lint-and-typecheck:
+  stage: quality
+  script:
+    - pnpm lint
+    - pnpm typecheck
+
+# --- TESTING STAGE ---
+
+unit-tests:
+  stage: test
+  script:
+    - pnpm test
+
+# --- DEPLOYMENT STAGE ---
+
+deploy-backend:
+  stage: deploy
+  only:
+    - main
+  dependencies:
+    - lint-and-typecheck
+    - unit-tests
+  script:
+    - cd apps/workers
+    - npx wrangler deploy --env production
+  variables:
+    CLOUDFLARE_API_TOKEN: $CLOUDFLARE_API_TOKEN
+    CLOUDFLARE_ACCOUNT_ID: $CLOUDFLARE_ACCOUNT_ID
+
+deploy-frontend:
+  stage: deploy
+  only:
+    - main
+  dependencies:
+    - lint-and-typecheck
+    - unit-tests
+  script:
+    - pnpm install -g vercel
+    # Pull production settings from Vercel securely
+    - vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+    # Compile the Next.js app inside GitLab Runner
+    - vercel build --prod --token=$VERCEL_TOKEN
+    # Deploy prebuilt output to production non-interactively
+    - vercel deploy --prebuilt --prod --yes --token=$VERCEL_TOKEN

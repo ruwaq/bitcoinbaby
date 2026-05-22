@@ -13,6 +13,7 @@ import {
   BABTC_V2_CONTRACT_VK,
   BABTC_V2_CONTRACT_BINARY,
 } from "../lib/babtc-v2-contract-binary";
+import type { BitcoinNetwork } from "../config/bitcoin";
 
 /** Dust amount for token outputs */
 const TOKEN_DUST_SATS = 330;
@@ -86,13 +87,13 @@ const RETRY_DELAY_BASE_MS = 5000;
 export class ClaimMintingService {
   private proverUrl: string;
   private appId: string;
-  private network: "mainnet" | "testnet" | "testnet4";
+  private network: BitcoinNetwork;
 
   constructor(config: {
     proverUrl?: string;
     appId: string;
     appVk?: string; // Deprecated: V2 uses BABTC_V2_CONTRACT_VK from binary
-    network?: "mainnet" | "testnet" | "testnet4";
+    network?: BitcoinNetwork;
   }) {
     this.proverUrl = config.proverUrl || DEFAULT_CHARMS_PROVER_URL;
     this.appId = config.appId;
@@ -571,7 +572,7 @@ export function getClaimMintingService(config: {
   proverUrl?: string;
   appId: string;
   appVk?: string; // Deprecated: V2 uses BABTC_V2_CONTRACT_VK from binary
-  network?: "mainnet" | "testnet" | "testnet4";
+  network?: BitcoinNetwork;
 }): ClaimMintingService {
   if (!mintingServiceInstance) {
     mintingServiceInstance = new ClaimMintingService(config);

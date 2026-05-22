@@ -22,6 +22,7 @@ export {
   getDerivationPath,
   NETWORK_CONFIGS,
   type BitcoinNetwork,
+  type SupportedNetwork,
   type ScrollsNetwork,
   type NetworkConfig,
 } from "./network-store";

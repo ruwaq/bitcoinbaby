@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 /**
  * Forms E2E Tests
@@ -8,7 +8,7 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Send Form", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/wallet/send");
+    await page.goto("/?tab=wallet&view=send");
     await page.waitForLoadState("domcontentloaded");
   });
 
@@ -50,7 +50,7 @@ test.describe("Send Form", () => {
 
 test.describe("Claim Form", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/wallet/claim");
+    await page.goto("/?tab=wallet&view=claim");
     await page.waitForLoadState("domcontentloaded");
   });
 
@@ -115,7 +115,7 @@ test.describe("Password Input Security", () => {
 
 test.describe("Form Validation", () => {
   test("should validate Bitcoin address format", async ({ page }) => {
-    await page.goto("/wallet/send");
+    await page.goto("/?tab=wallet&view=send");
     await page.waitForLoadState("domcontentloaded");
 
     const addressInput = page.locator(
@@ -140,7 +140,7 @@ test.describe("Form Validation", () => {
   });
 
   test("should validate amount is positive", async ({ page }) => {
-    await page.goto("/wallet/send");
+    await page.goto("/?tab=wallet&view=send");
     await page.waitForLoadState("domcontentloaded");
 
     const amountInput = page.locator(
@@ -161,7 +161,7 @@ test.describe("Form Validation", () => {
 
 test.describe("Form State Persistence", () => {
   test("should clear form after navigation", async ({ page }) => {
-    await page.goto("/wallet/send");
+    await page.goto("/?tab=wallet&view=send");
     await page.waitForLoadState("domcontentloaded");
 
     const addressInput = page.locator(
@@ -177,7 +177,7 @@ test.describe("Form State Persistence", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Come back
-      await page.goto("/wallet/send");
+      await page.goto("/?tab=wallet&view=send");
       await page.waitForLoadState("domcontentloaded");
 
       // Check if cleared (expected behavior)
@@ -192,7 +192,7 @@ test.describe("Form State Persistence", () => {
 
 test.describe("Form Error Display", () => {
   test("should display errors accessibly", async ({ page }) => {
-    await page.goto("/wallet/send");
+    await page.goto("/?tab=wallet&view=send");
     await page.waitForLoadState("domcontentloaded");
 
     // Errors should use appropriate ARIA
@@ -208,7 +208,7 @@ test.describe("Form Error Display", () => {
 
 test.describe("Form Loading States", () => {
   test("should show loading state during submission", async ({ page }) => {
-    await page.goto("/wallet/claim");
+    await page.goto("/?tab=wallet&view=claim");
     await page.waitForLoadState("domcontentloaded");
 
     // Look for claim button

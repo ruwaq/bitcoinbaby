@@ -75,6 +75,8 @@ describe("Mining Credit Service", () => {
     pendingWithdraw: 0n,
     streakCount: 5,
     lastMiningAt: Date.now() - 1000, // Recent mining
+    faucetLastClaimAt: 0,
+    faucetTotalClaimed: 0n,
     createdAt: Date.now() - 86400000,
     updatedAt: Date.now(),
   };

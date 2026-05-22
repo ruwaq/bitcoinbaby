@@ -10,6 +10,8 @@
  */
 
 import * as bitcoin from "bitcoinjs-lib";
+import { brotliCompressSync, constants } from "zlib";
+import * as cbor from "cbor2";
 import {
   generateRendererInscription,
   generateMinimalNFTInscription,
@@ -30,6 +32,10 @@ export interface InscriptionData {
   content: Uint8Array;
   /** Optional metadata */
   metadata?: Record<string, unknown>;
+  /** Optional content encoding (e.g. "br") */
+  contentEncoding?: string;
+  /** Optional parent inscription ID (txid:index / txidi0) for Parent-Child provenance */
+  parentInscriptionId?: string;
 }
 
 export interface InscriptionResult {
@@ -78,6 +84,46 @@ export interface BatchInscriptionPlan {
 }
 
 // =============================================================================
+// UTILS & SERIALIZATION
+// =============================================================================
+
+/**
+ * Serialize an inscription ID (txid:index or txidi0) to little-endian bytes representation
+ * used in Tag 3 (Parent).
+ */
+export function serializeInscriptionId(inscriptionId: string): Buffer {
+  const parts = inscriptionId.split("i");
+  const txidHex = parts[0];
+  const voutStr = parts[1] || "0";
+  const vout = parseInt(voutStr, 10);
+
+  const txidBuf = Buffer.from(txidHex, "hex");
+  if (txidBuf.length !== 32) {
+    throw new Error(`Invalid txid length in inscription ID: ${inscriptionId}`);
+  }
+
+  // Reverse txid (little-endian)
+  const reversedTxid = Buffer.from(txidBuf).reverse();
+
+  if (vout === 0) {
+    return reversedTxid;
+  }
+
+  // Serialize vout to little-endian and remove trailing zeros
+  const voutBuf = Buffer.alloc(4);
+  voutBuf.writeUInt32LE(vout);
+
+  // Find last non-zero byte
+  let lastNonZero = 3;
+  while (lastNonZero >= 0 && voutBuf[lastNonZero] === 0) {
+    lastNonZero--;
+  }
+
+  const trimmedVout = voutBuf.slice(0, lastNonZero + 1);
+  return Buffer.concat([reversedTxid, trimmedVout]);
+}
+
+// =============================================================================
 // INSCRIPTION ENVELOPE
 // =============================================================================
 
@@ -113,6 +159,27 @@ export function createInscriptionEnvelope(data: InscriptionData): Buffer {
 
   // Push content type
   parts.push(pushData(contentType));
+
+  // OP_9 for content-encoding field if present
+  if (data.contentEncoding) {
+    const encoding = Buffer.from(data.contentEncoding);
+    parts.push(Buffer.from([0x59])); // OP_9
+    parts.push(pushData(encoding));
+  }
+
+  // OP_3 for parent-inscription field if present
+  if (data.parentInscriptionId) {
+    const parentBytes = serializeInscriptionId(data.parentInscriptionId);
+    parts.push(Buffer.from([0x53])); // OP_3 (0x53)
+    parts.push(pushData(parentBytes));
+  }
+
+  // OP_5 for metadata if present (CBOR format)
+  if (data.metadata) {
+    const cborBytes = cbor.encode(data.metadata);
+    parts.push(Buffer.from([0x55])); // OP_5 (0x55)
+    parts.push(pushData(Buffer.from(cborBytes)));
+  }
 
   // OP_0 for content field
   parts.push(Buffer.from([0x00]));
@@ -202,6 +269,17 @@ export function estimateCostUSD(
 // =============================================================================
 
 /**
+ * Compress content using Brotli (quality 11)
+ */
+export function compressBrotli(content: Uint8Array): Uint8Array {
+  return brotliCompressSync(Buffer.from(content), {
+    params: {
+      [constants.BROTLI_PARAM_QUALITY]: 11,
+    },
+  });
+}
+
+/**
  * Generate complete inscription plan for Genesis Babies
  */
 export function generateInscriptionPlan(options: {
@@ -217,18 +295,24 @@ export function generateInscriptionPlan(options: {
   // 1. Sprite Library
   const libraryData = generateLibraryInscription(GENESIS_BABIES_LIBRARY);
   const libraryBytes = new TextEncoder().encode(libraryData.content);
-  const libraryFee = estimateInscriptionFee(libraryBytes.length, feeRate);
+  
+  // Try Brotli compression
+  const compressedLibrary = compressBrotli(libraryBytes);
+  const useCompressedLibrary = compressedLibrary.length < libraryBytes.length;
+  const finalLibraryBytes = useCompressedLibrary ? compressedLibrary : libraryBytes;
+  const libraryFee = estimateInscriptionFee(finalLibraryBytes.length, feeRate);
 
   inscriptions.push({
     name: "Genesis Babies Sprite Library",
     type: "library",
     data: {
       contentType: libraryData.contentType,
-      content: libraryBytes,
+      content: finalLibraryBytes,
+      contentEncoding: useCompressedLibrary ? "br" : undefined,
     },
     estimatedFee: libraryFee,
   });
-  totalSize += libraryBytes.length;
+  totalSize += finalLibraryBytes.length;
   totalFee += libraryFee;
 
   // 2. On-Chain Renderer
@@ -237,18 +321,24 @@ export function generateInscriptionPlan(options: {
     minify: true,
   });
   const rendererBytes = new TextEncoder().encode(rendererData.content);
-  const rendererFee = estimateInscriptionFee(rendererBytes.length, feeRate);
+  
+  // Try Brotli compression
+  const compressedRenderer = compressBrotli(rendererBytes);
+  const useCompressedRenderer = compressedRenderer.length < rendererBytes.length;
+  const finalRendererBytes = useCompressedRenderer ? compressedRenderer : rendererBytes;
+  const rendererFee = estimateInscriptionFee(finalRendererBytes.length, feeRate);
 
   inscriptions.push({
     name: "Genesis Babies Renderer",
     type: "renderer",
     data: {
       contentType: rendererData.contentType,
-      content: rendererBytes,
+      content: finalRendererBytes,
+      contentEncoding: useCompressedRenderer ? "br" : undefined,
     },
     estimatedFee: rendererFee,
   });
-  totalSize += rendererBytes.length;
+  totalSize += finalRendererBytes.length;
   totalFee += rendererFee;
 
   return {

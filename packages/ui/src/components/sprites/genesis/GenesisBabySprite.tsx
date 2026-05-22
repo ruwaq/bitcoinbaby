@@ -244,13 +244,13 @@ export const GenesisBabySprite: FC<GenesisBabySpriteProps> = ({
         filter: glowFilter,
       }}
     >
-      {/* Layer 0: Heritage background (muy sutil) */}
+      {/* Layer 0: Heritage watermark background (opacity ~0.12-0.18, elegant texture) */}
       <HeritageBackground heritage={traits.heritage} size={size} />
 
-      {/* Layer 1: Rarity effects (fondo) */}
+      {/* Layer 1: Rarity effects background aura (legendary/mythic only, very subtle) */}
       <RarityEffects rarity={traits.rarity} size={size} animated={animated} />
 
-      {/* Layer 2: Bloodline aura (si está habilitado) */}
+      {/* Layer 2: Bloodline aura (outer glow ring, only rare+) */}
       {showBloodlineAura && traits.rarity !== "common" && (
         <BloodlineAura
           bloodline={traits.bloodline}
@@ -259,32 +259,41 @@ export const GenesisBabySprite: FC<GenesisBabySpriteProps> = ({
         />
       )}
 
-      {/* Layer 3: Base sprite */}
-      <SpriteComponent
-        size={size}
-        state={state}
-        dna={traits.dna}
-        colors={colors}
-      />
+      {/* Layer 3: Base sprite — with depth drop-shadow for tridimensionality */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          filter: "drop-shadow(1px 2px 1px rgba(0,0,0,0.5))",
+        }}
+      >
+        <SpriteComponent
+          size={size}
+          state={state}
+          dna={traits.dna}
+          colors={colors}
+        />
+      </div>
 
-      {/* Layer 4: Bloodline overlay */}
+      {/* Layer 4: Bloodline overlay (crown/helm/hood/aura) + glowing-eye punch-through */}
       <BloodlineOverlay
         bloodline={traits.bloodline}
         size={size}
         animated={animated}
       />
 
-      {/* Layer 5: Heritage overlay */}
+      {/* Layer 5: Heritage cultural overlay (feathers, kente, runes, etc.) */}
       <HeritageOverlay
         heritage={traits.heritage}
         size={size}
         animated={animated}
       />
 
-      {/* Layer 6: Frame (si está habilitado) */}
+      {/* Layer 6: Rarity corner particles (rare/epic/legendary/mythic) */}
+      {/* Already rendered in Layer 1; RarityFrame adds border marks */}
       {showFrame && <RarityFrame rarity={traits.rarity} size={size} />}
 
-      {/* Layer 7: Badge (si está habilitado) */}
+      {/* Layer 7: Rarity badge dot indicator */}
       {showBadge && <RarityBadge rarity={traits.rarity} size={size} />}
     </div>
   );

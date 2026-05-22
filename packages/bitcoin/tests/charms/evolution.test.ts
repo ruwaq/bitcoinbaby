@@ -317,13 +317,36 @@ describe("createNFTWorkProofSpell", () => {
     expect(spell.outs[0].address).toBe(defaultParams.ownerAddress);
   });
 
-  it("should add XP to state based on bloodline", () => {
+  it("should add XP to state based on bloodline, capped at next level requirement", () => {
     const spell = createNFTWorkProofSpell(defaultParams);
-    const xpGain = calculateXpGain(defaultParams.currentState);
+    const xpGain = calculateXpGain(defaultParams.currentState); // 100 for rogue
+    const nextLevelReq = XP_REQUIREMENTS[defaultParams.currentState.level + 1]; // 100
+    const rawNewXp = defaultParams.currentState.xp + xpGain; // 50 + 100 = 150
+    const expectedXp = Math.min(rawNewXp, nextLevelReq); // min(150, 100) = 100
     const newState = spell.outs[0].charms.$00 as BabyNFTState;
 
-    expect(newState.xp).toBe(defaultParams.currentState.xp + xpGain);
+    // XP is capped at the next level's requirement to prevent overflow
+    expect(newState.xp).toBe(expectedXp); // 100 (capped)
+    // totalXp always accumulates the real gain (no cap)
     expect(newState.totalXp).toBe(defaultParams.currentState.totalXp + xpGain);
+  });
+
+  it("should NOT cap XP when total stays below next level requirement", () => {
+    // NFT with royal bloodline (1.5x) at xp=0: gains 150, cap is 100 → capped
+    // Use xp=0, rogue (100 gain), but cap is 100 → still capped
+    // For a test without cap: use xp=0, cap=100, gain=50 (impossible with current bloodlines)
+    // Instead: NFT at level 1, xp=30, royal bloodline → gain=150, raw=180, cap=100 → capped
+    // For no-cap test: use NFT at level 9 (cap=32000), xp=0, rogue → gain=100 → no cap
+    const highCapState = createMockNFT({ level: 9, xp: 0, bloodline: "rogue" });
+    const params = { ...defaultParams, currentState: highCapState };
+    const spell = createNFTWorkProofSpell(params);
+    const xpGain = calculateXpGain(highCapState); // 100
+    const nextLevelReq = XP_REQUIREMENTS[10]; // 32000
+    const newState = spell.outs[0].charms.$00 as BabyNFTState;
+
+    // 0 + 100 = 100 < 32000, so no cap applied
+    expect(newState.xp).toBe(xpGain); // 100, no cap
+    expect(newState.totalXp).toBe(xpGain);
   });
 
   it("should increment work count", () => {

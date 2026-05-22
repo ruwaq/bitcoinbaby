@@ -72,6 +72,7 @@ export {
   buildRevealTransaction,
   getDeploymentSummary,
   INSCRIPTION_ORDER,
+  compressBrotli,
   type InscriptionData,
   type InscriptionResult,
   type InscriptionConfig,

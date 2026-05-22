@@ -59,6 +59,14 @@ export interface Env {
   // Faucet configuration (Phase 1)
   FAUCET_AMOUNT?: string;
   FAUCET_MAX_TOTAL?: string;
+
+  // Cloudflare Workers AI
+  AI?: {
+    run(
+      model: string,
+      inputs: Record<string, unknown>
+    ): Promise<unknown>;
+  };
 }
 
 // =============================================================================
@@ -83,10 +91,18 @@ export interface VirtualBalance {
   streakCount: number;
   /** Last mining activity timestamp */
   lastMiningAt: number;
+  /** Last faucet claim timestamp (faucet rate limiting) */
+  faucetLastClaimAt: number;
+  /** Total faucet tokens claimed */
+  faucetTotalClaimed: bigint;
   /** Account creation timestamp */
   createdAt: number;
   /** Last update timestamp */
   updatedAt: number;
+  /** User reputation score (0-100) for PoUW auditing */
+  reputationScore?: number;
+  /** Block mining lockout timestamp until this time */
+  lockoutUntil?: number;
 }
 
 /**
@@ -116,6 +132,19 @@ export interface MiningProof {
   reward?: bigint;
   /** Whether this proof has been credited */
   credited?: boolean;
+}
+
+export interface AIProof {
+  taskId: string;
+  taskType: string;
+  inputPrompt: string;
+  seed: string;
+  output: string;
+  computeTime: number;
+  modelId: string;
+  timestamp: number;
+  publicKey: string;
+  signature: string;
 }
 
 // =============================================================================

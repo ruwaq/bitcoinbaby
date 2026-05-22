@@ -1,8 +1,8 @@
 /**
- * Animal Baby Sprite - CUTE CREATURE DESIGN
+ * Animal Baby Sprite - CUTE CREATURE DESIGN (Pixel Art Edition)
  *
  * Adorable animal babies with big eyes and soft features.
- * Aesthetic: kawaii meets pixel art, natural and playful.
+ * Aesthetic: 32x32 strict pixel art grid, cohesive and highly valuable visual asset.
  *
  * Variants:
  * - Kitten: Fluffy cat baby with curious expression
@@ -12,13 +12,13 @@
  * - Bear: Cuddly bear cub with round features
  *
  * Common elements:
- * - Big expressive eyes
+ * - Big expressive pixel-art eyes
  * - Soft fur textures
  * - Natural animal features (ears, tails, paws)
  */
 
 import { type FC } from "react";
-import { type BabyState, type ColorPalette, parseDNA } from "./types";
+import { type BabyState, type ColorPalette } from "./types";
 
 interface AnimalSpriteProps {
   size?: number;
@@ -105,290 +105,294 @@ export const AnimalSprite: FC<AnimalSpriteProps> = ({
     struggling: "animate-[shake_1s_ease-in-out_infinite]",
   };
 
-  // Render Kitten variant
+  // Render Kitten variant in pixel art
   const renderKitten = () => (
     <>
       {/* ===== BODY ===== */}
-      <ellipse cx="16" cy="22" rx="7" ry="6" fill={fur.base} />
-      <ellipse
-        cx="16"
-        cy="22"
-        rx="5"
-        ry="4"
-        fill={fur.highlight}
-        opacity="0.3"
-      />
+      {/* Torso */}
+      <rect x="10" y="18" width="12" height="9" fill={fur.base} />
+      <rect x="9" y="19" width="14" height="7" fill={fur.base} />
+      <rect x="12" y="18" width="8" height="7" fill={fur.highlight} opacity="0.3" />
+      <rect x="10" y="26" width="12" height="1" fill={fur.shadow} />
 
       {/* ===== HEAD ===== */}
-      <circle cx="16" cy="12" r="8" fill={fur.base} />
-      <circle cx="16" cy="13" r="6" fill={fur.highlight} opacity="0.2" />
+      <rect x="9" y="6" width="14" height="11" fill={fur.base} />
+      <rect x="8" y="8" width="16" height="7" fill={fur.base} />
+      <rect x="10" y="5" width="12" height="1" fill={fur.base} />
+      <rect x="10" y="7" width="12" height="8" fill={fur.highlight} opacity="0.15" />
+      <rect x="9" y="16" width="14" height="1" fill={fur.shadow} />
 
       {/* ===== EARS (triangular cat ears) ===== */}
-      <polygon points="6,8 9,4 12,10" fill={fur.base} />
-      <polygon points="7,8 9,5 11,9" fill={innerEar} />
-      <polygon points="20,10 23,4 26,8" fill={fur.base} />
-      <polygon points="21,9 23,5 25,8" fill={innerEar} />
+      {/* Left Ear */}
+      <rect x="7" y="3" width="2" height="3" fill={fur.base} />
+      <rect x="6" y="4" width="2" height="3" fill={fur.base} />
+      <rect x="8" y="2" width="1" height="2" fill={fur.base} />
+      <rect x="7" y="4" width="1" height="2" fill={innerEar} />
+      {/* Right Ear */}
+      <rect x="23" y="3" width="2" height="3" fill={fur.base} />
+      <rect x="24" y="4" width="2" height="3" fill={fur.base} />
+      <rect x="23" y="2" width="1" height="2" fill={fur.base} />
+      <rect x="24" y="4" width="1" height="2" fill={innerEar} />
 
       {/* ===== EYES (big cat eyes) ===== */}
-      <ellipse cx="12" cy="11" rx="2.5" ry="2" fill="#ffffff" />
-      <ellipse cx="20" cy="11" rx="2.5" ry="2" fill="#ffffff" />
-      <ellipse cx="12" cy="11" rx="1.5" ry="1.5" fill={eyes} />
-      <ellipse cx="20" cy="11" rx="1.5" ry="1.5" fill={eyes} />
-      {/* Eye highlights */}
-      <circle cx="11" cy="10" r="0.6" fill="#ffffff" />
-      <circle cx="19" cy="10" r="0.6" fill="#ffffff" />
+      {state !== "sleeping" ? (
+        <>
+          <rect x="10" y="9" width="4" height="3" fill="#ffffff" />
+          <rect x="18" y="9" width="4" height="3" fill="#ffffff" />
+          <rect x="11" y="9" width="2" height="3" fill={eyes} />
+          <rect x="19" y="9" width="2" height="3" fill={eyes} />
+          <rect x="11" y="9" width="1" height="1" fill="#ffffff" />
+          <rect x="19" y="9" width="1" height="1" fill="#ffffff" />
+        </>
+      ) : (
+        <>
+          <rect x="10" y="10" width="4" height="1" fill={fur.shadow} />
+          <rect x="18" y="10" width="4" height="1" fill={fur.shadow} />
+        </>
+      )}
 
       {/* ===== NOSE ===== */}
-      <polygon points="15,14 17,14 16,15.5" fill={nose} />
+      <rect x="15" y="12" width="2" height="1" fill={nose} />
 
       {/* ===== MOUTH ===== */}
-      <path
-        d="M14 16 Q16 17 18 16"
-        fill="none"
-        stroke={fur.shadow}
-        strokeWidth="0.5"
-      />
+      <rect x="14" y="14" width="4" height="1" fill={fur.shadow} />
+      <rect x="14" y="13" width="1" height="1" fill={fur.shadow} />
+      <rect x="17" y="13" width="1" height="1" fill={fur.shadow} />
 
       {/* ===== WHISKERS ===== */}
-      <line
-        x1="8"
-        y1="14"
-        x2="4"
-        y2="13"
-        stroke={fur.shadow}
-        strokeWidth="0.3"
-      />
-      <line
-        x1="8"
-        y1="15"
-        x2="4"
-        y2="15"
-        stroke={fur.shadow}
-        strokeWidth="0.3"
-      />
-      <line
-        x1="24"
-        y1="14"
-        x2="28"
-        y2="13"
-        stroke={fur.shadow}
-        strokeWidth="0.3"
-      />
-      <line
-        x1="24"
-        y1="15"
-        x2="28"
-        y2="15"
-        stroke={fur.shadow}
-        strokeWidth="0.3"
-      />
+      <rect x="4" y="12" width="3" height="1" fill={fur.shadow} opacity="0.6" />
+      <rect x="5" y="14" width="2" height="1" fill={fur.shadow} opacity="0.6" />
+      <rect x="25" y="12" width="3" height="1" fill={fur.shadow} opacity="0.6" />
+      <rect x="25" y="14" width="2" height="1" fill={fur.shadow} opacity="0.6" />
 
       {/* ===== PAWS ===== */}
-      <ellipse cx="11" cy="27" rx="2" ry="1.5" fill={fur.shadow} />
-      <ellipse cx="21" cy="27" rx="2" ry="1.5" fill={fur.shadow} />
+      <rect x="9" y="26" width="3" height="2" fill={fur.shadow} />
+      <rect x="20" y="26" width="3" height="2" fill={fur.shadow} />
 
       {/* ===== TAIL ===== */}
-      <path
-        d="M23 22 Q28 20 26 14"
-        fill="none"
-        stroke={fur.base}
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
+      <rect x="23" y="21" width="3" height="2" fill={fur.base} />
+      <rect x="25" y="18" width="2" height="4" fill={fur.base} />
+      <rect x="24" y="16" width="2" height="3" fill={fur.base} />
     </>
   );
 
-  // Render Puppy variant
+  // Render Puppy variant in pixel art
   const renderPuppy = () => (
     <>
       {/* ===== BODY ===== */}
-      <ellipse cx="16" cy="22" rx="7" ry="6" fill={fur.base} />
+      <rect x="10" y="18" width="12" height="9" fill={fur.base} />
+      <rect x="9" y="19" width="14" height="7" fill={fur.base} />
+      <rect x="10" y="26" width="12" height="1" fill={fur.shadow} />
 
       {/* ===== HEAD ===== */}
-      <circle cx="16" cy="12" r="8" fill={fur.base} />
+      <rect x="9" y="6" width="14" height="11" fill={fur.base} />
+      <rect x="8" y="8" width="16" height="7" fill={fur.base} />
+      <rect x="10" y="5" width="12" height="1" fill={fur.base} />
 
       {/* ===== EARS (floppy dog ears) ===== */}
-      <ellipse cx="7" cy="12" rx="3" ry="5" fill={fur.base} />
-      <ellipse cx="7" cy="13" rx="2" ry="3" fill={fur.shadow} opacity="0.3" />
-      <ellipse cx="25" cy="12" rx="3" ry="5" fill={fur.base} />
-      <ellipse cx="25" cy="13" rx="2" ry="3" fill={fur.shadow} opacity="0.3" />
+      {/* Left Ear */}
+      <rect x="6" y="8" width="2" height="7" fill={fur.base} />
+      <rect x="7" y="14" width="1" height="1" fill={fur.shadow} />
+      {/* Right Ear */}
+      <rect x="24" y="8" width="2" height="7" fill={fur.base} />
+      <rect x="24" y="14" width="1" height="1" fill={fur.shadow} />
 
       {/* ===== EYES ===== */}
-      <circle cx="12" cy="11" r="2.5" fill="#ffffff" />
-      <circle cx="20" cy="11" r="2.5" fill="#ffffff" />
-      <circle cx="12" cy="11" r="1.5" fill={eyes} />
-      <circle cx="20" cy="11" r="1.5" fill={eyes} />
-      <circle cx="11" cy="10" r="0.6" fill="#ffffff" />
-      <circle cx="19" cy="10" r="0.6" fill="#ffffff" />
+      {state !== "sleeping" ? (
+        <>
+          <rect x="10" y="9" width="3" height="3" fill="#ffffff" />
+          <rect x="19" y="9" width="3" height="3" fill="#ffffff" />
+          <rect x="11" y="9" width="2" height="3" fill={eyes} />
+          <rect x="19" y="9" width="2" height="3" fill={eyes} />
+          <rect x="11" y="9" width="1" height="1" fill="#ffffff" />
+          <rect x="19" y="9" width="1" height="1" fill="#ffffff" />
+        </>
+      ) : (
+        <>
+          <rect x="10" y="10" width="3" height="1" fill={fur.shadow} />
+          <rect x="19" y="10" width="3" height="1" fill={fur.shadow} />
+        </>
+      )}
 
       {/* ===== SNOUT ===== */}
-      <ellipse cx="16" cy="15" rx="3" ry="2" fill={fur.highlight} />
-      <ellipse cx="16" cy="14" rx="1.5" ry="1" fill={nose} />
+      <rect x="13" y="12" width="6" height="3" fill={fur.highlight} />
+      <rect x="15" y="11" width="2" height="2" fill={nose} />
 
       {/* ===== TONGUE ===== */}
-      <ellipse cx="16" cy="17" rx="1" ry="1.5" fill="#ff9999" />
+      <rect x="15" y="15" width="2" height="2" fill="#ff9999" />
 
       {/* ===== PAWS ===== */}
-      <ellipse cx="11" cy="27" rx="2.5" ry="1.5" fill={fur.shadow} />
-      <ellipse cx="21" cy="27" rx="2.5" ry="1.5" fill={fur.shadow} />
+      <rect x="9" y="26" width="3" height="2" fill={fur.shadow} />
+      <rect x="20" y="26" width="3" height="2" fill={fur.shadow} />
 
-      {/* ===== TAIL (wagging) ===== */}
-      <ellipse cx="25" cy="20" rx="2" ry="3" fill={fur.base} />
+      {/* ===== TAIL ===== */}
+      <rect x="23" y="19" width="2" height="3" fill={fur.base} />
     </>
   );
 
-  // Render Bunny variant
+  // Render Bunny variant in pixel art
   const renderBunny = () => (
     <>
       {/* ===== BODY ===== */}
-      <ellipse cx="16" cy="22" rx="6" ry="6" fill={fur.base} />
+      <rect x="10" y="18" width="12" height="9" fill={fur.base} />
+      <rect x="9" y="19" width="14" height="7" fill={fur.base} />
+      <rect x="10" y="26" width="12" height="1" fill={fur.shadow} />
 
       {/* ===== HEAD ===== */}
-      <circle cx="16" cy="12" r="7" fill={fur.base} />
+      <rect x="9" y="7" width="14" height="10" fill={fur.base} />
+      <rect x="8" y="9" width="16" height="6" fill={fur.base} />
+      <rect x="10" y="6" width="12" height="1" fill={fur.base} />
 
       {/* ===== EARS (long rabbit ears) ===== */}
-      <ellipse cx="11" cy="2" rx="2" ry="6" fill={fur.base} />
-      <ellipse cx="11" cy="2" rx="1" ry="4" fill={innerEar} />
-      <ellipse cx="21" cy="2" rx="2" ry="6" fill={fur.base} />
-      <ellipse cx="21" cy="2" rx="1" ry="4" fill={innerEar} />
+      {/* Left Ear */}
+      <rect x="9" y="0" width="3" height="7" fill={fur.base} />
+      <rect x="10" y="1" width="1" height="5" fill={innerEar} />
+      {/* Right Ear */}
+      <rect x="20" y="0" width="3" height="7" fill={fur.base} />
+      <rect x="21" y="1" width="1" height="5" fill={innerEar} />
 
       {/* ===== EYES ===== */}
-      <circle cx="12" cy="11" r="2" fill="#ffffff" />
-      <circle cx="20" cy="11" r="2" fill="#ffffff" />
-      <circle cx="12" cy="11" r="1.2" fill={eyes} />
-      <circle cx="20" cy="11" r="1.2" fill={eyes} />
-      <circle cx="11.5" cy="10.5" r="0.4" fill="#ffffff" />
-      <circle cx="19.5" cy="10.5" r="0.4" fill="#ffffff" />
+      {state !== "sleeping" ? (
+        <>
+          <rect x="10" y="10" width="3" height="3" fill="#ffffff" />
+          <rect x="19" y="10" width="3" height="3" fill="#ffffff" />
+          <rect x="11" y="10" width="2" height="3" fill={eyes} />
+          <rect x="19" y="10" width="2" height="3" fill={eyes} />
+          <rect x="11" y="10" width="1" height="1" fill="#ffffff" />
+          <rect x="19" y="10" width="1" height="1" fill="#ffffff" />
+        </>
+      ) : (
+        <>
+          <rect x="10" y="11" width="3" height="1" fill={fur.shadow} />
+          <rect x="19" y="11" width="3" height="1" fill={fur.shadow} />
+        </>
+      )}
 
       {/* ===== NOSE ===== */}
-      <ellipse cx="16" cy="14" rx="1" ry="0.8" fill={nose} />
+      <rect x="15" y="13" width="2" height="1" fill={nose} />
 
       {/* ===== CHEEKS ===== */}
-      <circle cx="10" cy="14" r="1.5" fill="#ffcccc" opacity="0.5" />
-      <circle cx="22" cy="14" r="1.5" fill="#ffcccc" opacity="0.5" />
-
-      {/* ===== WHISKERS ===== */}
-      <line
-        x1="10"
-        y1="14"
-        x2="6"
-        y2="13"
-        stroke={fur.shadow}
-        strokeWidth="0.3"
-      />
-      <line
-        x1="10"
-        y1="15"
-        x2="6"
-        y2="15"
-        stroke={fur.shadow}
-        strokeWidth="0.3"
-      />
-      <line
-        x1="22"
-        y1="14"
-        x2="26"
-        y2="13"
-        stroke={fur.shadow}
-        strokeWidth="0.3"
-      />
-      <line
-        x1="22"
-        y1="15"
-        x2="26"
-        y2="15"
-        stroke={fur.shadow}
-        strokeWidth="0.3"
-      />
+      <rect x="8" y="13" width="2" height="1" fill="#ffcccc" opacity="0.6" />
+      <rect x="22" y="13" width="2" height="1" fill="#ffcccc" opacity="0.6" />
 
       {/* ===== FEET ===== */}
-      <ellipse cx="12" cy="28" rx="3" ry="1.5" fill={fur.shadow} />
-      <ellipse cx="20" cy="28" rx="3" ry="1.5" fill={fur.shadow} />
+      <rect x="9" y="26" width="4" height="2" fill={fur.shadow} />
+      <rect x="19" y="26" width="4" height="2" fill={fur.shadow} />
 
       {/* ===== TAIL (fluffy ball) ===== */}
-      <circle cx="23" cy="24" r="2" fill={fur.highlight} />
+      <rect x="23" y="22" width="2" height="2" fill={fur.highlight} />
     </>
   );
 
-  // Render Fox variant
+  // Render Fox variant in pixel art
   const renderFox = () => (
     <>
       {/* ===== BODY ===== */}
-      <ellipse cx="16" cy="22" rx="6" ry="5" fill={fur.base} />
-      <ellipse cx="16" cy="24" rx="4" ry="2" fill={fur.highlight} />
+      <rect x="10" y="18" width="12" height="9" fill={fur.base} />
+      <rect x="9" y="19" width="14" height="7" fill={fur.base} />
+      <rect x="12" y="20" width="8" height="5" fill={fur.highlight} />
+      <rect x="10" y="26" width="12" height="1" fill={fur.shadow} />
 
       {/* ===== HEAD ===== */}
-      <circle cx="16" cy="12" r="7" fill={fur.base} />
+      <rect x="9" y="6" width="14" height="11" fill={fur.base} />
+      <rect x="8" y="8" width="16" height="7" fill={fur.base} />
+      <rect x="10" y="5" width="12" height="1" fill={fur.base} />
       {/* White face marking */}
-      <path d="M16 8 L12 16 L16 18 L20 16 Z" fill={fur.highlight} />
+      <rect x="14" y="9" width="4" height="7" fill={fur.highlight} />
+      <rect x="13" y="11" width="6" height="4" fill={fur.highlight} />
+      <rect x="12" y="13" width="8" height="2" fill={fur.highlight} />
 
       {/* ===== EARS (pointed fox ears) ===== */}
-      <polygon points="7,10 10,2 13,10" fill={fur.base} />
-      <polygon points="8,9 10,4 12,9" fill={fur.shadow} />
-      <polygon points="19,10 22,2 25,10" fill={fur.base} />
-      <polygon points="20,9 22,4 24,9" fill={fur.shadow} />
+      {/* Left Ear */}
+      <rect x="7" y="3" width="3" height="4" fill={fur.base} />
+      <rect x="6" y="4" width="1" height="3" fill={fur.base} />
+      <rect x="8" y="2" width="1" height="2" fill={fur.base} />
+      <rect x="8" y="4" width="1" height="2" fill={fur.shadow} />
+      {/* Right Ear */}
+      <rect x="22" y="3" width="3" height="4" fill={fur.base} />
+      <rect x="25" y="4" width="1" height="3" fill={fur.base} />
+      <rect x="23" y="2" width="1" height="2" fill={fur.base} />
+      <rect x="23" y="4" width="1" height="2" fill={fur.shadow} />
 
       {/* ===== EYES (sly fox eyes) ===== */}
-      <ellipse cx="12" cy="11" rx="2" ry="1.5" fill="#ffffff" />
-      <ellipse cx="20" cy="11" rx="2" ry="1.5" fill="#ffffff" />
-      <ellipse cx="12" cy="11" rx="1.2" ry="1" fill={eyes} />
-      <ellipse cx="20" cy="11" rx="1.2" ry="1" fill={eyes} />
-      <circle cx="11.5" cy="10.5" r="0.4" fill="#ffffff" />
-      <circle cx="19.5" cy="10.5" r="0.4" fill="#ffffff" />
+      {state !== "sleeping" ? (
+        <>
+          <rect x="10" y="9" width="3" height="3" fill="#ffffff" />
+          <rect x="19" y="9" width="3" height="3" fill="#ffffff" />
+          <rect x="11" y="9" width="2" height="2" fill={eyes} />
+          <rect x="19" y="9" width="2" height="2" fill={eyes} />
+          <rect x="11" y="9" width="1" height="1" fill="#ffffff" />
+          <rect x="19" y="9" width="1" height="1" fill="#ffffff" />
+        </>
+      ) : (
+        <>
+          <rect x="10" y="10" width="3" height="1" fill={fur.shadow} />
+          <rect x="19" y="10" width="3" height="1" fill={fur.shadow} />
+        </>
+      )}
 
       {/* ===== NOSE ===== */}
-      <ellipse cx="16" cy="15" rx="1.5" ry="1" fill={nose} />
+      <rect x="15" y="13" width="2" height="2" fill={nose} />
 
       {/* ===== PAWS ===== */}
-      <ellipse cx="11" cy="27" rx="2" ry="1.5" fill={fur.shadow} />
-      <ellipse cx="21" cy="27" rx="2" ry="1.5" fill={fur.shadow} />
+      <rect x="9" y="26" width="3" height="2" fill={fur.shadow} />
+      <rect x="20" y="26" width="3" height="2" fill={fur.shadow} />
 
       {/* ===== TAIL (bushy fox tail) ===== */}
-      <ellipse cx="26" cy="20" rx="4" ry="3" fill={fur.base} />
-      <ellipse cx="28" cy="19" rx="2" ry="1.5" fill={fur.highlight} />
+      <rect x="23" y="19" width="4" height="6" fill={fur.base} />
+      <rect x="24" y="17" width="3" height="3" fill={fur.highlight} />
+      <rect x="25" y="18" width="2" height="2" fill={fur.highlight} />
     </>
   );
 
-  // Render Bear variant
+  // Render Bear variant in pixel art
   const renderBear = () => (
     <>
       {/* ===== BODY ===== */}
-      <ellipse cx="16" cy="22" rx="8" ry="7" fill={fur.base} />
+      <rect x="9" y="18" width="14" height="9" fill={fur.base} />
+      <rect x="8" y="19" width="16" height="7" fill={fur.base} />
+      <rect x="9" y="26" width="14" height="1" fill={fur.shadow} />
 
       {/* ===== HEAD ===== */}
-      <circle cx="16" cy="11" r="8" fill={fur.base} />
+      <rect x="9" y="6" width="14" height="11" fill={fur.base} />
+      <rect x="8" y="8" width="16" height="7" fill={fur.base} />
+      <rect x="10" y="5" width="12" height="1" fill={fur.base} />
 
       {/* ===== EARS (round bear ears) ===== */}
-      <circle cx="8" cy="6" r="3" fill={fur.base} />
-      <circle cx="8" cy="6" r="1.5" fill={fur.shadow} />
-      <circle cx="24" cy="6" r="3" fill={fur.base} />
-      <circle cx="24" cy="6" r="1.5" fill={fur.shadow} />
+      {/* Left Ear */}
+      <rect x="7" y="3" width="3" height="3" fill={fur.base} />
+      <rect x="8" y="4" width="1" height="1" fill={fur.shadow} />
+      {/* Right Ear */}
+      <rect x="22" y="3" width="3" height="3" fill={fur.base} />
+      <rect x="23" y="4" width="1" height="1" fill={fur.shadow} />
 
       {/* ===== SNOUT ===== */}
-      <ellipse cx="16" cy="14" rx="4" ry="3" fill={fur.highlight} />
+      <rect x="12" y="12" width="8" height="4" fill={fur.highlight} />
+      <rect x="14" y="11" width="4" height="2" fill={nose} />
 
       {/* ===== EYES ===== */}
-      <circle cx="12" cy="10" r="2" fill="#ffffff" />
-      <circle cx="20" cy="10" r="2" fill="#ffffff" />
-      <circle cx="12" cy="10" r="1.2" fill={eyes} />
-      <circle cx="20" cy="10" r="1.2" fill={eyes} />
-      <circle cx="11.5" cy="9.5" r="0.4" fill="#ffffff" />
-      <circle cx="19.5" cy="9.5" r="0.4" fill="#ffffff" />
-
-      {/* ===== NOSE ===== */}
-      <ellipse cx="16" cy="13" rx="2" ry="1.5" fill={nose} />
+      {state !== "sleeping" ? (
+        <>
+          <rect x="10" y="9" width="3" height="3" fill="#ffffff" />
+          <rect x="19" y="9" width="3" height="3" fill="#ffffff" />
+          <rect x="11" y="9" width="2" height="3" fill={eyes} />
+          <rect x="19" y="9" width="2" height="3" fill={eyes} />
+          <rect x="11" y="9" width="1" height="1" fill="#ffffff" />
+          <rect x="19" y="9" width="1" height="1" fill="#ffffff" />
+        </>
+      ) : (
+        <>
+          <rect x="10" y="10" width="3" height="1" fill={fur.shadow} />
+          <rect x="19" y="10" width="3" height="1" fill={fur.shadow} />
+        </>
+      )}
 
       {/* ===== MOUTH ===== */}
-      <path
-        d="M14 15 Q16 17 18 15"
-        fill="none"
-        stroke={fur.shadow}
-        strokeWidth="0.5"
-      />
+      <rect x="14" y="14" width="4" height="1" fill={fur.shadow} />
 
       {/* ===== PAWS ===== */}
-      <ellipse cx="10" cy="28" rx="3" ry="2" fill={fur.shadow} />
-      <ellipse cx="22" cy="28" rx="3" ry="2" fill={fur.shadow} />
+      <rect x="8" y="26" width="4" height="2" fill={fur.shadow} />
+      <rect x="20" y="26" width="4" height="2" fill={fur.shadow} />
     </>
   );
 

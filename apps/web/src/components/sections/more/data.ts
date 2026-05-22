@@ -12,6 +12,8 @@ export interface MenuItem {
   href: string;
   external?: boolean;
   highlight?: boolean;
+  locked?: boolean;
+  lockedLabel?: string;
   onClick?: () => void;
 }
 

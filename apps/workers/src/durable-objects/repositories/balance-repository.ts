@@ -71,8 +71,12 @@ export class BalanceRepository {
         pendingWithdraw: BigInt(row.pending_withdraw as string),
         streakCount: (row.streak_count as number) || 0,
         lastMiningAt: row.last_mining_at as number,
+        faucetLastClaimAt: (row.faucet_last_claim_at as number) || 0,
+        faucetTotalClaimed: BigInt((row.faucet_total_claimed as string) || "0"),
         createdAt: row.created_at as number,
         updatedAt: row.updated_at as number,
+        reputationScore: typeof row.reputation_score === "number" ? row.reputation_score : 100,
+        lockoutUntil: typeof row.lockout_until === "number" ? row.lockout_until : 0,
       };
       this.state.difficultyState = deserializeState(
         row.difficulty_state as string | null,
@@ -83,7 +87,7 @@ export class BalanceRepository {
 
     // Create new
     this.sql.exec(
-      `INSERT INTO balance (address, streak_count, created_at, updated_at) VALUES (?, 0, ?, ?)`,
+      `INSERT INTO balance (address, streak_count, reputation_score, lockout_until, created_at, updated_at) VALUES (?, 0, 100, 0, ?, ?)`,
       address,
       now,
       now,
@@ -97,8 +101,12 @@ export class BalanceRepository {
       pendingWithdraw: 0n,
       streakCount: 0,
       lastMiningAt: 0,
+      faucetLastClaimAt: 0,
+      faucetTotalClaimed: 0n,
       createdAt: now,
       updatedAt: now,
+      reputationScore: 100,
+      lockoutUntil: 0,
     };
     this.state.difficultyState = createInitialState();
     this.state.cacheLoadedAt = now;
@@ -123,7 +131,11 @@ export class BalanceRepository {
         pending_withdraw = ?,
         streak_count = ?,
         last_mining_at = ?,
+        faucet_last_claim_at = ?,
+        faucet_total_claimed = ?,
         difficulty_state = ?,
+        reputation_score = ?,
+        lockout_until = ?,
         updated_at = ?
        WHERE address = ?`,
       balance.virtualBalance.toString(),
@@ -132,7 +144,11 @@ export class BalanceRepository {
       balance.pendingWithdraw.toString(),
       balance.streakCount,
       balance.lastMiningAt,
+      balance.faucetLastClaimAt,
+      balance.faucetTotalClaimed.toString(),
       diffStateJson,
+      balance.reputationScore ?? 100,
+      balance.lockoutUntil ?? 0,
       now,
       balance.address,
     );

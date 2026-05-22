@@ -74,6 +74,11 @@ export interface IMempoolService {
   getCurrentBlockHeight(): Promise<number>;
 
   /**
+   * Get current block hash
+   */
+  getCurrentBlockHash(): Promise<string>;
+
+  /**
    * Get fee estimates
    */
   getFeeEstimates(): Promise<FeeEstimates>;

@@ -62,6 +62,25 @@ export interface FeeEstimates {
 }
 
 /**
+ * Block information
+ */
+export interface BlockInfo {
+  id: string;
+  height: number;
+  version: number;
+  timestamp: number;
+  tx_count: number;
+  size: number;
+  weight: number;
+  merkle_root: string;
+  previousblockhash: string;
+  mediantime: number;
+  nonce: number;
+  bits: number;
+  difficulty: number;
+}
+
+/**
  * Blockchain API client interface
  */
 export interface BlockchainAPI {
@@ -71,4 +90,19 @@ export interface BlockchainAPI {
   getTransaction(txid: string): Promise<TransactionInfo>;
   broadcastTransaction(txHex: string): Promise<string>;
   getFeeEstimates(): Promise<FeeEstimates>;
+  getBlockHeight(): Promise<number>;
+  getBlock(blockHash: string): Promise<BlockInfo>;
+  getBlockTxids(blockHash: string): Promise<string[]>;
+  getTransactionHex(txid: string): Promise<string>;
+  waitForConfirmation(
+    txid: string,
+    options?: {
+      timeoutMs?: number;
+      pollIntervalMs?: number;
+    }
+  ): Promise<TransactionInfo>;
+  getAddressTransactions(
+    address: string,
+    afterTxid?: string
+  ): Promise<TransactionInfo[]>;
 }

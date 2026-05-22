@@ -18,13 +18,13 @@ import { DurableObject } from "cloudflare:workers";
 import { balanceLogger } from "../lib/logger";
 import type {
   Env,
-  MiningProof,
   ApiResponse,
   BalanceResponse,
   ClaimableBalance,
   ClaimPrepareResponse,
   ClaimConfirmResponse,
   ClaimStatus,
+  AIProof,
 } from "../lib/types";
 import { CLAIM_EXPIRATION_MS } from "../lib/types";
 import {
@@ -34,6 +34,8 @@ import {
 } from "../services/proof-aggregator";
 import { estimateInitialDifficulty, VARDIFF_CONFIG } from "../lib/vardiff";
 import { getRedis, updateAllPeriods, updateUserStats } from "../lib/redis";
+import { initMempoolService } from "../services/mempool-service";
+import { getNetworkForEnvironment } from "../config/bitcoin";
 
 // Modular repositories and services
 import {
@@ -41,7 +43,7 @@ import {
   ProofRepository,
   ClaimRepository,
 } from "./repositories";
-import { processMiningCredit } from "./services";
+import { processAICredit, performSemanticAudit } from "./services";
 
 // Minimum withdraw amount (from env)
 const DEFAULT_MIN_WITHDRAW = 100n;
@@ -86,6 +88,8 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         pending_withdraw TEXT NOT NULL DEFAULT '0',
         streak_count INTEGER NOT NULL DEFAULT 0,
         last_mining_at INTEGER NOT NULL DEFAULT 0,
+        faucet_last_claim_at INTEGER NOT NULL DEFAULT 0,
+        faucet_total_claimed TEXT NOT NULL DEFAULT '0',
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       )
@@ -101,6 +105,20 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     }
     try {
       this.sql.exec(`ALTER TABLE balance ADD COLUMN difficulty_state TEXT`);
+    } catch {
+      /* exists */
+    }
+    try {
+      this.sql.exec(
+        `ALTER TABLE balance ADD COLUMN faucet_last_claim_at INTEGER NOT NULL DEFAULT 0`,
+      );
+    } catch {
+      /* exists */
+    }
+    try {
+      this.sql.exec(
+        `ALTER TABLE balance ADD COLUMN faucet_total_claimed TEXT NOT NULL DEFAULT '0'`,
+      );
     } catch {
       /* exists */
     }
@@ -180,6 +198,49 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     this.sql.exec(
       `CREATE INDEX IF NOT EXISTS idx_claims_status ON claims(status)`,
     );
+
+    // PoUW Tasks table
+    this.sql.exec(`
+      CREATE TABLE IF NOT EXISTS pouw_tasks (
+        id TEXT PRIMARY KEY,
+        block_hash TEXT NOT NULL,
+        prompt TEXT NOT NULL,
+        seed TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        status TEXT DEFAULT 'active'
+      )
+    `);
+
+    // PoUW Submissions table
+    this.sql.exec(`
+      CREATE TABLE IF NOT EXISTS pouw_submissions (
+        task_id TEXT NOT NULL,
+        address TEXT NOT NULL,
+        output TEXT NOT NULL,
+        compute_time REAL NOT NULL,
+        signature TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (task_id, address),
+        FOREIGN KEY (task_id) REFERENCES pouw_tasks(id)
+      )
+    `);
+
+    this.sql.exec(
+      `CREATE INDEX IF NOT EXISTS idx_submissions_task ON pouw_submissions(task_id)`,
+    );
+
+    // Add reputation_score column to balance if not exists
+    try {
+      this.sql.exec(`ALTER TABLE balance ADD COLUMN reputation_score INTEGER DEFAULT 100`);
+    } catch {
+      /* exists */
+    }
+    // Add lockout_until column to balance if not exists
+    try {
+      this.sql.exec(`ALTER TABLE balance ADD COLUMN lockout_until INTEGER DEFAULT 0`);
+    } catch {
+      /* exists */
+    }
   }
 
   /**
@@ -201,12 +262,14 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       switch (request.method) {
         case "GET":
           if (action === "get" || action === "") return this.handleGetBalance();
+          if (action === "pouw-task") return this.handleGetPouwTask();
           if (action === "history") {
             const limit = parseInt(url.searchParams.get("limit") || "100", 10);
             return this.handleGetHistory(limit);
           }
           if (action === "claimable") return this.handleGetClaimableBalance();
           if (action === "claim-history") return this.handleGetClaimHistory();
+          if (action === "retriable-claims") return this.handleGetRetriableClaims();
           if (action === "claim-status") {
             const claimId = pathParts[3];
             if (!claimId) return this.errorResponse("Claim ID required", 400);
@@ -230,6 +293,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
           if (action === "update-claim-status")
             return this.handleUpdateClaimStatus(request);
           if (action === "cancel-claim") return this.handleCancelClaim(request);
+          if (action === "cleanup-expired") return this.handleCleanupExpired();
           break;
 
         case "DELETE":
@@ -303,56 +367,87 @@ export class VirtualBalanceDO extends DurableObject<Env> {
   }
 
   // ===========================================================================
-  // MINING CREDIT
+  // MINING CREDIT (PoUW AI Era)
   // ===========================================================================
 
   private async handleCreditMining(request: Request): Promise<Response> {
     if (!this.address) return this.errorResponse("Address required", 400);
 
-    let proof: MiningProof;
+    let proof: AIProof;
     try {
-      proof = (await request.json()) as MiningProof;
+      proof = (await request.json()) as AIProof;
     } catch {
       return this.errorResponse("Invalid JSON body", 400);
     }
 
-    if (!proof || !proof.hash || !proof.blockData) {
+    if (!proof || !proof.taskId || !proof.output || !proof.signature || !proof.publicKey) {
       return this.errorResponse("Invalid proof: missing required fields", 400);
     }
 
     const balance = this.balanceRepo.getOrCreate(this.address);
-    const difficultyState = this.balanceRepo.getDifficultyState();
-    const sharesInLastHour = this.proofRepo.getSharesInLastHour();
+    // Count submissions in last hour for rate limiting/stats
+    // We query the pouw_submissions table for count in last hour
+    let submissionsInLastHour = 0;
+    try {
+      const oneHourAgo = Date.now() - 3600000;
+      const countRows = this.sql
+        .exec(
+          "SELECT COUNT(*) as cnt FROM pouw_submissions WHERE address = ? AND created_at > ?",
+          this.address,
+          oneHourAgo
+        )
+        .toArray();
+      submissionsInLastHour = (countRows[0]?.cnt as number) || 0;
+    } catch {
+      /* ignore */
+    }
 
-    const result = await processMiningCredit(proof, {
+    // Process AI Credit (validates signature, checks derived address, computes rewards)
+    const result = await processAICredit(proof, {
       env: this.env,
       address: this.address,
       balance,
-      difficultyState,
-      sharesInLastHour,
+      submissionsInLastHour,
+      balanceRepo: this.balanceRepo,
     });
 
     if (!result.success) {
       return this.errorResponse(result.error!, result.errorCode || 500);
     }
 
-    // Store proof
-    this.proofRepo.store({
-      id: result.proofId!,
-      hash: proof.hash,
-      nonce:
-        typeof proof.nonce === "string"
-          ? parseInt(proof.nonce, 10)
-          : proof.nonce,
-      difficulty: proof.difficulty,
-      blockData: proof.blockData,
-      reward: result.reward!,
-      address: this.address,
-    });
+    // Store PoUW submission in database
+    try {
+      this.sql.exec(
+        `INSERT OR REPLACE INTO pouw_submissions (task_id, address, output, compute_time, signature, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        proof.taskId,
+        this.address,
+        proof.output,
+        proof.computeTime,
+        proof.signature,
+        Date.now()
+      );
+    } catch (err) {
+      balanceLogger.error("Failed to store pouw submission in SQLite", { err, address: this.address });
+      return this.errorResponse("Internal database error storing proof", 500);
+    }
 
     // Update balance
     this.balanceRepo.update(result.balance!);
-    this.proofRepo.incrementShareCounter();
+
+    // Schedule random semantic audit LLM-as-a-Judge (1% chance)
+    const shouldAudit = Math.random() < 0.01;
+    if (shouldAudit) {
+      this.ctx.waitUntil(
+        performSemanticAudit(
+          this.env,
+          proof,
+          this.address,
+          result.reward!,
+          this.balanceRepo
+        )
+      );
+    }
 
     // Update leaderboard async
     this.updateLeaderboardAsync(this.address, result.balance!.totalMined);
@@ -367,10 +462,78 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         nftBoost: result.boosts!.nft,
         engagementBoost: result.boosts!.engagement,
         cosmicBoost: result.boosts!.cosmic,
-        varDiff: result.varDiff,
+        reputation: result.boosts!.reputation,
       },
       timestamp: Date.now(),
     });
+  }
+
+  /**
+   * GET /balance/:address/pouw-task - Retrieve or generate PoUW task based JIT on Bitcoin block
+   */
+  private async handleGetPouwTask(): Promise<Response> {
+    if (!this.address) return this.errorResponse("Address required", 400);
+
+    try {
+      const network = getNetworkForEnvironment(this.env.ENVIRONMENT);
+      const mempoolService = initMempoolService(network, this.env.CACHE || null);
+      const blockHash = await mempoolService.getCurrentBlockHash();
+
+      // Check if there is an active task for this blockHash in the database
+      const rows = this.sql
+        .exec("SELECT * FROM pouw_tasks WHERE block_hash = ? AND status = 'active' LIMIT 1", blockHash)
+        .toArray();
+
+      if (rows.length > 0) {
+        const row = rows[0];
+        return Response.json({
+          success: true,
+          data: {
+            id: row.id as string,
+            type: "pouw",
+            input: row.prompt as string,
+            seed: row.seed as string,
+            blockHash: row.block_hash as string,
+          },
+        });
+      }
+
+      // Generate a new task
+      const prompts = [
+        "Write a short lore entry about Baby learning how to read the Bitcoin blockchain.",
+        "Describe the Genesis Baby's reaction to seeing the Bitcoin difficulty adjustment.",
+        "Describe how a baby miner operates a tiny WebGPU mining rig in their crib.",
+        "Write a story about a baby discovering Satoshi's whitepaper in their toy chest.",
+        "Describe the Genesis Baby's first encounter with a Lightning Network node.",
+        "Write a legend about how the Golden Pacifier was forged in a blocks mined by Satoshi."
+      ];
+      const prompt = prompts[Math.floor(Math.random() * prompts.length)];
+      const taskId = `pouw-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      this.sql.exec(
+        `INSERT INTO pouw_tasks (id, block_hash, prompt, seed, created_at, status)
+         VALUES (?, ?, ?, ?, ?, 'active')`,
+        taskId,
+        blockHash,
+        prompt,
+        blockHash,
+        Date.now()
+      );
+
+      return Response.json({
+        success: true,
+        data: {
+          id: taskId,
+          type: "pouw",
+          input: prompt,
+          seed: blockHash,
+          blockHash,
+        },
+      });
+    } catch (error) {
+      balanceLogger.error("Failed to generate/retrieve PoUW task", { error, address: this.address });
+      return this.errorResponse("Failed to generate PoUW task", 500);
+    }
   }
 
   private async handleSetHashrate(request: Request): Promise<Response> {
@@ -564,7 +727,17 @@ export class VirtualBalanceDO extends DurableObject<Env> {
   private async handleFaucetCredit(request: Request): Promise<Response> {
     if (!this.address) return this.errorResponse("Address required", 400);
 
-    const body = (await request.json()) as { amount: string };
+    let body: { amount: string; maxTotal?: string; cooldownMs?: number };
+    try {
+      body = (await request.json()) as {
+        amount: string;
+        maxTotal?: string;
+        cooldownMs?: number;
+      };
+    } catch {
+      return this.errorResponse("Invalid JSON body", 400);
+    }
+
     if (!body.amount) {
       return this.errorResponse("Amount is required", 400);
     }
@@ -575,10 +748,37 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     }
 
     const balance = this.balanceRepo.getOrCreate(this.address);
+    const now = Date.now();
 
-    // Credit to both virtual balance and total mined
+    // 1. Check Cooldown
+    if (body.cooldownMs && body.cooldownMs > 0) {
+      const timeSinceLastClaim = now - balance.faucetLastClaimAt;
+      if (timeSinceLastClaim < body.cooldownMs) {
+        const remainingMs = body.cooldownMs - timeSinceLastClaim;
+        return this.errorResponse(
+          `Faucet cooldown active. Try again in ${Math.ceil(remainingMs / 1000)} seconds.`,
+          429,
+        );
+      }
+    }
+
+    // 2. Check Max Claim limit
+    if (body.maxTotal) {
+      const maxTotal = BigInt(body.maxTotal);
+      const totalClaimedAfter = balance.faucetTotalClaimed + amount;
+      if (totalClaimedAfter > maxTotal) {
+        return this.errorResponse(
+          `Maximum faucet total reached (${maxTotal} BABTC). You have claimed ${balance.faucetTotalClaimed}.`,
+          400,
+        );
+      }
+    }
+
+    // Credit to virtual balance, total mined, and faucet fields
     balance.virtualBalance += amount;
     balance.totalMined += amount;
+    balance.faucetLastClaimAt = now;
+    balance.faucetTotalClaimed += amount;
     this.balanceRepo.update(balance);
 
     balanceLogger.info("Faucet credited", {
@@ -586,6 +786,8 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       address: this.address,
       newBalance: balance.virtualBalance.toString(),
       totalMined: balance.totalMined.toString(),
+      faucetLastClaimAt: balance.faucetLastClaimAt,
+      faucetTotalClaimed: balance.faucetTotalClaimed.toString(),
     });
 
     // Update leaderboard async
@@ -597,8 +799,10 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         credited: amount.toString(),
         newBalance: balance.virtualBalance.toString(),
         totalMined: balance.totalMined.toString(),
+        faucetLastClaimAt: balance.faucetLastClaimAt,
+        faucetTotalClaimed: balance.faucetTotalClaimed.toString(),
       },
-      timestamp: Date.now(),
+      timestamp: now,
     });
   }
 
@@ -724,7 +928,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       estimatedFee,
     );
 
-    const now = Date.now();
+    const now = aggregatedProof.timestamp;
     const expiresAt = now + CLAIM_EXPIRATION_MS;
     const claimId = aggregatedProof.nonce;
 
@@ -739,6 +943,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       serverSignature: claimData.serverSignature,
       opReturnData: claimData.opReturnData,
       expiresAt,
+      preparedAt: now,
     });
 
     // Mark proofs as being claimed
@@ -802,6 +1007,13 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     });
     this.proofRepo.markClaimed(body.claimId);
 
+    // Deduct the claimed amount from the user's virtual balance to prevent double spending
+    const balance = this.balanceRepo.getOrCreate(this.address);
+    const amountToDeduct = BigInt(claim.amount);
+    balance.virtualBalance -= amountToDeduct;
+    balance.totalWithdrawn += amountToDeduct;
+    this.balanceRepo.update(balance);
+
     const responseData: ClaimConfirmResponse = {
       status: "broadcast",
       mintTxid: null,
@@ -813,6 +1025,30 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     return Response.json({
       success: true,
       data: responseData,
+      timestamp: Date.now(),
+    });
+  }
+
+  private handleGetRetriableClaims(): Response {
+    if (!this.address) return this.errorResponse("Address required", 400);
+    const retriable = this.claimRepo.getRetriable(this.address);
+    return Response.json({
+      success: true,
+      data: { retriable },
+      timestamp: Date.now(),
+    });
+  }
+
+  private handleCleanupExpired(): Response {
+    if (!this.address) return this.errorResponse("Address required", 400);
+    const expired = this.claimRepo.getExpiredPrepared(Date.now());
+    for (const claim of expired) {
+      this.claimRepo.updateStatus(claim.id, this.address, "expired");
+      this.proofRepo.releaseFromClaim(claim.id);
+    }
+    return Response.json({
+      success: true,
+      data: { cleanedCount: expired.length },
       timestamp: Date.now(),
     });
   }

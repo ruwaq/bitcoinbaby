@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 /**
  * Wallet SPA Navigation Test
@@ -32,46 +32,58 @@ test.describe("Wallet SPA Navigation", () => {
 
     // Helper to click a tab button
     async function clickTab(tabName: string): Promise<void> {
-      // Tabs are buttons in a nav element
-      await page.locator(`nav button:has-text("${tabName}")`).first().click();
+      const tabIdMap: Record<string, string> = {
+        "Mining": "mining",
+        "NFTs": "nfts",
+        "Wallet": "wallet",
+        "More": "more",
+        "Token": "token",
+        "$BABTC": "token"
+      };
+      const id = tabIdMap[tabName] || tabName.toLowerCase();
+      await page.getByTestId(`tab-${id}`).click();
     }
 
     // 1. IMPORT WALLET
     console.log("📱 Step 1: Importing wallet...");
     await page.goto("/?tab=wallet");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3000);
 
-    // Click Import button
+    // Wait for either the import button (wallet not connected) or address button (wallet already connected)
     const importButton = page.getByRole("button", { name: /import/i });
+    const addressButton = page.locator('button:has-text("tb1")');
+    
+    await Promise.race([
+      importButton.waitFor({ state: "visible", timeout: 20000 }),
+      addressButton.first().waitFor({ state: "visible", timeout: 20000 })
+    ]).catch(() => {});
+
+    // Click Import button if visible
     if (await importButton.isVisible().catch(() => false)) {
       await importButton.click();
-      await page.waitForTimeout(1000);
+      
+      // Wait for mnemonic input field to be visible and ready
+      const mnemonicInput = page.locator("textarea");
+      await mnemonicInput.waitFor({ state: "visible", timeout: 5000 });
+      await mnemonicInput.fill(TEST_MNEMONIC);
 
-      // Fill mnemonic
-      const mnemonicInput = page.locator(
-        'textarea, input[placeholder*="word"], input[placeholder*="phrase"]',
-      );
-      if ((await mnemonicInput.count()) > 0) {
-        await mnemonicInput.first().fill(TEST_MNEMONIC);
-        await page.waitForTimeout(500);
+      // Fill passwords
+      const passwordInputs = page.locator('input[type="password"]');
+      await passwordInputs.first().waitFor({ state: "visible", timeout: 5000 });
+      if ((await passwordInputs.count()) >= 2) {
+        await passwordInputs.first().fill(TEST_PASSWORD);
+        await passwordInputs.nth(1).fill(TEST_PASSWORD);
 
-        // Fill passwords
-        const passwordInputs = page.locator('input[type="password"]');
-        if ((await passwordInputs.count()) >= 2) {
-          await passwordInputs.first().fill(TEST_PASSWORD);
-          await passwordInputs.nth(1).fill(TEST_PASSWORD);
-          await page.waitForTimeout(500);
-
-          // Submit
-          const submitBtn = page.getByRole("button", {
-            name: /import|confirm/i,
-          });
-          if (await submitBtn.isVisible().catch(() => false)) {
-            await submitBtn.click();
-            await page.waitForTimeout(5000);
-          }
-        }
+        // Submit
+        const submitBtn = page.getByRole("button", {
+          name: "IMPORT WALLET",
+          exact: true,
+        });
+        await submitBtn.waitFor({ state: "visible", timeout: 5000 });
+        await submitBtn.click();
+        
+        // Wait for the import modal/action to complete and address button to appear
+        await addressButton.first().waitFor({ state: "visible", timeout: 20000 }).catch(() => {});
       }
     }
 

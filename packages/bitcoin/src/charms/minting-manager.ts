@@ -39,7 +39,7 @@ import type {
   MiningReward,
 } from "./token";
 import {
-  MempoolClient,
+  BlockchainAPI,
   createMempoolClient,
   getEncodedMerkleProof,
   type MerkleProof,
@@ -214,7 +214,7 @@ export interface PreparedSpellV9 {
 export class MintingManager {
   private readonly network: BitcoinNetwork;
   private readonly proverClient: CharmsProverClient;
-  private readonly mempoolClient: MempoolClient;
+  private readonly mempoolClient: BlockchainAPI;
   private readonly txBuilder: TransactionBuilder;
   private readonly debug: boolean;
 

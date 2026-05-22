@@ -708,9 +708,9 @@ export function useMintNFT(): UseMintNFTReturn {
               const tx = await mempoolClient.getTransaction(
                 broadcastCommitTxid!,
               );
-              if (tx && tx.txid) {
+              if (tx && tx.status && tx.status.confirmed === true) {
                 resolved = true;
-                log.info("Commit confirmed in mempool:", {
+                log.info("Commit confirmed in block:", {
                   txid: broadcastCommitTxid,
                   elapsed: Date.now() - startTime,
                 });
@@ -718,7 +718,7 @@ export function useMintNFT(): UseMintNFTReturn {
                 return;
               }
             } catch {
-              // Transaction not found yet — this is expected during polling
+              // Transaction not found yet or not confirmed — this is expected during polling
             }
 
             if (Date.now() - startTime >= CONFIRMATION_TIMEOUT_MS) {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  MempoolClient,
+  type BlockchainAPI,
   createMempoolClient,
   type AddressBalance,
   type UTXO,
@@ -34,7 +34,7 @@ export function useBalance(options: UseBalanceOptions = {}) {
     refreshInterval = 30000,
   } = options;
 
-  const clientRef = useRef<MempoolClient | null>(null);
+  const clientRef = useRef<BlockchainAPI | null>(null);
   // Track mounted state to prevent setState on unmounted component
   const isMountedRef = useRef(true);
 

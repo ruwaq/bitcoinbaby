@@ -8,7 +8,7 @@
 
 import * as bitcoin from "bitcoinjs-lib";
 import * as ecc from "tiny-secp256k1";
-import type { MempoolClient } from "../blockchain/mempool";
+import type { BlockchainAPI } from "../blockchain/types";
 
 // Initialize bitcoinjs-lib with secp256k1
 bitcoin.initEccLib(ecc);
@@ -85,7 +85,7 @@ export async function rawTxToPsbt(
   rawTxHex: string,
   fundingUtxo: FundingUtxo,
   ownerAddress: string,
-  mempoolClient: MempoolClient,
+  mempoolClient: BlockchainAPI,
   network?: bitcoin.Network,
 ): Promise<string> {
   // Default to testnet for backward compatibility, but allow mainnet override

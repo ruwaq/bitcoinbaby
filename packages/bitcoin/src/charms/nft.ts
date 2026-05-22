@@ -162,9 +162,9 @@ export const LEVEL_BOOSTS: Record<number, number> = {
  * Combines level boost + rarity boost
  */
 export function getMiningBoost(nft: BabyNFTState): number {
-  const levelBoost = LEVEL_BOOSTS[nft.level] || 0;
+  const levelBoost = LEVEL_BOOSTS[nft.level] ?? 0;
   const rarityBoost =
-    GENESIS_BABIES_CONFIG.rarityTiers[nft.rarityTier]?.boost || 0;
+    GENESIS_BABIES_CONFIG.rarityTiers[nft.rarityTier]?.boost ?? 0;
 
   // Boosts are additive
   return levelBoost + rarityBoost;
@@ -352,14 +352,23 @@ export interface NFTWorkProofParams {
 
 /**
  * Generate work proof spell (adds XP)
+ * XP is capped at the requirement for the next level to prevent overflow.
  */
 export function createNFTWorkProofSpell(params: NFTWorkProofParams): SpellV2 {
   const appRef = `n/${params.appId}/${params.appVk}`;
   const xpGain = calculateXpGain(params.currentState);
+  const nextLevelReq = XP_REQUIREMENTS[params.currentState.level + 1];
+
+  // Cap XP at the next level's requirement so the UTXO state stays bounded
+  const rawNewXp = params.currentState.xp + xpGain;
+  const cappedNewXp =
+    nextLevelReq !== undefined
+      ? Math.min(rawNewXp, nextLevelReq)
+      : rawNewXp;
 
   const newState: BabyNFTState = {
     ...params.currentState,
-    xp: params.currentState.xp + xpGain,
+    xp: cappedNewXp,
     totalXp: params.currentState.totalXp + xpGain,
     workCount: params.currentState.workCount + 1,
     lastWorkBlock: params.currentBlock,

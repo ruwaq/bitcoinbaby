@@ -26,7 +26,9 @@ import {
   PERIOD_INFO,
   type LeaderboardCategory,
   type LeaderboardPeriod,
+  type BitcoinNetwork,
 } from "@bitcoinbaby/core";
+import { getPhaseConfig } from "@bitcoinbaby/shared";
 import { useWallet } from "../../hooks/useWallet";
 
 /**
@@ -112,7 +114,7 @@ function CategoryCard({
   );
 }
 
-export default function LeaderboardPage() {
+function LeaderboardContent() {
   // Wallet hook for user address
   const wallet = useWallet();
   const { network } = useNetworkStore();
@@ -382,4 +384,79 @@ export default function LeaderboardPage() {
       </footer>
     </main>
   );
+}
+
+function LeaderboardLockedView({ network }: { network: BitcoinNetwork }) {
+  return (
+    <main className="min-h-screen p-4 md:p-8 bg-pixel-bg-dark">
+      {/* Header */}
+      <header className="max-w-4xl mx-auto mb-16">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+            >
+              <div className="w-10 h-10 bg-pixel-primary border-2 border-black flex items-center justify-center">
+                <span className="font-pixel text-pixel-text-dark text-xs">
+                  B
+                </span>
+              </div>
+              <h1 className="font-pixel text-lg md:text-xl text-pixel-primary">
+                BITCOIN<span className="text-pixel-secondary">BABY</span>
+              </h1>
+            </Link>
+          </div>
+
+          <nav className="flex items-center gap-2">
+            <NetworkBadge network={network} />
+            <Link
+              href="/"
+              className="px-3 py-2 font-pixel text-[8px] text-pixel-text-muted hover:text-pixel-primary transition-colors"
+            >
+              HOME
+            </Link>
+          </nav>
+        </div>
+      </header>
+
+      <div className="max-w-md mx-auto text-center mt-12">
+        <div className="mb-6 mx-auto w-20 h-20 bg-pixel-bg-medium border-4 border-pixel-warning flex items-center justify-center shadow-[4px_4px_0_0_#000]">
+          <span className="text-4xl">🏆</span>
+        </div>
+        
+        <h2 className="font-pixel text-xl text-pixel-primary mb-2">
+          LEADERBOARD LOCKED
+        </h2>
+        
+        <div className="mb-6 p-4 bg-pixel-bg-medium border-4 border-pixel-warning shadow-[4px_4px_0_0_#000]">
+          <p className="font-pixel text-[10px] text-pixel-warning uppercase mb-2">
+            ⚠️ PHASE 2 REQUIRED
+          </p>
+          <p className="font-pixel-body text-xs text-pixel-text-muted leading-relaxed">
+            The global rankings and miner leaderboard will unlock in Phase 2 (Mining). 
+            Train your Baby, stack rewards, and prepare to compete with miners worldwide!
+          </p>
+        </div>
+
+        <Link
+          href="/"
+          className="inline-block px-6 py-3 font-pixel text-xs bg-pixel-primary text-pixel-text-dark border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all"
+        >
+          BACK HOME
+        </Link>
+      </div>
+    </main>
+  );
+}
+
+export default function LeaderboardPage() {
+  const { features } = getPhaseConfig();
+  const { network } = useNetworkStore();
+
+  if (!features.leaderboard) {
+    return <LeaderboardLockedView network={network} />;
+  }
+
+  return <LeaderboardContent />;
 }

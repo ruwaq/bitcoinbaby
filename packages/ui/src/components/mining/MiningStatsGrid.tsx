@@ -12,7 +12,7 @@ import { clsx } from "clsx";
 export interface MiningStats {
   /** Mining session uptime in seconds */
   uptime?: number;
-  /** Total hashes computed */
+  /** Total words/tokens learned */
   totalHashes: number;
   /** Valid shares found */
   shares: number;
@@ -20,7 +20,7 @@ export interface MiningStats {
   difficulty: number;
   /** Miner type (CPU, WebGPU, etc.) */
   minerType?: string;
-  /** Current hashrate in H/s */
+  /** Current speed in T/s */
   hashrate?: number;
 }
 
@@ -51,16 +51,16 @@ function formatUptime(seconds: number): string {
 }
 
 /**
- * Format hashrate for display
+ * Format speed (tokens/s) for display
  */
 function formatHashrate(hashrate: number): string {
   if (hashrate >= 1_000_000) {
-    return `${(hashrate / 1_000_000).toFixed(2)} MH/s`;
+    return `${(hashrate / 1_000_000).toFixed(2)} MT/s`;
   }
   if (hashrate >= 1_000) {
-    return `${(hashrate / 1_000).toFixed(2)} KH/s`;
+    return `${(hashrate / 1_000).toFixed(2)} KT/s`;
   }
-  return `${Math.round(hashrate)} H/s`;
+  return `${hashrate.toFixed(1)} T/s`;
 }
 
 /**
@@ -154,7 +154,7 @@ export function MiningStatsGrid({
       value: stats.uptime !== undefined ? formatUptime(stats.uptime) : "--",
     },
     {
-      label: "Hashes",
+      label: "Words Learned",
       value: formatNumber(stats.totalHashes),
     },
     {
@@ -171,7 +171,7 @@ export function MiningStatsGrid({
   // Add optional stats
   if (stats.hashrate !== undefined) {
     items.unshift({
-      label: "Hashrate",
+      label: "Speed",
       value: formatHashrate(stats.hashrate),
       highlight: true,
     });
@@ -179,8 +179,8 @@ export function MiningStatsGrid({
 
   if (stats.minerType) {
     items.push({
-      label: "Miner",
-      value: stats.minerType,
+      label: "Model",
+      value: stats.minerType === "webgpu" ? "Gemma 4 E2B (WebGPU)" : "Gemma 4 E2B (CPU)",
     });
   }
 

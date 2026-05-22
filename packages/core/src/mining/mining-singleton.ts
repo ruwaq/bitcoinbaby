@@ -25,6 +25,8 @@ import type {
   MiningResult,
   DeviceCapabilities,
   XPGainedEvent,
+  AITask,
+  AIProof,
 } from "./types";
 import { MIN_DIFFICULTY } from "../tokenomics/constants";
 import { createLogger } from "@bitcoinbaby/shared";
@@ -72,6 +74,8 @@ export interface MiningManagerConfig extends Partial<OrchestratorConfig> {
   /** Callback when XP is gained from mining (for NFT work proof) */
   onXPGained?: (event: XPGainedEvent) => void;
   onError?: (error: Error) => void;
+  /** Callback when an AI local task has been solved locally and requires wallet signing */
+  onAILocalTaskResolved?: (proof: AIProof, task: AITask) => void;
 
   // Feature options
   enablePersistence?: boolean;
@@ -179,6 +183,11 @@ class MiningManager {
     // XP gained event (for NFT work proof system)
     this.orchestrator.on("onXPGained", (event) => {
       this.config.onXPGained?.(event);
+    });
+
+    // AI local task resolved event
+    this.orchestrator.on("onAILocalTaskResolved", (proof, task) => {
+      this.config.onAILocalTaskResolved?.(proof, task);
     });
 
     this.orchestrator.on("onStatusChange", (status) => {

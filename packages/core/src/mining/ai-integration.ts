@@ -31,21 +31,12 @@
  * ============================================================================
  */
 
-// Types are defined locally to avoid importing from @bitcoinbaby/ai at build time
-// The actual types are compatible with the AI package
-
-/** AI Task definition (matches @bitcoinbaby/ai) */
-interface AITask {
-  id: string;
-  type: "classification" | "embedding" | "sentiment";
-  input: string | string[];
-  model?: string;
-}
+import { AITask, AIProof } from "./types";
 
 /** AI Result definition (matches @bitcoinbaby/ai) */
 interface AIResult {
   taskId: string;
-  output: unknown;
+  output: string;
   computeTime: number;
   proof: string;
   verified: boolean;
@@ -215,7 +206,7 @@ export class AIWorkIntegration {
   /**
    * Execute a single AI task
    */
-  async executeTask(): Promise<AIWorkResult> {
+  async executeTask(task?: AITask): Promise<AIWorkResult> {
     if (!this.engine) {
       return {
         success: false,
@@ -225,11 +216,11 @@ export class AIWorkIntegration {
     }
 
     try {
-      // Generate a random sentiment analysis task
-      const task = this.generateSentimentTask();
+      // Use provided task or generate a default one
+      const taskToExecute = task || this.generateDefaultAITask();
 
       // Execute with timeout
-      const result = await this.executeWithTimeout(task);
+      const result = await this.executeWithTimeout(taskToExecute);
 
       this.tasksCompleted++;
 
@@ -278,35 +269,24 @@ export class AIWorkIntegration {
   }
 
   /**
-   * Generate a sentiment analysis task
-   * These tasks contribute to training collective sentiment models
+   * Generate a default AI PoUW task
    */
-  private generateSentimentTask(): AITask {
-    const sentences = [
-      "The new Bitcoin update brings exciting features to the ecosystem.",
-      "I'm concerned about the recent market volatility.",
-      "This project has incredible potential for the future.",
-      "The community support for this initiative is overwhelming.",
-      "Technical challenges remain, but progress is being made.",
-      "Innovation in blockchain continues to accelerate.",
-      "The user experience could definitely be improved.",
-      "Great progress on the development roadmap today!",
-      "Security concerns need to be addressed urgently.",
-      "The team is doing an amazing job with this release.",
-      "Decentralization is the key to financial freedom.",
-      "The network hashrate has reached new all-time highs.",
-      "Mining rewards are helping secure the network.",
-      "Baby's first Bitcoin transaction was a success!",
-      "The proof of useful work concept is revolutionary.",
+  private generateDefaultAITask(): AITask {
+    const prompts = [
+      "Explain the importance of decentralization in public blockchains.",
+      "Summarize how Proof of Useful Work helps reduce carbon footprint.",
+      "Write a short pixel-art description of a cyber baby learning AI.",
+      "How does WebGPU enable local neural network inference in browsers?",
+      "Design a virtual gym workout routine for a Bitcoin Baby."
     ];
 
-    const randomSentence =
-      sentences[Math.floor(Math.random() * sentences.length)];
+    const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
 
     return {
       id: `pouw-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      type: "sentiment",
-      input: randomSentence,
+      type: "pouw",
+      input: randomPrompt,
+      seed: Math.random().toString(16).slice(2),
     };
   }
 

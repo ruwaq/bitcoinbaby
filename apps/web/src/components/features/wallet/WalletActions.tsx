@@ -10,19 +10,20 @@
  * - Get testnet BTC link
  */
 
-import Link from "next/link";
 import { Button, pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
 
 interface WalletActionsProps {
   onLock: () => void;
   onDelete: () => void;
   showTestnetFaucet: boolean;
+  onViewChange?: (view: "send" | "claim" | "history") => void;
 }
 
 export function WalletActions({
   onLock,
   onDelete,
   showTestnetFaucet,
+  onViewChange,
 }: WalletActionsProps) {
   return (
     <>
@@ -31,29 +32,30 @@ export function WalletActions({
         className="flex gap-2 sm:gap-3 pt-4 border-t-2 border-pixel-border"
         aria-label="Wallet actions"
       >
-        <Link href="/wallet/send" className="flex-1" aria-label="Send Bitcoin">
-          <Button variant="default" className="w-full">
-            SEND
-          </Button>
-        </Link>
-        <Link
-          href="/wallet/claim"
-          className="flex-1"
+        <Button
+          variant="default"
+          className="w-full"
+          onClick={() => onViewChange?.("send")}
+          aria-label="Send Bitcoin"
+        >
+          SEND
+        </Button>
+        <Button
+          variant="success"
+          className="w-full"
+          onClick={() => onViewChange?.("claim")}
           aria-label="Claim BABTC tokens"
         >
-          <Button variant="success" className="w-full">
-            CLAIM
-          </Button>
-        </Link>
-        <Link
-          href="/wallet/history"
-          className="flex-1"
+          CLAIM
+        </Button>
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => onViewChange?.("history")}
           aria-label="View transaction history"
         >
-          <Button variant="outline" className="w-full">
-            HISTORY
-          </Button>
-        </Link>
+          HISTORY
+        </Button>
       </nav>
 
       {/* Get Testnet BTC */}

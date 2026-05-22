@@ -8,3 +8,5 @@ export { LockedWallet } from "./LockedWallet";
 export { BalancesGrid } from "./BalancesGrid";
 export { SecurityInfo } from "./SecurityInfo";
 export { WalletActions } from "./WalletActions";
+export { SendView } from "./SendView";
+export { HistoryView } from "./HistoryView";

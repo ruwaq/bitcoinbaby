@@ -83,6 +83,27 @@ export interface MiningProof {
   timestamp?: number;
 }
 
+export interface AIProof {
+  taskId: string;
+  taskType: string;
+  inputPrompt: string;
+  seed: string;
+  output: string;
+  computeTime: number;
+  modelId: string;
+  timestamp: number;
+  publicKey: string;
+  signature: string;
+}
+
+export interface PouwTaskResponse {
+  id: string;
+  type: "pouw";
+  input: string;
+  seed: string;
+  blockHash: string;
+}
+
 // =============================================================================
 // WITHDRAW POOL
 // =============================================================================

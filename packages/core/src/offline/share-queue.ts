@@ -49,6 +49,18 @@ export interface QueuedShare {
   error: string | null;
   /** When to retry next (for backoff) */
   nextRetry: number | null;
+
+  // PoUW AIProof fields
+  isAI?: boolean;
+  taskId?: string;
+  taskType?: string;
+  inputPrompt?: string;
+  seed?: string;
+  output?: string;
+  computeTime?: number;
+  modelId?: string;
+  publicKey?: string;
+  signature?: string;
 }
 
 export interface QueueStats {

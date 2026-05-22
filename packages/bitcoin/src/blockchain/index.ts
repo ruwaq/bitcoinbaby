@@ -11,6 +11,7 @@ export type {
   TransactionInfo,
   FeeEstimates,
   BlockchainAPI,
+  BlockInfo,
 } from "./types";
 
 // Mempool.space client
@@ -19,8 +20,9 @@ export {
   MempoolAPIError,
   createMempoolClient,
   type MempoolClientOptions,
-  type BlockInfo,
 } from "./mempool";
+
+export { MockMempoolClient } from "./mock-mempool";
 
 // Merkle proof utilities
 export {

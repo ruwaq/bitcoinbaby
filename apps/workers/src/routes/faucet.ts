@@ -15,7 +15,6 @@ import {
   getVirtualBalanceStub,
   forwardToDO,
   safeDOCall,
-  errorResponse,
 } from "../lib/helpers";
 import { validateBody, bitcoinAddressSchema } from "../lib/middleware";
 import { balanceLogger } from "../lib/logger";
@@ -65,121 +64,66 @@ faucetRouter.post(
       100, // hard ceiling: max 100 per claim
     );
     const faucetMaxTotal = Number(c.env.FAUCET_MAX_TOTAL || DEFAULT_FAUCET_MAX_TOTAL);
-
-    // ---- Rate Limit Check (KV-based) ----
     const rateLimitKey = `faucet:claim:${address}`;
     const kv = c.env.CACHE;
 
-    if (kv) {
-      try {
-        const cached = await kv.get<{ lastClaimAt: number; totalClaimed: number }>(
-          rateLimitKey,
-          "json",
-        );
-
-        const now = Date.now();
-
-        if (cached) {
-          // Check cooldown
-          const nextClaimAt = cached.lastClaimAt + FAUCET_WINDOW_MS;
-          if (now < nextClaimAt) {
-            const retryAfterSec = Math.ceil((nextClaimAt - now) / 1000);
-            c.header("Retry-After", String(retryAfterSec));
-            return c.json(
-              {
-                success: false,
-                error: "Faucet cooldown active. Please wait before claiming again.",
-                nextClaimAt,
-                retryAfterSeconds: retryAfterSec,
-                totalClaimed: cached.totalClaimed,
-                timestamp: now,
-              },
-              429,
-            );
-          }
-
-          // Check max total
-          if (cached.totalClaimed + faucetAmount > faucetMaxTotal) {
-            return c.json(
-              {
-                success: false,
-                error: `Maximum faucet total reached (${faucetMaxTotal} BABTC). You have claimed ${cached.totalClaimed}.`,
-                totalClaimed: cached.totalClaimed,
-                maxTotal: faucetMaxTotal,
-                timestamp: now,
-              },
-              400,
-            );
-          }
-        }
-      } catch (kvError) {
-        balanceLogger.warn("KV rate limit check failed", { error: kvError, address });
-        // Fall through — allow claim if KV is temporarily unavailable
-      }
-    }
-
-    // ---- Check current balance from VirtualBalanceDO ----
-    let currentBalance = 0n;
-    try {
-      const balanceStub = getVirtualBalanceStub(c.env, address);
-      const balanceResponse = await forwardToDO(balanceStub, `/balance/${address}/get`);
-      const balanceData = (await balanceResponse.json()) as {
-        success: boolean;
-        data?: { virtualBalance: string; totalMined: string };
-      };
-
-      if (balanceData.success && balanceData.data) {
-        currentBalance = BigInt(balanceData.data.totalMined || "0");
-      }
-
-      // Enforce max total from on-chain data (in case KV is stale)
-      if (currentBalance + BigInt(faucetAmount) > BigInt(faucetMaxTotal)) {
-        return errorResponse(
-          c,
-          `Maximum faucet total reached (${faucetMaxTotal} BABTC). Current: ${currentBalance}.`,
-          400,
-        );
-      }
-    } catch (balanceError) {
-      balanceLogger.error("Failed to fetch balance for faucet check", balanceError);
-      return errorResponse(c, "Unable to verify current balance. Please try again.", 503);
-    }
-
-    // ---- Credit via VirtualBalanceDO FIRST (source of truth), then update KV ----
+    // ---- Credit and validate via VirtualBalanceDO atomically ----
     return safeDOCall(
       c,
       async () => {
         const stub = getVirtualBalanceStub(c.env, address);
 
-        // 1. Forward credit to DO FIRST (source of truth)
+        // Forward credit to DO (performs atomic check of cooldown and maxTotal)
         const doResponse = await forwardToDO(stub, `/balance/${address}/faucet`, {
           method: "POST",
-          body: { amount: String(faucetAmount) },
+          body: {
+            amount: String(faucetAmount),
+            maxTotal: String(faucetMaxTotal),
+            cooldownMs: FAUCET_WINDOW_MS,
+          },
         });
+
         if (!doResponse.ok) {
-          const err = await doResponse.text();
-          balanceLogger.error("Faucet DO credit failed", { err, address });
-          return errorResponse(c, "Faucet credit failed. Please try again.", 503);
+          let errMsg = "Faucet credit failed. Please try again.";
+          try {
+            const errJson = await doResponse.clone().json() as { error?: string };
+            if (errJson && errJson.error) {
+              errMsg = errJson.error;
+            }
+          } catch {
+            try {
+              const text = await doResponse.clone().text();
+              if (text) errMsg = text;
+            } catch {}
+          }
+          balanceLogger.error("Faucet DO credit failed", { error: errMsg, address });
+          return c.json(
+            {
+              success: false,
+              error: errMsg,
+              timestamp: Date.now(),
+            },
+            doResponse.status as any,
+          );
         }
 
-        // 2. Only update KV after DO succeeds (idempotent cache)
-        const now = Date.now();
+        // Only update KV cache after DO succeeds (idempotent cache)
         if (kv) {
-          const cached = await kv.get<{ lastClaimAt: number; totalClaimed: number }>(
-            rateLimitKey,
-            "json",
-          );
-          const newTotalClaimed = (cached?.totalClaimed ?? Number(currentBalance)) + faucetAmount;
-
           try {
-            await kv.put(
-              rateLimitKey,
-              JSON.stringify({
-                lastClaimAt: now,
-                totalClaimed: newTotalClaimed,
-              }),
-              { expirationTtl: Math.ceil(FAUCET_WINDOW_MS / 1000) + 86400 }, // 24h + 1 day buffer
-            );
+            const doData = await doResponse.clone().json() as {
+              success: boolean;
+              data?: { faucetLastClaimAt: number; faucetTotalClaimed: string };
+            };
+            if (doData.success && doData.data) {
+              await kv.put(
+                rateLimitKey,
+                JSON.stringify({
+                  lastClaimAt: doData.data.faucetLastClaimAt,
+                  totalClaimed: Number(doData.data.faucetTotalClaimed),
+                }),
+                { expirationTtl: Math.ceil(FAUCET_WINDOW_MS / 1000) + 86400 }, // 24h + 1 day buffer
+              );
+            }
           } catch (kvError) {
             balanceLogger.warn("KV rate limit write failed", { error: kvError, address });
             // Non-fatal — the DO balance itself is the source of truth

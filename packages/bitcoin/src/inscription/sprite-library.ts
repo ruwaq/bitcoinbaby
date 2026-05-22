@@ -436,50 +436,190 @@ export async function buildSpriteLibrary(): Promise<BuildResult> {
   let largest = { name: "", size: 0 };
   let smallest = { name: "", size: Infinity };
 
-  // PLACEHOLDER: These are estimated sizes, not actual SVG data
-  // TODO: Implement SVG extraction from React sprite components
-
-  const componentDefs: Array<{ id: string; category: string; size: number }> = [
+  const componentDefs: Array<{
+    id: string;
+    category: "base" | "bloodline" | "heritage" | "rarity" | "accessory" | "effect";
+    pathData: string;
+    zIndex: number;
+    fill: string;
+  }> = [
     // Base types
-    { id: "base_human", category: "base", size: 800 },
-    { id: "base_animal", category: "base", size: 750 },
-    { id: "base_robot", category: "base", size: 900 },
-    { id: "base_mystic", category: "base", size: 850 },
-    { id: "base_alien", category: "base", size: 700 },
-    { id: "base_shaman", category: "base", size: 820 },
-    { id: "base_elemental", category: "base", size: 780 },
-    { id: "base_dragon", category: "base", size: 950 },
+    {
+      id: "base_human",
+      category: "base",
+      zIndex: 10,
+      fill: "var(--skin)",
+      pathData: `<g id="base_human"><rect x="11" y="17" width="10" height="8" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="12" y="25" width="8" height="3" fill="var(--shade)"/><rect x="11" y="5" width="10" height="10" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="9" y="8" width="2" height="3" fill="var(--skin)"/><rect x="21" y="8" width="2" height="3" fill="var(--skin)"/><rect x="12" y="9" width="2" height="2" fill="#ffffff"/><rect x="18" y="9" width="2" height="2" fill="#ffffff"/><rect x="12" y="9" width="1" height="2" fill="var(--eye)"/><rect x="18" y="9" width="1" height="2" fill="var(--eye)"/><rect x="14" y="12" width="4" height="1" fill="var(--shade)"/><rect x="10" y="3" width="12" height="3" fill="var(--pri)"/><rect x="12" y="2" width="8" height="1" fill="var(--sec)"/></g>`
+    },
+    {
+      id: "base_animal",
+      category: "base",
+      zIndex: 10,
+      fill: "var(--skin)",
+      pathData: `<g id="base_animal"><rect x="9" y="3" width="2" height="2" fill="var(--skin)"/><rect x="21" y="3" width="2" height="2" fill="var(--skin)"/><rect x="10" y="4" width="1" height="1" fill="#ffcccc"/><rect x="21" y="4" width="1" height="1" fill="#ffcccc"/><rect x="11" y="5" width="10" height="10" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="11" y="17" width="10" height="8" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="21" y="20" width="2" height="4" fill="var(--skin)"/><rect x="12" y="9" width="2" height="2" fill="var(--eye)"/><rect x="18" y="9" width="2" height="2" fill="var(--eye)"/><rect x="15" y="11" width="2" height="1" fill="var(--shade)"/><rect x="14" y="12" width="4" height="1" fill="var(--shade)"/></g>`
+    },
+    {
+      id: "base_robot",
+      category: "base",
+      zIndex: 10,
+      fill: "var(--skin)",
+      pathData: `<g id="base_robot"><rect x="11" y="5" width="10" height="10" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="11" y="17" width="10" height="8" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="15" y="2" width="2" height="3" fill="var(--shade)"/><rect x="15" y="1" width="2" height="1" fill="var(--acc)"/><rect x="12" y="8" width="8" height="3" fill="var(--shade2,#111)"/><rect x="13" y="9" width="6" height="1" fill="var(--eye)"/><rect x="13" y="19" width="2" height="2" fill="var(--shade)"/><rect x="17" y="19" width="2" height="2" fill="var(--acc)"/></g>`
+    },
+    {
+      id: "base_mystic",
+      category: "base",
+      zIndex: 10,
+      fill: "var(--skin)",
+      pathData: `<g id="base_mystic"><rect x="11" y="5" width="10" height="10" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="11" y="17" width="10" height="8" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="15" y="7" width="2" height="2" fill="var(--eye)"/><rect x="15.5" y="7.5" width="1" height="1" fill="#ffffff"/><rect x="13" y="11" width="1" height="2" fill="var(--acc)"/><rect x="18" y="11" width="1" height="2" fill="var(--acc)"/><rect x="14" y="20" width="4" height="1" fill="var(--acc)"/></g>`
+    },
+    {
+      id: "base_alien",
+      category: "base",
+      zIndex: 10,
+      fill: "var(--skin)",
+      pathData: `<g id="base_alien"><rect x="9" y="4" width="14" height="11" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="11" y="15" width="10" height="2" fill="var(--skin)"/><rect x="10" y="7" width="4" height="5" fill="var(--eye)"/><rect x="18" y="7" width="4" height="5" fill="var(--eye)"/><rect x="11" y="8" width="1" height="1" fill="#ffffff"/><rect x="19" y="8" width="1" height="1" fill="#ffffff"/><rect x="14" y="17" width="4" height="2" fill="var(--skin)"/><rect x="12" y="19" width="8" height="8" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/></g>`
+    },
+    {
+      id: "base_shaman",
+      category: "base",
+      zIndex: 10,
+      fill: "var(--skin)",
+      pathData: `<g id="base_shaman"><rect x="11" y="5" width="10" height="10" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="11" y="17" width="10" height="8" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="12" y="7" width="1" height="6" fill="var(--pri)"/><rect x="19" y="7" width="1" height="6" fill="var(--pri)"/><rect x="15" y="6" width="2" height="2" fill="var(--acc)"/><rect x="13" y="9" width="1" height="2" fill="var(--eye)"/><rect x="18" y="9" width="1" height="2" fill="var(--eye)"/><rect x="15" y="12" width="2" height="1" fill="var(--shade)"/></g>`
+    },
+    {
+      id: "base_elemental",
+      category: "base",
+      zIndex: 10,
+      fill: "var(--skin)",
+      pathData: `<g id="base_elemental"><rect x="11" y="5" width="10" height="10" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="11" y="17" width="10" height="8" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="13" y="2" width="6" height="3" fill="var(--pri)"/><rect x="14" y="1" width="4" height="1" fill="var(--sec)"/><rect x="15" y="0" width="2" height="1" fill="var(--acc)"/><rect x="12" y="9" width="2" height="2" fill="var(--eye)"/><rect x="18" y="9" width="2" height="2" fill="var(--eye)"/></g>`
+    },
+    {
+      id: "base_dragon",
+      category: "base",
+      zIndex: 10,
+      fill: "var(--skin)",
+      pathData: `<g id="base_dragon"><rect x="9" y="2" width="2" height="3" fill="var(--acc)"/><rect x="21" y="2" width="2" height="3" fill="var(--acc)"/><rect x="11" y="5" width="10" height="10" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="11" y="17" width="10" height="8" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="13" y="19" width="2" height="1" fill="var(--pri)"/><rect x="17" y="21" width="2" height="1" fill="var(--pri)"/><rect x="21" y="20" width="3" height="3" fill="var(--skin)" stroke="var(--shade2,#111)" stroke-width="0.5"/></g>`
+    },
     // Bloodlines
-    { id: "bloodline_royal", category: "bloodline", size: 400 },
-    { id: "bloodline_warrior", category: "bloodline", size: 450 },
-    { id: "bloodline_rogue", category: "bloodline", size: 380 },
-    { id: "bloodline_mystic", category: "bloodline", size: 420 },
+    {
+      id: "bloodline_royal",
+      category: "bloodline",
+      zIndex: 20,
+      fill: "var(--pri)",
+      pathData: `<g id="bloodline_royal"><rect x="10" y="1" width="12" height="3" fill="#ffd700" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="10" y="0" width="2" height="1" fill="#ffd700"/><rect x="15" y="0" width="2" height="1" fill="#ffd700"/><rect x="20" y="0" width="2" height="1" fill="#ffd700"/><rect x="12" y="2" width="1" height="1" fill="#ef4444"/><rect x="19" y="2" width="1" height="1" fill="#3b82f6"/></g>`
+    },
+    {
+      id: "bloodline_warrior",
+      category: "bloodline",
+      zIndex: 20,
+      fill: "var(--pri)",
+      pathData: `<g id="bloodline_warrior"><rect x="9" y="2" width="14" height="4" fill="#6b7280" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="15" y="0" width="2" height="2" fill="#ef4444"/><rect x="12" y="11" width="1" height="3" fill="#ef4444"/></g>`
+    },
+    {
+      id: "bloodline_rogue",
+      category: "bloodline",
+      zIndex: 20,
+      fill: "var(--pri)",
+      pathData: `<g id="bloodline_rogue"><rect x="9" y="3" width="14" height="12" fill="#1f2937" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="10" y="17" width="12" height="9" fill="#1f2937" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="12" y="11" width="8" height="4" fill="#111827"/></g>`
+    },
+    {
+      id: "bloodline_mystic",
+      category: "bloodline",
+      zIndex: 20,
+      fill: "var(--pri)",
+      pathData: `<g id="bloodline_mystic"><rect x="12" y="2" width="8" height="3" fill="#8b5cf6" stroke="var(--shade2,#111)" stroke-width="0.5"/><rect x="15" y="0" width="2" height="2" fill="#f472b6"/></g>`
+    },
     // Heritage
-    { id: "heritage_americas", category: "heritage", size: 300 },
-    { id: "heritage_africa", category: "heritage", size: 320 },
-    { id: "heritage_asia", category: "heritage", size: 310 },
-    { id: "heritage_europa", category: "heritage", size: 290 },
-    { id: "heritage_oceania", category: "heritage", size: 280 },
+    {
+      id: "heritage_americas",
+      category: "heritage",
+      zIndex: 30,
+      fill: "var(--acc)",
+      pathData: `<g id="heritage_americas"><rect x="8" y="3" width="2" height="4" fill="#dc2626"/><rect x="8" y="2" width="1" height="1" fill="#ffffff"/><rect x="2" y="2" width="28" height="28" fill="#14b8a6" opacity="0.15" style="pointer-events:none;"/></g>`
+    },
+    {
+      id: "heritage_africa",
+      category: "heritage",
+      zIndex: 30,
+      fill: "var(--acc)",
+      pathData: `<g id="heritage_africa"><rect x="11" y="16" width="10" height="2" fill="#fbbf24"/><rect x="13" y="17" width="6" height="1" fill="#dc2626"/><rect x="2" y="2" width="28" height="28" fill="#f59e0b" opacity="0.15" style="pointer-events:none;"/></g>`
+    },
+    {
+      id: "heritage_asia",
+      category: "heritage",
+      zIndex: 30,
+      fill: "var(--acc)",
+      pathData: `<g id="heritage_asia"><rect x="15" y="16" width="2" height="2" fill="#10b981"/><rect x="2" y="2" width="28" height="28" fill="#dc2626" opacity="0.15" style="pointer-events:none;"/></g>`
+    },
+    {
+      id: "heritage_europa",
+      category: "heritage",
+      zIndex: 30,
+      fill: "var(--acc)",
+      pathData: `<g id="heritage_europa"><rect x="10" y="4" width="12" height="1" fill="#22c55e"/><rect x="2" y="2" width="28" height="28" fill="#1e40af" opacity="0.15" style="pointer-events:none;"/></g>`
+    },
+    {
+      id: "heritage_oceania",
+      category: "heritage",
+      zIndex: 30,
+      fill: "var(--acc)",
+      pathData: `<g id="heritage_oceania"><rect x="12" y="16" width="8" height="1" fill="#ffffff"/><rect x="2" y="2" width="28" height="28" fill="#0891b2" opacity="0.15" style="pointer-events:none;"/></g>`
+    },
     // Rarity effects
-    { id: "rarity_common", category: "rarity", size: 100 },
-    { id: "rarity_uncommon", category: "rarity", size: 150 },
-    { id: "rarity_rare", category: "rarity", size: 200 },
-    { id: "rarity_epic", category: "rarity", size: 250 },
-    { id: "rarity_legendary", category: "rarity", size: 350 },
-    { id: "rarity_mythic", category: "rarity", size: 500 },
+    {
+      id: "rarity_common",
+      category: "rarity",
+      zIndex: 0,
+      fill: "transparent",
+      pathData: `<g id="rarity_common"><rect x="0" y="0" width="32" height="32" fill="none" stroke="#6b7280" stroke-width="0.5"/></g>`
+    },
+    {
+      id: "rarity_uncommon",
+      category: "rarity",
+      zIndex: 0,
+      fill: "transparent",
+      pathData: `<g id="rarity_uncommon"><rect x="0" y="0" width="32" height="32" fill="none" stroke="#22c55e" stroke-width="0.5"/><rect x="1" y="1" width="1" height="1" fill="#22c55e"/><rect x="30" y="1" width="1" height="1" fill="#22c55e"/></g>`
+    },
+    {
+      id: "rarity_rare",
+      category: "rarity",
+      zIndex: 0,
+      fill: "transparent",
+      pathData: `<g id="rarity_rare"><rect x="0" y="0" width="32" height="32" fill="none" stroke="#3b82f6" stroke-width="0.5"/><rect x="1" y="1" width="1" height="2" fill="#60a5fa"/><rect x="30" y="1" width="1" height="2" fill="#60a5fa"/></g>`
+    },
+    {
+      id: "rarity_epic",
+      category: "rarity",
+      zIndex: 0,
+      fill: "transparent",
+      pathData: `<g id="rarity_epic"><rect x="0" y="0" width="32" height="32" fill="none" stroke="#8b5cf6" stroke-width="0.5"/><rect x="1" y="1" width="2" height="2" fill="#c084fc"/><rect x="29" y="1" width="2" height="2" fill="#c084fc"/></g>`
+    },
+    {
+      id: "rarity_legendary",
+      category: "rarity",
+      zIndex: 0,
+      fill: "transparent",
+      pathData: `<g id="rarity_legendary"><rect x="0" y="0" width="32" height="32" fill="none" stroke="#fbbf24" stroke-width="0.5"/><rect x="1" y="1" width="2" height="2" fill="#ffffff"/><rect x="29" y="1" width="2" height="2" fill="#ffffff"/><circle cx="16" cy="16" r="14" fill="none" stroke="#fbbf24" stroke-width="0.5" stroke-dasharray="2,2"/></g>`
+    },
+    {
+      id: "rarity_mythic",
+      category: "rarity",
+      zIndex: 0,
+      fill: "transparent",
+      pathData: `<g id="rarity_mythic"><rect x="0" y="0" width="32" height="32" fill="none" stroke="#ec4899" stroke-width="0.5"/><rect x="1" y="1" width="2" height="2" fill="#ffffff"/><rect x="29" y="1" width="2" height="2" fill="#ffffff"/><circle cx="16" cy="16" r="14" fill="none" stroke="#ec4899" stroke-width="0.5" stroke-dasharray="4,2"/></g>`
+    }
   ];
 
   for (const comp of componentDefs) {
-    // Placeholder SVG data
-    const svg = `<g id="${comp.id}"><!-- ${comp.size} bytes --></g>`;
-    components.set(comp.id, svg);
-    totalSize += comp.size;
+    const size = new TextEncoder().encode(comp.pathData).length;
+    components.set(comp.id, comp.pathData);
+    totalSize += size;
 
-    if (comp.size > largest.size) {
-      largest = { name: comp.id, size: comp.size };
+    if (size > largest.size) {
+      largest = { name: comp.id, size };
     }
-    if (comp.size < smallest.size) {
-      smallest = { name: comp.id, size: comp.size };
+    if (size < smallest.size) {
+      smallest = { name: comp.id, size };
     }
   }
 
@@ -490,9 +630,9 @@ export async function buildSpriteLibrary(): Promise<BuildResult> {
       id: c.id,
       category: c.category,
       subtype: c.id.split("_")[1],
-      zIndex: c.category === "base" ? 10 : c.category === "bloodline" ? 20 : 30,
-      pathData: "", // Would contain actual path data
-      fill: "primary",
+      zIndex: c.zIndex,
+      pathData: c.pathData,
+      fill: c.fill,
     })),
   };
 

@@ -9,6 +9,7 @@ import {
   useMiningBoost,
   useUnlockModal,
   useDeleteWalletModal,
+  type SupportedNetwork,
 } from "@bitcoinbaby/core";
 import { getDeploymentConfig } from "@bitcoinbaby/bitcoin";
 
@@ -69,10 +70,10 @@ export interface UseWalletDashboardReturn {
 
   // Network
   network: {
-    current: "mainnet" | "testnet4";
+    current: SupportedNetwork;
     mainnetAllowed: boolean;
     explorerUrl: string;
-    switch: (network: "mainnet" | "testnet4") => void;
+    switch: (network: SupportedNetwork) => void;
     enableMainnet: () => void;
   };
 

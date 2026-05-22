@@ -20,14 +20,16 @@ vi.mock("@bitcoinbaby/shared", async () => {
   const actual = await vi.importActual("@bitcoinbaby/shared");
   return {
     ...actual,
-    HttpClient: vi.fn().mockImplementation(() => ({
-      get: vi.fn(),
-      post: vi.fn(),
-      put: vi.fn(),
-      delete: vi.fn(),
-      setBaseUrl: vi.fn(),
-      getBaseUrl: vi.fn().mockReturnValue("http://localhost:8787"),
-    })),
+    HttpClient: vi.fn().mockImplementation(function () {
+      return {
+        get: vi.fn(),
+        post: vi.fn(),
+        put: vi.fn(),
+        delete: vi.fn(),
+        setBaseUrl: vi.fn(),
+        getBaseUrl: vi.fn().mockReturnValue("http://localhost:8787"),
+      };
+    }),
   };
 });
 

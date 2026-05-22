@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  bitcoin:
+    image: vulpemventures/bitcoin:26.0
+    container_name: bitcoin-regtest
+    ports:
+      - "18443:18443" # RPC
+      - "18444:18444" # P2P
+    command: >
+      bitcoind
+      -regtest=1
+      -rpcallowip=0.0.0.0/0
+      -rpcbind=0.0.0.0
+      -rpcuser=bitcoin
+      -rpcpassword=bitcoin
+      -txindex=1
+      -fallbackfee=0.0002
+      -server=1
+      -zmqpubrawblock=tcp://0.0.0.0:28332
+      -zmqpubrawtx=tcp://0.0.0.0:28333
+    volumes:
+      - bitcoin-data:/data
+
+  electrs:
+    image: vulpemventures/electrs:latest
+    container_name: electrs-regtest
+    depends_on:
+      - bitcoin
+    ports:
+      - "50001:50001" # Electrum RPC
+      - "30002:30002" # HTTP API (Esplora)
+    command: >
+      /bin/electrs
+      --conf-background
+      --db-dir /data/db
+      --daemon-dir /data/bitcoin
+      --cookie bitcoin:bitcoin
+      --daemon-rpc-addr bitcoin:18443
+      --daemon-p2p-addr bitcoin:18444
+      --electrum-rpc-addr 0.0.0.0:50001
+      --http-addr 0.0.0.0:30002
+      --network regtest
+      --log-filters INFO
+    volumes:
+      - bitcoin-data:/data/bitcoin:ro
+      - electrs-data:/data/db
+
+  chopsticks:
+    image: vulpemventures/chopsticks:latest
+    container_name: chopsticks-regtest
+    depends_on:
+      - bitcoin
+      - electrs
+    ports:
+      - "5000:5000" # Web Explorer and API
+    command: >
+      chopsticks
+      --bitcoin-addr bitcoin:18443
+      --electrs-addr electrs:30002
+      --network regtest
+      --rpc-user bitcoin
+      --rpc-pass bitcoin
+      --addr 0.0.0.0:5000
+
+volumes:
+  bitcoin-data:
+  electrs-data:

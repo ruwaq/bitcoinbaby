@@ -69,6 +69,7 @@ function buildNetworkConfig(
 export const NETWORK_CONFIGS: Record<SupportedNetwork, NetworkConfig> = {
   mainnet: buildNetworkConfig("mainnet", "Bitcoin Mainnet", true, 6),
   testnet4: buildNetworkConfig("testnet4", "Bitcoin Testnet4", false, 1),
+  regtest: buildNetworkConfig("regtest", "Bitcoin Regtest (Local)", false, 1),
 };
 
 /**

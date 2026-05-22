@@ -55,6 +55,8 @@ export interface UseGlobalMiningOptions {
   onXPGained?: MiningManagerConfig["onXPGained"];
   /** Callback on error */
   onError?: MiningManagerConfig["onError"];
+  /** Callback when an AI local task has been solved locally and requires wallet signing */
+  onAILocalTaskResolved?: MiningManagerConfig["onAILocalTaskResolved"];
 }
 
 export interface UseGlobalMiningReturn extends MiningManagerState {
@@ -98,6 +100,7 @@ export function useGlobalMining(
     onWorkFound,
     onXPGained,
     onError,
+    onAILocalTaskResolved,
   } = options;
 
   // Get global manager
@@ -125,6 +128,7 @@ export function useGlobalMining(
       onWorkFound,
       onXPGained,
       onError,
+      onAILocalTaskResolved,
     });
 
     // Subscribe to state changes
@@ -153,6 +157,7 @@ export function useGlobalMining(
     onWorkFound,
     onXPGained,
     onError,
+    onAILocalTaskResolved,
     updateStats,
   ]);
 

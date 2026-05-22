@@ -36,6 +36,7 @@ import {
   cachedResponse,
 } from "../lib/helpers";
 import { leaderboardLogger } from "../lib/logger";
+import { constantTimeEqual } from "../lib/encoding";
 
 export const leaderboardRouter = new Hono<{ Bindings: Env }>();
 
@@ -200,6 +201,13 @@ leaderboardRouter.get("/rank/:address", async (c) => {
  * POST /api/leaderboard/update - Update user score (internal)
  */
 leaderboardRouter.post("/update", async (c) => {
+  const adminKey = c.req.header("X-Admin-Key");
+  const expectedKey = c.env.ADMIN_KEY;
+
+  if (!expectedKey || !adminKey || !constantTimeEqual(adminKey, expectedKey)) {
+    return errorResponse(c, "Unauthorized", 401);
+  }
+
   const body = await c.req.json();
 
   if (!body.address || !isValidBitcoinAddress(body.address)) {

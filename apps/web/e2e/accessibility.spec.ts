@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 /**
  * Accessibility E2E Tests
@@ -10,6 +10,10 @@ test.describe("Keyboard Navigation", () => {
   test("should support tab navigation", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("domcontentloaded");
+
+    // Wait for at least one button to be visible and interactive
+    const button = page.getByRole("button").first();
+    await button.waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
 
     // Press tab and check focus moves
     await page.keyboard.press("Tab");
@@ -23,6 +27,10 @@ test.describe("Keyboard Navigation", () => {
   test("should have visible focus indicators", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("domcontentloaded");
+
+    // Wait for at least one button to be visible and interactive
+    const button = page.getByRole("button").first();
+    await button.waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
 
     // Tab to first focusable element
     await page.keyboard.press("Tab");
@@ -47,8 +55,9 @@ test.describe("Keyboard Navigation", () => {
     await page.goto("/");
     await page.waitForLoadState("domcontentloaded");
 
-    // Find first button
+    // Find first button and wait for it
     const button = page.getByRole("button").first();
+    await button.waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
     await button.focus();
     await page.keyboard.press("Enter");
 
@@ -61,6 +70,7 @@ test.describe("Keyboard Navigation", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const button = page.getByRole("button").first();
+    await button.waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
     await button.focus();
     await page.keyboard.press("Space");
 
@@ -187,7 +197,7 @@ test.describe("Form Accessibility", () => {
   });
 
   test("should announce form errors", async ({ page }) => {
-    await page.goto("/wallet/send");
+    await page.goto("/?tab=wallet&view=send");
     await page.waitForLoadState("domcontentloaded");
 
     // Form errors should be accessible

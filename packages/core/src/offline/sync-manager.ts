@@ -294,13 +294,24 @@ class SyncManager {
     blockData: string;
     reward: bigint;
     timestamp: number;
+    // PoUW AIProof fields
+    isAI?: boolean;
+    taskId?: string;
+    taskType?: string;
+    inputPrompt?: string;
+    seed?: string;
+    output?: string;
+    computeTime?: number;
+    modelId?: string;
+    publicKey?: string;
+    signature?: string;
   }): Promise<{ queued: boolean; duplicate: boolean }> {
     if (!this.address) {
       return { queued: false, duplicate: false };
     }
 
-    // Reject shares below minimum difficulty (server will reject anyway)
-    if (share.difficulty < MIN_DIFFICULTY) {
+    // Reject shares below minimum difficulty (server will reject anyway) - skip for AI
+    if (!share.isAI && share.difficulty < MIN_DIFFICULTY) {
       // Throttle logging to reduce console spam (log every 10 rejections or every 5 seconds)
       this.rejectedShareCount++;
       const now = Date.now();
@@ -317,8 +328,8 @@ class SyncManager {
       return { queued: false, duplicate: false };
     }
 
-    // Reject shares with missing blockData (server requires it for validation)
-    if (!share.blockData || share.blockData.trim() === "") {
+    // Reject shares with missing blockData (server requires it for validation) - skip for AI
+    if (!share.isAI && (!share.blockData || share.blockData.trim() === "")) {
       console.warn(
         "[SyncManager] Share rejected: missing blockData. Cannot validate proof without original challenge:nonce data.",
       );
@@ -551,13 +562,29 @@ class SyncManager {
       await markSyncing(share.id!);
 
       // Send to API
-      const response = await client.creditMining(share.address, {
-        hash: share.hash,
-        nonce: share.nonce,
-        difficulty: share.difficulty,
-        blockData: share.blockData,
-        timestamp: share.timestamp,
-      });
+      let response;
+      if (share.isAI) {
+        response = await client.creditMining(share.address, {
+          taskId: share.taskId || "",
+          taskType: share.taskType || "pouw",
+          inputPrompt: share.inputPrompt || "",
+          seed: share.seed || "",
+          output: share.output || "",
+          computeTime: share.computeTime || 0,
+          modelId: share.modelId || "",
+          timestamp: share.timestamp,
+          publicKey: share.publicKey || "",
+          signature: share.signature || "",
+        });
+      } else {
+        response = await client.creditMining(share.address, {
+          hash: share.hash,
+          nonce: share.nonce,
+          difficulty: share.difficulty,
+          blockData: share.blockData,
+          timestamp: share.timestamp,
+        });
+      }
 
       if (response.success) {
         await markSynced(share.id!);

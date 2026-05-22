@@ -8,7 +8,7 @@
  */
 
 import { sha256 } from "@noble/hashes/sha256";
-import type { MempoolClient } from "./mempool";
+import type { BlockchainAPI } from "./types";
 
 // =============================================================================
 // TYPES
@@ -224,7 +224,7 @@ export function verifyMerkleProof(
  * Fetch Merkle proof for a confirmed transaction
  */
 export async function getMerkleProof(
-  mempoolClient: MempoolClient,
+  mempoolClient: BlockchainAPI,
   txid: string,
 ): Promise<MerkleProof> {
   // Get transaction info to find block
@@ -512,7 +512,7 @@ export function encodeMerkleProofHex(
  * Get encoded Merkle proof ready for Charms spell
  */
 export async function getEncodedMerkleProof(
-  mempoolClient: MempoolClient,
+  mempoolClient: BlockchainAPI,
   txid: string,
 ): Promise<EncodedMerkleProof> {
   // Get transaction info to find block

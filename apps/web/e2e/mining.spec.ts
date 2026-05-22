@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 /**
  * Mining Section E2E Tests
@@ -8,8 +8,21 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Mining Section UI", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/?tab=mining");
+    await page.goto("/?tab=mining", { waitUntil: "commit" });
     await page.waitForLoadState("domcontentloaded");
+
+    // Wait for __walletStore to be initialized
+    await page.waitForFunction(() => typeof (window as any).__walletStore !== "undefined", { timeout: 30000 });
+
+    // Inject wallet to simulate connected state
+    await page.evaluate(() => {
+      (window as any).__walletStore.getState().setWallet({
+        address: "tb1qtest123456789address",
+        publicKey: "020000000000000000000000000000000000000000000000000000000000000000",
+        balance: BigInt("100000"),
+        babyTokens: BigInt("50000"),
+      });
+    });
   });
 
   test("should display mining section", async ({ page }) => {
@@ -49,7 +62,7 @@ test.describe("Mining Section UI", () => {
   test("should show balance panel", async ({ page }) => {
     // Mining section should show current balance
     const balanceText = page.getByText(/balance|BABTC|virtual/i).first();
-    await expect(balanceText).toBeVisible({ timeout: 10000 });
+    await expect(balanceText).toBeVisible({ timeout: 15000 });
   });
 
   test("should display NFT boost info", async ({ page }) => {

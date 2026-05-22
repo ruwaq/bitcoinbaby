@@ -45,8 +45,9 @@ export class ClaimRepository {
     serverSignature: string;
     opReturnData: string;
     expiresAt: number;
+    preparedAt?: number;
   }): void {
-    const now = Date.now();
+    const preparedAt = claim.preparedAt || Date.now();
     this.sql.exec(
       `INSERT INTO claims
        (id, address, amount, proof_count, total_work, merkle_root, server_signature, op_return_data, status, prepared_at, expires_at)
@@ -59,7 +60,7 @@ export class ClaimRepository {
       claim.merkleRoot,
       claim.serverSignature,
       claim.opReturnData,
-      now,
+      preparedAt,
       claim.expiresAt,
     );
   }
@@ -108,6 +109,36 @@ export class ClaimRepository {
          WHERE address = ? AND status = 'broadcast' AND expires_at > ?`,
         address,
         now,
+      )
+      .toArray();
+
+    return rows.map((r) => this.mapRow(r));
+  }
+
+  /**
+   * Get expired prepared claims
+   */
+  getExpiredPrepared(now: number): StoredClaim[] {
+    const rows = this.sql
+      .exec(
+        `SELECT * FROM claims
+         WHERE status = 'prepared' AND expires_at <= ?`,
+        now,
+      )
+      .toArray();
+
+    return rows.map((r) => this.mapRow(r));
+  }
+
+  /**
+   * Get claims that can be retried (broadcast or failed status)
+   */
+  getRetriable(address: string): StoredClaim[] {
+    const rows = this.sql
+      .exec(
+        `SELECT * FROM claims
+         WHERE address = ? AND (status = 'broadcast' OR status = 'failed')`,
+        address,
       )
       .toArray();
 

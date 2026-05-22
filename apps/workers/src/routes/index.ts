@@ -12,3 +12,6 @@ export { gameRouter } from "./game";
 export { claimRouter } from "./claim";
 export { engagementRouter } from "./engagement";
 export { faucetRouter } from "./faucet";
+export { pouwRouter } from "./pouw";
+export { healthRouter } from "./health";
+

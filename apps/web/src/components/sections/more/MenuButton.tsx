@@ -10,42 +10,58 @@ interface MenuButtonProps {
 }
 
 export function MenuButton({ item }: MenuButtonProps) {
+  const isLocked = item.locked;
+
   const content = (
     <div
       className={clsx(
-        "flex items-center gap-4 p-4",
-        `bg-pixel-bg-medium ${pixelBorders.medium}`,
-        pixelShadows.md,
-        "hover:translate-x-[2px] hover:translate-y-[2px]",
-        pixelShadows.smHover,
-        "transition-all cursor-pointer",
-        item.highlight && "border-pixel-primary",
+        "flex items-center gap-4 p-4 transition-all",
+        isLocked
+          ? `bg-pixel-bg-dark border-4 border-pixel-border opacity-60 cursor-not-allowed`
+          : `bg-pixel-bg-medium ${pixelBorders.medium} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} cursor-pointer`,
+        !isLocked && item.highlight && "border-pixel-primary",
       )}
     >
       {/* Icon */}
-      <div className="w-12 h-12 flex items-center justify-center bg-pixel-bg-dark border-2 border-black text-2xl">
-        {item.icon}
+      <div className={clsx(
+        "w-12 h-12 flex items-center justify-center border-2 border-black text-2xl bg-pixel-bg-dark",
+        isLocked && "opacity-50"
+      )}>
+        {isLocked ? "🔒" : item.icon}
       </div>
 
       {/* Text */}
       <div className="flex-1">
-        <h3
-          className={clsx(
-            "font-pixel text-xs uppercase",
-            item.highlight ? "text-pixel-primary" : "text-pixel-text",
+        <div className="flex items-center gap-2">
+          <h3
+            className={clsx(
+              "font-pixel text-xs uppercase",
+              isLocked
+                ? "text-pixel-text-muted"
+                : item.highlight ? "text-pixel-primary" : "text-pixel-text",
+            )}
+          >
+            {item.label}
+          </h3>
+          {isLocked && item.lockedLabel && (
+            <span className="px-1.5 py-0.5 font-pixel text-[6px] bg-pixel-warning/20 text-pixel-warning border border-pixel-warning uppercase">
+              {item.lockedLabel}
+            </span>
           )}
-        >
-          {item.label}
-        </h3>
+        </div>
         <p className="font-pixel-body text-xs text-pixel-text-muted mt-1">
           {item.description}
         </p>
       </div>
 
       {/* Arrow */}
-      <div className="font-pixel text-pixel-text-muted">→</div>
+      {!isLocked && <div className="font-pixel text-pixel-text-muted">→</div>}
     </div>
   );
+
+  if (isLocked) {
+    return <div className="w-full">{content}</div>;
+  }
 
   if (item.onClick) {
     return (

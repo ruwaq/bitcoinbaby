@@ -23,7 +23,7 @@ export type { AddressType } from "@bitcoinbaby/shared";
 export type BitcoinNetwork = "mainnet" | "testnet" | "testnet4" | "regtest";
 
 /** Networks supported in production (subset) */
-export type SupportedNetwork = "mainnet" | "testnet4";
+export type SupportedNetwork = "mainnet" | "testnet4" | "regtest";
 
 /** Scrolls API network mapping */
 export type ScrollsNetwork = "main" | "testnet4";
@@ -51,6 +51,11 @@ export const NETWORK_ENDPOINTS: Record<SupportedNetwork, NetworkEndpoints> = {
     mempoolApi: "https://mempool.space/testnet4/api",
     scrollsApi: "https://scrolls.charms.dev",
     explorerUrl: "https://mempool.space/testnet4",
+  },
+  regtest: {
+    mempoolApi: "http://localhost:5000/api",
+    scrollsApi: "http://localhost:8787",
+    explorerUrl: "http://localhost:5000",
   },
 };
 

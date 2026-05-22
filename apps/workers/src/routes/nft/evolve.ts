@@ -31,6 +31,7 @@ import {
   MIN_DIFFICULTY_FOR_XP,
 } from "./middleware";
 import { parseNFTData } from "./types";
+import { countLeadingZeroBits } from "../../lib/proof-validation";
 
 export const evolveRouter = new Hono<{ Bindings: Env }>();
 
@@ -300,6 +301,16 @@ evolveRouter.post(
         return errorResponse(
           c,
           `Difficulty ${difficulty} is below minimum ${MIN_DIFFICULTY_FOR_XP}`,
+          400,
+        );
+      }
+
+      // Cryptographically verify the share hash meets the claimed difficulty target
+      const leadingZeros = countLeadingZeroBits(shareHash);
+      if (leadingZeros < difficulty) {
+        return errorResponse(
+          c,
+          `Invalid proof of work: share hash does not meet claimed difficulty of ${difficulty} (got ${leadingZeros})`,
           400,
         );
       }

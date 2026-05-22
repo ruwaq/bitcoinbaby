@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 /**
  * Navigation E2E Tests
@@ -70,8 +70,8 @@ test.describe("Tab Navigation", () => {
     // Start on home
     await page.goto("/");
 
-    // Find and click mining tab
-    const miningTab = page.getByRole("button", { name: /Mining/i });
+    // Find and click mining tab button (specifically targeting the navigation one)
+    const miningTab = page.getByTestId("tab-mining");
     if (await miningTab.isVisible()) {
       await miningTab.click();
       await expect(page).toHaveURL(/tab=mining/);

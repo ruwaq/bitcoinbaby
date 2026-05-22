@@ -18,6 +18,7 @@ import {
   type BitcoinNetwork,
   type ScrollsNetwork,
 } from "@bitcoinbaby/shared";
+import type { SupportedNetwork } from "../types";
 
 // =============================================================================
 // NETWORK ENDPOINTS (re-exported from shared for convenience)
@@ -186,14 +187,31 @@ export const GENESIS_BABIES_MAINNET = {
 } as const;
 
 /**
+ * Regtest Genesis Babies NFT App Configuration
+ *
+ * STATUS: DEPLOYED locally for development.
+ */
+export const GENESIS_BABIES_REGTEST = {
+  network: "regtest" as const,
+  appId: "6ce41e63fa9a1029e934fd0113e322c292c9de31a4cb10f03f07e0bfc0c6c2cf",
+  appVk: "2e455d2692d118528f5aefd4a32b37ab32de8fb90a8a385f198f0a1da7a43754",
+  name: "Genesis Babies",
+  symbol: "GBABY",
+  maxSupply: 10_000,
+  priceSats: 50_000n,
+  treasuryAddress: "tb1p7kk2fuf8kv5vjftczlezfded94v9ay9s0h7ggd87k5d5ws744lesw7smmu",
+  isPlaceholder: false,
+} as const;
+
+/**
  * Get Genesis Babies config for a network
  */
 export function getGenesisBabiesConfig(
-  network: "testnet4" | "mainnet" = "testnet4",
+  network: SupportedNetwork = "testnet4",
 ) {
-  return network === "mainnet"
-    ? GENESIS_BABIES_MAINNET
-    : GENESIS_BABIES_TESTNET4;
+  if (network === "mainnet") return GENESIS_BABIES_MAINNET;
+  if (network === "regtest") return GENESIS_BABIES_REGTEST;
+  return GENESIS_BABIES_TESTNET4;
 }
 
 /**

@@ -23,7 +23,7 @@ import {
   validateBody,
   validateParams,
   bitcoinAddressSchema,
-  miningProofSchema,
+  aiProofSchema,
   rateLimits,
 } from "../lib/middleware";
 import { constantTimeEqual } from "../lib/encoding";
@@ -70,7 +70,7 @@ balanceRouter.post(
   "/:address/credit",
   rateLimits.miningCredit,
   validateParams(addressParamSchema),
-  validateBody(miningProofSchema),
+  validateBody(aiProofSchema),
   async (c) => {
     const { address } = c.get("validatedParams");
     const proof = c.get("validatedBody");

@@ -77,13 +77,16 @@ export class EvolutionService {
   getEvolutionStatus(nft: BabyNFTState): EvolutionStatus {
     const nextLevel = nft.level + 1;
     const canEvolve = canLevelUp(nft);
-    const xpRequired = XP_REQUIREMENTS[nextLevel] || 0;
-    const tokenCost = EVOLUTION_COSTS[nextLevel] || 0n;
+    const xpRequired = XP_REQUIREMENTS[nextLevel] ?? 0;
+    const tokenCost = EVOLUTION_COSTS[nextLevel] ?? 0n;
     const currentBoost = getMiningBoost(nft);
-    // Calculate next boost including both level and rarity
-    const nextLevelBoost = LEVEL_BOOSTS[nextLevel] ?? LEVEL_BOOSTS[nft.level];
+    // nextBoost: use nextLevel boost if below max, otherwise stay at current level boost
+    const isMaxLevel = nft.level >= GENESIS_BABIES_CONFIG.maxLevel;
+    const nextLevelBoost = isMaxLevel
+      ? (LEVEL_BOOSTS[nft.level] ?? 0)
+      : (LEVEL_BOOSTS[nextLevel] ?? LEVEL_BOOSTS[nft.level] ?? 0);
     const rarityBoost =
-      GENESIS_BABIES_CONFIG.rarityTiers[nft.rarityTier]?.boost || 0;
+      GENESIS_BABIES_CONFIG.rarityTiers[nft.rarityTier]?.boost ?? 0;
     const nextBoost = nextLevelBoost + rarityBoost;
 
     return {
@@ -222,21 +225,28 @@ export class EvolutionService {
     // 2. Get fee info
     const feeEstimates = await this.client.getFeeEstimates();
 
-    // 3. Calculate new state
+    // 3. Calculate new XP state (same cap logic as the on-chain spell)
     const xpGain = calculateXpGain(params.currentState);
-    const newXp = params.currentState.xp + xpGain;
-    const willLevelUp = newXp >= XP_REQUIREMENTS[params.currentState.level + 1];
+    const nextLevelReq = XP_REQUIREMENTS[params.currentState.level + 1];
+    const rawNewXp = params.currentState.xp + xpGain;
+    const cappedNewXp =
+      nextLevelReq !== undefined
+        ? Math.min(rawNewXp, nextLevelReq)
+        : rawNewXp;
+    // NOTE: Work-proof does NOT auto-level-up — that requires a separate levelUp tx.
+    // We report whether the player CAN now level up (canLevelUpNow flag).
+    const canLevelUpNow =
+      nextLevelReq !== undefined && cappedNewXp >= nextLevelReq;
 
     return {
       spell,
       type: "work_proof",
       xpGained: xpGain,
-      newXp: willLevelUp ? 0 : newXp,
-      newLevel: willLevelUp
-        ? params.currentState.level + 1
-        : params.currentState.level,
+      newXp: cappedNewXp,
+      newLevel: params.currentState.level, // Level unchanged — levelUp is a separate tx
       tokensBurned: 0n,
       estimatedFee: feeEstimates.halfHourFee * 200, // ~200 vbytes
+      canLevelUpNow,
     };
   }
 
@@ -301,6 +311,8 @@ export interface EvolutionResult {
   newLevel: number;
   tokensBurned: bigint;
   estimatedFee: number;
+  /** Only present for work_proof: true if the player can now submit a levelUp tx */
+  canLevelUpNow?: boolean;
 }
 
 // =============================================================================

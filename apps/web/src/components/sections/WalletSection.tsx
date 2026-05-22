@@ -14,6 +14,8 @@
  */
 
 import { useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useWalletDashboard } from "@/hooks/features";
 import { FaucetCard } from "@/components/features/faucet/FaucetCard";
 import { getPhaseConfig } from "@bitcoinbaby/shared";
@@ -27,7 +29,7 @@ import {
   InfoBanner,
   CopyButton,
 } from "@bitcoinbaby/ui";
-import { pixelCard } from "@bitcoinbaby/ui";
+import { pixelCard, pixelBorders, pixelShadows } from "@bitcoinbaby/ui";
 import {
   generateMnemonicFromEntropy,
   validateMnemonic,
@@ -37,11 +39,52 @@ import {
   BalancesGrid,
   SecurityInfo,
   WalletActions,
+  SendView,
+  HistoryView,
 } from "@/components/features/wallet";
 
+// Dynamic import for ClaimSection to prevent SSR issues
+const ClaimSection = dynamic(
+  () =>
+    import("@/components/claim/ClaimSection").then((mod) => mod.ClaimSection),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="animate-pulse p-8">
+        <div className="h-32 bg-pixel-bg-medium rounded mb-4" />
+        <div className="h-48 bg-pixel-bg-medium rounded" />
+      </div>
+    ),
+  },
+);
+
 export function WalletSection() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   // Single composite hook replaces 10+ individual hooks
   const { wallet, balances, network, actions, overlays } = useWalletDashboard();
+
+  // Get active view from URL search params
+  const activeView = (searchParams.get("view") || "dashboard") as
+    | "dashboard"
+    | "send"
+    | "claim"
+    | "history";
+
+  const handleViewChange = useCallback(
+    (view: "dashboard" | "send" | "claim" | "history") => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", "wallet");
+      if (view === "dashboard") {
+        params.delete("view");
+      } else {
+        params.set("view", view);
+      }
+      router.push(`/?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
 
   const handleGenerateMnemonic = useCallback((entropy: Uint8Array): string => {
     const entropySlice = entropy.slice(0, 16);
@@ -108,70 +151,149 @@ export function WalletSection() {
           />
         )}
 
-        {/* Wallet unlocked - Show dashboard */}
+        {/* Wallet unlocked - Show dashboard or dynamic views */}
         {wallet.hasStoredWallet && !wallet.isLocked && wallet.address && (
-          <div className={`${pixelCard.primary} p-6`}>
-            <div className="space-y-6">
-              {/* Address Section */}
-              <div>
-                <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-                  <label className="font-pixel text-pixel-xs text-pixel-text-muted">
-                    YOUR ADDRESS
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <NetworkBadge network={network.current} />
-                    <span className="px-2 py-1 font-pixel text-pixel-2xs bg-pixel-bg-light text-pixel-text-muted border border-pixel-border">
-                      TAPROOT
-                    </span>
+          <>
+            {activeView === "dashboard" && (
+              <div className={`${pixelCard.primary} p-6`}>
+                <div className="space-y-6">
+                  {/* Address Section */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                      <label className="font-pixel text-pixel-xs text-pixel-text-muted">
+                        YOUR ADDRESS
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <NetworkBadge network={network.current} />
+                        <span className="px-2 py-1 font-pixel text-pixel-2xs bg-pixel-bg-light text-pixel-text-muted border border-pixel-border">
+                          TAPROOT
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 sm:gap-3 bg-pixel-bg-dark p-3 border-2 border-pixel-border">
+                      <span className="font-pixel-mono text-body-xs text-pixel-text flex-1 truncate-address">
+                        {wallet.address}
+                      </span>
+                      <CopyButton text={wallet.address} label="COPY" />
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-3 bg-pixel-bg-dark p-3 border-2 border-pixel-border">
-                  <span className="font-pixel-mono text-body-xs text-pixel-text flex-1 truncate-address">
-                    {wallet.address}
-                  </span>
-                  <CopyButton text={wallet.address} label="COPY" />
+
+                  {/* QR Code */}
+                  <QRCode data={wallet.address} />
+
+                  {/* Balances */}
+                  <BalancesGrid
+                    btcBalance={balances.btc.confirmed}
+                    btcUnconfirmed={balances.btc.unconfirmed}
+                    btcLoading={balances.btc.loading}
+                    onRefreshBtc={actions.refreshBalances}
+                    virtualBalance={balances.virtual.balance}
+                    totalMined={balances.virtual.totalMined}
+                    virtualLoading={balances.virtual.loading}
+                    babtcFormatted={balances.babtc.formatted}
+                    babtcLoading={balances.babtc.loading}
+                    babtcError={balances.babtc.error}
+                    miningBoost={balances.nftBoost.boost}
+                    nftCount={balances.nftBoost.nftCount}
+                    boostLoading={balances.nftBoost.loading}
+                  />
+
+                  {/* Faucet (Phase 1 — BABTC for NFT evolution) */}
+                  {getPhaseConfig().features.babtcFaucet && (
+                    <FaucetCard address={wallet.address} />
+                  )}
+
+                  {balances.btc.lastUpdated && (
+                    <p className="font-pixel text-pixel-2xs text-pixel-text-muted text-center">
+                      Last updated: {balances.btc.lastUpdated.toLocaleTimeString()}
+                    </p>
+                  )}
+
+                  {/* Actions */}
+                  <WalletActions
+                    onLock={actions.lock}
+                    onDelete={overlays.openDelete}
+                    showTestnetFaucet={network.current === "testnet4"}
+                    onViewChange={handleViewChange}
+                  />
                 </div>
               </div>
+            )}
 
-              {/* QR Code */}
-              <QRCode data={wallet.address} />
+            {activeView === "send" && (
+              <div className={`${pixelCard.primary} p-6`}>
+                <SendView onBack={() => handleViewChange("dashboard")} />
+              </div>
+            )}
 
-              {/* Balances */}
-              <BalancesGrid
-                btcBalance={balances.btc.confirmed}
-                btcUnconfirmed={balances.btc.unconfirmed}
-                btcLoading={balances.btc.loading}
-                onRefreshBtc={actions.refreshBalances}
-                virtualBalance={balances.virtual.balance}
-                totalMined={balances.virtual.totalMined}
-                virtualLoading={balances.virtual.loading}
-                babtcFormatted={balances.babtc.formatted}
-                babtcLoading={balances.babtc.loading}
-                babtcError={balances.babtc.error}
-                miningBoost={balances.nftBoost.boost}
-                nftCount={balances.nftBoost.nftCount}
-                boostLoading={balances.nftBoost.loading}
-              />
+            {activeView === "claim" && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between pb-4 border-b-2 border-pixel-border">
+                  <div>
+                    <h2 className="font-pixel text-md text-pixel-primary">
+                      CLAIM TOKENS
+                    </h2>
+                    <p className="font-pixel-body text-xs text-pixel-text-muted mt-1">
+                      Convert mining work to $BABTC
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleViewChange("dashboard")}
+                    className="font-pixel text-pixel-2xs text-pixel-text-muted hover:text-pixel-primary transition-colors border-2 border-pixel-border px-2 py-1 bg-pixel-bg-medium"
+                  >
+                    ← BACK
+                  </button>
+                </div>
 
-              {/* Faucet (Phase 1 — BABTC for NFT evolution) */}
-              {getPhaseConfig().features.babtcFaucet && (
-                <FaucetCard address={wallet.address} />
-              )}
+                {/* Claim Section */}
+                <ClaimSection />
 
-              {balances.btc.lastUpdated && (
-                <p className="font-pixel text-pixel-2xs text-pixel-text-muted text-center">
-                  Last updated: {balances.btc.lastUpdated.toLocaleTimeString()}
-                </p>
-              )}
+                {/* Help Text */}
+                <div className={`p-4 bg-pixel-bg-medium ${pixelBorders.medium}`}>
+                  <h3 className="font-pixel text-pixel-2xs text-pixel-primary mb-2">
+                    HOW CLAIMING WORKS
+                  </h3>
+                  <ul className="space-y-1.5 text-xs text-pixel-text-muted">
+                    <li className="flex items-start gap-2">
+                      <span className="text-pixel-success">1.</span>
+                      <span>Mine to earn virtual work points (free, unlimited)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-pixel-success">2.</span>
+                      <span>Prepare your claim (server signs your work)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-pixel-success">3.</span>
+                      <span>Create and broadcast a Bitcoin transaction (~1000 sats)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-pixel-success">4.</span>
+                      <span>After confirmation, your $BABTC tokens are minted on Bitcoin</span>
+                    </li>
+                  </ul>
 
-              {/* Actions */}
-              <WalletActions
-                onLock={actions.lock}
-                onDelete={overlays.openDelete}
-                showTestnetFaucet={network.current === "testnet4"}
-              />
-            </div>
-          </div>
+                  <div className="mt-4 p-3 bg-pixel-bg-dark/50 rounded">
+                    <p className="text-xs text-pixel-secondary font-pixel mb-1">
+                      WHY PAY FEES?
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Unlike games where the team pays transaction fees, BitcoinBaby
+                      lets you claim when YOU want at YOUR preferred fee rate. This
+                      makes the game sustainable and gives you full control over your
+                      tokens.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeView === "history" && (
+              <div className={`${pixelCard.primary} p-6`}>
+                <HistoryView onBack={() => handleViewChange("dashboard")} />
+              </div>
+            )}
+          </>
         )}
 
         {/* Error display */}

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 /**
  * More Section E2E Tests
@@ -141,9 +141,8 @@ test.describe("Internal Navigation", () => {
     const settingsLink = page.getByRole("link", { name: /settings/i });
     if (await settingsLink.isVisible().catch(() => false)) {
       await settingsLink.click();
-      await page.waitForLoadState("domcontentloaded");
-      // Should navigate to settings
-      expect(page.url()).toMatch(/settings/);
+      // Should navigate to settings (SPA transition support)
+      await expect(page).toHaveURL(/settings/);
     }
   });
 
@@ -153,8 +152,7 @@ test.describe("Internal Navigation", () => {
     const leaderboardLink = page.getByRole("link", { name: /leaderboard/i });
     if (await leaderboardLink.isVisible().catch(() => false)) {
       await leaderboardLink.click();
-      await page.waitForLoadState("domcontentloaded");
-      expect(page.url()).toMatch(/leaderboard/);
+      await expect(page).toHaveURL(/leaderboard/);
     }
   });
 
@@ -164,8 +162,7 @@ test.describe("Internal Navigation", () => {
     const helpLink = page.getByRole("link", { name: /help|guide/i });
     if (await helpLink.isVisible().catch(() => false)) {
       await helpLink.click();
-      await page.waitForLoadState("domcontentloaded");
-      expect(page.url()).toMatch(/help/);
+      await expect(page).toHaveURL(/help/);
     }
   });
 });

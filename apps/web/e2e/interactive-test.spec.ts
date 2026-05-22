@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { test } from "./fixtures";
 
 /**
  * Interactive Testing with Screenshots
@@ -11,8 +11,8 @@ const TEST_MNEMONIC =
 
 test.describe("Interactive App Testing", () => {
   test("Complete app exploration with screenshots", async ({ page }) => {
-    // Configure longer timeout for interactive testing
-    test.setTimeout(120000);
+    // Configure longer timeout for interactive testing (3 minutes)
+    test.setTimeout(180000);
 
     // Capture console errors
     const consoleErrors: string[] = [];
@@ -27,7 +27,7 @@ test.describe("Interactive App Testing", () => {
 
     // 1. HOME PAGE
     console.log("📸 Opening home page...");
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "commit" });
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
     await page.screenshot({
@@ -38,7 +38,7 @@ test.describe("Interactive App Testing", () => {
 
     // 2. MINING TAB
     console.log("📸 Opening mining tab...");
-    await page.goto("/?tab=mining");
+    await page.goto("/?tab=mining", { waitUntil: "commit" });
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
     await page.screenshot({
@@ -49,7 +49,7 @@ test.describe("Interactive App Testing", () => {
 
     // 3. NFT TAB
     console.log("📸 Opening NFT tab...");
-    await page.goto("/?tab=nfts");
+    await page.goto("/?tab=nfts", { waitUntil: "commit" });
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
     await page.screenshot({
@@ -60,7 +60,7 @@ test.describe("Interactive App Testing", () => {
 
     // 4. WALLET TAB (before import)
     console.log("📸 Opening wallet tab...");
-    await page.goto("/?tab=wallet");
+    await page.goto("/?tab=wallet", { waitUntil: "commit" });
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
     await page.screenshot({
@@ -126,7 +126,7 @@ test.describe("Interactive App Testing", () => {
 
     // 6. MORE TAB
     console.log("📸 Opening more tab...");
-    await page.goto("/?tab=more");
+    await page.goto("/?tab=more", { waitUntil: "commit" });
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
     await page.screenshot({
@@ -151,7 +151,7 @@ test.describe("Interactive App Testing", () => {
 
     // 8. SEND PAGE
     console.log("📸 Opening send page...");
-    await page.goto("/wallet/send");
+    await page.goto("/?tab=wallet&view=send", { waitUntil: "commit" });
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
     await page.screenshot({
@@ -162,7 +162,7 @@ test.describe("Interactive App Testing", () => {
 
     // 9. CLAIM PAGE
     console.log("📸 Opening claim page...");
-    await page.goto("/wallet/claim");
+    await page.goto("/?tab=wallet&view=claim", { waitUntil: "commit" });
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
     await page.screenshot({
@@ -173,7 +173,7 @@ test.describe("Interactive App Testing", () => {
 
     // 10. HISTORY PAGE
     console.log("📸 Opening history page...");
-    await page.goto("/wallet/history");
+    await page.goto("/?tab=wallet&view=history", { waitUntil: "commit" });
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
     await page.screenshot({
@@ -184,7 +184,7 @@ test.describe("Interactive App Testing", () => {
 
     // 11. BACK TO WALLET TAB (after import attempt)
     console.log("📸 Final wallet state...");
-    await page.goto("/?tab=wallet");
+    await page.goto("/?tab=wallet", { waitUntil: "commit" });
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
     await page.screenshot({
@@ -195,7 +195,7 @@ test.describe("Interactive App Testing", () => {
 
     // 12. NFT MINT ATTEMPT
     console.log("📸 Testing NFT mint flow...");
-    await page.goto("/?tab=nfts");
+    await page.goto("/?tab=nfts", { waitUntil: "commit" });
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(1000);
 
@@ -213,7 +213,7 @@ test.describe("Interactive App Testing", () => {
     // 13. MOBILE VIEW
     console.log("📸 Testing mobile view...");
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "commit" });
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(1000);
     await page.screenshot({
@@ -222,23 +222,23 @@ test.describe("Interactive App Testing", () => {
     });
     console.log("✅ Mobile home captured");
 
-    await page.goto("/?tab=mining");
+    await page.goto("/?tab=mining", { waitUntil: "commit" });
     await page.waitForTimeout(1000);
     await page.screenshot({
       path: "test-results/screenshots/17-mobile-mining.png",
       fullPage: true,
     });
-    console.log("✅ Mobile mining captured");
+    console.log("... Mobile mining captured");
 
-    await page.goto("/?tab=nfts");
+    await page.goto("/?tab=nfts", { waitUntil: "commit" });
     await page.waitForTimeout(1000);
     await page.screenshot({
       path: "test-results/screenshots/18-mobile-nfts.png",
       fullPage: true,
     });
-    console.log("✅ Mobile NFTs captured");
+    console.log("... Mobile NFTs captured");
 
-    await page.goto("/?tab=wallet");
+    await page.goto("/?tab=wallet", { waitUntil: "commit" });
     await page.waitForTimeout(1000);
     await page.screenshot({
       path: "test-results/screenshots/19-mobile-wallet.png",

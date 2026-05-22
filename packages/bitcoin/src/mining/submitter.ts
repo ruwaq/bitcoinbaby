@@ -23,7 +23,7 @@
 
 import { CharmsService, createCharmsService } from "../scrolls";
 import {
-  MempoolClient,
+  BlockchainAPI,
   createMempoolClient,
   getEncodedMerkleProof,
   type MerkleProof,
@@ -101,7 +101,7 @@ function scrollsToBitcoinNetwork(network: ScrollsNetwork): BitcoinNetwork {
 export class MiningSubmitter {
   private charmsService: CharmsService;
   private proverClient: CharmsProverClient;
-  private mempoolClient: MempoolClient;
+  private mempoolClient: BlockchainAPI;
   private txBuilder: TransactionBuilder;
   private minerAddress: string;
   private minerXOnlyPubKey: Uint8Array | undefined;

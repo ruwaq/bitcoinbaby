@@ -9,31 +9,33 @@ BitcoinBaby is a gamified mining platform where users "raise" a digital baby by 
 ```
 bitcoinbaby/
 ├── apps/
-│   ├── web/                # Next.js 15 (SSR + API Routes)
-│   └── native/             # Next.js + Capacitor (iOS/Android)
+│   ├── web/                # Next.js 16 (SSR + API Routes + Capacitor for mobile)
+│   └── workers/            # Cloudflare Workers (Hono API + Durable Objects)
 ├── packages/
-│   ├── ui/                 # Shared React components
+│   ├── ui/                 # Shared React components (Tailwind CSS v4)
 │   ├── core/               # Business logic + Zustand stores
 │   ├── bitcoin/            # bitcoinjs-lib + Charms SDK
 │   ├── ai/                 # Transformers.js wrapper
+│   ├── shared/             # Shared types, config, HTTP client, and validation
 │   └── config/             # Shared ESLint, Tailwind, TypeScript
 ├── turbo.json
 └── pnpm-workspace.yaml
 ```
 
-**85%+ code shared** between web and mobile apps.
+**95%+ code shared** between web and mobile native targets since they are unified in `apps/web`.
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
 | Monorepo | Turborepo + pnpm |
-| Web | Next.js 15, React 19, Tailwind, shadcn/ui |
-| Mobile | Capacitor (static export) |
+| Web | Next.js 16.2.6, React 19.2.3, Tailwind CSS v4, shadcn/ui |
+| Mobile | Capacitor (static build wrapper inside apps/web) |
+| Backend | Cloudflare Workers, Hono, Durable Objects, Redis |
 | State | Zustand |
 | Mining | Web Workers + WebGPU |
-| Blockchain | BitcoinOS, Charms, bitcoinjs-lib |
-| AI | Transformers.js |
+| Blockchain | Bitcoin (Testnet4/Mainnet), Charms, bitcoinjs-lib |
+| AI | Transformers.js (WebGPU-accelerated text classification) |
 
 ## Quick Start
 
@@ -81,35 +83,41 @@ pnpm add @bitcoinbaby/ui --filter @bitcoinbaby/web --workspace
 ## Project Structure
 
 ### apps/web
-Full Next.js 15 application with:
-- App Router
-- SSR + API Routes
-- SEO optimized
-- Deploy to Vercel
+Full Next.js 16 application with:
+- App Router, React 19, and Tailwind CSS v4
+- SSR + API Routes (web target deployed to Vercel)
+- Integrated Capacitor setup for iOS/Android native targets (built via static export)
+- Uses shared UI components, core mining loop, and Zustand stores
 
-### apps/native
-Static export of Next.js wrapped with Capacitor:
-- iOS and Android builds
-- Background mining via Capacitor plugins
-- Same UI components as web
+### apps/workers
+Backend APIs running on Cloudflare Workers edge:
+- Hono router for fast, edge-native endpoint execution
+- Durable Objects to maintain real-time game rooms, withdraw pools, and virtual balances
+- Redis (Upstash) for global mining leaderboard
 
 ### packages/core
-Business logic shared between apps:
-- Mining orchestrator (CPU/WebGPU)
-- Baby state management
-- Zustand stores
+Business logic shared across the project:
+- Mining orchestrator (CPU/WebGPU) with variable difficulty support
+- Game loop, Achievements, and Baby state decay logic
+- Zustand stores for client-side state
 
 ### packages/ui
-React components using:
-- shadcn/ui
-- Tailwind CSS
-- class-variance-authority
+Design system and core reusable components:
+- Tailwind CSS v4 utility classes
+- shadcn/ui base primitives and layout elements
+- class-variance-authority styling variants
 
 ### packages/bitcoin
-Blockchain integration:
-- Wallet generation
-- Transaction building
-- Charms protocol integration
+Bitcoin and smart contract operations:
+- Wallet generation (bip32, bip39 derivation)
+- PSBT transaction building and atomic swaps
+- Charms protocol integration (Inscriptions, UTXO validation)
+
+### packages/shared
+Single source of truth for the workspace:
+- Shared TypeScript schemas and validation rules (Zod)
+- Config values (env handling, game phases)
+- Base HTTP Client and structured logging utilities
 
 ## Roadmap
 

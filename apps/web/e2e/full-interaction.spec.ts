@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { test } from "./fixtures";
 
 /**
  * Full Interaction Test
@@ -35,7 +35,7 @@ test.describe("Full App Interaction", () => {
 
     // 1. IMPORT WALLET FIRST
     console.log("📱 Step 1: Importing wallet...");
-    await page.goto("/?tab=wallet");
+    await page.goto("/?tab=wallet", { waitUntil: "commit" });
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3000);
 
@@ -92,12 +92,12 @@ test.describe("Full App Interaction", () => {
 
     // 2. MINING - Navigate using tab clicks (not page.goto) to preserve wallet state
     console.log("⛏️ Step 2: Testing mining...");
-    const miningTab = page.getByRole("link", { name: /mining/i });
+    const miningTab = page.getByRole("button", { name: /mining/i }).first();
     if (await miningTab.isVisible().catch(() => false)) {
       await miningTab.click();
     } else {
       // Fallback to direct navigation
-      await page.goto("/?tab=mining");
+      await page.goto("/?tab=mining", { waitUntil: "commit" });
     }
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3000);
@@ -142,11 +142,11 @@ test.describe("Full App Interaction", () => {
 
     // 3. NFT SECTION - Try to mint (use tab click)
     console.log("🎨 Step 3: Testing NFT minting...");
-    const nftsTab = page.getByRole("link", { name: /nfts/i });
+    const nftsTab = page.getByRole("button", { name: /nfts/i }).first();
     if (await nftsTab.isVisible().catch(() => false)) {
       await nftsTab.click();
     } else {
-      await page.goto("/?tab=nfts");
+      await page.goto("/?tab=nfts", { waitUntil: "commit" });
     }
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3000);
@@ -181,11 +181,11 @@ test.describe("Full App Interaction", () => {
 
     // 4. WALLET FEATURES (use tab click)
     console.log("💳 Step 4: Testing wallet features...");
-    const walletTab = page.getByRole("link", { name: /wallet/i });
+    const walletTab = page.getByRole("button", { name: /wallet/i }).first();
     if (await walletTab.isVisible().catch(() => false)) {
       await walletTab.click();
     } else {
-      await page.goto("/?tab=wallet");
+      await page.goto("/?tab=wallet", { waitUntil: "commit" });
     }
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3000);
@@ -238,7 +238,12 @@ test.describe("Full App Interaction", () => {
 
     // Test CLAIM page
     console.log("🎁 Testing claim page...");
-    await page.goto("/wallet/claim");
+    const walletClaimButton = page.getByRole("button", { name: /^claim$/i });
+    if (await walletClaimButton.isVisible().catch(() => false)) {
+      await walletClaimButton.click();
+    } else {
+      await page.goto("/?tab=wallet&view=claim", { waitUntil: "commit" });
+    }
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3000);
     await page.screenshot({
@@ -259,7 +264,17 @@ test.describe("Full App Interaction", () => {
 
     // Test HISTORY page
     console.log("📜 Testing history page...");
-    await page.goto("/wallet/history");
+    const backToWalletButton = page.getByRole("button", { name: /back/i });
+    if (await backToWalletButton.isVisible().catch(() => false)) {
+      await backToWalletButton.click();
+      await page.waitForTimeout(1000);
+    }
+    const walletHistoryButton = page.getByRole("button", { name: /^history$/i });
+    if (await walletHistoryButton.isVisible().catch(() => false)) {
+      await walletHistoryButton.click();
+    } else {
+      await page.goto("/?tab=wallet&view=history", { waitUntil: "commit" });
+    }
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3000);
     await page.screenshot({
@@ -269,11 +284,11 @@ test.describe("Full App Interaction", () => {
 
     // 5. MORE SECTION / SETTINGS (use tab click)
     console.log("⚙️ Step 5: Testing settings...");
-    const moreTab = page.getByRole("link", { name: /more/i });
+    const moreTab = page.getByRole("button", { name: /more/i }).first();
     if (await moreTab.isVisible().catch(() => false)) {
       await moreTab.click();
     } else {
-      await page.goto("/?tab=more");
+      await page.goto("/?tab=more", { waitUntil: "commit" });
     }
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2000);
@@ -296,11 +311,11 @@ test.describe("Full App Interaction", () => {
 
     // 6. TOKEN SECTION (use tab click)
     console.log("🪙 Step 6: Token section...");
-    const tokenTab = page.getByRole("link", { name: /\$babtc/i });
+    const tokenTab = page.getByRole("button", { name: /\$babtc/i }).first();
     if (await tokenTab.isVisible().catch(() => false)) {
       await tokenTab.click();
     } else {
-      await page.goto("/?tab=token");
+      await page.goto("/?tab=token", { waitUntil: "commit" });
     }
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3000);
@@ -311,11 +326,11 @@ test.describe("Full App Interaction", () => {
 
     // 7. FINAL STATE - Go back to wallet (use tab click)
     console.log("🏁 Final check...");
-    const walletTabFinal = page.getByRole("link", { name: /wallet/i });
+    const walletTabFinal = page.getByRole("button", { name: /wallet/i }).first();
     if (await walletTabFinal.isVisible().catch(() => false)) {
       await walletTabFinal.click();
     } else {
-      await page.goto("/?tab=wallet");
+      await page.goto("/?tab=wallet", { waitUntil: "commit" });
     }
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3000);

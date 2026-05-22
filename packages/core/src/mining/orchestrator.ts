@@ -6,6 +6,8 @@ import type {
   DeviceCapabilities,
   BatteryManager,
   XPGainedEvent,
+  AITask,
+  AIProof,
 } from "./types";
 import { CPUMiner } from "./cpu-miner";
 import {
@@ -16,6 +18,7 @@ import {
 } from "./capabilities";
 import { MIN_DIFFICULTY } from "../tokenomics/constants";
 import { createLogger } from "@bitcoinbaby/shared";
+import { getApiClient } from "../api/client";
 
 const log = createLogger("Orchestrator");
 import {
@@ -30,10 +33,7 @@ const defaultConfig: OrchestratorConfig = {
   throttleOnBattery: true,
   throttleWhenHidden: true,
   initialDifficulty: MIN_DIFFICULTY, // D22 - sustainable emission rate
-  // SECURITY: AI PoUW is DISABLED by default until server-side verification
-  // is implemented. Without server-side validation, AI proofs can be spoofed.
-  // See: docs/SECURITY_AUDIT_2026-03-08.md
-  enableAIPoUW: false,
+  enableAIPoUW: true,
   aiTaskFrequency: 1, // Execute AI task on every share
 };
 
@@ -55,6 +55,9 @@ export class MiningOrchestrator {
   private cleanupFunctions: (() => void)[] = [];
   private currentBlockData?: string; // Store for fallback recovery
   private aiIntegration: AIWorkIntegration | null = null; // AI PoUW integration
+  private aiHashrate = 0;
+  private aiTotalTokens = 0;
+  private isPaused = false;
 
   constructor(config: Partial<OrchestratorConfig> = {}) {
     this.config = { ...defaultConfig, ...config };
@@ -110,6 +113,35 @@ export class MiningOrchestrator {
     this.currentBlockData = blockData;
 
     try {
+      if (this.config.enableAIPoUW) {
+        log.info("Initializing AI engine for PoUW...");
+        if (!this.aiIntegration) {
+          this.aiIntegration = new AIWorkIntegration({
+            enabled: true,
+            taskFrequency: this.config.aiTaskFrequency ?? 1,
+            preferWebGPU: this.config.preferWebGPU,
+          });
+        }
+        await this.aiIntegration.initialize();
+
+        if (this.startCancelled) {
+          log.debug("Start cancelled during AI engine initialization");
+          this.isRunning = false;
+          this.isStarting = false;
+          return;
+        }
+
+        this.aiHashrate = 0;
+        this.isPaused = false;
+
+        // Run AI mining loop asynchronously
+        this.runAILoop();
+
+        this.isStarting = false;
+        this.events.onStatusChange?.("running");
+        return;
+      }
+
       // Detect capabilities
       const caps = await this.detectCapabilities();
 
@@ -317,7 +349,10 @@ export class MiningOrchestrator {
    * Pause mining
    */
   pause(): void {
-    if (this.activeMiner && this.isRunning) {
+    if (this.config.enableAIPoUW && this.isRunning) {
+      this.isPaused = true;
+      this.events.onStatusChange?.("paused");
+    } else if (this.activeMiner && this.isRunning) {
       this.activeMiner.pause();
       this.events.onStatusChange?.("paused");
     }
@@ -327,7 +362,10 @@ export class MiningOrchestrator {
    * Resume mining
    */
   resume(): void {
-    if (this.activeMiner && this.isRunning) {
+    if (this.config.enableAIPoUW && this.isRunning) {
+      this.isPaused = false;
+      this.events.onStatusChange?.("running");
+    } else if (this.activeMiner && this.isRunning) {
       this.activeMiner.resume();
       this.events.onStatusChange?.("running");
     }
@@ -527,14 +565,26 @@ export class MiningOrchestrator {
 
   // Getters
   getHashrate(): number {
+    if (this.config.enableAIPoUW) {
+      return this.aiHashrate;
+    }
     return this.activeMiner?.getHashrate() ?? 0;
   }
 
   getTotalHashes(): number {
+    if (this.config.enableAIPoUW) {
+      return this.aiTotalTokens;
+    }
     return this.activeMiner?.getTotalHashes() ?? 0;
   }
 
   getMinerType(): "cpu" | "webgpu" | null {
+    if (!this.isRunning) {
+      return null;
+    }
+    if (this.config.enableAIPoUW) {
+      return this.aiIntegration?.getStatus().hasWebGPU ? "webgpu" : "cpu";
+    }
     return this.activeMiner?.type ?? null;
   }
 
@@ -608,5 +658,104 @@ export class MiningOrchestrator {
       });
     }
     await this.aiIntegration.initialize();
+  }
+
+  /**
+   * Run the sequential AI Proof of Useful Work loop
+   */
+  private async runAILoop(): Promise<void> {
+    log.info("Starting AI PoUW loop...");
+    const client = getApiClient();
+    const address = this.config.minerAddress;
+
+    if (!address) {
+      log.error("Cannot mine without a miner address");
+      this.events.onError?.(new Error("Miner address is required for PoUW"));
+      this.stop();
+      return;
+    }
+
+    while (this.isRunning) {
+      if (this.isPaused) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        continue;
+      }
+
+      try {
+        log.debug("Fetching JIT AI task from server...");
+        const response = await client.getPouwTask(address);
+
+        if (!response.success || !response.data) {
+          log.warn("Failed to fetch AI task from server, retrying in 5s...", {
+            error: response.error,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+          continue;
+        }
+
+        const task = response.data;
+        log.info(`Received AI Task ${task.id} based on block ${task.blockHash}`);
+
+        // Map PouwTaskResponse to AITask
+        const aiTask: AITask = {
+          id: task.id,
+          type: "pouw",
+          input: task.input,
+          seed: task.seed,
+        };
+
+        const startTime = performance.now();
+        const aiResult = await this.aiIntegration!.executeTask(aiTask);
+        const computeTime = performance.now() - startTime;
+
+        if (!aiResult.success || !aiResult.proof) {
+          log.warn("AI Task local execution failed, retrying in 3s...", {
+            error: aiResult.error,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          continue;
+        }
+
+        log.info(`AI Task ${task.id} completed. Resolving and requesting signature...`);
+
+        // Deserialize unsigned proof
+        const proofObj = JSON.parse(aiResult.proof) as AIProof;
+
+        // Emit onAILocalTaskResolved to request signing on the frontend
+        if (this.events.onAILocalTaskResolved) {
+          this.events.onAILocalTaskResolved(proofObj, aiTask);
+        }
+
+        // Simulate onXPGained event
+        const baseXP = this.calculateBaseXP(MIN_DIFFICULTY);
+        const mockMiningResult: MiningResult = {
+          hash: proofObj.taskId,
+          nonce: 0,
+          difficulty: MIN_DIFFICULTY,
+          timestamp: proofObj.timestamp,
+          blockData: task.blockHash,
+          aiProof: aiResult.proof,
+        };
+        this.emitXPGained(mockMiningResult, baseXP);
+
+        // Estimate tokens/s
+        const tokenEstimate = Math.ceil(proofObj.output.length / 4) + 1;
+        this.aiTotalTokens += tokenEstimate;
+        const tokensPerSecond = tokenEstimate / (computeTime / 1000);
+        this.aiHashrate = tokensPerSecond;
+        this.events.onHashrateUpdate?.(tokensPerSecond);
+
+        // Throttle between tasks to prevent overheating
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      } catch (error) {
+        log.error("Error in AI mining loop", { error });
+        this.events.onError?.(
+          error instanceof Error ? error : new Error("AI mining loop encountered an error")
+        );
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
+    }
+    log.info("AI PoUW loop stopped.");
   }
 }

@@ -1,569 +1,649 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { pixelBorders } from "@bitcoinbaby/ui";
+import {
+  pixelBorders,
+  GenesisBabySprite,
+  generateRandomTraits,
+  traitsFromHash,
+  getMiningBoost,
+  getXpForNextLevel,
+  getEvolutionCostDisplay,
+  MAX_LEVEL,
+  PixelCard,
+  PixelButton,
+  PixelProgress,
+  PixelBadge,
+  type GenesisBabyTraits,
+  type BabyState,
+} from "@bitcoinbaby/ui";
 
-// Import sprites directly since we're in the web app
-// In production, these would come from @bitcoinbaby/ui
-
-// ============================================
-// SPRITE COMPONENTS (inline for now)
-// ============================================
-
-// Oracle Sprite
-function Oracle({
-  size = 128,
-  state = "idle",
-}: {
-  size?: number;
-  state?: "idle" | "talking" | "thinking";
-}) {
-  const stateClasses = {
-    idle: "",
-    talking: "animate-pulse",
-    thinking: "animate-[pixel-float_2s_ease-in-out_infinite]",
-  };
-  return (
-    <div className={`relative ${stateClasses[state]}`}>
-      <svg
-        width={size}
-        height={size}
-        viewBox="0 0 32 32"
-        style={{ imageRendering: "pixelated" }}
-      >
-        <rect x="4" y="8" width="2" height="20" fill="#8b5cf6" />
-        <rect x="3" y="6" width="4" height="3" fill="#f7931a" />
-        <rect x="4" y="5" width="2" height="1" fill="#ffc107" />
-        <rect x="10" y="16" width="14" height="14" fill="#0f0f1b" />
-        <rect x="8" y="18" width="2" height="10" fill="#0f0f1b" />
-        <rect x="24" y="18" width="2" height="10" fill="#0f0f1b" />
-        <rect x="11" y="18" width="1" height="1" fill="#4ade80" />
-        <rect x="14" y="19" width="1" height="1" fill="#4ade80" />
-        <rect x="17" y="18" width="1" height="1" fill="#4ade80" />
-        <rect x="20" y="20" width="1" height="1" fill="#4ade80" />
-        <rect x="12" y="22" width="1" height="1" fill="#4ade80" />
-        <rect x="15" y="23" width="1" height="1" fill="#4ade80" />
-        <rect x="12" y="6" width="10" height="10" fill="#374151" />
-        <rect x="10" y="8" width="2" height="6" fill="#374151" />
-        <rect x="22" y="8" width="2" height="6" fill="#374151" />
-        <rect x="11" y="5" width="12" height="2" fill="#0f0f1b" />
-        <rect x="15" y="7" width="4" height="3" fill="#1f2937" />
-        <rect x="16" y="8" width="2" height="1" fill="#ef4444" />
-        <rect x="13" y="12" width="1" height="6" fill="#6b7280" />
-        <rect x="15" y="13" width="1" height="7" fill="#9ca3af" />
-        <rect x="17" y="12" width="1" height="8" fill="#6b7280" />
-        <rect x="19" y="13" width="1" height="6" fill="#9ca3af" />
-        <rect x="6" y="18" width="4" height="2" fill="#374151" />
-      </svg>
-      {state === "talking" && (
-        <div className="absolute -top-2 -right-2 w-4 h-4 bg-green-500 border-2 border-black animate-bounce" />
-      )}
-    </div>
-  );
-}
-
-// SatoBots
-function SatoBots({ count = 3, size = 32 }: { count?: number; size?: number }) {
-  return (
-    <div className="relative flex items-center">
-      {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={i}
-          className="animate-[pixel-float_2s_ease-in-out_infinite]"
-          style={{
-            marginLeft: i > 0 ? -size * 0.3 : 0,
-            animationDelay: `${i * 200}ms`,
-          }}
-        >
-          <svg
-            width={size}
-            height={size}
-            viewBox="0 0 16 16"
-            style={{ imageRendering: "pixelated" }}
-          >
-            <rect x="6" y="1" width="4" height="1" fill="#6b7280" />
-            <rect x="7" y="2" width="2" height="2" fill="#374151" />
-            <rect x="4" y="5" width="8" height="6" fill="#f7931a" />
-            <rect x="3" y="6" width="1" height="4" fill="#f7931a" />
-            <rect x="12" y="6" width="1" height="4" fill="#f7931a" />
-            <rect x="5" y="7" width="2" height="2" fill="#1f2937" />
-            <rect x="9" y="7" width="2" height="2" fill="#1f2937" />
-            <rect x="5" y="7" width="1" height="1" fill="#4fc3f7" />
-            <rect x="9" y="7" width="1" height="1" fill="#4fc3f7" />
-            <rect x="7" y="12" width="1" height="1" fill="#ffc107" />
-            <rect
-              x="6"
-              y="14"
-              width="1"
-              height="1"
-              fill="#ffc107"
-              opacity="0.5"
-            />
-          </svg>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Code Egg
-function CodeEgg({
-  size = 128,
-  state = "dormant",
-}: {
-  size?: number;
-  state?: "dormant" | "warming" | "hatching";
-}) {
-  const stateClasses = {
-    dormant: "opacity-80",
-    warming: "animate-pulse",
-    hatching: "animate-[pixel-shake_0.3s_ease-in-out_infinite]",
-  };
-  const opacity = { dormant: 0.3, warming: 0.7, hatching: 1 };
-  return (
-    <div className={`relative ${stateClasses[state]}`}>
-      <svg
-        width={size}
-        height={size}
-        viewBox="0 0 32 32"
-        style={{ imageRendering: "pixelated" }}
-      >
-        <ellipse cx="16" cy="30" rx="10" ry="2" fill="#000000" opacity="0.3" />
-        <rect x="8" y="8" width="16" height="18" fill="#374151" />
-        <rect x="6" y="10" width="2" height="14" fill="#374151" />
-        <rect x="24" y="10" width="2" height="14" fill="#374151" />
-        <rect x="10" y="6" width="12" height="2" fill="#374151" />
-        <rect x="10" y="26" width="12" height="2" fill="#374151" />
-        <rect x="10" y="10" width="6" height="6" fill="#1a1a2e" />
-        <rect x="16" y="10" width="6" height="6" fill="#4b5563" />
-        <rect x="10" y="16" width="6" height="6" fill="#4b5563" />
-        <rect x="16" y="16" width="6" height="6" fill="#1a1a2e" />
-        <g opacity={opacity[state]}>
-          <rect x="9" y="12" width="1" height="8" fill="#f7931a" />
-          <rect x="22" y="14" width="1" height="6" fill="#f7931a" />
-          <rect x="12" y="11" width="4" height="1" fill="#f7931a" />
-          <rect x="17" y="15" width="4" height="1" fill="#f7931a" />
-          <rect x="15" y="13" width="2" height="2" fill="#ffc107" />
-        </g>
-        <rect x="14" y="6" width="1" height="3" fill="#000000" />
-        <rect x="15" y="8" width="2" height="1" fill="#000000" />
-      </svg>
-      {state === "hatching" && (
-        <>
-          <div className="absolute top-0 left-1/4 w-2 h-2 bg-orange-500 animate-ping" />
-          <div
-            className="absolute top-2 right-1/4 w-2 h-2 bg-cyan-500 animate-ping"
-            style={{ animationDelay: "100ms" }}
-          />
-        </>
-      )}
-    </div>
-  );
-}
-
-// Baby Sprite
-function BabySprite({
-  size = 192,
-  state = "idle",
-}: {
-  size?: number;
-  state?: string;
-}) {
-  const stateClasses: Record<string, string> = {
-    idle: "animate-[pixel-float_2s_ease-in-out_infinite]",
-    happy: "animate-bounce",
-    sleeping: "opacity-70 hue-rotate-[240deg]",
-    hungry: "animate-[pixel-shake_0.3s_ease-in-out_infinite]",
-    mining: "",
-    evolving: "animate-pulse",
-  };
-  const isSleeping = state === "sleeping";
-  const isMining = state === "mining";
-  return (
-    <div className={`relative ${stateClasses[state] || ""}`}>
-      <svg
-        width={size}
-        height={size}
-        viewBox="0 0 16 16"
-        style={{ imageRendering: "pixelated" }}
-      >
-        <rect x="7" y="0" width="2" height="2" fill="#4fc3f7" />
-        <rect x="8" y="0" width="1" height="1" fill="#81d4fa" />
-        <rect x="4" y="2" width="8" height="6" fill="#ffc107" />
-        <rect x="3" y="3" width="1" height="4" fill="#ffc107" />
-        <rect x="12" y="3" width="1" height="4" fill="#ffc107" />
-        <rect x="5" y="3" width="6" height="3" fill="#4fc3f7" opacity="0.6" />
-        <rect x="6" y="3" width="2" height="2" fill="#8b5cf6" opacity="0.7" />
-        <rect x="8" y="4" width="2" height="2" fill="#8b5cf6" opacity="0.7" />
-        {!isSleeping ? (
-          <>
-            <rect x="5" y="5" width="2" height="2" fill="#1f2937" />
-            <rect x="9" y="5" width="2" height="2" fill="#1f2937" />
-            <rect x="5" y="5" width="1" height="1" fill="#ffffff" />
-            <rect x="9" y="5" width="1" height="1" fill="#ffffff" />
-          </>
-        ) : (
-          <>
-            <rect x="5" y="6" width="2" height="1" fill="#1f2937" />
-            <rect x="9" y="6" width="2" height="1" fill="#1f2937" />
-          </>
-        )}
-        <rect x="7" y="7" width="2" height="1" fill="#1f2937" />
-        <rect x="3" y="5" width="1" height="1" fill="#ff9999" />
-        <rect x="12" y="5" width="1" height="1" fill="#ff9999" />
-        <rect x="5" y="8" width="6" height="5" fill="#f7931a" />
-        <rect x="4" y="9" width="1" height="3" fill="#f7931a" />
-        <rect x="11" y="9" width="1" height="3" fill="#f7931a" />
-        <rect x="7" y="9" width="2" height="3" fill="#1f2937" />
-        <rect x="6" y="10" width="1" height="1" fill="#1f2937" />
-        <rect x="9" y="10" width="1" height="1" fill="#1f2937" />
-        <rect x="5" y="13" width="2" height="1" fill="#e67e00" />
-        <rect x="9" y="13" width="2" height="1" fill="#e67e00" />
-      </svg>
-      {isMining && (
-        <>
-          <div className="absolute -top-2 -left-2 w-2 h-2 bg-orange-500 animate-ping" />
-          <div
-            className="absolute -top-1 -right-3 w-2 h-2 bg-cyan-500 animate-ping"
-            style={{ animationDelay: "100ms" }}
-          />
-          <div
-            className="absolute -bottom-2 left-4 w-2 h-2 bg-green-500 animate-ping"
-            style={{ animationDelay: "200ms" }}
-          />
-        </>
-      )}
-      {isSleeping && (
-        <div className="absolute -top-4 right-0 font-pixel text-cyan-400 text-xs animate-[pixel-float_2s_ease-in-out_infinite]">
-          Zzz
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Teen Sprite
-function TeenSprite({
-  size = 192,
-  state = "idle",
-}: {
-  size?: number;
-  state?: string;
-}) {
-  const stateClasses: Record<string, string> = {
-    idle: "",
-    hacking: "animate-pulse",
-    mining_boost: "",
-  };
-  const isHacking = state === "hacking";
-  return (
-    <div className={`relative ${stateClasses[state] || ""}`}>
-      <svg
-        width={size}
-        height={size}
-        viewBox="0 0 24 24"
-        style={{ imageRendering: "pixelated" }}
-      >
-        <ellipse cx="12" cy="23" rx="6" ry="1" fill="#000000" opacity="0.3" />
-        <rect x="6" y="2" width="12" height="10" fill="#6366f1" />
-        <rect x="5" y="4" width="1" height="6" fill="#6366f1" />
-        <rect x="18" y="4" width="1" height="6" fill="#6366f1" />
-        <rect x="8" y="1" width="8" height="2" fill="#6366f1" />
-        <rect x="7" y="10" width="10" height="1" fill="#4f46e5" />
-        <rect x="8" y="4" width="8" height="6" fill="#f7931a" />
-        <rect x="7" y="5" width="10" height="4" fill="#1f2937" />
-        <rect x="8" y="6" width="3" height="2" fill="#0f0f1b" />
-        <rect x="13" y="6" width="3" height="2" fill="#0f0f1b" />
-        {isHacking && (
-          <>
-            <rect
-              x="8"
-              y="6"
-              width="1"
-              height="1"
-              fill="#4ade80"
-              className="animate-pulse"
-            />
-            <rect
-              x="10"
-              y="7"
-              width="1"
-              height="1"
-              fill="#4ade80"
-              className="animate-pulse"
-            />
-            <rect
-              x="13"
-              y="6"
-              width="1"
-              height="1"
-              fill="#4ade80"
-              className="animate-pulse"
-            />
-            <rect
-              x="15"
-              y="7"
-              width="1"
-              height="1"
-              fill="#4ade80"
-              className="animate-pulse"
-            />
-          </>
-        )}
-        <rect x="10" y="9" width="4" height="1" fill="#e67e00" />
-        <rect x="7" y="11" width="10" height="8" fill="#f7931a" />
-        <rect x="6" y="12" width="1" height="5" fill="#f7931a" />
-        <rect x="17" y="12" width="1" height="5" fill="#f7931a" />
-        <rect x="8" y="13" width="1" height="3" fill="#4fc3f7" />
-        <rect x="9" y="14" width="2" height="1" fill="#4fc3f7" />
-        <rect x="14" y="12" width="2" height="1" fill="#4fc3f7" />
-        <rect x="15" y="13" width="1" height="2" fill="#4fc3f7" />
-        <rect x="11" y="13" width="2" height="4" fill="#1f2937" />
-        <rect x="4" y="12" width="2" height="4" fill="#e67e00" />
-        <rect x="18" y="12" width="2" height="4" fill="#e67e00" />
-        <rect x="4" y="16" width="2" height="2" fill="#f7931a" />
-        <rect x="18" y="16" width="2" height="2" fill="#f7931a" />
-        <rect x="8" y="19" width="3" height="3" fill="#e67e00" />
-        <rect x="13" y="19" width="3" height="3" fill="#e67e00" />
-        <rect x="7" y="21" width="4" height="1" fill="#1f2937" />
-        <rect x="13" y="21" width="4" height="1" fill="#1f2937" />
-      </svg>
-      {state === "mining_boost" && (
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(247,147,26,0.3) 0%, transparent 60%)",
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-// ============================================
-// SHOWCASE PAGE
-// ============================================
+const BASE_TYPES = ["human", "animal", "robot", "mystic", "alien", "shaman", "elemental", "dragon"] as const;
+const BLOODLINES = ["royal", "warrior", "rogue", "mystic"] as const;
+const HERITAGES = ["americas", "africa", "asia", "europa", "oceania"] as const;
+const RARITIES = ["common", "uncommon", "rare", "epic", "legendary", "mythic"] as const;
+const STATES = ["idle", "happy", "sleeping", "hungry", "mining", "learning", "evolving", "thriving", "struggling"] as const;
 
 export default function CharactersPage() {
-  const [babyState, setBabyState] = useState<string>("idle");
-  const [eggState, setEggState] = useState<"dormant" | "warming" | "hatching">(
-    "dormant",
-  );
-  const [oracleState, setOracleState] = useState<
-    "idle" | "talking" | "thinking"
-  >("idle");
-  const [teenState, setTeenState] = useState<string>("idle");
+  // Current traits state
+  const [traits, setTraits] = useState<GenesisBabyTraits>({
+    baseType: "human",
+    bloodline: "royal",
+    heritage: "americas",
+    rarity: "common",
+    dna: "f7931a0000000000",
+  });
+
+  // UI customization options
+  const [spriteSize, setSpriteSize] = useState<number>(256);
+  const [showFrame, setShowFrame] = useState<boolean>(true);
+  const [showBadge, setShowBadge] = useState<boolean>(true);
+  const [showBloodlineAura, setShowBloodlineAura] = useState<boolean>(true);
+  const [animated, setAnimated] = useState<boolean>(true);
+  const [babyState, setBabyState] = useState<BabyState>("idle");
+
+  // DNA Input state
+  const [dnaInput, setDnaInput] = useState<string>(traits.dna);
+  const [dnaError, setDnaError] = useState<string | null>(null);
+
+  // Evolution Simulator state
+  const [level, setLevel] = useState<number>(1);
+  const [xp, setXp] = useState<number>(0);
+  const [isEvolving, setIsEvolving] = useState<boolean>(false);
+  const [evolutionSuccess, setEvolutionSuccess] = useState<boolean>(false);
+
+  // Track if DNA needs updating when traits change manually
+  const [isManualUpdate, setIsManualUpdate] = useState<boolean>(false);
+
+  // Parse DNA input
+  const handleParseDna = (hash: string) => {
+    if (!hash || hash.trim() === "") {
+      setDnaError("El hash de DNA no puede estar vacío");
+      return;
+    }
+    const cleanHash = hash.replace(/^0x/, "").trim();
+    if (!/^[0-9a-fA-F]+$/.test(cleanHash)) {
+      setDnaError("El DNA debe ser un hash hexadecimal válido");
+      return;
+    }
+
+    try {
+      const parsedTraits = traitsFromHash(cleanHash);
+      setTraits(parsedTraits);
+      setDnaInput(cleanHash);
+      setDnaError(null);
+      setIsManualUpdate(false);
+    } catch (err) {
+      setDnaError("Error al procesar el DNA");
+    }
+  };
+
+  // Generate random baby
+  const handleRandomBaby = () => {
+    const randomTraits = generateRandomTraits();
+    setTraits(randomTraits);
+    setDnaInput(randomTraits.dna);
+    setDnaError(null);
+    setIsManualUpdate(false);
+  };
+
+  // Sync DNA input state when traits change (but only if not manually typed)
+  useEffect(() => {
+    if (!isManualUpdate) {
+      setDnaInput(traits.dna);
+    }
+  }, [traits.dna, isManualUpdate]);
+
+  // Update specific trait manually
+  const updateTrait = <K extends keyof Omit<GenesisBabyTraits, "dna">>(
+    key: K,
+    value: GenesisBabyTraits[K]
+  ) => {
+    setIsManualUpdate(true);
+    setTraits((prev) => {
+      const nextTraits = { ...prev, [key]: value };
+      // Try to generate a dummy DNA that matches some aspects, or keep the existing DNA
+      return nextTraits;
+    });
+  };
+
+  // XP requirement for next level
+  const reqXp = useMemo(() => {
+    return getXpForNextLevel(level);
+  }, [level]);
+
+  // Mock production state for NFT helpers
+  const mockNftState = useMemo(() => {
+    return {
+      dna: traits.dna,
+      bloodline: traits.bloodline,
+      baseType: traits.baseType,
+      genesisBlock: 100,
+      rarityTier: traits.rarity,
+      tokenId: 1,
+      level: level,
+      xp: xp,
+      totalXp: xp,
+      workCount: 0,
+      lastWorkBlock: 0,
+      evolutionCount: level - 1,
+      tokensEarned: 0n,
+    };
+  }, [traits, level, xp]);
+
+  // Calculate boosts
+  const currentBoost = useMemo(() => {
+    return getMiningBoost(mockNftState);
+  }, [mockNftState]);
+
+  const nextBoost = useMemo(() => {
+    if (level >= MAX_LEVEL) return currentBoost;
+    return getMiningBoost({ ...mockNftState, level: level + 1 });
+  }, [mockNftState, level, currentBoost]);
+
+  // Add simulated XP
+  const addXp = (amount: number) => {
+    if (level >= MAX_LEVEL) return;
+    setXp((prev) => Math.min(reqXp, prev + amount));
+  };
+
+  // Trigger simulated evolution
+  const triggerEvolution = () => {
+    if (xp < reqXp || level >= MAX_LEVEL || isEvolving) return;
+
+    setIsEvolving(true);
+    setBabyState("evolving");
+    setEvolutionSuccess(false);
+
+    // Simulate 1.5s evolution process
+    setTimeout(() => {
+      setLevel((prev) => prev + 1);
+      setXp(0);
+      setIsEvolving(false);
+      setBabyState("happy");
+      setEvolutionSuccess(true);
+
+      // Reset success banner after 3 seconds
+      setTimeout(() => {
+        setEvolutionSuccess(false);
+      }, 3000);
+    }, 1500);
+  };
+
+  // Reset simulator state
+  const resetSimulator = () => {
+    setLevel(1);
+    setXp(0);
+    setBabyState("idle");
+    setEvolutionSuccess(false);
+  };
+
+  // Rarity color helpers for borders/badges
+  const rarityColors = {
+    common: { border: "border-gray-500", text: "text-gray-400", bg: "bg-gray-950/80" },
+    uncommon: { border: "border-green-500", text: "text-green-400", bg: "bg-green-950/80" },
+    rare: { border: "border-blue-500", text: "text-blue-400", bg: "bg-blue-950/80" },
+    epic: { border: "border-purple-500", text: "text-purple-400", bg: "bg-purple-950/80" },
+    legendary: { border: "border-yellow-500", text: "text-yellow-400", bg: "bg-yellow-950/80" },
+    mythic: { border: "border-pink-500", text: "text-pink-400", bg: "bg-pink-950/80" },
+  }[traits.rarity];
 
   return (
-    <main className="min-h-screen p-8 bg-pixel-bg-dark">
-      <div className="max-w-6xl mx-auto">
+    <main className="min-h-screen p-4 md:p-8 bg-pixel-bg-dark text-pixel-text">
+      <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
-        <header className="mb-12 text-center">
-          <h1 className="font-pixel text-2xl text-pixel-primary mb-4">
-            CHARACTER GALLERY
+        <header className="relative py-6 px-8 bg-pixel-bg-medium border-4 border-black text-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <div className="absolute top-2 left-2 w-2 h-2 bg-pixel-primary" />
+          <div className="absolute top-2 right-2 w-2 h-2 bg-pixel-primary" />
+          <div className="absolute bottom-2 left-2 w-2 h-2 bg-pixel-primary" />
+          <div className="absolute bottom-2 right-2 w-2 h-2 bg-pixel-primary" />
+          
+          <h1 className="font-pixel text-2xl md:text-3xl text-pixel-primary mb-2 tracking-wider">
+            GENESIS BABIES DESIGNER
           </h1>
-          <p className="font-pixel-body text-lg text-pixel-text-muted">
-            BitcoinBaby Pixel Art Character Ecosystem
+          <p className="font-pixel text-[10px] md:text-xs text-pixel-text-muted uppercase">
+            Visualizador de Arte Real On-Chain y Simulador de Evolución
           </p>
         </header>
 
-        {/* Evolution Timeline */}
-        <section className="mb-16">
-          <h2 className="font-pixel text-sm text-pixel-secondary mb-6">
-            EVOLUTION STAGES
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {/* Egg */}
-            <div
-              className={`bg-pixel-bg-medium ${pixelBorders.medium} p-6 text-center`}
-            >
-              <div className="flex justify-center mb-4">
-                <CodeEgg size={96} state={eggState} />
-              </div>
-              <h3 className="font-pixel text-xs text-pixel-text mb-2">
-                STAGE 0
-              </h3>
-              <p className="font-pixel-body text-sm text-pixel-text-muted mb-4">
-                El Huevo de Codigo
-              </p>
-              <div className="flex gap-2 justify-center flex-wrap">
-                {(["dormant", "warming", "hatching"] as const).map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setEggState(s)}
-                    className={`px-2 py-1 font-pixel text-[8px] border-2 border-black ${eggState === s ? "bg-pixel-primary text-black" : "bg-pixel-bg-dark text-pixel-text"}`}
-                  >
-                    {s.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Baby */}
-            <div
-              className={`bg-pixel-bg-medium ${pixelBorders.medium} p-6 text-center`}
-            >
-              <div className="flex justify-center mb-4">
-                <BabySprite size={96} state={babyState} />
-              </div>
-              <h3 className="font-pixel text-xs text-pixel-text mb-2">
-                STAGE 1
-              </h3>
-              <p className="font-pixel-body text-sm text-pixel-text-muted mb-4">
-                El Bebe Nodo
-              </p>
-              <div className="flex gap-2 justify-center flex-wrap">
-                {["idle", "happy", "sleeping", "mining"].map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setBabyState(s)}
-                    className={`px-2 py-1 font-pixel text-[8px] border-2 border-black ${babyState === s ? "bg-pixel-primary text-black" : "bg-pixel-bg-dark text-pixel-text"}`}
-                  >
-                    {s.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Teen */}
-            <div
-              className={`bg-pixel-bg-medium ${pixelBorders.medium} p-6 text-center`}
-            >
-              <div className="flex justify-center mb-4">
-                <TeenSprite size={96} state={teenState} />
-              </div>
-              <h3 className="font-pixel text-xs text-pixel-text mb-2">
-                STAGE 2
-              </h3>
-              <p className="font-pixel-body text-sm text-pixel-text-muted mb-4">
-                El Cypher-Adolescente
-              </p>
-              <div className="flex gap-2 justify-center flex-wrap">
-                {["idle", "hacking", "mining_boost"].map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setTeenState(s)}
-                    className={`px-2 py-1 font-pixel text-[8px] border-2 border-black ${teenState === s ? "bg-pixel-primary text-black" : "bg-pixel-bg-dark text-pixel-text"}`}
-                  >
-                    {s.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Master (Coming Soon) */}
-            <div className="bg-pixel-bg-medium border-4 border-dashed border-pixel-border p-6 text-center opacity-50">
-              <div className="flex justify-center mb-4 h-24 items-center">
-                <span className="font-pixel text-4xl text-pixel-text-muted">
-                  ?
-                </span>
-              </div>
-              <h3 className="font-pixel text-xs text-pixel-text mb-2">
-                STAGE 3
-              </h3>
-              <p className="font-pixel-body text-sm text-pixel-text-muted">
-                El Maestro Cadena
-              </p>
-              <p className="font-pixel text-[8px] text-pixel-primary mt-4">
-                COMING SOON
-              </p>
-            </div>
+        {/* Level Up Flash Message */}
+        {evolutionSuccess && (
+          <div className="animate-bounce border-4 border-pixel-success bg-pixel-bg-medium text-pixel-success p-4 font-pixel text-center text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+            ✨ ¡EVOLUCIÓN COMPLETADA CON ÉXITO! EL PODER DE MINADO HA AUMENTADO ✨
           </div>
-        </section>
+        )}
 
-        {/* NPCs */}
-        <section className="mb-16">
-          <h2 className="font-pixel text-sm text-pixel-secondary mb-6">
-            NPCs & COMPANIONS
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Oracle */}
-            <div className={`bg-pixel-bg-medium ${pixelBorders.medium} p-6`}>
-              <div className="flex items-center gap-6">
-                <Oracle size={128} state={oracleState} />
-                <div>
-                  <h3 className="font-pixel text-sm text-pixel-text mb-2">
-                    EL ORACULO DEL MEMPOOL
+        {/* Dashboard Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* LEFT COLUMN: Visualizer & View Settings (5 cols on lg) */}
+          <div className="lg:col-span-5 space-y-6">
+            <PixelCard>
+              <div className="font-pixel text-[10px] text-pixel-primary pb-2 mb-4 border-b-2 border-pixel-border flex items-center justify-between">
+                <span>VISTA DEL GENESIS BABY</span>
+              </div>
+              <div className="flex flex-col items-center justify-center p-6 space-y-6">
+                {/* Sprite Render Frame */}
+                <div 
+                  className={`relative flex items-center justify-center bg-pixel-bg-dark border-4 border-black p-4 transition-all duration-300 ${
+                    isEvolving ? "animate-[pixel-shake_0.15s_ease-in-out_infinite]" : ""
+                  }`}
+                  style={{
+                    width: `${spriteSize + 32}px`,
+                    height: `${spriteSize + 32}px`,
+                  }}
+                >
+                  {/* Outer Rarity Glow / Aura in GPU */}
+                  <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-40" />
+                  
+                  <div className="relative z-10">
+                    <GenesisBabySprite
+                      traits={traits}
+                      size={spriteSize}
+                      state={babyState}
+                      showFrame={showFrame}
+                      showBadge={showBadge}
+                      showBloodlineAura={showBloodlineAura}
+                      animated={animated}
+                    />
+                  </div>
+                </div>
+
+                {/* Info Badges */}
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <PixelBadge variant="default" className="text-[9px] uppercase">
+                    Level {level}
+                  </PixelBadge>
+                  <span className={`px-2 py-0.5 border-2 text-[9px] font-pixel uppercase ${rarityColors.border} ${rarityColors.text} ${rarityColors.bg}`}>
+                    {traits.rarity}
+                  </span>
+                  <PixelBadge variant="secondary" className="text-[9px] uppercase">
+                    {traits.baseType}
+                  </PixelBadge>
+                  <PixelBadge variant="idle" className="text-[9px] uppercase">
+                    {traits.bloodline}
+                  </PixelBadge>
+                </div>
+
+                {/* Display Adjustments */}
+                <div className="w-full space-y-4 pt-4 border-t-2 border-pixel-border">
+                  <h3 className="font-pixel text-[10px] text-pixel-secondary uppercase">
+                    Ajustes de Pantalla
                   </h3>
-                  <p className="font-pixel-body text-sm text-pixel-text-muted mb-4">
-                    Wise robotic wizard guide. Appears in tutorials and help
-                    sections.
-                  </p>
-                  <div className="flex gap-2 flex-wrap">
-                    {(["idle", "talking", "thinking"] as const).map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => setOracleState(s)}
-                        className={`px-2 py-1 font-pixel text-[8px] border-2 border-black ${oracleState === s ? "bg-pixel-secondary text-black" : "bg-pixel-bg-dark text-pixel-text"}`}
+
+                  {/* Size slider */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between font-pixel text-[9px] text-pixel-text-muted">
+                      <span>TAMAÑO:</span>
+                      <span>{spriteSize}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="128"
+                      max="320"
+                      step="32"
+                      value={spriteSize}
+                      onChange={(e) => setSpriteSize(Number(e.target.value))}
+                      className="w-full accent-pixel-primary bg-pixel-bg-dark border-2 border-black h-4 cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Checkbox settings */}
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <label className="flex items-center space-x-2 font-pixel text-[9px] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={animated}
+                        onChange={(e) => setAnimated(e.target.checked)}
+                        className="form-checkbox h-3.5 w-3.5 accent-pixel-primary bg-pixel-bg-dark border-2 border-black"
+                      />
+                      <span>ANIMACIONES</span>
+                    </label>
+
+                    <label className="flex items-center space-x-2 font-pixel text-[9px] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showFrame}
+                        onChange={(e) => setShowFrame(e.target.checked)}
+                        className="form-checkbox h-3.5 w-3.5 accent-pixel-primary bg-pixel-bg-dark border-2 border-black"
+                      />
+                      <span>MARCO RAREZA</span>
+                    </label>
+
+                    <label className="flex items-center space-x-2 font-pixel text-[9px] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showBadge}
+                        onChange={(e) => setShowBadge(e.target.checked)}
+                        className="form-checkbox h-3.5 w-3.5 accent-pixel-primary bg-pixel-bg-dark border-2 border-black"
+                      />
+                      <span>BADGE RAREZA</span>
+                    </label>
+
+                    <label className="flex items-center space-x-2 font-pixel text-[9px] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showBloodlineAura}
+                        onChange={(e) => setShowBloodlineAura(e.target.checked)}
+                        className="form-checkbox h-3.5 w-3.5 accent-pixel-primary bg-pixel-bg-dark border-2 border-black"
+                      />
+                      <span>AURA LINAJE</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </PixelCard>
+
+            {/* Traits Details Card */}
+            <PixelCard>
+              <div className="font-pixel text-[10px] text-pixel-secondary pb-2 mb-4 border-b-2 border-pixel-border flex items-center justify-between">
+                <span>ESTADÍSTICAS DEL BEBÉ</span>
+              </div>
+              <div className="p-4 space-y-3 font-pixel text-[10px]">
+                <div className="flex justify-between border-b-2 border-pixel-border pb-1">
+                  <span className="text-pixel-text-muted">DNA HASH:</span>
+                  <span className="font-mono text-xs select-all text-pixel-primary break-all">{traits.dna}</span>
+                </div>
+                <div className="flex justify-between border-b-2 border-pixel-border pb-1">
+                  <span className="text-pixel-text-muted">TIPO BASE:</span>
+                  <span className="text-pixel-text capitalize">{traits.baseType}</span>
+                </div>
+                <div className="flex justify-between border-b-2 border-pixel-border pb-1">
+                  <span className="text-pixel-text-muted">LINAJE (BLOODLINE):</span>
+                  <span className="text-pixel-text capitalize">{traits.bloodline}</span>
+                </div>
+                <div className="flex justify-between border-b-2 border-pixel-border pb-1">
+                  <span className="text-pixel-text-muted">HERENCIA (HERITAGE):</span>
+                  <span className="text-pixel-text capitalize">{traits.heritage}</span>
+                </div>
+                <div className="flex justify-between border-b-2 border-pixel-border pb-1">
+                  <span className="text-pixel-text-muted">BOOST BASE POR RAREZA:</span>
+                  <span className="text-pixel-success">+{getMiningBoost({ ...mockNftState, level: 1 })}%</span>
+                </div>
+                <div className="flex justify-between pb-1">
+                  <span className="text-pixel-text-muted">BOOST ACTUAL TOTAL:</span>
+                  <span className="text-pixel-primary font-bold">+{currentBoost}%</span>
+                </div>
+              </div>
+            </PixelCard>
+          </div>
+
+          {/* RIGHT COLUMN: Customizer & Evolution Simulator (7 cols on lg) */}
+          <div className="lg:col-span-7 space-y-6">
+            
+            {/* Customizer Panel */}
+            <PixelCard>
+              <div className="font-pixel text-[10px] text-pixel-text pb-2 mb-4 border-b-2 border-pixel-border flex items-center justify-between">
+                <span>ANALIZADOR DE DNA Y PERSONALIZADOR</span>
+              </div>
+              <div className="p-6 space-y-6">
+                
+                {/* DNA Input */}
+                <div className="space-y-2">
+                  <h3 className="font-pixel text-[10px] text-pixel-secondary uppercase">
+                    Generación Determinística por DNA
+                  </h3>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={dnaInput}
+                      onChange={(e) => {
+                        setDnaInput(e.target.value);
+                        setIsManualUpdate(true);
+                      }}
+                      placeholder="Introduce DNA hexadecimal (e.g. 0xef44...)"
+                      className="flex-1 px-3 py-2 bg-pixel-bg-dark border-4 border-black font-mono text-xs focus:outline-none focus:border-pixel-primary text-pixel-text placeholder:text-pixel-text-muted"
+                    />
+                    <PixelButton
+                      variant="default"
+                      onClick={() => handleParseDna(dnaInput)}
+                      className="px-4 py-2 text-[10px]"
+                    >
+                      ANALIZAR DNA
+                    </PixelButton>
+                  </div>
+                  {dnaError && (
+                    <p className="font-pixel text-[8px] text-pixel-error uppercase">{dnaError}</p>
+                  )}
+                  <div className="flex justify-between gap-2 pt-1">
+                    <span className="font-pixel text-[8px] text-pixel-text-muted">
+                      El DNA determina de manera exacta y inmutable los rasgos del bebé.
+                    </span>
+                    <button
+                      onClick={handleRandomBaby}
+                      className="font-pixel text-[9px] text-pixel-primary hover:underline uppercase"
+                    >
+                      🎲 BEBÉ ALEATORIO
+                    </button>
+                  </div>
+                </div>
+
+                {/* Dropdowns Customizer */}
+                <div className="space-y-4 border-t-2 border-pixel-border pt-4">
+                  <h3 className="font-pixel text-[10px] text-pixel-secondary uppercase">
+                    Personalizador de Capas Visuales
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Base Type Select */}
+                    <div className="space-y-1">
+                      <label className="font-pixel text-[9px] text-pixel-text-muted uppercase">
+                        Tipo de Personaje
+                      </label>
+                      <select
+                        value={traits.baseType}
+                        onChange={(e) => updateTrait("baseType", e.target.value as any)}
+                        className="w-full p-2 bg-pixel-bg-dark border-4 border-black font-pixel text-[10px] text-pixel-text focus:outline-none focus:border-pixel-primary"
                       >
-                        {s.toUpperCase()}
-                      </button>
-                    ))}
+                        {BASE_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {t.toUpperCase()}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Bloodline Select */}
+                    <div className="space-y-1">
+                      <label className="font-pixel text-[9px] text-pixel-text-muted uppercase">
+                        Linaje (Bloodline)
+                      </label>
+                      <select
+                        value={traits.bloodline}
+                        onChange={(e) => updateTrait("bloodline", e.target.value as any)}
+                        className="w-full p-2 bg-pixel-bg-dark border-4 border-black font-pixel text-[10px] text-pixel-text focus:outline-none focus:border-pixel-primary"
+                      >
+                        {BLOODLINES.map((b) => (
+                          <option key={b} value={b}>
+                            {b.toUpperCase()}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Heritage Select */}
+                    <div className="space-y-1">
+                      <label className="font-pixel text-[9px] text-pixel-text-muted uppercase">
+                        Herencia (Heritage)
+                      </label>
+                      <select
+                        value={traits.heritage}
+                        onChange={(e) => updateTrait("heritage", e.target.value as any)}
+                        className="w-full p-2 bg-pixel-bg-dark border-4 border-black font-pixel text-[10px] text-pixel-text focus:outline-none focus:border-pixel-primary"
+                      >
+                        {HERITAGES.map((h) => (
+                          <option key={h} value={h}>
+                            {h.toUpperCase()}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Rarity Select */}
+                    <div className="space-y-1">
+                      <label className="font-pixel text-[9px] text-pixel-text-muted uppercase">
+                        Rareza (Rarity)
+                      </label>
+                      <select
+                        value={traits.rarity}
+                        onChange={(e) => updateTrait("rarity", e.target.value as any)}
+                        className="w-full p-2 bg-pixel-bg-dark border-4 border-black font-pixel text-[10px] text-pixel-text focus:outline-none focus:border-pixel-primary"
+                      >
+                        {RARITIES.map((r) => (
+                          <option key={r} value={r}>
+                            {r.toUpperCase()}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Character State */}
+                  <div className="space-y-1">
+                    <label className="font-pixel text-[9px] text-pixel-text-muted uppercase">
+                      Pose / Estado del Sprite (Animado)
+                    </label>
+                    <select
+                      value={babyState}
+                      onChange={(e) => setBabyState(e.target.value as BabyState)}
+                      className="w-full p-2 bg-pixel-bg-dark border-4 border-black font-pixel text-[10px] text-pixel-text focus:outline-none focus:border-pixel-primary"
+                    >
+                      {STATES.map((s) => (
+                        <option key={s} value={s}>
+                          {s.toUpperCase()}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
-            </div>
+            </PixelCard>
 
-            {/* SatoBots */}
-            <div className={`bg-pixel-bg-medium ${pixelBorders.medium} p-6`}>
-              <div className="flex items-center gap-6">
-                <SatoBots count={3} size={48} />
-                <div>
-                  <h3 className="font-pixel text-sm text-pixel-text mb-2">
-                    LOS SATO-BOTS
-                  </h3>
-                  <p className="font-pixel-body text-sm text-pixel-text-muted mb-4">
-                    Tiny helper drones representing satoshis. Appear for rewards
-                    and achievements.
-                  </p>
-                  <div className="flex gap-4 mt-2">
-                    <SatoBots count={1} size={32} />
-                    <SatoBots count={2} size={32} />
-                    <SatoBots count={3} size={32} />
+            {/* Evolution Simulator Panel */}
+            <PixelCard>
+              <div className="font-pixel text-[10px] text-pixel-legendary pb-2 mb-4 border-b-2 border-pixel-border flex items-center justify-between">
+                <span>SIMULADOR DE EVOLUCIÓN E INCREMENTO DE PODER</span>
+              </div>
+              <div className="p-6 space-y-6">
+                
+                {/* Level indicators */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-pixel-bg-dark border-4 border-black p-3 text-center">
+                    <div className="font-pixel text-[9px] text-pixel-text-muted uppercase">NIVEL ACTUAL</div>
+                    <div className="font-pixel text-xl text-pixel-primary mt-1">Lvl {level}</div>
+                  </div>
+
+                  <div className="bg-pixel-bg-dark border-4 border-black p-3 text-center">
+                    <div className="font-pixel text-[9px] text-pixel-text-muted uppercase">SIGUIENTE NIVEL</div>
+                    <div className="font-pixel text-xl text-pixel-success mt-1">
+                      {level < MAX_LEVEL ? `Lvl ${level + 1}` : "MAX"}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </section>
 
-        {/* Color Palette */}
-        <section>
-          <h2 className="font-pixel text-sm text-pixel-secondary mb-6">
-            COLOR PALETTE
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-            {[
-              { name: "Bitcoin Orange", color: "#f7931a" },
-              { name: "Cyan", color: "#4fc3f7" },
-              { name: "Purple", color: "#8b5cf6" },
-              { name: "Success", color: "#4ade80" },
-              { name: "Error", color: "#ef4444" },
-              { name: "Dark", color: "#0f0f1b" },
-            ].map(({ name, color }) => (
-              <div key={name} className="text-center">
-                <div
-                  className="w-full h-16 border-4 border-black mb-2"
-                  style={{ backgroundColor: color }}
-                />
-                <p className="font-pixel text-[8px] text-pixel-text">{name}</p>
-                <p className="font-pixel-mono text-xs text-pixel-text-muted">
-                  {color}
-                </p>
+                {/* Progress bars (XP) */}
+                <div className="space-y-2">
+                  <div className="flex justify-between font-pixel text-[9px]">
+                    <span className="text-pixel-text-muted">PUNTOS DE EXPERIENCIA (XP):</span>
+                    <span>
+                      {level < MAX_LEVEL ? `${xp} / ${reqXp} XP` : "MAX LVL"}
+                    </span>
+                  </div>
+                  <div className="h-6 bg-pixel-bg-dark border-4 border-black overflow-hidden relative">
+                    <div
+                      className="h-full bg-pixel-secondary transition-all duration-300"
+                      style={{ width: `${level < MAX_LEVEL ? (xp / reqXp) * 100 : 100}%` }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center font-pixel text-[8px] text-white mix-blend-difference">
+                      {level < MAX_LEVEL ? `${Math.round((xp / reqXp) * 100)}% COMPLETADO` : "MÁXIMA MADUREZ"}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <PixelButton
+                      variant="outline"
+                      onClick={() => addXp(25)}
+                      disabled={level >= MAX_LEVEL || xp >= reqXp || isEvolving}
+                      className="flex-1 py-1 text-[9px]"
+                    >
+                      +25 XP
+                    </PixelButton>
+                    <PixelButton
+                      variant="outline"
+                      onClick={() => addXp(100)}
+                      disabled={level >= MAX_LEVEL || xp >= reqXp || isEvolving}
+                      className="flex-1 py-1 text-[9px]"
+                    >
+                      +100 XP
+                    </PixelButton>
+                  </div>
+                </div>
+
+                {/* Stats comparison before/after */}
+                <div className="border-t-2 border-pixel-border pt-4 space-y-3 font-pixel text-[10px]">
+                  <h4 className="text-pixel-secondary uppercase mb-2">Simulación de Boost de Minado</h4>
+                  
+                  <div className="flex justify-between">
+                    <span className="text-pixel-text-muted">Mining Boost actual:</span>
+                    <span className="text-pixel-text">+{currentBoost}%</span>
+                  </div>
+                  
+                  <div className="flex justify-between">
+                    <span className="text-pixel-text-muted">Mining Boost siguiente:</span>
+                    <span className="text-pixel-success">
+                      {level < MAX_LEVEL ? `+${nextBoost}% (+${nextBoost - currentBoost}%)` : "MÁXIMO"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between border-t-2 border-pixel-border/50 pt-2 font-bold">
+                    <span className="text-pixel-text-muted">Costo en tokens $BABY:</span>
+                    <span className="text-pixel-primary">
+                      {level < MAX_LEVEL ? getEvolutionCostDisplay(level) : "N/A"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Simulator Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <PixelButton
+                    variant="default"
+                    onClick={triggerEvolution}
+                    disabled={xp < reqXp || level >= MAX_LEVEL || isEvolving}
+                    className="flex-1 py-3 text-xs uppercase relative overflow-hidden"
+                  >
+                    {isEvolving ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="animate-spin h-3 w-3 border-2 border-black border-t-transparent inline-block" />
+                        EVOLUCIONANDO...
+                      </span>
+                    ) : (
+                      "EVOLUCIONAR AHORA"
+                    )}
+                  </PixelButton>
+                  
+                  <PixelButton
+                    variant="destructive"
+                    onClick={resetSimulator}
+                    className="py-3 text-xs uppercase sm:px-6"
+                  >
+                    REINICIAR
+                  </PixelButton>
+                </div>
+
               </div>
-            ))}
+            </PixelCard>
+
           </div>
-        </section>
+
+        </div>
 
         {/* Back Link */}
-        <div className="mt-12 text-center">
+        <div className="text-center pt-8 border-t-4 border-black">
           <Link
             href="/"
-            className="font-pixel text-xs text-pixel-primary hover:text-pixel-secondary transition-colors"
+            className="font-pixel text-[10px] text-pixel-primary hover:text-pixel-secondary transition-colors uppercase tracking-wider"
           >
-            ← BACK TO HOME
+            ← Volver a la Billetera Principal
           </Link>
         </div>
       </div>

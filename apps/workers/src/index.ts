@@ -33,6 +33,8 @@ import {
   claimRouter,
   engagementRouter,
   faucetRouter,
+  pouwRouter,
+  healthRouter,
 } from "./routes";
 
 // Re-export Durable Objects
@@ -134,67 +136,8 @@ app.get("/", (c) => {
   });
 });
 
-app.get("/health", async (c) => {
-  const checks: Record<string, "ok" | "error" | "unknown"> = {
-    api: "ok",
-    redis: "unknown",
-    kv: "unknown",
-  };
-
-  // Check Redis connectivity
-  try {
-    const redis = getRedis(c.env);
-    if (redis) {
-      await redis.ping();
-      checks.redis = "ok";
-    }
-  } catch {
-    checks.redis = "error";
-  }
-
-  // Check KV availability
-  try {
-    if (c.env.CACHE) {
-      // Simple read test
-      await c.env.CACHE.get("health-check-test");
-      checks.kv = "ok";
-    }
-  } catch {
-    checks.kv = "error";
-  }
-
-  const allHealthy = Object.values(checks).every(
-    (v) => v === "ok" || v === "unknown",
-  );
-
-  return c.json(
-    {
-      status: allHealthy ? "healthy" : "degraded",
-      environment: c.env.ENVIRONMENT,
-      version: "2.0.0",
-      checks,
-      timestamp: Date.now(),
-    },
-    allHealthy ? 200 : 503,
-  );
-});
-
-// Metrics endpoint (JSON summary)
-import { metrics } from "./lib/metrics";
-
-app.get("/metrics", (c) => {
-  return c.json({
-    success: true,
-    data: metrics.summary(),
-    timestamp: Date.now(),
-  });
-});
-
-// Prometheus-compatible metrics endpoint
-app.get("/metrics/prometheus", (c) => {
-  c.header("Content-Type", "text/plain; charset=utf-8");
-  return c.text(metrics.toPrometheus());
-});
+// Mount Health router (which handles /health, /health/metrics and /health/metrics/prometheus)
+app.route("/health", healthRouter);
 
 // =============================================================================
 // MOUNT MODULAR ROUTERS
@@ -204,11 +147,15 @@ app.get("/metrics/prometheus", (c) => {
 // Phase 2+: claims, leaderboard
 claimRouter.use("*", phaseGate(2));
 leaderboardRouter.use("*", phaseGate(2));
-// Phase 3+: game
+// Phase 3+: game, pouw
 gameRouter.use("*", phaseGate(3));
+pouwRouter.use("*", phaseGate(3));
 
 // Balance management
 app.route("/api/balance", balanceRouter);
+
+// PoUW Task Retrieval
+app.route("/api/pouw", pouwRouter);
 
 // Leaderboards
 app.route("/api/leaderboard", leaderboardRouter);

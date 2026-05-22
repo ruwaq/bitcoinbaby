@@ -71,6 +71,7 @@ const MEMPOOL_API_URLS = {
   mainnet: "https://mempool.space/api",
   testnet: "https://mempool.space/testnet/api",
   testnet4: "https://mempool.space/testnet4/api",
+  regtest: "http://localhost:5000/api",
 };
 
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -284,6 +285,45 @@ export class MempoolService implements IMempoolService {
     }
 
     return 0;
+  }
+
+  /**
+   * Get current block hash (cached)
+   */
+  async getCurrentBlockHash(): Promise<string> {
+    const cacheKey = this.cacheKey("blockhash", "current");
+
+    const cached = await this.getFromCache<string>(cacheKey);
+    if (cached !== null) return cached;
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        REQUEST_TIMEOUT_MS,
+      );
+
+      const response = await fetch(`${this.baseUrl}/blocks/tip/hash`, {
+        headers: { Accept: "text/plain" },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const hash = await response.text();
+        if (hash) {
+          const trimmedHash = hash.trim();
+          await this.setInCache(cacheKey, trimmedHash, CACHE_TTL.BLOCK_HEIGHT);
+          return trimmedHash;
+        }
+      }
+    } catch (error) {
+      claimLogger.error("Failed to get block hash", { error });
+    }
+
+    // Default fallback block hash for offline/regtest environments
+    return "00000000000000000000eb3efb58111e1ebef3d11b333857d42531aa7d620583";
   }
 
   /**
@@ -525,7 +565,7 @@ let mempoolServiceInstance: MempoolService | null = null;
  * Get or create the mempool service instance
  */
 export function getMempoolService(
-  network: "mainnet" | "testnet" | "testnet4" = "testnet4",
+  network: BitcoinNetwork = "testnet4",
 ): MempoolService {
   if (!mempoolServiceInstance) {
     mempoolServiceInstance = new MempoolService(network);
@@ -537,7 +577,7 @@ export function getMempoolService(
  * Initialize mempool service with KV caching
  */
 export function initMempoolService(
-  network: "mainnet" | "testnet" | "testnet4",
+  network: BitcoinNetwork,
   kv: KVNamespace | null,
 ): IMempoolService {
   const service = getMempoolService(network);

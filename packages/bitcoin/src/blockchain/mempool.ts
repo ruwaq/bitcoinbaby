@@ -14,6 +14,7 @@ import type {
   AddressBalance,
   TransactionInfo,
   FeeEstimates,
+  BlockInfo,
 } from "./types";
 import {
   requireValidAddress,
@@ -22,6 +23,7 @@ import {
   assertValid,
 } from "../validation";
 import { ApiError } from "../errors";
+import { MockMempoolClient } from "./mock-mempool";
 
 // Mempool.space base URLs
 const MEMPOOL_URLS: Record<BitcoinNetwork, string> = {
@@ -254,25 +256,6 @@ export class MempoolClient implements BlockchainAPI {
 }
 
 /**
- * Block information from Mempool API
- */
-export interface BlockInfo {
-  id: string;
-  height: number;
-  version: number;
-  timestamp: number;
-  tx_count: number;
-  size: number;
-  weight: number;
-  merkle_root: string;
-  previousblockhash: string;
-  mediantime: number;
-  nonce: number;
-  bits: number;
-  difficulty: number;
-}
-
-/**
  * Custom error for Mempool API errors
  * Extends shared ApiError for consistency
  */
@@ -286,11 +269,23 @@ export class MempoolAPIError extends ApiError {
   }
 }
 
+let globalMockClient: MockMempoolClient | null = null;
+
 /**
  * Create a Mempool client instance
  */
 export function createMempoolClient(
   options?: MempoolClientOptions,
-): MempoolClient {
+): BlockchainAPI {
+  if (
+    typeof process !== "undefined" &&
+    process.env &&
+    process.env.NEXT_PUBLIC_USE_MOCK_BLOCKCHAIN === "true"
+  ) {
+    if (!globalMockClient) {
+      globalMockClient = new MockMempoolClient(options?.network ?? "testnet4");
+    }
+    return globalMockClient;
+  }
   return new MempoolClient(options);
 }

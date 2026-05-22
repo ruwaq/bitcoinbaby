@@ -32,6 +32,8 @@ import {
   validateAddressNetwork,
 } from "../config/bitcoin";
 import { validatePlatformFeePercent, MIN_CLAIM_TOKENS } from "../config/claim";
+import { getRedis } from "../lib/redis";
+import { getClaimMintingService } from "../services/claim-minting-service";
 
 // =============================================================================
 // SCHEMAS
@@ -48,6 +50,7 @@ const executeClaimSchema = z.object({
 const completeClaimSchema = z.object({
   claimId: z.string().uuid(),
   signedPsbtBase64: z.string().min(100),
+  address: z.string().regex(/^(bc1|tb1)[a-zA-HJ-NP-Z0-9]{25,62}$/),
 });
 
 // =============================================================================
@@ -154,11 +157,15 @@ claimRouter.get(
         );
       }
 
-      const balanceData = (await balanceResponse.json()) as {
-        unclaimedWork: string;
-        unclaimedProofs: number;
-        claimableTokens: string;
+      const balanceResult = (await balanceResponse.json()) as {
+        success: boolean;
+        data: {
+          unclaimedWork: string;
+          unclaimedProofs: number;
+          claimableTokens: string;
+        };
       };
+      const balanceData = balanceResult.data;
 
       // 2. Get user's UTXOs
       const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
@@ -336,10 +343,10 @@ claimRouter.post("/execute", validateBody(executeClaimSchema), async (c) => {
  * Server broadcasts and queues mint.
  */
 claimRouter.post("/complete", validateBody(completeClaimSchema), async (c) => {
-  const { claimId, signedPsbtBase64 } = await c.req.json();
+  const { claimId, signedPsbtBase64, address } = await c.req.json();
 
   try {
-    claimLogger.info("Complete request", { claimId });
+    claimLogger.info("Complete request", { claimId, address });
 
     // 1. Finalize PSBT and extract TX
     const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
@@ -373,6 +380,25 @@ claimRouter.post("/complete", validateBody(completeClaimSchema), async (c) => {
     }
 
     claimLogger.info("Claim broadcast", { claimId, txid });
+
+    // 3. Confirm claim in VirtualBalanceDO
+    const stub = getVirtualBalanceStub(c.env, address);
+    const doResponse = await forwardToDO(stub, "/confirm-claim", {
+      method: "POST",
+      body: JSON.stringify({ claimId, claimTxid: txid }),
+    });
+
+    if (!doResponse.ok) {
+      const doErrorText = await doResponse.text();
+      claimLogger.error("Failed to confirm claim in DO", { claimId, error: doErrorText });
+      return c.json(
+        {
+          success: false,
+          error: `Failed to confirm claim state: ${doErrorText}`,
+        } as CompleteClaimResponse,
+        500,
+      );
+    }
 
     const response: CompleteClaimResponse = {
       success: true,
@@ -439,5 +465,261 @@ claimRouter.get("/status/:claimId", async (c) => {
   } catch (error) {
     claimLogger.error("Status error", { claimId, address, error });
     return errorResponse(c, "Failed to get claim status", 500);
+  }
+});
+
+/**
+ * POST /api/claim/mint
+ *
+ * Mint tokens after claim transaction is confirmed.
+ */
+claimRouter.post(
+  "/mint",
+  validateBody(
+    z.object({
+      claimId: z.string().uuid(),
+      address: z.string().regex(/^(bc1|tb1)[a-zA-HJ-NP-Z0-9]{25,62}$/),
+    }),
+  ),
+  async (c) => {
+    const { claimId, address } = await c.req.json();
+    try {
+      // 1. Get claim status/details from DO
+      const stub = getVirtualBalanceStub(c.env, address);
+      const doResponse = await forwardToDO(
+        stub,
+        `/balance/${address}/claim-status/${claimId}`,
+        { method: "GET" },
+      );
+      if (!doResponse.ok) {
+        return errorResponse(c, "Claim not found in DO", 404);
+      }
+      const claimRes = await doResponse.json() as {
+        success: boolean;
+        data: {
+          id: string;
+          address: string;
+          amount: string;
+          proofCount: number;
+          totalWork: string;
+          merkleRoot: string | null;
+          serverSignature: string | null;
+          claimTxid: string | null;
+          mintTxid: string | null;
+          status: string;
+        };
+      };
+      const claim = claimRes.data;
+
+      if (claim.status === "completed") {
+        return successResponse(c, {
+          status: "completed",
+          mintTxid: claim.mintTxid,
+          message: "Claim already minted successfully",
+        });
+      }
+
+      if (!claim.claimTxid) {
+        return errorResponse(c, "Claim transaction has not been broadcast yet", 400);
+      }
+
+      // Update status to 'minting' in DO
+      await forwardToDO(stub, `/balance/${address}/update-claim-status`, {
+        method: "POST",
+        body: { claimId, status: "minting" },
+      });
+
+      // 2. Initialize minting service
+      const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
+      const mintingService = getClaimMintingService({
+        proverUrl: c.env.PROVER_URL || "https://v11.charms.dev",
+        appId: c.env.BABTC_APP_ID || "placeholder",
+        network,
+      });
+
+      // 3. Process mint
+      const mintResult = await mintingService.processMint({
+        claimId: claim.id,
+        address: claim.address,
+        claimTxid: claim.claimTxid,
+        tokenAmount: claim.amount,
+        totalWork: claim.totalWork,
+        proofCount: claim.proofCount,
+        merkleRoot: claim.merkleRoot || "",
+        serverSignature: claim.serverSignature || "",
+        nonce: claim.id,
+        timestamp: Date.now(),
+      });
+
+      if (mintResult.success && mintResult.mintTxid) {
+        // Update DO claim status to completed
+        await forwardToDO(stub, `/balance/${address}/update-claim-status`, {
+          method: "POST",
+          body: {
+            claimId,
+            status: "completed",
+            mintTxid: mintResult.mintTxid,
+          },
+        });
+        return successResponse(c, {
+          status: "completed",
+          mintTxid: mintResult.mintTxid,
+        });
+      } else {
+        // Update status to the returned status (broadcast or failed)
+        await forwardToDO(stub, `/balance/${address}/update-claim-status`, {
+          method: "POST",
+          body: {
+            claimId,
+            status: mintResult.status,
+            error: mintResult.error || "Minting failed",
+          },
+        });
+        return errorResponse(c, mintResult.error || "Minting failed", 500);
+      }
+    } catch (error) {
+      claimLogger.error("Mint route error", { claimId, address, error });
+      return errorResponse(c, "Failed to process mint", 500);
+    }
+  },
+);
+
+/**
+ * POST /api/claim/cleanup
+ *
+ * Cleanup expired claims across all active users.
+ */
+claimRouter.post("/cleanup", async (c) => {
+  try {
+    const redis = getRedis(c.env);
+    const miners = await redis.zrange<string[]>("leaderboard:miners:alltime", 0, -1);
+    const earners = await redis.zrange<string[]>("leaderboard:earners:alltime", 0, -1);
+    const addresses = new Set([...(miners || []), ...(earners || [])]);
+
+    let expiredCount = 0;
+    for (const address of addresses) {
+      try {
+        const stub = getVirtualBalanceStub(c.env, address);
+        const response = await forwardToDO(stub, `/balance/${address}/cleanup-expired`, {
+          method: "POST",
+        });
+        if (response.ok) {
+          const resData = await response.json() as {
+            success: boolean;
+            data?: { cleanedCount?: number };
+          };
+          expiredCount += resData.data?.cleanedCount || 0;
+        }
+      } catch (err) {
+        claimLogger.error(`Error cleaning expired claims for ${address}`, err);
+      }
+    }
+    return c.json({ expiredCount });
+  } catch (error) {
+    claimLogger.error("Failed to run claim cleanup", error);
+    return errorResponse(c, "Failed to run claim cleanup", 500);
+  }
+});
+
+/**
+ * POST /api/claim/retry-failed
+ *
+ * Retry minting failed or broadcast claims.
+ */
+claimRouter.post("/retry-failed", async (c) => {
+  try {
+    const redis = getRedis(c.env);
+    const miners = await redis.zrange<string[]>("leaderboard:miners:alltime", 0, -1);
+    const earners = await redis.zrange<string[]>("leaderboard:earners:alltime", 0, -1);
+    const addresses = new Set([...(miners || []), ...(earners || [])]);
+
+    let retriedCount = 0;
+    const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
+    const mintingService = getClaimMintingService({
+      proverUrl: c.env.PROVER_URL || "https://v11.charms.dev",
+      appId: c.env.BABTC_APP_ID || "placeholder",
+      network,
+    });
+
+    for (const address of addresses) {
+      try {
+        const stub = getVirtualBalanceStub(c.env, address);
+        const response = await forwardToDO(stub, `/balance/${address}/retriable-claims`, {
+          method: "GET",
+        });
+        if (!response.ok) continue;
+
+        const resData = await response.json() as {
+          success: boolean;
+          data?: {
+            retriable?: Array<{
+              id: string;
+              address: string;
+              amount: string;
+              proofCount: number;
+              totalWork: string;
+              merkleRoot: string | null;
+              serverSignature: string | null;
+              claimTxid: string | null;
+              status: string;
+            }>;
+          };
+        };
+
+        const retriableClaims = resData.data?.retriable || [];
+        for (const claim of retriableClaims) {
+          if (!claim.claimTxid) continue;
+
+          claimLogger.info(`Retrying claim ${claim.id} for address ${address}`);
+          retriedCount++;
+
+          // Update status to 'minting'
+          await forwardToDO(stub, `/balance/${address}/update-claim-status`, {
+            method: "POST",
+            body: { claimId: claim.id, status: "minting" },
+          });
+
+          const mintResult = await mintingService.processMint({
+            claimId: claim.id,
+            address: claim.address,
+            claimTxid: claim.claimTxid,
+            tokenAmount: claim.amount,
+            totalWork: claim.totalWork,
+            proofCount: claim.proofCount,
+            merkleRoot: claim.merkleRoot || "",
+            serverSignature: claim.serverSignature || "",
+            nonce: claim.id,
+            timestamp: Date.now(),
+          });
+
+          if (mintResult.success && mintResult.mintTxid) {
+            await forwardToDO(stub, `/balance/${address}/update-claim-status`, {
+              method: "POST",
+              body: {
+                claimId: claim.id,
+                status: "completed",
+                mintTxid: mintResult.mintTxid,
+              },
+            });
+          } else {
+            await forwardToDO(stub, `/balance/${address}/update-claim-status`, {
+              method: "POST",
+              body: {
+                claimId: claim.id,
+                status: mintResult.status,
+                error: mintResult.error || "Retry minting failed",
+              },
+            });
+          }
+        }
+      } catch (err) {
+        claimLogger.error(`Error retrying claims for ${address}`, err);
+      }
+    }
+
+    return c.json({ retriedCount });
+  } catch (error) {
+    claimLogger.error("Failed to retry failed claims", error);
+    return errorResponse(c, "Failed to retry failed claims", 500);
   }
 });

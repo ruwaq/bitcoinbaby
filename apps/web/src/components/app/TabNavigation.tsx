@@ -57,6 +57,7 @@ export function TabNavigation({
         return (
           <button
             key={tab.id}
+            data-testid={`tab-${tab.id}`}
             onClick={() => onTabChange(tab.id)}
             className={clsx(
               "flex-1 flex flex-col items-center gap-1",

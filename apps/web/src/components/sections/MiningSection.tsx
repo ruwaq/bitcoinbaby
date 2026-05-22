@@ -62,15 +62,14 @@ export function MiningSection() {
             Proof of Useful Work
           </h3>
           <p className="font-pixel-body text-sm text-pixel-text leading-relaxed">
-            Your computing power is not wasted on meaningless algorithms. We are
-            building a system where mining energy{" "}
+            Your computing power is not wasted on meaningless algorithms. We run the{" "}
             <span className="text-pixel-secondary font-semibold">
-              trains artificial intelligence
+              Gemma 4 E2B model locally
             </span>
-            . Every hash contributes to a collective AI model.
+            . Every token processed helps the Genesis Baby learn and secures the Proof of Useful Work (PoUW) consensus.
           </p>
           <p className="font-pixel text-pixel-2xs text-pixel-text-muted mt-2">
-            Current phase: Traditional mining | Next phase: AI Training
+            Current phase: Gemma 4 E2B PoUW local
           </p>
         </InfoBanner>
 

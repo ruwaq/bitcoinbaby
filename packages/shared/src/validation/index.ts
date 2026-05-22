@@ -34,6 +34,9 @@ export {
   nonceSchema,
   miningProofSchema,
   type MiningProof,
+  // AI PoUW schemas
+  aiProofSchema,
+  type AIProof,
   // NFT schemas
   dnaSchema,
   bloodlineSchema,

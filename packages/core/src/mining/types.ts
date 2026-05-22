@@ -44,6 +44,31 @@ export interface XPGainedEvent {
   timestamp: number;
 }
 
+export interface AITask {
+  id: string;
+  type: "text-generation" | "pouw";
+  input: string;
+  seed: string; // Hash del bloque de Bitcoin
+  maxTokens?: number;
+  model?: string;
+}
+
+export interface AIProof {
+  taskId: string;
+  taskType: string;
+  inputPrompt: string;
+  seed: string;
+  output: string;
+  computeTime: number;
+  modelId: string;
+  timestamp: number;
+}
+
+export interface SignedAIProof extends AIProof {
+  publicKey: string;
+  signature: string;
+}
+
 /**
  * Events emitted by miners
  */
@@ -54,6 +79,8 @@ export interface MinerEvents {
   onError: (error: Error) => void;
   /** Emitted when a valid share is found - use to award XP to equipped NFT */
   onXPGained?: (event: XPGainedEvent) => void;
+  /** Emitted when an AI local task has been successfully solved and needs signing */
+  onAILocalTaskResolved?: (proof: AIProof, task: AITask) => void;
 }
 
 /**

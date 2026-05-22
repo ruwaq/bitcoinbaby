@@ -287,6 +287,28 @@ export const leaderboardPeriodSchema = z.enum(["daily", "weekly", "alltime"]);
 export type LeaderboardPeriod = z.infer<typeof leaderboardPeriodSchema>;
 
 // =============================================================================
+// AI Proof-of-Useful-Work (PoUW) SCHEMAS
+// =============================================================================
+
+/**
+ * AI Proof submitted by the client after completing a WebGPU inference task.
+ */
+export const aiProofSchema = z.object({
+  taskId: z.string().min(1, "Task ID is required"),
+  taskType: z.string().min(1, "Task type is required"),
+  inputPrompt: z.string().min(1, "Input prompt is required"),
+  seed: z.string().min(1, "Seed is required"),
+  output: z.string().min(1, "Output is required"),
+  computeTime: z.number().positive("Compute time must be positive"),
+  modelId: z.string().min(1, "Model ID is required"),
+  timestamp: z.number().int().positive("Timestamp must be positive"),
+  publicKey: z.string().regex(/^[0-9a-fA-F]{64,66}$/, "Public key must be a valid 32 or 33-byte hex string"),
+  signature: z.string().min(1, "Client signature is required"),
+});
+
+export type AIProof = z.infer<typeof aiProofSchema>;
+
+// =============================================================================
 // HELPERS
 // =============================================================================
 

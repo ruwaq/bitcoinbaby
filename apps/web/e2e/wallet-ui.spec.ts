@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 /**
  * Wallet UI E2E Tests
@@ -134,21 +134,17 @@ test.describe("Wallet Security Features", () => {
 
 test.describe("Wallet Page Routes", () => {
   test("should have send page", async ({ page }) => {
-    await page.goto("/wallet/send");
-    // Should either show send form or redirect/prompt for wallet
-    const response = await page.goto("/wallet/send");
+    const response = await page.goto("/?tab=wallet&view=send");
     expect(response?.status()).toBeLessThan(500);
   });
 
   test("should have claim page", async ({ page }) => {
-    await page.goto("/wallet/claim");
-    const response = await page.goto("/wallet/claim");
+    const response = await page.goto("/?tab=wallet&view=claim");
     expect(response?.status()).toBeLessThan(500);
   });
 
   test("should have history page", async ({ page }) => {
-    await page.goto("/wallet/history");
-    const response = await page.goto("/wallet/history");
+    const response = await page.goto("/?tab=wallet&view=history");
     expect(response?.status()).toBeLessThan(500);
   });
 });

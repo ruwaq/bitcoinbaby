@@ -16,18 +16,16 @@ import * as Y from "yjs";
 import type { Env, ApiResponse, GameState } from "../lib/types";
 import { gameLogger } from "../lib/logger";
 
-// WebSocket connection with metadata
-interface Connection {
-  webSocket: WebSocket;
+interface WebSocketAttachment {
   clientId: string;
   connectedAt: number;
+  roomId: string;
 }
 
 export class GameRoomDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private roomId: string | null = null;
   private ydoc: Y.Doc;
-  private connections: Map<string, Connection> = new Map();
   private saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // OPTIMIZATION: Track if state is already loaded to prevent repeated DB reads
@@ -182,12 +180,17 @@ export class GameRoomDO extends DurableObject<Env> {
       data: Array.from(update),
     });
 
-    for (const [clientId, conn] of this.connections) {
+    const websockets = this.ctx.getWebSockets();
+    for (const ws of websockets) {
+      let clientId = "unknown";
       try {
-        conn.webSocket.send(message);
+        const attachment = ws.deserializeAttachment() as WebSocketAttachment | null;
+        if (attachment) {
+          clientId = attachment.clientId;
+        }
+        ws.send(message);
       } catch (error) {
         gameLogger.error("Failed to send to client", error, { clientId });
-        this.connections.delete(clientId);
       }
     }
   }
@@ -273,38 +276,18 @@ export class GameRoomDO extends DurableObject<Env> {
 
     const clientId = crypto.randomUUID();
 
+    // En Cloudflare Workers, para soportar hibernación, serializeAttachment se debe llamar
+    // ANTES de acceptWebSocket.
+    server.serializeAttachment({
+      clientId,
+      connectedAt: Date.now(),
+      roomId: this.roomId || "",
+    });
+
     // Accept the WebSocket
     this.ctx.acceptWebSocket(server);
 
-    // Store connection
-    this.connections.set(clientId, {
-      webSocket: server,
-      clientId,
-      connectedAt: Date.now(),
-    });
-
     this.logSyncAction(clientId, "connected");
-
-    // Set up message handler
-    server.addEventListener("message", (event) => {
-      this.handleWebSocketMessage(clientId, event.data as string);
-    });
-
-    // Set up close handler
-    server.addEventListener("close", () => {
-      this.connections.delete(clientId);
-      this.logSyncAction(clientId, "disconnected");
-      gameLogger.debug("Client disconnected", { clientId });
-    });
-
-    // Set up error handler
-    server.addEventListener("error", (event) => {
-      gameLogger.error("WebSocket error", undefined, {
-        clientId,
-        message: event instanceof ErrorEvent ? event.message : "Unknown error",
-      });
-      this.connections.delete(clientId);
-    });
 
     // Send initial state
     const state = Y.encodeStateAsUpdate(this.ydoc);
@@ -327,7 +310,7 @@ export class GameRoomDO extends DurableObject<Env> {
   /**
    * Handle WebSocket message
    */
-  private handleWebSocketMessage(clientId: string, data: string): void {
+  private handleWebSocketMessage(clientId: string, data: string, ws: WebSocket): void {
     try {
       const message = JSON.parse(data);
 
@@ -342,25 +325,19 @@ export class GameRoomDO extends DurableObject<Env> {
 
         case "ping": {
           // Respond with pong
-          const conn = this.connections.get(clientId);
-          if (conn) {
-            conn.webSocket.send(JSON.stringify({ type: "pong" }));
-          }
+          ws.send(JSON.stringify({ type: "pong" }));
           break;
         }
 
         case "get-state": {
           // Send current state
-          const conn = this.connections.get(clientId);
-          if (conn) {
-            const state = Y.encodeStateAsUpdate(this.ydoc);
-            conn.webSocket.send(
-              JSON.stringify({
-                type: "yjs-sync",
-                data: Array.from(state),
-              }),
-            );
-          }
+          const state = Y.encodeStateAsUpdate(this.ydoc);
+          ws.send(
+            JSON.stringify({
+              type: "yjs-sync",
+              data: Array.from(state),
+            }),
+          );
           break;
         }
       }
@@ -434,9 +411,10 @@ export class GameRoomDO extends DurableObject<Env> {
 
     // Broadcast reset to all clients
     const state = Y.encodeStateAsUpdate(this.ydoc);
-    for (const [, conn] of this.connections) {
+    const websockets = this.ctx.getWebSockets();
+    for (const ws of websockets) {
       try {
-        conn.webSocket.send(
+        ws.send(
           JSON.stringify({
             type: "yjs-sync",
             data: Array.from(state),
@@ -518,9 +496,10 @@ export class GameRoomDO extends DurableObject<Env> {
     // Broadcast update to all connected clients
     if (added.length > 0) {
       const state = Y.encodeStateAsUpdate(this.ydoc);
-      for (const [, conn] of this.connections) {
+      const websockets = this.ctx.getWebSockets();
+      for (const ws of websockets) {
         try {
-          conn.webSocket.send(
+          ws.send(
             JSON.stringify({
               type: "yjs-sync",
               data: Array.from(state),
@@ -566,31 +545,71 @@ export class GameRoomDO extends DurableObject<Env> {
     ws: WebSocket,
     message: string | ArrayBuffer,
   ): Promise<void> {
-    // Find client ID for this WebSocket
-    let clientId: string | null = null;
-    for (const [id, conn] of this.connections) {
-      if (conn.webSocket === ws) {
-        clientId = id;
-        break;
+    try {
+      const attachment = ws.deserializeAttachment() as WebSocketAttachment | null;
+      if (!attachment) {
+        gameLogger.error("WebSocket message received but attachment is missing");
+        return;
       }
-    }
 
-    if (clientId && typeof message === "string") {
-      this.handleWebSocketMessage(clientId, message);
+      const { clientId, roomId } = attachment;
+
+      // Ensure room state is loaded
+      if (!this.roomId) {
+        this.roomId = roomId;
+      }
+      this.loadState();
+
+      if (typeof message === "string") {
+        this.handleWebSocketMessage(clientId, message, ws);
+      }
+    } catch (error) {
+      gameLogger.error("Failed to handle hibernated WebSocket message", error);
     }
   }
 
   /**
    * Handle WebSocket close during hibernation
    */
-  async webSocketClose(ws: WebSocket): Promise<void> {
-    for (const [clientId, conn] of this.connections) {
-      if (conn.webSocket === ws) {
-        this.connections.delete(clientId);
+  async webSocketClose(
+    ws: WebSocket,
+    code: number,
+    reason: string,
+    _wasClean: boolean,
+  ): Promise<void> {
+    try {
+      const attachment = ws.deserializeAttachment() as WebSocketAttachment | null;
+      if (attachment) {
+        const { clientId, roomId } = attachment;
+        if (!this.roomId) {
+          this.roomId = roomId;
+        }
         this.logSyncAction(clientId, "disconnected");
-        gameLogger.debug("Client disconnected (hibernation)", { clientId });
-        break;
+        gameLogger.debug("Client disconnected (hibernation close)", { clientId, code, reason });
       }
+    } catch (error) {
+      gameLogger.error("Error in webSocketClose", error);
+    }
+  }
+
+  /**
+   * Handle WebSocket error during hibernation
+   */
+  async webSocketError(ws: WebSocket, error: any): Promise<void> {
+    try {
+      const attachment = ws.deserializeAttachment() as WebSocketAttachment | null;
+      if (attachment) {
+        const { clientId, roomId } = attachment;
+        if (!this.roomId) {
+          this.roomId = roomId;
+        }
+        gameLogger.error("WebSocket error (hibernation error)", undefined, {
+          clientId,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    } catch (err) {
+      gameLogger.error("Error in webSocketError", err);
     }
   }
 }

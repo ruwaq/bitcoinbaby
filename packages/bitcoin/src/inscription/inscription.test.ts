@@ -26,6 +26,7 @@ import {
   generateInscriptionPlan,
   getDeploymentSummary,
   createInscriptionEnvelope,
+  serializeInscriptionId,
 } from "./inscription-builder";
 
 // =============================================================================
@@ -180,6 +181,15 @@ describe("On-Chain Renderer", () => {
     expect(html).toContain("getRarity");
   });
 
+  it("should contain correct XSS regex with double backslashes in template but single in emitted string", () => {
+    const html = generateOnChainRenderer({
+      libraryInscriptionId: "abc123i0",
+    });
+    // Because generateOnChainRenderer uses a template string,
+    // "on[a-z]+\\s*=" in the source code generates "on[a-z]+\s*=" in the output HTML.
+    expect(html).toContain("on[a-z]+\\s*=");
+  });
+
   it("should minify renderer", () => {
     const html = generateOnChainRenderer({
       libraryInscriptionId: "abc123i0",
@@ -199,7 +209,9 @@ describe("On-Chain Renderer", () => {
 
     expect(result.contentType).toBe("text/html");
     expect(result.content.length).toBeGreaterThan(0);
-    expect(result.size).toBeLessThan(10000); // Should be under 10KB
+    // Renderer size pre-Brotli: premium renderer has more features.
+    // In production it is compressed to ~5-6KB with Brotli (Tag 9).
+    expect(result.size).toBeLessThan(25000); // Under 25KB pre-compression
   });
 });
 
@@ -354,6 +366,24 @@ describe("Inscription Envelope", () => {
     expect(envelope[envelope.length - 1]).toBe(0x68);
   });
 
+  it("should support Brotli contentEncoding and include OP_9 tag", () => {
+    const data = {
+      contentType: "text/plain",
+      content: new Uint8Array([72, 101, 108, 108, 111]),
+      contentEncoding: "br",
+    };
+
+    const envelope = createInscriptionEnvelope(data);
+
+    // Find the position of OP_9 (0x59)
+    const op9Index = envelope.indexOf(0x59);
+    expect(op9Index).toBeGreaterThan(-1);
+
+    // The next bytes should be the length (2) and the content encoding "br"
+    expect(envelope[op9Index + 1]).toBe(2);
+    expect(envelope.slice(op9Index + 2, op9Index + 4).toString()).toBe("br");
+  });
+
   it("should handle large content", () => {
     const largeContent = new Uint8Array(2000).fill(65); // 2KB of 'A'
     const data = {
@@ -406,7 +436,8 @@ describe("Integration: Full NFT Flow", () => {
       libraryInscriptionId: "lib123i0",
       minify: true,
     });
-    expect(renderer.size).toBeLessThan(10000);
+    // Renderer size pre-Brotli: ~19-21KB. Brotli compresses it to ~5-6KB for inscription.
+    expect(renderer.size).toBeLessThan(25000);
 
     // 5. Generate NFT metadata
     const metadata = generateNFTMetadata({
@@ -438,3 +469,57 @@ describe("Integration: Full NFT Flow", () => {
     );
   });
 });
+
+describe("Parent-Child Provenance and Metadata (Tags 3 & 5)", () => {
+  it("should serialize inscription ID correctly", () => {
+    // 32-byte txid: 87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681b
+    const inscriptionId = "87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681bi0";
+    const bytes = serializeInscriptionId(inscriptionId);
+    
+    expect(bytes.length).toBe(32);
+    // reversed txid
+    const expectedTxidHex = "1b6883d10c7d38432a1a5543a312d23e45a9280fe221a2b0502539fafbecb587";
+    expect(bytes.toString("hex")).toBe(expectedTxidHex);
+
+    const inscriptionIdVout1 = "87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681bi1";
+    const bytesVout1 = serializeInscriptionId(inscriptionIdVout1);
+    expect(bytesVout1.length).toBe(33);
+    expect(bytesVout1.toString("hex")).toBe(expectedTxidHex + "01");
+
+    const inscriptionIdVout256 = "87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681bi256";
+    const bytesVout256 = serializeInscriptionId(inscriptionIdVout256);
+    expect(bytesVout256.length).toBe(34);
+    expect(bytesVout256.toString("hex")).toBe(expectedTxidHex + "0001");
+  });
+
+  it("should create envelope containing Tag 3 and Tag 5", () => {
+    const parentId = "87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681bi1";
+    const metadata = {
+      name: "Genesis Baby #42",
+      attributes: [{ trait_type: "Base Type", value: "human" }]
+    };
+
+    const envelope = createInscriptionEnvelope({
+      contentType: "text/plain",
+      content: Buffer.from("hello"),
+      parentInscriptionId: parentId,
+      metadata
+    });
+
+    const envelopeHex = envelope.toString("hex");
+
+    // Check header: OP_FALSE (00) OP_IF (63) 03 6f7264 (ord)
+    expect(envelopeHex).toContain("0063036f7264");
+
+    // Check Content Type tag: OP_1 (51) followed by push data of "text/plain" (0a746578742f706c61696e)
+    expect(envelopeHex).toContain("510a746578742f706c61696e");
+
+    // Check Parent ID tag: OP_3 (53) followed by push data of 33 bytes (21) and the serialized parent ID
+    const expectedParentSerialized = "211b6883d10c7d38432a1a5543a312d23e45a9280fe221a2b0502539fafbecb58701";
+    expect(envelopeHex).toContain("53" + expectedParentSerialized);
+
+    // Check Metadata tag: OP_5 (55)
+    expect(envelopeHex).toContain("55");
+  });
+});
+

@@ -25,6 +25,7 @@ import {
   useWalletStore,
   type WalletMetadata,
   type WalletInfo as CoreWalletInfo,
+  type SupportedNetwork,
 } from "@bitcoinbaby/core";
 import { createLogger } from "@bitcoinbaby/shared";
 
@@ -192,7 +193,7 @@ type UseWalletReturn = WalletState & WalletActions;
 /**
  * Map network store type to bitcoin package type
  */
-function mapNetwork(network: "mainnet" | "testnet4"): BitcoinNetwork {
+function mapNetwork(network: SupportedNetwork): BitcoinNetwork {
   return network;
 }
 

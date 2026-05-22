@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { clsx } from "clsx";
 
-type BitcoinNetwork = "mainnet" | "testnet4";
+type BitcoinNetwork = "mainnet" | "testnet4" | "regtest";
 
 interface NetworkSwitcherProps {
   /** Current network */
@@ -176,6 +176,7 @@ export function NetworkBadge({
   size?: "default" | "prominent";
 }) {
   const isMainnet = network === "mainnet";
+  const isRegtest = network === "regtest";
 
   // Auto-prominent for mainnet
   const isProminent = size === "prominent" || isMainnet;
@@ -191,7 +192,9 @@ export function NetworkBadge({
         // Color variants
         isMainnet
           ? "bg-pixel-error text-white animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]"
-          : "bg-pixel-secondary text-pixel-text-dark",
+          : isRegtest
+            ? "bg-purple-600 text-white"
+            : "bg-pixel-secondary text-pixel-text-dark",
         className,
       )}
     >
@@ -199,18 +202,18 @@ export function NetworkBadge({
         className={clsx(
           "rounded-full",
           isProminent ? "w-2.5 h-2.5" : "w-2 h-2",
-          isMainnet ? "bg-yellow-400 animate-ping" : "bg-blue-400",
+          isMainnet ? "bg-yellow-400 animate-ping" : isRegtest ? "bg-purple-300 animate-pulse" : "bg-blue-400",
         )}
       />
       <span
         className={clsx(
           "rounded-full absolute",
           isProminent ? "w-2.5 h-2.5" : "w-2 h-2",
-          isMainnet ? "bg-yellow-400" : "bg-blue-400",
+          isMainnet ? "bg-yellow-400" : isRegtest ? "bg-purple-300" : "bg-blue-400",
         )}
         style={{ position: "relative" }}
       />
-      {isMainnet ? "MAINNET" : "TESTNET4"}
+      {network === "mainnet" ? "MAINNET" : network === "regtest" ? "REGTEST" : "TESTNET4"}
       {isMainnet && <span className="ml-1 text-yellow-400">!</span>}
     </span>
   );
