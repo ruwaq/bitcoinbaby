@@ -57,6 +57,14 @@ const nextConfig: NextConfig = {
       sharp: false,
       "onnxruntime-node": false,
     };
+    // Disable Webpack's parsing of new URL() syntax globally to prevent compile errors for WASM files
+    config.module.parser = {
+      ...config.module.parser,
+      javascript: {
+        ...config.module.parser?.javascript,
+        url: false,
+      },
+    };
     return config;
   },
 
