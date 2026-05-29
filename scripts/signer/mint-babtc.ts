@@ -33,7 +33,7 @@ const NETWORK = bitcoin.networks.testnet;
 const DERIVATION_PATH = "m/86'/1'/0'/0/0";
 const MIN_DIFFICULTY = 16; // Minimum leading zero bits
 const MEMPOOL_API = "https://mempool.space/testnet4/api";
-const PROVER_API = "https://v11.charms.dev";
+const PROVER_API = "https://v14.charms.dev";
 
 // BABTC Contract Config
 const BABTC_APP_ID =

@@ -62,11 +62,12 @@ export interface Env {
 
   // Cloudflare Workers AI
   AI?: {
-    run(
-      model: string,
-      inputs: Record<string, unknown>
-    ): Promise<unknown>;
+    run(model: string, inputs: Record<string, unknown>): Promise<unknown>;
   };
+
+  // Cloudflare AI Gateway
+  CF_AI_API_TOKEN?: string;
+  CF_ACCOUNT_ID?: string;
 }
 
 // =============================================================================

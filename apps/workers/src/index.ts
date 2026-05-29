@@ -83,7 +83,10 @@ app.use(
       // restricting this to known branch names (e.g., main, staging) or
       // removing it entirely and using an explicit allowlist for previews.
       if (/^https:\/\/bitcoinbaby-[a-z0-9-]+\.vercel\.app$/.test(origin)) {
-        console.warn("[CORS] Allowing Vercel preview origin (broad pattern):", origin);
+        console.warn(
+          "[CORS] Allowing Vercel preview origin (broad pattern):",
+          origin,
+        );
         return origin;
       }
 
@@ -114,8 +117,11 @@ app.use("*", async (c, next) => {
 });
 
 // Metrics middleware (must be after request ID)
-import { metricsMiddleware } from "./lib/middleware";
+import { metricsMiddleware, securityHeaders } from "./lib/middleware";
 app.use("*", metricsMiddleware);
+
+// Security headers (must be applied to all responses)
+app.use("*", securityHeaders);
 
 // =============================================================================
 // PHASE GATING - Apply before mounting gated routes

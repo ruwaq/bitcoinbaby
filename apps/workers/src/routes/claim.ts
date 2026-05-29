@@ -532,7 +532,7 @@ claimRouter.post(
       // 2. Initialize minting service
       const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
       const mintingService = getClaimMintingService({
-        proverUrl: c.env.PROVER_URL || "https://v11.charms.dev",
+        proverUrl: c.env.PROVER_URL || "https://v14.charms.dev",
         appId: c.env.BABTC_APP_ID || "placeholder",
         network,
       });
@@ -636,7 +636,7 @@ claimRouter.post("/retry-failed", async (c) => {
     let retriedCount = 0;
     const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
     const mintingService = getClaimMintingService({
-      proverUrl: c.env.PROVER_URL || "https://v11.charms.dev",
+      proverUrl: c.env.PROVER_URL || "https://v14.charms.dev",
       appId: c.env.BABTC_APP_ID || "placeholder",
       network,
     });

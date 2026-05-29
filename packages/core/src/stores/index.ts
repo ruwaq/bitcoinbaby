@@ -100,6 +100,7 @@ export {
   selectHasFailedProofs,
   selectTokensAtRisk,
 } from "./dead-letter-store";
+export { useNarrativeStore } from "./narrative-store";
 
 // Granular selectors for performance optimization
 export {

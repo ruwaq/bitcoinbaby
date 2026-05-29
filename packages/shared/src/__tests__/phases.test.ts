@@ -9,7 +9,7 @@
  * each import.
  */
 
-import { describe, it, expect, beforeAll, vi, type Mock } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 
 // Types we expect from the phase module
 interface PhaseFeatures {

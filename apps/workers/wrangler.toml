@@ -65,11 +65,11 @@ MIN_WITHDRAW_AMOUNT = "100"
 POOL_PERIOD_DAYS = "7"
 MAX_FEE_RATE_SAT_VB = "10"
 # Charms Prover API
-# Hosted prover: https://v11.charms.dev (latest version)
+# Hosted prover: https://v14.charms.dev (latest version)
 # For local development, run: charms server (localhost:17784)
 # Documentation: https://docs.charms.dev/guides/wallet-integration/transactions/prover-api/
-PROVER_URL = "https://v11.charms.dev"
-CHARMS_PROVER_URL = "https://v11.charms.dev"
+PROVER_URL = "https://v14.charms.dev"
+CHARMS_PROVER_URL = "https://v14.charms.dev"
 # Scrolls API for token balances
 SCROLLS_API_URL = "https://scrolls.charms.dev"
 # Phase configuration — controls which features are active
@@ -131,8 +131,8 @@ PHASE = "2"
 FAUCET_AMOUNT = "5"
 FAUCET_MAX_TOTAL = "50"
 # Charms Prover API (v11 - hosted prover)
-PROVER_URL = "https://v11.charms.dev"
-CHARMS_PROVER_URL = "https://v11.charms.dev"
+PROVER_URL = "https://v14.charms.dev"
+CHARMS_PROVER_URL = "https://v14.charms.dev"
 # Scrolls API for token balances
 SCROLLS_API_URL = "https://scrolls.charms.dev"
 # BABTC Token configuration
@@ -187,7 +187,7 @@ crons = ["0 */6 * * *"]
 #
 # Optional:
 #   ADMIN_KEY - Admin API key for reset endpoints (fallback for CLAIM_SECRET_KEY if not set)
-#   PROVER_URL - Custom Prover API URL (default: https://v11.charms.dev)
+#   PROVER_URL - Custom Prover API URL (default: https://v14.charms.dev)
 #
 # =============================================================================
 # BABTC Token Configuration (Testnet4)

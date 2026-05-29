@@ -11,7 +11,7 @@
 /**
  * Default Charms prover URL (v11)
  */
-export const DEFAULT_PROVER_URL = "https://v11.charms.dev";
+export const DEFAULT_PROVER_URL = "https://v14.charms.dev";
 
 /**
  * Prover API endpoints
