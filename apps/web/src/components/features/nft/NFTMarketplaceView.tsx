@@ -29,6 +29,7 @@ interface NFTMarketplaceViewProps {
   isProcessing: boolean;
   error: string | null;
   onBuy: (tokenId: number) => Promise<{ success: boolean; error?: string }>;
+  onUnlist?: (tokenId: number) => Promise<{ success: boolean; error?: string }>;
   onGoToCollection: () => void;
   onRetry?: () => void;
   onDismissError?: () => void;
@@ -41,6 +42,7 @@ export function NFTMarketplaceView({
   isProcessing,
   error,
   onBuy,
+  onUnlist,
   onGoToCollection,
   onRetry,
   onDismissError,
@@ -134,7 +136,11 @@ export function NFTMarketplaceView({
                 className="text-6xl"
                 style={{ imageRendering: "pixelated" }}
                 animate={{ scale: [1, 1.08, 1] }}
-                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                transition={{
+                  duration: 2.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
               >
                 🏪
               </motion.span>
@@ -181,6 +187,7 @@ export function NFTMarketplaceView({
                 <MarketplaceListing
                   listing={listing}
                   onBuy={onBuy}
+                  onUnlist={onUnlist}
                   currentUserAddress={currentUserAddress}
                   isProcessing={isProcessing}
                 />
@@ -198,8 +205,8 @@ export function NFTMarketplaceView({
         transition={{ delay: 0.3 }}
       >
         <p className="font-pixel text-[7px] text-pixel-text-muted">
-          Note: To list your NFT for sale, go to your Collection and select an
-          NFT. Listing feature coming soon!
+          Note: To list your NFT for sale, go to your Collection, select an NFT,
+          and click "List for Sale".
         </p>
       </motion.div>
     </div>

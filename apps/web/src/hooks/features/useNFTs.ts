@@ -92,6 +92,9 @@ export interface UseNFTsReturn {
       tokenId: number,
       price: number,
     ) => Promise<{ success: boolean; error?: string }>;
+    unlistNFT: (
+      tokenId: number,
+    ) => Promise<{ success: boolean; error?: string }>;
   };
 
   // Evolution
@@ -190,6 +193,7 @@ export function useNFTs(): UseNFTsReturn {
     isLoading: isLoadingListings,
     buyNFT,
     listNFT,
+    unlistNFT,
     isProcessing: isProcessingMarketplace,
     processingError: marketplaceError,
   } = useMarketplace();
@@ -324,6 +328,7 @@ export function useNFTs(): UseNFTsReturn {
       error: marketplaceError,
       buyNFT,
       listNFT,
+      unlistNFT,
     },
 
     evolution: {

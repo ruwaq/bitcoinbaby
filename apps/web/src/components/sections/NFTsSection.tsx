@@ -18,6 +18,7 @@ import {
   NFTClaimFlow,
   NFTCollectionView,
   NFTExplorerView,
+  NFTMarketplaceView,
 } from "@/components/features/nft";
 import { SyncStatus, NFTTabNav, MintTabContent, useNFTsSection } from "./nfts";
 
@@ -151,6 +152,19 @@ export function NFTsSection() {
           />
         )}
 
+        {activeTab === "marketplace" && (
+          <NFTMarketplaceView
+            listings={marketplace.listings}
+            isLoading={marketplace.isLoading}
+            error={marketplace.error}
+            currentUserAddress={walletAddress}
+            isProcessing={marketplace.isProcessing}
+            onBuy={marketplace.buyNFT}
+            onUnlist={marketplace.unlistNFT}
+            onGoToCollection={() => setActiveTab("collection")}
+          />
+        )}
+
         {activeTab === "mint" && (
           <div className="flex flex-col gap-6">
             <MintTabContent
@@ -180,9 +194,13 @@ export function NFTsSection() {
 
             {/* Collapsible Manual Claim Accordion */}
             <details className="group">
-              <summary className={`font-pixel text-pixel-2xs bg-pixel-bg-medium ${pixelBorders.medium} p-4 text-pixel-text-muted hover:text-pixel-primary flex items-center justify-between cursor-pointer list-none [&::-webkit-details-marker]:hidden outline-none select-none`}>
+              <summary
+                className={`font-pixel text-pixel-2xs bg-pixel-bg-medium ${pixelBorders.medium} p-4 text-pixel-text-muted hover:text-pixel-primary flex items-center justify-between cursor-pointer list-none [&::-webkit-details-marker]:hidden outline-none select-none`}
+              >
                 <span>MANUAL CLAIM WORKFLOW</span>
-                <span className="transform group-open:rotate-180 transition-transform duration-200">▼</span>
+                <span className="transform group-open:rotate-180 transition-transform duration-200">
+                  ▼
+                </span>
               </summary>
               <div className="mt-4">
                 <NFTClaimFlow

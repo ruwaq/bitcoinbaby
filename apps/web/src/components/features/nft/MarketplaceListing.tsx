@@ -3,15 +3,18 @@
 /**
  * MarketplaceListing - NFT marketplace listing card
  *
- * Displays a single NFT listing with traits, price, and buy button.
+ * Displays a single NFT listing with traits, price, buy button,
+ * and unlist button for the seller.
  */
 
+import { useState } from "react";
 import { Button, pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
 import type { NFTListingWithNFT } from "@bitcoinbaby/core";
 
 interface MarketplaceListingProps {
   listing: NFTListingWithNFT;
   onBuy: (tokenId: number) => void;
+  onUnlist?: (tokenId: number) => Promise<{ success: boolean; error?: string }>;
   currentUserAddress?: string;
   isProcessing: boolean;
 }
@@ -19,11 +22,30 @@ interface MarketplaceListingProps {
 export function MarketplaceListing({
   listing,
   onBuy,
+  onUnlist,
   currentUserAddress,
   isProcessing,
 }: MarketplaceListingProps) {
   const isOwnListing = listing.sellerAddress === currentUserAddress;
   const isWalletConnected = !!currentUserAddress;
+  const [isUnlisting, setIsUnlisting] = useState(false);
+  const [unlistError, setUnlistError] = useState<string | null>(null);
+
+  const handleUnlist = async () => {
+    if (!onUnlist) return;
+    setIsUnlisting(true);
+    setUnlistError(null);
+    try {
+      const result = await onUnlist(listing.tokenId);
+      if (!result.success) {
+        setUnlistError(result.error || "Failed to unlist");
+      }
+    } catch (err) {
+      setUnlistError(err instanceof Error ? err.message : "Failed to unlist");
+    } finally {
+      setIsUnlisting(false);
+    }
+  };
 
   return (
     <div
@@ -77,20 +99,41 @@ export function MarketplaceListing({
         Seller: {listing.sellerAddress.slice(0, 12)}...
       </p>
 
-      {/* Buy Button */}
-      <Button
-        onClick={() => onBuy(listing.tokenId)}
-        disabled={!isWalletConnected || isProcessing || isOwnListing}
-        variant="success"
-        size="sm"
-        className="w-full"
-      >
-        {isOwnListing
-          ? "Your Listing"
-          : isProcessing
-            ? "Processing..."
-            : "Buy Now"}
-      </Button>
+      {/* Action Buttons */}
+      <div className="space-y-2">
+        {isOwnListing && onUnlist ? (
+          <>
+            <Button
+              onClick={handleUnlist}
+              disabled={isUnlisting || isProcessing}
+              variant="destructive"
+              size="sm"
+              className="w-full"
+            >
+              {isUnlisting ? "Unlisting..." : "Unlist"}
+            </Button>
+            {unlistError && (
+              <p className="font-pixel text-[7px] text-pixel-error text-center">
+                {unlistError}
+              </p>
+            )}
+          </>
+        ) : (
+          <Button
+            onClick={() => onBuy(listing.tokenId)}
+            disabled={!isWalletConnected || isProcessing || isOwnListing}
+            variant="success"
+            size="sm"
+            className="w-full"
+          >
+            {isOwnListing
+              ? "Your Listing"
+              : isProcessing
+                ? "Processing..."
+                : "Buy Now"}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
