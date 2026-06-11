@@ -1,28 +1,88 @@
 import type { Metadata, Viewport } from "next";
-import { Press_Start_2P, Pixelify_Sans, VT323 } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { RootProvider } from "@/providers";
+import { RetroEffects } from "@/components/app/RetroEffects";
 
-// Pixel Art Fonts - optimized loading via next/font
-const pressStart2P = Press_Start_2P({
-  weight: "400",
-  subsets: ["latin"],
+// Pixel Art Fonts — loaded LOCALLY so they work offline
+// Font files are in src/fonts/ (copied from next/font/google cache)
+// Press Start 2P — the main pixel display font
+const pressStart2P = localFont({
+  src: [
+    {
+      path: "../../src/fonts/dbbdd2d89d2ef0ef-s.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../src/fonts/a06229eb79a83cfc-s.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../src/fonts/c9e224327ce7933e-s.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../src/fonts/d85064eaed4b8683-s.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../src/fonts/db234bd00cda6a96-s.p.woff2",
+      weight: "400",
+      style: "normal",
+    },
+  ],
   display: "swap",
   variable: "--font-pixel",
   preload: true,
 });
 
-const pixelifySans = Pixelify_Sans({
-  weight: ["400", "500", "600", "700"],
-  subsets: ["latin"],
+// Pixelify Sans — body text font
+const pixelifySans = localFont({
+  src: [
+    {
+      path: "../../src/fonts/aaf0e744731a46d3-s.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../src/fonts/751eccb0decf5e18-s.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../src/fonts/b7bd7951037de757-s.p.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../src/fonts/f6590a0f07a97750-s.woff2",
+      weight: "400",
+      style: "normal",
+    },
+  ],
   display: "swap",
   variable: "--font-pixel-body",
   preload: true,
 });
 
-const vt323 = VT323({
-  weight: "400",
-  subsets: ["latin"],
+// VT323 — monospace terminal font
+const vt323 = localFont({
+  src: [
+    {
+      path: "../../src/fonts/c565b14407d34fed-s.p.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../src/fonts/9cb204d1bfdb6539-s.woff2",
+      weight: "400",
+      style: "normal",
+    },
+  ],
   display: "swap",
   variable: "--font-vt323",
   preload: true,
@@ -108,27 +168,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="min-h-screen bg-pixel-bg-dark text-pixel-text antialiased">
-        {/* CRT scanline effect - subtle overlay for retro feel */}
-        {/* Uses reduced opacity for readability, only visible on larger screens */}
-        <div
-          className="pointer-events-none fixed inset-0 z-50 hidden md:block"
-          aria-hidden="true"
-          style={{
-            background:
-              "repeating-linear-gradient(0deg, rgba(0,0,0,0.08) 0px, rgba(0,0,0,0.08) 1px, transparent 1px, transparent 3px)",
-            mixBlendMode: "multiply",
-          }}
-        />
-        {/* Subtle vignette for depth */}
-        <div
-          className="pointer-events-none fixed inset-0 z-40 hidden lg:block"
-          aria-hidden="true"
-          style={{
-            background:
-              "radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.15) 100%)",
-          }}
-        />
-
+        <RetroEffects />
         <RootProvider>
           {/* Main content with safe areas */}
           <div className="safe-top">{children}</div>
