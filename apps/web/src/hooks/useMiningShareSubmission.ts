@@ -28,6 +28,7 @@ import { createLogger } from "@bitcoinbaby/shared";
 import { useMiningSubmitter } from "./useMiningSubmitter";
 import { useWalletConnection } from "./useWalletConnection";
 import { sha256, signSchnorr, bytesToHex } from "@bitcoinbaby/bitcoin";
+import type { AIProof, AITask } from "@bitcoinbaby/core";
 
 const log = createLogger("ShareSubmission");
 
@@ -163,7 +164,10 @@ export function useMiningShareSubmission(
 
     // Subscribe to sync events
     const unsubscribe = syncManager.subscribe((event: SyncEvent) => {
-      log.debug("[ShareSubmission] Sync event", { type: event.type, data: event.data });
+      log.debug("[ShareSubmission] Sync event", {
+        type: event.type,
+        data: event.data,
+      });
       switch (event.type) {
         case "sync_start":
           setIsSubmitting(true);
@@ -242,14 +246,19 @@ export function useMiningShareSubmission(
   }, [isSubmitting]);
 
   const handleAILocalTaskResolved = useCallback(
-    async (proof: any, task: any) => {
-      log.debug("[ShareSubmission] AI task resolved, starting main thread Schnorr signing", { taskId: proof.taskId });
+    async (proof: AIProof, _task: AITask) => {
+      log.debug(
+        "[ShareSubmission] AI task resolved, starting main thread Schnorr signing",
+        { taskId: proof.taskId },
+      );
       if (!publicKey) {
-        log.error("[ShareSubmission] Cannot sign proof: Wallet not connected or no public key");
+        log.error(
+          "[ShareSubmission] Cannot sign proof: Wallet not connected or no public key",
+        );
         return;
       }
 
-      const reward = calculateShareReward(proof.difficulty);
+      const reward = calculateShareReward(proof.difficulty ?? 1);
 
       try {
         const signedProof = await withPrivateKey(async (privateKey) => {
@@ -268,20 +277,25 @@ export function useMiningShareSubmission(
         });
 
         if (!signedProof) {
-          log.warn("[ShareSubmission] Private key signing failed (wallet locked or user rejected)");
+          log.warn(
+            "[ShareSubmission] Private key signing failed (wallet locked or user rejected)",
+          );
           return;
         }
 
-        log.info("[ShareSubmission] AI Proof signed successfully, queueing to SyncManager", {
-          taskId: proof.taskId,
-          signature: signedProof.signature.substring(0, 10) + "...",
-        });
+        log.info(
+          "[ShareSubmission] AI Proof signed successfully, queueing to SyncManager",
+          {
+            taskId: proof.taskId,
+            signature: signedProof.signature.substring(0, 10) + "...",
+          },
+        );
 
         // Add to SyncManager as AI proof
         const { queued, duplicate } = await syncManagerRef.current.addShare({
           hash: proof.hash || proof.taskId,
           nonce: 0,
-          difficulty: proof.difficulty,
+          difficulty: proof.difficulty ?? 1,
           blockData: "",
           reward,
           timestamp: proof.timestamp,
@@ -395,7 +409,8 @@ export function useMiningShareSubmission(
         addNotification({
           type: "error",
           title: "Share Queue Failed",
-          message: "Your share could not be saved. It will be retried automatically.",
+          message:
+            "Your share could not be saved. It will be retried automatically.",
         });
       });
   }, [mining.lastShare, mining.isRunning, addNotification]);

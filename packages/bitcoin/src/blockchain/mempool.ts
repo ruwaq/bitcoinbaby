@@ -269,7 +269,7 @@ export class MempoolAPIError extends ApiError {
   }
 }
 
-let globalMockClient: MockMempoolClient | null = null;
+let globalMockClient: BlockchainAPI | null = null;
 
 /**
  * Create a Mempool client instance
@@ -277,6 +277,22 @@ let globalMockClient: MockMempoolClient | null = null;
 export function createMempoolClient(
   options?: MempoolClientOptions,
 ): BlockchainAPI {
+  // Dev Fund mode — local Bitcoin simulation with free funds
+  if (
+    typeof window !== "undefined" &&
+    localStorage.getItem("bitcoinbaby-dev-fund") === "true"
+  ) {
+    // Dynamic require to avoid bundling dev provider in production
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { DevFundProvider } = require("../providers/dev-fund-provider");
+    if (!globalMockClient) {
+      globalMockClient = new DevFundProvider(
+        options?.network ?? "testnet4",
+      ) as unknown as BlockchainAPI;
+    }
+    return globalMockClient as BlockchainAPI;
+  }
+
   if (
     typeof process !== "undefined" &&
     process.env &&

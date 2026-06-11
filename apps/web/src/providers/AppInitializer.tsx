@@ -19,6 +19,7 @@ import {
   initializeBonusEngine,
   type WalletInfo,
 } from "@bitcoinbaby/core";
+import { isDevFundEnabled, enableDevFund } from "@bitcoinbaby/bitcoin";
 import { useNFTSync } from "@/hooks/useNFTSync";
 import {
   isWalletSingletonActive,
@@ -63,6 +64,14 @@ export function AppInitializer() {
   // Sync NFTs when wallet is connected and unlocked
   // This hook fetches NFTs from the server and updates the store
   const { isLoading, refresh } = useNFTSync();
+
+  // Auto-enable Dev Fund in development so wallets always have test funds
+  useEffect(() => {
+    if (!isDevFundEnabled()) {
+      console.log("[AppInitializer] Auto-enabling Dev Fund for testing...");
+      enableDevFund();
+    }
+  }, []);
 
   // CRITICAL: Sync wallet singleton to store on mount and on changes
   // This ensures the wallet stays connected when navigating between tabs

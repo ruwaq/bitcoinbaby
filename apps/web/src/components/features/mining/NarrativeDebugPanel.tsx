@@ -12,11 +12,7 @@
 import { useState, useCallback } from "react";
 import { NarrativeEngine } from "@bitcoinbaby/ai";
 import { useNarrativeStore } from "@bitcoinbaby/core";
-import type {
-  BabyNFTState,
-  NarrativeEvent,
-  NarrativeState,
-} from "@bitcoinbaby/ai";
+import type { BabyNFTState } from "@bitcoinbaby/ai";
 import type { BaseType, Bloodline } from "@bitcoinbaby/bitcoin";
 
 // =============================================================================
@@ -83,11 +79,6 @@ export function NarrativeDebugPanel() {
   const [customOutput, setCustomOutput] = useState("");
   const [results, setResults] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
-  // Subscribe to count only, not the full store — avoids re-render cascades
-  const storeEventCount = useNarrativeStore((s) => {
-    const st = s.states[nft.tokenId];
-    return st ? st.events.length : 0;
-  });
   // Get the actual store reference for imperative calls (not reactive)
   const store = useNarrativeStore.getState;
 

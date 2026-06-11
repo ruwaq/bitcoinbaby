@@ -219,26 +219,35 @@ export function useMining(options: UseMiningOptions = {}): UseMiningReturn {
 
   // CRITICAL: Stop mining when wallet locks, disconnects, or network changes
   // This prevents mining to wrong address or submitting proofs on wrong network
+  // Use refs to avoid unstable callback references in dependency arrays
+  const miningStopRef = useRef(mining.stop);
+  const miningIsRunningRef = useRef(mining.isRunning);
+
   useEffect(() => {
+    // Sync refs at the start of the effect (not during render)
+    miningStopRef.current = mining.stop;
+    miningIsRunningRef.current = mining.isRunning;
+
     // Check if network changed
     if (previousNetworkRef.current !== network) {
       previousNetworkRef.current = network;
-      if (mining.isRunning) {
+      if (miningIsRunningRef.current) {
         console.log("[useMining] Network changed, stopping mining for safety");
-        mining.stop();
+        miningStopRef.current();
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Using specific mining properties to avoid infinite loops
-  }, [network, mining.isRunning, mining.stop]);
+  }, [network, mining.stop, mining.isRunning]);
 
   // Stop mining when wallet locks or disconnects
   useEffect(() => {
-    if ((isLocked || !wallet?.address) && mining.isRunning) {
+    miningStopRef.current = mining.stop;
+    miningIsRunningRef.current = mining.isRunning;
+
+    if ((isLocked || !wallet?.address) && miningIsRunningRef.current) {
       console.log("[useMining] Wallet locked or disconnected, stopping mining");
-      mining.stop();
+      miningStopRef.current();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Using specific mining properties to avoid infinite loops
-  }, [isLocked, wallet?.address, mining.isRunning, mining.stop]);
+  }, [isLocked, wallet?.address, mining.stop, mining.isRunning]);
 
   return {
     wallet,

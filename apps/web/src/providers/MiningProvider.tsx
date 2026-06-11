@@ -23,13 +23,9 @@ import {
 import {
   getMiningManager,
   forceSaveMiningState,
-  formatHashrate,
-  formatTotal,
   MIN_DIFFICULTY,
   type MiningManagerState,
 } from "@bitcoinbaby/core";
-import { supportsSharedWorker } from "@/hooks/useSharedMining";
-
 // =============================================================================
 // CONTEXT
 // =============================================================================
@@ -37,7 +33,6 @@ import { supportsSharedWorker } from "@/hooks/useSharedMining";
 interface MiningContextValue {
   isInitialized: boolean;
   state: MiningManagerState;
-  sharedWorkerSupported: boolean;
 }
 
 const MiningContext = createContext<MiningContextValue | null>(null);
@@ -52,7 +47,6 @@ interface MiningProviderProps {
 
 export function MiningProvider({ children }: MiningProviderProps) {
   const [isInitialized, setIsInitialized] = useState(false);
-  const [sharedWorkerSupported] = useState(() => supportsSharedWorker());
   const [state, setState] = useState<MiningManagerState>({
     isRunning: false,
     isPaused: false,
@@ -73,13 +67,6 @@ export function MiningProvider({ children }: MiningProviderProps) {
     canResume: false,
     lifetimeHashes: 0,
     lifetimeShares: 0,
-  });
-
-  // SharedWorker state (for multi-tab mining)
-  const [sharedWorkerState, setSharedWorkerState] = useState({
-    isRunning: false,
-    hashrate: 0,
-    shares: 0,
   });
 
   // Initialize singleton mining manager
@@ -127,83 +114,8 @@ export function MiningProvider({ children }: MiningProviderProps) {
     };
   }, []);
 
-  // Listen to SharedWorker state (if supported)
-  useEffect(() => {
-    if (!sharedWorkerSupported || typeof SharedWorker === "undefined") return;
-
-    let worker: SharedWorker;
-    try {
-      worker = new SharedWorker("/workers/mining-shared-worker.js", {
-        name: "bitcoinbaby-mining",
-      });
-
-      // Handle worker errors
-      worker.onerror = (error) => {
-        const errorMessage =
-          error instanceof ErrorEvent
-            ? error.message
-            : "SharedWorker failed to load";
-        console.error("[MiningProvider] SharedWorker error:", errorMessage);
-
-        // Reset shared worker state on error
-        setSharedWorkerState({
-          isRunning: false,
-          hashrate: 0,
-          shares: 0,
-        });
-      };
-
-      worker.port.onmessage = (event) => {
-        const { type, data } = event.data;
-
-        // Handle error messages from worker
-        if (type === "error") {
-          console.error("[MiningProvider] SharedWorker reported error:", data);
-          return;
-        }
-
-        if (type === "state" || type === "stats") {
-          setSharedWorkerState((prev) => ({
-            isRunning: data.isRunning ?? prev.isRunning,
-            hashrate: data.hashrate ?? 0,
-            shares: data.shares ?? 0,
-          }));
-        } else if (type === "status") {
-          setSharedWorkerState((prev) => ({
-            ...prev,
-            isRunning: data === "running",
-          }));
-        }
-      };
-
-      // Handle port errors
-      worker.port.onmessageerror = (error) => {
-        console.error(
-          "[MiningProvider] SharedWorker port message error:",
-          error,
-        );
-      };
-
-      worker.port.start();
-      worker.port.postMessage({ type: "getState" });
-
-      // Log successful connection
-      console.debug("[MiningProvider] SharedWorker connected successfully");
-    } catch (error) {
-      // SharedWorker not available - log the reason
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      console.warn(
-        "[MiningProvider] SharedWorker initialization failed:",
-        errorMessage,
-      );
-    }
-  }, [sharedWorkerSupported]);
-
   return (
-    <MiningContext.Provider
-      value={{ isInitialized, state, sharedWorkerSupported }}
-    >
+    <MiningContext.Provider value={{ isInitialized, state }}>
       {children}
     </MiningContext.Provider>
   );

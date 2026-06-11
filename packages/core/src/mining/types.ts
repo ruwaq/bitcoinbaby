@@ -62,6 +62,10 @@ export interface AIProof {
   computeTime: number;
   modelId: string;
   timestamp: number;
+  /** Mining difficulty at time of proof generation */
+  difficulty?: number;
+  /** SHA-256 hash of the proof data (for integrity verification) */
+  hash?: string;
 }
 
 export interface SignedAIProof extends AIProof {

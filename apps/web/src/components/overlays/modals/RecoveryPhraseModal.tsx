@@ -79,7 +79,7 @@ export function RecoveryPhraseModal() {
   return (
     <div className="p-6 max-w-md w-full">
       <div className="text-center mb-6">
-        <div className="text-4xl mb-3">&#128273;</div>
+        <div className="text-4xl mb-3">🔑</div>
         <h2 className="font-pixel text-lg text-pixel-primary">
           RECOVERY PHRASE
         </h2>
@@ -93,7 +93,7 @@ export function RecoveryPhraseModal() {
       {/* Warning banner */}
       <div className="bg-pixel-error/10 border-2 border-pixel-error/50 p-3 rounded mb-4">
         <p className="font-pixel-body text-xs text-pixel-error">
-          &#9888; Never share your recovery phrase. Anyone with these words can
+          ⚠️ Never share your recovery phrase. Anyone with these words can
           access your wallet.
         </p>
       </div>
@@ -177,7 +177,7 @@ export function RecoveryPhraseModal() {
               onClick={() => setRevealed(true)}
               className="w-full py-2 mb-4 font-pixel-body text-sm text-pixel-secondary hover:underline"
             >
-              &#128065; Click to reveal words
+              👁 Click to reveal words
             </button>
           )}
 

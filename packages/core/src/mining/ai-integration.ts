@@ -96,7 +96,7 @@ export class AIWorkIntegration {
   private tasksCompleted = 0;
   private lastError?: string;
   private shareCounter = 0;
-  
+
   private modelState: "idle" | "loading" | "ready" | "error" = "idle";
   private downloadProgress = 0;
   private downloadDetails?: { file?: string; loaded?: number; total?: number };
@@ -291,13 +291,14 @@ export class AIWorkIntegration {
   /**
    * Generate a default AI PoUW task
    */
-  private generateDefaultAITask(): AITask {
+  /** @internal - exposed for testing */
+  generateDefaultAITask(): AITask {
     const prompts = [
       "Explain the importance of decentralization in public blockchains.",
       "Summarize how Proof of Useful Work helps reduce carbon footprint.",
       "Write a short pixel-art description of a cyber baby learning AI.",
       "How does WebGPU enable local neural network inference in browsers?",
-      "Design a virtual gym workout routine for a Bitcoin Baby."
+      "Design a virtual gym workout routine for a Bitcoin Baby.",
     ];
 
     const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
@@ -306,7 +307,11 @@ export class AIWorkIntegration {
       id: `pouw-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       type: "pouw",
       input: randomPrompt,
-      seed: Math.random().toString(16).slice(2),
+      seed: Array.from({ length: 16 }, () =>
+        Math.floor(Math.random() * 256)
+          .toString(16)
+          .padStart(2, "0"),
+      ).join(""),
     };
   }
 

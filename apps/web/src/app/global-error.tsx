@@ -10,13 +10,12 @@
  * Users should never see a blank screen.
  */
 
-export default function GlobalError({
-  error,
-  reset,
-}: {
+interface GlobalErrorProps {
   error: Error & { digest?: string };
   reset: () => void;
-}) {
+}
+
+export default function GlobalError({ error, reset }: GlobalErrorProps) {
   return (
     <html lang="en">
       <body className="bg-[#0f0f1b] text-white min-h-screen flex items-center justify-center p-4">

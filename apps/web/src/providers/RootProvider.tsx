@@ -18,7 +18,11 @@ import { usePlatform } from "@/hooks";
 import { MiningProvider } from "./MiningProvider";
 import { QueryProvider } from "./QueryProvider";
 import { AppInitializer } from "./AppInitializer";
-import { usePendingTxStore, cleanupStuckTransactions, useWalletStore } from "@bitcoinbaby/core";
+import {
+  usePendingTxStore,
+  cleanupStuckTransactions,
+  useWalletStore,
+} from "@bitcoinbaby/core";
 import { ModalManager } from "@/components/overlays/ModalManager";
 
 interface RootProviderProps {
@@ -44,48 +48,76 @@ export function RootProvider({ children }: RootProviderProps) {
   useEffect(() => {
     setIsHydrated(true);
     if (typeof window !== "undefined") {
-      (window as any).__walletStore = useWalletStore;
+      (window as unknown as Record<string, unknown>).__walletStore =
+        useWalletStore;
 
       // Clean up old service workers registered on localhost to avoid caching issues in development
-      if (window.location.hostname === "localhost" && "serviceWorker" in navigator && !navigator.webdriver) {
+      if (
+        window.location.hostname === "localhost" &&
+        "serviceWorker" in navigator &&
+        !navigator.webdriver
+      ) {
         const swClearedKey = "sw-cleared-v1";
         if (!sessionStorage.getItem(swClearedKey)) {
-          navigator.serviceWorker.getRegistrations().then(async (registrations) => {
-            if (registrations.length > 0) {
-              console.log(`[RootProvider] Found ${registrations.length} service worker registrations. Starting cleanup...`);
-              
-              // Unregister all service workers and wait for them to finish
-              const unregisterPromises = registrations.map((registration) => {
-                console.log("[RootProvider] Unregistering service worker:", registration.scope);
-                return registration.unregister().catch((err) => {
-                  console.error("[RootProvider] Failed to unregister service worker:", err);
-                  return false;
+          navigator.serviceWorker
+            .getRegistrations()
+            .then(async (registrations) => {
+              if (registrations.length > 0) {
+                console.log(
+                  `[RootProvider] Found ${registrations.length} service worker registrations. Starting cleanup...`,
+                );
+
+                // Unregister all service workers and wait for them to finish
+                const unregisterPromises = registrations.map((registration) => {
+                  console.log(
+                    "[RootProvider] Unregistering service worker:",
+                    registration.scope,
+                  );
+                  return registration.unregister().catch((err) => {
+                    console.error(
+                      "[RootProvider] Failed to unregister service worker:",
+                      err,
+                    );
+                    return false;
+                  });
                 });
-              });
-              
-              await Promise.all(unregisterPromises);
-              
-              // Clear all caches and wait for completion
-              if ("caches" in window) {
-                try {
-                  const cacheKeys = await caches.keys();
-                  await Promise.all(cacheKeys.map((key) => caches.delete(key)));
-                  console.log("[RootProvider] All caches deleted successfully.");
-                } catch (err) {
-                  console.error("[RootProvider] Failed to clear caches:", err);
+
+                await Promise.all(unregisterPromises);
+
+                // Clear all caches and wait for completion
+                if ("caches" in window) {
+                  try {
+                    const cacheKeys = await caches.keys();
+                    await Promise.all(
+                      cacheKeys.map((key) => caches.delete(key)),
+                    );
+                    console.log(
+                      "[RootProvider] All caches deleted successfully.",
+                    );
+                  } catch (err) {
+                    console.error(
+                      "[RootProvider] Failed to clear caches:",
+                      err,
+                    );
+                  }
                 }
+
+                // Mark as cleared in sessionStorage before reloading
+                sessionStorage.setItem(swClearedKey, "true");
+
+                console.log(
+                  "[RootProvider] Cleanup finished. Reloading page...",
+                );
+                // Force reload to fetch fresh content
+                window.location.reload();
               }
-              
-              // Mark as cleared in sessionStorage before reloading
-              sessionStorage.setItem(swClearedKey, "true");
-              
-              console.log("[RootProvider] Cleanup finished. Reloading page...");
-              // Force reload to fetch fresh content
-              window.location.reload();
-            }
-          }).catch((err) => {
-            console.error("[RootProvider] Error fetching service worker registrations:", err);
-          });
+            })
+            .catch((err) => {
+              console.error(
+                "[RootProvider] Error fetching service worker registrations:",
+                err,
+              );
+            });
         }
       }
     }

@@ -12,16 +12,28 @@ test.describe("Mining Section UI", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for __walletStore to be initialized
-    await page.waitForFunction(() => typeof (window as any).__walletStore !== "undefined", { timeout: 30000 });
+    await page.waitForFunction(
+      () =>
+        typeof (window as unknown as Record<string, unknown>).__walletStore !==
+        "undefined",
+      { timeout: 30000 },
+    );
 
     // Inject wallet to simulate connected state
     await page.evaluate(() => {
-      (window as any).__walletStore.getState().setWallet({
-        address: "tb1qtest123456789address",
-        publicKey: "020000000000000000000000000000000000000000000000000000000000000000",
-        balance: BigInt("100000"),
-        babyTokens: BigInt("50000"),
-      });
+      (
+        (window as unknown as Record<string, unknown>).__walletStore as {
+          getState: () => { setWallet: (w: Record<string, unknown>) => void };
+        }
+      )
+        .getState()
+        .setWallet({
+          address: "tb1qtest123456789address",
+          publicKey:
+            "020000000000000000000000000000000000000000000000000000000000000000",
+          balance: BigInt("100000"),
+          babyTokens: BigInt("50000"),
+        });
     });
   });
 

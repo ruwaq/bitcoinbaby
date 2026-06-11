@@ -2,15 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
+import { pixelBorders } from "@bitcoinbaby/ui";
 
-export default function WalletError({
-  error,
-  reset,
-}: {
+interface WalletErrorProps {
   error: Error & { digest?: string };
   reset: () => void;
-}) {
+}
+
+export default function WalletError({ error, reset }: WalletErrorProps) {
   const [isClearing, setIsClearing] = useState(false);
 
   useEffect(() => {
@@ -60,7 +59,7 @@ export default function WalletError({
 
         {/* Error Card */}
         <div
-          className={`bg-pixel-bg-medium ${pixelBorders.error} p-6 ${pixelShadows.lg}`}
+          className={`bg-pixel-bg-medium ${pixelBorders.error} p-6 shadow-[8px_8px_0_0_#000]`}
         >
           {/* Warning Icon - Pixel Art Style */}
           <div className="flex justify-center mb-6">
@@ -118,7 +117,7 @@ export default function WalletError({
             {/* Option 1: Retry */}
             <button
               onClick={reset}
-              className={`w-full py-3 font-pixel text-[10px] bg-pixel-primary text-black ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none`}
+              className={`w-full py-3 font-pixel text-[10px] bg-pixel-primary text-black ${pixelBorders.thick} shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0_0_#000] transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none`}
             >
               RETRY LOADING WALLET
             </button>
@@ -128,10 +127,10 @@ export default function WalletError({
               <button
                 onClick={handleClearWallet}
                 disabled={isClearing}
-                className={`w-full py-3 font-pixel text-[10px] ${pixelBorders.thick} ${pixelShadows.md} transition-all ${
+                className={`w-full py-3 font-pixel text-[10px] ${pixelBorders.thick} shadow-[4px_4px_0_0_#000] transition-all ${
                   isClearing
                     ? "bg-pixel-border text-pixel-text-muted cursor-wait"
-                    : `bg-pixel-error text-white hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} active:translate-x-[4px] active:translate-y-[4px] active:shadow-none`
+                    : "bg-pixel-error text-white hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0_0_#000] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none"
                 }`}
               >
                 {isClearing ? "CLEARING..." : "CLEAR WALLET DATA & RESTART"}
@@ -149,7 +148,7 @@ export default function WalletError({
                   e.preventDefault();
                   handleClearWallet();
                 }}
-                className={`block w-full py-3 font-pixel text-[10px] text-center bg-pixel-bg-light text-pixel-text ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all`}
+                className={`block w-full py-3 font-pixel text-[10px] text-center bg-pixel-bg-light text-pixel-text ${pixelBorders.thick} shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0_0_#000] transition-all`}
               >
                 GENERATE NEW WALLET
               </a>

@@ -5,7 +5,9 @@ name = "bitcoinbaby-api"
 main = "src/index.ts"
 compatibility_date = "2025-02-01"
 compatibility_flags = ["nodejs_compat"]
-account_id = "58f90adc571d31c4b7a860b6edef3406"
+# account_id is set via CLOUDFLARE_ACCOUNT_ID environment variable in CI
+# For local development, run: wrangler login
+# account_id = "your-account-id-here"
 
 # Development
 [dev]
@@ -86,6 +88,8 @@ BABTC_GENESIS = "b3deba0743aeffd0e455ce442b1693107090341381e3d8bcc5f586667c3e8a8
 # Treasury address - holds BABTC tokens
 TREASURY_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8"
 # Foundation address - receives 20% platform fee from claims
+# IMPORTANT: This should be a DIFFERENT address from TREASURY_ADDRESS in production.
+# Currently using the same address for testnet — separate before mainnet launch.
 FOUNDATION_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8"
 # Platform fee percentage for claims (20% = extra output to foundation)
 PLATFORM_FEE_PERCENT = "20"
@@ -143,6 +147,8 @@ BABTC_GENESIS = "b3deba0743aeffd0e455ce442b1693107090341381e3d8bcc5f586667c3e8a8
 # Treasury address for testnet4
 TREASURY_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8"
 # Foundation address - receives 20% platform fee from claims
+# IMPORTANT: This should be a DIFFERENT address from TREASURY_ADDRESS in production.
+# Currently using the same address for testnet — separate before mainnet launch.
 FOUNDATION_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8"
 # Platform fee percentage for claims (20% = extra output to foundation)
 PLATFORM_FEE_PERCENT = "20"

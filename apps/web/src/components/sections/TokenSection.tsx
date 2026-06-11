@@ -42,8 +42,8 @@ export function TokenSection() {
   const isClaiming = false; // Actual claim goes through wallet page
 
   const handleClaim = async () => {
-    // Navigate to wallet claim page for on-chain minting
-    router.push("/wallet/claim");
+    // Navigate to wallet tab with claim view for on-chain minting
+    router.push("/?tab=wallet&view=claim");
   };
 
   return (
@@ -69,9 +69,13 @@ export function TokenSection() {
 
       {/* Advanced Tokenomics & Resources */}
       <details className="mt-6 group">
-        <summary className={`font-pixel text-pixel-2xs bg-pixel-bg-medium ${pixelBorders.medium} p-4 text-pixel-text-muted hover:text-pixel-primary flex items-center justify-between cursor-pointer list-none [&::-webkit-details-marker]:hidden outline-none select-none`}>
+        <summary
+          className={`font-pixel text-pixel-2xs bg-pixel-bg-medium ${pixelBorders.medium} p-4 text-pixel-text-muted hover:text-pixel-primary flex items-center justify-between cursor-pointer list-none [&::-webkit-details-marker]:hidden outline-none select-none`}
+        >
           <span>ADVANCED TOKENOMICS & RESOURCES</span>
-          <span className="transform group-open:rotate-180 transition-transform duration-200">▼</span>
+          <span className="transform group-open:rotate-180 transition-transform duration-200">
+            ▼
+          </span>
         </summary>
         <div className="mt-6 flex flex-col gap-6">
           {/* Tokenomics */}

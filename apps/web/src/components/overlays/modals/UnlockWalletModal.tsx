@@ -52,7 +52,7 @@ export function UnlockWalletModal() {
   return (
     <div className="p-6 max-w-sm w-full">
       <div className="text-center mb-6">
-        <div className="text-4xl mb-3">&#128274;</div>
+        <div className="text-4xl mb-3">🔒</div>
         <h2 className="font-pixel text-lg text-pixel-primary">UNLOCK WALLET</h2>
         <p className="font-pixel-body text-sm text-pixel-text-muted mt-1">
           Enter your password to unlock

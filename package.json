@@ -6,7 +6,9 @@
     "overrides": {
       "minimatch": ">=9.0.6",
       "tar": ">=7.5.11",
-      "protobufjs": ">=7.5.5",
+      "protobufjs": ">=8.2.0",
+      "postcss": ">=8.5.10",
+      "ws": ">=8.20.1",
       "rollup": ">=4.59.0",
       "flatted": ">=3.4.0",
       "undici": ">=7.24.0",
@@ -28,15 +30,27 @@
     "signer": "pnpm --filter @bitcoinbaby/signer start",
     "signer:once": "pnpm --filter @bitcoinbaby/signer start:once",
     "signer:test": "pnpm --filter @bitcoinbaby/signer test:e2e",
-    "signer:wallet": "pnpm --filter @bitcoinbaby/signer generate-wallet"
+    "signer:wallet": "pnpm --filter @bitcoinbaby/signer generate-wallet",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.0",
     "@vitest/ui": "^4.1.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.5",
     "prettier": "^3.0.0",
-    "turbo": "^2.0.0",
+    "turbo": "^2.9.16",
     "typescript": "^5.0.0",
     "vitest": "^4.1.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "prettier --write",
+      "eslint --fix --max-warnings 0"
+    ],
+    "*.{json,md,css,html}": [
+      "prettier --write"
+    ]
   },
   "engines": {
     "node": ">=20.0.0"

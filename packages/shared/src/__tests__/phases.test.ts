@@ -112,16 +112,21 @@ describe("Phase 1 (NFTs + Faucet)", () => {
       expect(config.features.onChainEvolution).toBe(false);
     });
 
-    it("sets defaultTab to 'nfts'", () => {
+    it("sets defaultTab to 'baby'", () => {
       const config = mod.getPhaseConfig();
-      expect(config.defaultTab).toBe("nfts");
+      expect(config.defaultTab).toBe("dashboard");
     });
 
     it("has correct visibleTabs", () => {
       const config = mod.getPhaseConfig();
-      expect(config.visibleTabs).toEqual(["token", "nfts", "wallet", "more"]);
-      // Mining tab should NOT be visible in Phase 1
-      expect(config.visibleTabs).not.toContain("mining");
+      expect(config.visibleTabs).toEqual([
+        "dashboard",
+        "nfts",
+        "wallet",
+        "more",
+      ]);
+      // Mining is integrated into Dashboard in all phases
+      expect(config.visibleTabs).toContain("dashboard");
     });
   });
 
@@ -214,14 +219,13 @@ describe("Phase 2 (Mining)", () => {
 
     it("sets defaultTab to 'token'", () => {
       const config = mod.getPhaseConfig();
-      expect(config.defaultTab).toBe("token");
+      expect(config.defaultTab).toBe("dashboard");
     });
 
     it("has correct visibleTabs with mining", () => {
       const config = mod.getPhaseConfig();
       expect(config.visibleTabs).toEqual([
-        "token",
-        "mining",
+        "dashboard",
         "nfts",
         "wallet",
         "more",
@@ -280,15 +284,14 @@ describe("Phase 3 (Game)", () => {
       expect(config.features.onChainEvolution).toBe(true);
     });
 
-    it("sets defaultTab to 'token'", () => {
-      expect(mod.getPhaseConfig().defaultTab).toBe("token");
+    it("sets defaultTab to 'baby'", () => {
+      expect(mod.getPhaseConfig().defaultTab).toBe("dashboard");
     });
 
     it("has all tabs visible", () => {
       const config = mod.getPhaseConfig();
       expect(config.visibleTabs).toEqual([
-        "token",
-        "mining",
+        "dashboard",
         "nfts",
         "wallet",
         "more",

@@ -104,4 +104,7 @@ export type {
   OrchestratorConfig,
   DeviceCapabilities,
   PoolConfig,
+  AITask,
+  AIProof,
+  SignedAIProof,
 } from "./types";

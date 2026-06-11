@@ -11,28 +11,29 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCapacitor, usePlatform } from "@/hooks";
 
+// BottomNav uses the same URL scheme as TabNavigation (/?tab=...)
+// This ensures both navigation systems stay in sync
 const navItems = [
-  { href: "/", label: "Home", icon: "\u{1F3E0}", activeIcon: "\u{1F3E1}" },
   {
-    href: "/mine",
-    label: "Mine",
-    icon: "\u{26CF}\u{FE0F}",
-    activeIcon: "\u{26CF}\u{FE0F}",
+    href: "/?tab=dashboard",
+    label: "Home",
+    icon: "\u{1F3E0}",
+    activeIcon: "\u{1F3E1}",
   },
   {
-    href: "/wallet",
-    label: "Wallet",
-    icon: "\u{1F4B0}",
-    activeIcon: "\u{1F4B5}",
-  },
-  {
-    href: "/nfts",
+    href: "/?tab=nfts",
     label: "NFTs",
     icon: "\u{1F3A8}",
     activeIcon: "\u{1F5BC}\u{FE0F}",
   },
   {
-    href: "/settings",
+    href: "/?tab=wallet",
+    label: "Wallet",
+    icon: "\u{1F4B0}",
+    activeIcon: "\u{1F4B5}",
+  },
+  {
+    href: "/?tab=more",
     label: "More",
     icon: "\u{2699}\u{FE0F}",
     activeIcon: "\u{2699}\u{FE0F}",
@@ -44,8 +45,8 @@ export function BottomNav() {
   const { haptic, isNative } = useCapacitor();
   const { isMobile, isPWA, isReady } = usePlatform();
 
-  // Only show on mobile, PWA, or native
-  const shouldShow = isReady && (isMobile || isPWA || isNative);
+  // Always show — consistent mobile-game-like navigation on all devices
+  const shouldShow = isReady;
 
   const handlePress = async () => {
     if (isNative) {
@@ -63,10 +64,17 @@ export function BottomNav() {
     >
       <div className="flex justify-around items-center h-16">
         {navItems.map((item) => {
-          const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
+          // Match tab parameter in URL for active state detection
+          const itemTab = new URLSearchParams(
+            item.href.split("?")[1] || "",
+          ).get("tab");
+          const currentTab = new URLSearchParams(
+            pathname.split("?")[1] || "",
+          ).get("tab");
+          const isActive = itemTab
+            ? currentTab === itemTab ||
+              (!currentTab && itemTab === "baby" && pathname === "/")
+            : pathname === item.href;
 
           return (
             <Link

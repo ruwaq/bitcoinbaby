@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
-  pixelBorders,
   GenesisBabySprite,
   generateRandomTraits,
   traitsFromHash,
@@ -13,17 +12,42 @@ import {
   MAX_LEVEL,
   PixelCard,
   PixelButton,
-  PixelProgress,
   PixelBadge,
   type GenesisBabyTraits,
   type BabyState,
 } from "@bitcoinbaby/ui";
 
-const BASE_TYPES = ["human", "animal", "robot", "mystic", "alien", "shaman", "elemental", "dragon"] as const;
+const BASE_TYPES = [
+  "human",
+  "animal",
+  "robot",
+  "mystic",
+  "alien",
+  "shaman",
+  "elemental",
+  "dragon",
+] as const;
 const BLOODLINES = ["royal", "warrior", "rogue", "mystic"] as const;
 const HERITAGES = ["americas", "africa", "asia", "europa", "oceania"] as const;
-const RARITIES = ["common", "uncommon", "rare", "epic", "legendary", "mythic"] as const;
-const STATES = ["idle", "happy", "sleeping", "hungry", "mining", "learning", "evolving", "thriving", "struggling"] as const;
+const RARITIES = [
+  "common",
+  "uncommon",
+  "rare",
+  "epic",
+  "legendary",
+  "mythic",
+] as const;
+const STATES = [
+  "idle",
+  "happy",
+  "sleeping",
+  "hungry",
+  "mining",
+  "learning",
+  "evolving",
+  "thriving",
+  "struggling",
+] as const;
 
 export default function CharactersPage() {
   // Current traits state
@@ -74,7 +98,7 @@ export default function CharactersPage() {
       setDnaInput(cleanHash);
       setDnaError(null);
       setIsManualUpdate(false);
-    } catch (err) {
+    } catch {
       setDnaError("Error al procesar el DNA");
     }
   };
@@ -98,7 +122,7 @@ export default function CharactersPage() {
   // Update specific trait manually
   const updateTrait = <K extends keyof Omit<GenesisBabyTraits, "dna">>(
     key: K,
-    value: GenesisBabyTraits[K]
+    value: GenesisBabyTraits[K],
   ) => {
     setIsManualUpdate(true);
     setTraits((prev) => {
@@ -113,8 +137,8 @@ export default function CharactersPage() {
     return getXpForNextLevel(level);
   }, [level]);
 
-  // Mock production state for NFT helpers
-  const mockNftState = useMemo(() => {
+  // Preview NFT state for the character viewer (not connected to real wallet)
+  const previewNftState = useMemo(() => {
     return {
       dna: traits.dna,
       bloodline: traits.bloodline,
@@ -134,13 +158,13 @@ export default function CharactersPage() {
 
   // Calculate boosts
   const currentBoost = useMemo(() => {
-    return getMiningBoost(mockNftState);
-  }, [mockNftState]);
+    return getMiningBoost(previewNftState);
+  }, [previewNftState]);
 
   const nextBoost = useMemo(() => {
     if (level >= MAX_LEVEL) return currentBoost;
-    return getMiningBoost({ ...mockNftState, level: level + 1 });
-  }, [mockNftState, level, currentBoost]);
+    return getMiningBoost({ ...previewNftState, level: level + 1 });
+  }, [previewNftState, level, currentBoost]);
 
   // Add simulated XP
   const addXp = (amount: number) => {
@@ -181,12 +205,36 @@ export default function CharactersPage() {
 
   // Rarity color helpers for borders/badges
   const rarityColors = {
-    common: { border: "border-gray-500", text: "text-gray-400", bg: "bg-gray-950/80" },
-    uncommon: { border: "border-green-500", text: "text-green-400", bg: "bg-green-950/80" },
-    rare: { border: "border-blue-500", text: "text-blue-400", bg: "bg-blue-950/80" },
-    epic: { border: "border-purple-500", text: "text-purple-400", bg: "bg-purple-950/80" },
-    legendary: { border: "border-yellow-500", text: "text-yellow-400", bg: "bg-yellow-950/80" },
-    mythic: { border: "border-pink-500", text: "text-pink-400", bg: "bg-pink-950/80" },
+    common: {
+      border: "border-gray-500",
+      text: "text-gray-400",
+      bg: "bg-gray-950/80",
+    },
+    uncommon: {
+      border: "border-green-500",
+      text: "text-green-400",
+      bg: "bg-green-950/80",
+    },
+    rare: {
+      border: "border-blue-500",
+      text: "text-blue-400",
+      bg: "bg-blue-950/80",
+    },
+    epic: {
+      border: "border-purple-500",
+      text: "text-purple-400",
+      bg: "bg-purple-950/80",
+    },
+    legendary: {
+      border: "border-yellow-500",
+      text: "text-yellow-400",
+      bg: "bg-yellow-950/80",
+    },
+    mythic: {
+      border: "border-pink-500",
+      text: "text-pink-400",
+      bg: "bg-pink-950/80",
+    },
   }[traits.rarity];
 
   return (
@@ -198,7 +246,7 @@ export default function CharactersPage() {
           <div className="absolute top-2 right-2 w-2 h-2 bg-pixel-primary" />
           <div className="absolute bottom-2 left-2 w-2 h-2 bg-pixel-primary" />
           <div className="absolute bottom-2 right-2 w-2 h-2 bg-pixel-primary" />
-          
+
           <h1 className="font-pixel text-2xl md:text-3xl text-pixel-primary mb-2 tracking-wider">
             GENESIS BABIES DESIGNER
           </h1>
@@ -210,13 +258,13 @@ export default function CharactersPage() {
         {/* Level Up Flash Message */}
         {evolutionSuccess && (
           <div className="animate-bounce border-4 border-pixel-success bg-pixel-bg-medium text-pixel-success p-4 font-pixel text-center text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-            ✨ ¡EVOLUCIÓN COMPLETADA CON ÉXITO! EL PODER DE MINADO HA AUMENTADO ✨
+            ✨ ¡EVOLUCIÓN COMPLETADA CON ÉXITO! EL PODER DE MINADO HA AUMENTADO
+            ✨
           </div>
         )}
 
         {/* Dashboard Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
           {/* LEFT COLUMN: Visualizer & View Settings (5 cols on lg) */}
           <div className="lg:col-span-5 space-y-6">
             <PixelCard>
@@ -225,9 +273,11 @@ export default function CharactersPage() {
               </div>
               <div className="flex flex-col items-center justify-center p-6 space-y-6">
                 {/* Sprite Render Frame */}
-                <div 
+                <div
                   className={`relative flex items-center justify-center bg-pixel-bg-dark border-4 border-black p-4 transition-all duration-300 ${
-                    isEvolving ? "animate-[pixel-shake_0.15s_ease-in-out_infinite]" : ""
+                    isEvolving
+                      ? "animate-[pixel-shake_0.15s_ease-in-out_infinite]"
+                      : ""
                   }`}
                   style={{
                     width: `${spriteSize + 32}px`,
@@ -236,7 +286,7 @@ export default function CharactersPage() {
                 >
                   {/* Outer Rarity Glow / Aura in GPU */}
                   <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-40" />
-                  
+
                   <div className="relative z-10">
                     <GenesisBabySprite
                       traits={traits}
@@ -252,13 +302,21 @@ export default function CharactersPage() {
 
                 {/* Info Badges */}
                 <div className="flex flex-wrap gap-2 justify-center">
-                  <PixelBadge variant="default" className="text-[9px] uppercase">
+                  <PixelBadge
+                    variant="default"
+                    className="text-[9px] uppercase"
+                  >
                     Level {level}
                   </PixelBadge>
-                  <span className={`px-2 py-0.5 border-2 text-[9px] font-pixel uppercase ${rarityColors.border} ${rarityColors.text} ${rarityColors.bg}`}>
+                  <span
+                    className={`px-2 py-0.5 border-2 text-[9px] font-pixel uppercase ${rarityColors.border} ${rarityColors.text} ${rarityColors.bg}`}
+                  >
                     {traits.rarity}
                   </span>
-                  <PixelBadge variant="secondary" className="text-[9px] uppercase">
+                  <PixelBadge
+                    variant="secondary"
+                    className="text-[9px] uppercase"
+                  >
                     {traits.baseType}
                   </PixelBadge>
                   <PixelBadge variant="idle" className="text-[9px] uppercase">
@@ -343,27 +401,47 @@ export default function CharactersPage() {
               <div className="p-4 space-y-3 font-pixel text-[10px]">
                 <div className="flex justify-between border-b-2 border-pixel-border pb-1">
                   <span className="text-pixel-text-muted">DNA HASH:</span>
-                  <span className="font-mono text-xs select-all text-pixel-primary break-all">{traits.dna}</span>
+                  <span className="font-mono text-xs select-all text-pixel-primary break-all">
+                    {traits.dna}
+                  </span>
                 </div>
                 <div className="flex justify-between border-b-2 border-pixel-border pb-1">
                   <span className="text-pixel-text-muted">TIPO BASE:</span>
-                  <span className="text-pixel-text capitalize">{traits.baseType}</span>
+                  <span className="text-pixel-text capitalize">
+                    {traits.baseType}
+                  </span>
                 </div>
                 <div className="flex justify-between border-b-2 border-pixel-border pb-1">
-                  <span className="text-pixel-text-muted">LINAJE (BLOODLINE):</span>
-                  <span className="text-pixel-text capitalize">{traits.bloodline}</span>
+                  <span className="text-pixel-text-muted">
+                    LINAJE (BLOODLINE):
+                  </span>
+                  <span className="text-pixel-text capitalize">
+                    {traits.bloodline}
+                  </span>
                 </div>
                 <div className="flex justify-between border-b-2 border-pixel-border pb-1">
-                  <span className="text-pixel-text-muted">HERENCIA (HERITAGE):</span>
-                  <span className="text-pixel-text capitalize">{traits.heritage}</span>
+                  <span className="text-pixel-text-muted">
+                    HERENCIA (HERITAGE):
+                  </span>
+                  <span className="text-pixel-text capitalize">
+                    {traits.heritage}
+                  </span>
                 </div>
                 <div className="flex justify-between border-b-2 border-pixel-border pb-1">
-                  <span className="text-pixel-text-muted">BOOST BASE POR RAREZA:</span>
-                  <span className="text-pixel-success">+{getMiningBoost({ ...mockNftState, level: 1 })}%</span>
+                  <span className="text-pixel-text-muted">
+                    BOOST BASE POR RAREZA:
+                  </span>
+                  <span className="text-pixel-success">
+                    +{getMiningBoost({ ...previewNftState, level: 1 })}%
+                  </span>
                 </div>
                 <div className="flex justify-between pb-1">
-                  <span className="text-pixel-text-muted">BOOST ACTUAL TOTAL:</span>
-                  <span className="text-pixel-primary font-bold">+{currentBoost}%</span>
+                  <span className="text-pixel-text-muted">
+                    BOOST ACTUAL TOTAL:
+                  </span>
+                  <span className="text-pixel-primary font-bold">
+                    +{currentBoost}%
+                  </span>
                 </div>
               </div>
             </PixelCard>
@@ -371,14 +449,12 @@ export default function CharactersPage() {
 
           {/* RIGHT COLUMN: Customizer & Evolution Simulator (7 cols on lg) */}
           <div className="lg:col-span-7 space-y-6">
-            
             {/* Customizer Panel */}
             <PixelCard>
               <div className="font-pixel text-[10px] text-pixel-text pb-2 mb-4 border-b-2 border-pixel-border flex items-center justify-between">
                 <span>ANALIZADOR DE DNA Y PERSONALIZADOR</span>
               </div>
               <div className="p-6 space-y-6">
-                
                 {/* DNA Input */}
                 <div className="space-y-2">
                   <h3 className="font-pixel text-[10px] text-pixel-secondary uppercase">
@@ -404,11 +480,14 @@ export default function CharactersPage() {
                     </PixelButton>
                   </div>
                   {dnaError && (
-                    <p className="font-pixel text-[8px] text-pixel-error uppercase">{dnaError}</p>
+                    <p className="font-pixel text-[8px] text-pixel-error uppercase">
+                      {dnaError}
+                    </p>
                   )}
                   <div className="flex justify-between gap-2 pt-1">
                     <span className="font-pixel text-[8px] text-pixel-text-muted">
-                      El DNA determina de manera exacta y inmutable los rasgos del bebé.
+                      El DNA determina de manera exacta y inmutable los rasgos
+                      del bebé.
                     </span>
                     <button
                       onClick={handleRandomBaby}
@@ -424,7 +503,7 @@ export default function CharactersPage() {
                   <h3 className="font-pixel text-[10px] text-pixel-secondary uppercase">
                     Personalizador de Capas Visuales
                   </h3>
-                  
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Base Type Select */}
                     <div className="space-y-1">
@@ -433,7 +512,12 @@ export default function CharactersPage() {
                       </label>
                       <select
                         value={traits.baseType}
-                        onChange={(e) => updateTrait("baseType", e.target.value as any)}
+                        onChange={(e) =>
+                          updateTrait(
+                            "baseType",
+                            e.target.value as GenesisBabyTraits["baseType"],
+                          )
+                        }
                         className="w-full p-2 bg-pixel-bg-dark border-4 border-black font-pixel text-[10px] text-pixel-text focus:outline-none focus:border-pixel-primary"
                       >
                         {BASE_TYPES.map((t) => (
@@ -451,7 +535,12 @@ export default function CharactersPage() {
                       </label>
                       <select
                         value={traits.bloodline}
-                        onChange={(e) => updateTrait("bloodline", e.target.value as any)}
+                        onChange={(e) =>
+                          updateTrait(
+                            "bloodline",
+                            e.target.value as GenesisBabyTraits["bloodline"],
+                          )
+                        }
                         className="w-full p-2 bg-pixel-bg-dark border-4 border-black font-pixel text-[10px] text-pixel-text focus:outline-none focus:border-pixel-primary"
                       >
                         {BLOODLINES.map((b) => (
@@ -469,7 +558,12 @@ export default function CharactersPage() {
                       </label>
                       <select
                         value={traits.heritage}
-                        onChange={(e) => updateTrait("heritage", e.target.value as any)}
+                        onChange={(e) =>
+                          updateTrait(
+                            "heritage",
+                            e.target.value as GenesisBabyTraits["heritage"],
+                          )
+                        }
                         className="w-full p-2 bg-pixel-bg-dark border-4 border-black font-pixel text-[10px] text-pixel-text focus:outline-none focus:border-pixel-primary"
                       >
                         {HERITAGES.map((h) => (
@@ -487,7 +581,12 @@ export default function CharactersPage() {
                       </label>
                       <select
                         value={traits.rarity}
-                        onChange={(e) => updateTrait("rarity", e.target.value as any)}
+                        onChange={(e) =>
+                          updateTrait(
+                            "rarity",
+                            e.target.value as GenesisBabyTraits["rarity"],
+                          )
+                        }
                         className="w-full p-2 bg-pixel-bg-dark border-4 border-black font-pixel text-[10px] text-pixel-text focus:outline-none focus:border-pixel-primary"
                       >
                         {RARITIES.map((r) => (
@@ -506,7 +605,9 @@ export default function CharactersPage() {
                     </label>
                     <select
                       value={babyState}
-                      onChange={(e) => setBabyState(e.target.value as BabyState)}
+                      onChange={(e) =>
+                        setBabyState(e.target.value as BabyState)
+                      }
                       className="w-full p-2 bg-pixel-bg-dark border-4 border-black font-pixel text-[10px] text-pixel-text focus:outline-none focus:border-pixel-primary"
                     >
                       {STATES.map((s) => (
@@ -526,16 +627,21 @@ export default function CharactersPage() {
                 <span>SIMULADOR DE EVOLUCIÓN E INCREMENTO DE PODER</span>
               </div>
               <div className="p-6 space-y-6">
-                
                 {/* Level indicators */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-pixel-bg-dark border-4 border-black p-3 text-center">
-                    <div className="font-pixel text-[9px] text-pixel-text-muted uppercase">NIVEL ACTUAL</div>
-                    <div className="font-pixel text-xl text-pixel-primary mt-1">Lvl {level}</div>
+                    <div className="font-pixel text-[9px] text-pixel-text-muted uppercase">
+                      NIVEL ACTUAL
+                    </div>
+                    <div className="font-pixel text-xl text-pixel-primary mt-1">
+                      Lvl {level}
+                    </div>
                   </div>
 
                   <div className="bg-pixel-bg-dark border-4 border-black p-3 text-center">
-                    <div className="font-pixel text-[9px] text-pixel-text-muted uppercase">SIGUIENTE NIVEL</div>
+                    <div className="font-pixel text-[9px] text-pixel-text-muted uppercase">
+                      SIGUIENTE NIVEL
+                    </div>
                     <div className="font-pixel text-xl text-pixel-success mt-1">
                       {level < MAX_LEVEL ? `Lvl ${level + 1}` : "MAX"}
                     </div>
@@ -545,7 +651,9 @@ export default function CharactersPage() {
                 {/* Progress bars (XP) */}
                 <div className="space-y-2">
                   <div className="flex justify-between font-pixel text-[9px]">
-                    <span className="text-pixel-text-muted">PUNTOS DE EXPERIENCIA (XP):</span>
+                    <span className="text-pixel-text-muted">
+                      PUNTOS DE EXPERIENCIA (XP):
+                    </span>
                     <span>
                       {level < MAX_LEVEL ? `${xp} / ${reqXp} XP` : "MAX LVL"}
                     </span>
@@ -553,10 +661,14 @@ export default function CharactersPage() {
                   <div className="h-6 bg-pixel-bg-dark border-4 border-black overflow-hidden relative">
                     <div
                       className="h-full bg-pixel-secondary transition-all duration-300"
-                      style={{ width: `${level < MAX_LEVEL ? (xp / reqXp) * 100 : 100}%` }}
+                      style={{
+                        width: `${level < MAX_LEVEL ? (xp / reqXp) * 100 : 100}%`,
+                      }}
                     />
                     <div className="absolute inset-0 flex items-center justify-center font-pixel text-[8px] text-white mix-blend-difference">
-                      {level < MAX_LEVEL ? `${Math.round((xp / reqXp) * 100)}% COMPLETADO` : "MÁXIMA MADUREZ"}
+                      {level < MAX_LEVEL
+                        ? `${Math.round((xp / reqXp) * 100)}% COMPLETADO`
+                        : "MÁXIMA MADUREZ"}
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -581,24 +693,36 @@ export default function CharactersPage() {
 
                 {/* Stats comparison before/after */}
                 <div className="border-t-2 border-pixel-border pt-4 space-y-3 font-pixel text-[10px]">
-                  <h4 className="text-pixel-secondary uppercase mb-2">Simulación de Boost de Minado</h4>
-                  
+                  <h4 className="text-pixel-secondary uppercase mb-2">
+                    Simulación de Boost de Minado
+                  </h4>
+
                   <div className="flex justify-between">
-                    <span className="text-pixel-text-muted">Mining Boost actual:</span>
+                    <span className="text-pixel-text-muted">
+                      Mining Boost actual:
+                    </span>
                     <span className="text-pixel-text">+{currentBoost}%</span>
                   </div>
-                  
+
                   <div className="flex justify-between">
-                    <span className="text-pixel-text-muted">Mining Boost siguiente:</span>
+                    <span className="text-pixel-text-muted">
+                      Mining Boost siguiente:
+                    </span>
                     <span className="text-pixel-success">
-                      {level < MAX_LEVEL ? `+${nextBoost}% (+${nextBoost - currentBoost}%)` : "MÁXIMO"}
+                      {level < MAX_LEVEL
+                        ? `+${nextBoost}% (+${nextBoost - currentBoost}%)`
+                        : "MÁXIMO"}
                     </span>
                   </div>
 
                   <div className="flex justify-between border-t-2 border-pixel-border/50 pt-2 font-bold">
-                    <span className="text-pixel-text-muted">Costo en tokens $BABY:</span>
+                    <span className="text-pixel-text-muted">
+                      Costo en tokens $BABY:
+                    </span>
                     <span className="text-pixel-primary">
-                      {level < MAX_LEVEL ? getEvolutionCostDisplay(level) : "N/A"}
+                      {level < MAX_LEVEL
+                        ? getEvolutionCostDisplay(level)
+                        : "N/A"}
                     </span>
                   </div>
                 </div>
@@ -620,7 +744,7 @@ export default function CharactersPage() {
                       "EVOLUCIONAR AHORA"
                     )}
                   </PixelButton>
-                  
+
                   <PixelButton
                     variant="destructive"
                     onClick={resetSimulator}
@@ -629,12 +753,9 @@ export default function CharactersPage() {
                     REINICIAR
                   </PixelButton>
                 </div>
-
               </div>
             </PixelCard>
-
           </div>
-
         </div>
 
         {/* Back Link */}

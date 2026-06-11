@@ -10,11 +10,7 @@
  */
 
 import { clsx } from "clsx";
-import {
-  useGlobalMining,
-  formatHashrate,
-  MIN_DIFFICULTY,
-} from "@bitcoinbaby/core";
+import { useGlobalMining, formatHashrate } from "@bitcoinbaby/core";
 import { SyncStatusIndicator } from "./SyncStatusIndicator";
 
 interface MiningStatusBarProps {

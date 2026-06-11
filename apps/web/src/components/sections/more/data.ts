@@ -61,6 +61,25 @@ export const MENU_ITEMS: MenuItem[] = [
     icon: "❓",
     href: "/help",
   },
+  {
+    id: "devfund",
+    label: "🔄 Reload Test Funds",
+    description: "Get 1 BTC for testing (auto-enabled in dev mode)",
+    icon: "🚀",
+    href: "#",
+    highlight: true,
+    onClick: () => {
+      // Reload page to refresh Dev Fund state
+      localStorage.setItem("bitcoinbaby-dev-fund", "true");
+      alert(
+        "🚀 Test Funds Active!\n\n" +
+          "• All wallets get 1 BTC for testing\n" +
+          "• Transactions confirm instantly\n" +
+          "• No real Bitcoin needed\n\n" +
+          "Refresh the page to apply.",
+      );
+    },
+  },
 ];
 
 export const SOCIAL_LINKS: MenuItem[] = [

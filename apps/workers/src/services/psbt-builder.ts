@@ -116,9 +116,16 @@ export class PsbtBuilder implements IPsbtBuilderService {
 
       // Add input
       const scriptPubKey = addressToScriptPubkey(request.address);
-      const isTaproot = request.address.startsWith("tb1p") || request.address.startsWith("bc1p");
+      const isTaproot =
+        request.address.startsWith("tb1p") ||
+        request.address.startsWith("bc1p");
 
-      const inputData: any = {
+      const inputData: {
+        hash: string;
+        index: number;
+        witnessUtxo: { script: Buffer; value: number };
+        tapInternalKey?: Buffer;
+      } = {
         hash: selectedUtxo.txid,
         index: selectedUtxo.vout,
         witnessUtxo: {

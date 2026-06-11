@@ -145,7 +145,9 @@ export function useGameLoop(
     (action: GameAction) => {
       if (isDead) return;
       engine.performAction(action);
-      setBaby(engine.getBaby());
+      // Spread to create a new reference so React detects the state change
+      const baby = engine.getBaby();
+      setBaby(baby ? { ...baby } : null);
     },
     [engine, isDead],
   );
@@ -154,7 +156,8 @@ export function useGameLoop(
     (isMining: boolean) => {
       if (isDead) return;
       engine.setMining(isMining);
-      setBaby(engine.getBaby());
+      // Don't spread here — setMining is called from effects and would cause loops.
+      // The UI will pick up changes on next action/performed event.
     },
     [engine, isDead],
   );
@@ -163,8 +166,7 @@ export function useGameLoop(
     (hashes: number, shares: number) => {
       if (isDead) return;
       engine.recordMiningProgress(hashes, shares);
-      setBaby(engine.getBaby());
-      setState(engine.getState());
+      // Don't spread here — called from effects, would cause loops.
     },
     [engine, isDead],
   );

@@ -56,10 +56,19 @@ async function resetAllData() {
   // Reload
   window.location.reload();
 }
-import { getPhaseConfig } from "@bitcoinbaby/shared";
+import { getPhaseConfig, type TabType } from "@bitcoinbaby/shared";
+import {
+  usePendingTxStore,
+  useNarrativeStore,
+  useBabyStore,
+} from "@bitcoinbaby/core";
+import {
+  OnboardingTour,
+  useOnboarding,
+} from "@/components/overlays/OnboardingTour";
 import { AppHeader } from "./AppHeader";
-import { TabNavigation, type TabType } from "./TabNavigation";
 import { TestnetBanner } from "./TestnetBanner";
+import { BottomNav } from "@/components/navigation/BottomNav";
 
 // Reset confirmation modal component
 function ResetConfirmationModal({
@@ -188,12 +197,8 @@ function ResetConfirmationModal({
 // Lazy load sections for better performance
 import dynamic from "next/dynamic";
 
-const TokenSection = dynamic(
-  () => import("../sections/TokenSection").then((m) => m.TokenSection),
-  { ssr: false },
-);
-const MiningSection = dynamic(
-  () => import("../sections/MiningSection").then((m) => m.MiningSection),
+const DashboardSection = dynamic(
+  () => import("../sections/DashboardSection").then((m) => m.DashboardSection),
   { ssr: false },
 );
 const NFTsSection = dynamic(
@@ -209,12 +214,26 @@ const MoreSection = dynamic(
   { ssr: false },
 );
 
-// Loading placeholder
+// Loading placeholder — shown during lazy-load and tab transitions
 function SectionLoader() {
   return (
     <div className="flex items-center justify-center min-h-[400px]">
-      <div className="font-pixel text-xs text-pixel-text-muted animate-pulse">
-        Loading...
+      <div className="flex flex-col items-center gap-4">
+        {/* Pixel art loading animation — 3 bouncing blocks */}
+        <div className="flex gap-2">
+          <div className="w-3 h-3 bg-pixel-primary animate-pixel-float" />
+          <div
+            className="w-3 h-3 bg-pixel-secondary animate-pixel-float"
+            style={{ animationDelay: "0.15s" }}
+          />
+          <div
+            className="w-3 h-3 bg-pixel-primary animate-pixel-float"
+            style={{ animationDelay: "0.3s" }}
+          />
+        </div>
+        <span className="font-pixel text-[10px] text-pixel-text-muted">
+          LOADING
+        </span>
       </div>
     </div>
   );
@@ -227,6 +246,26 @@ function AppShellInner() {
 
   // Phase configuration
   const phaseConfig = getPhaseConfig();
+
+  // Onboarding tour
+  const onboarding = useOnboarding();
+
+  // Badge counts for notification dots on tabs
+  const pendingTxCount = usePendingTxStore(
+    (s) => s.transactions.filter((tx) => tx.status === "pending").length,
+  );
+  const babyExists = useBabyStore((s) => s.baby !== null);
+  const narrativeEventCount = useNarrativeStore((s) => {
+    if (!s.activeTokenId) return 0;
+    const st = s.states[s.activeTokenId];
+    return st ? st.events.length : 0;
+  });
+
+  const tabBadges: Partial<Record<TabType, number>> = {
+    dashboard: babyExists ? 0 : 1,
+    wallet: pendingTxCount > 0 ? pendingTxCount : 0,
+    nfts: narrativeEventCount > 0 ? Math.min(narrativeEventCount, 99) : 0,
+  };
 
   // Get tab from URL or default from phase config
   const urlTab = searchParams.get("tab") as TabType | null;
@@ -267,8 +306,8 @@ function AppShellInner() {
   }, [urlTab, activeTab, defaultTab]);
 
   // Quick navigation handlers
-  const goToMining = useCallback(
-    () => handleTabChange("mining"),
+  const goToDashboard = useCallback(
+    () => handleTabChange("dashboard"),
     [handleTabChange],
   );
   const goToWallet = useCallback(
@@ -281,47 +320,39 @@ function AppShellInner() {
       {/* Testnet Banner */}
       <TestnetBanner />
 
-      {/* Persistent Header */}
-      <AppHeader onMiningClick={goToMining} onWalletClick={goToWallet} />
+      {/* Compact Header — status bar style */}
+      <AppHeader onMiningClick={goToDashboard} onWalletClick={goToWallet} />
 
-      {/* Tab Navigation */}
-      <TabNavigation
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        visibleTabs={phaseConfig.visibleTabs}
-      />
-
-      {/* Content Area */}
-      <main className="flex-1 overflow-auto">
+      {/* Content Area — scrollable, with bottom padding for nav */}
+      <main className="flex-1 overflow-auto pb-20">
         <Suspense fallback={<SectionLoader />}>
-          {activeTab === "token" && <TokenSection />}
-          {activeTab === "mining" && <MiningSection />}
+          {activeTab === "dashboard" && <DashboardSection />}
           {activeTab === "nfts" && <NFTsSection />}
           {activeTab === "wallet" && <WalletSection />}
           {activeTab === "more" && <MoreSection />}
         </Suspense>
       </main>
 
-      {/* Footer */}
-      <footer className="px-4 py-3 border-t-2 border-pixel-border bg-pixel-bg-medium">
-        <div className="flex items-center justify-between">
-          <p className="font-pixel text-[6px] text-pixel-text-muted uppercase">
-            BitcoinBaby v0.1.0 - Testnet4
-          </p>
-          <button
-            onClick={() => setShowResetModal(true)}
-            className="font-pixel text-[6px] text-pixel-error hover:text-pixel-error/80 uppercase"
-          >
-            Reset All
-          </button>
-        </div>
-      </footer>
+      {/* Bottom Navigation — always visible, game-style */}
+      <BottomNav />
 
       {/* Reset Confirmation Modal */}
       <ResetConfirmationModal
         isOpen={showResetModal}
         onConfirm={handleResetConfirm}
         onCancel={() => setShowResetModal(false)}
+      />
+
+      {/* Onboarding Tour */}
+      <OnboardingTour
+        isOpen={onboarding.isOpen}
+        step={onboarding.step}
+        currentStep={onboarding.currentStep}
+        totalSteps={onboarding.totalSteps}
+        onNext={onboarding.next}
+        onPrev={onboarding.prev}
+        onSkip={onboarding.skip}
+        onNavigate={(tab) => handleTabChange(tab as TabType)}
       />
     </div>
   );

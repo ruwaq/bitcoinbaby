@@ -33,12 +33,6 @@ const MODEL_DISPLAY: Record<string, string> = {
   "baby-brain": "BabyBrain",
 };
 
-const MODEL_SIZE_HINTS: Record<string, string> = {
-  smollm2: "~80 MB",
-  distilgpt2: "~50 MB",
-  "baby-brain": "0 MB",
-};
-
 interface ModelStatusIndicatorProps {
   modelChainStatus?: ModelChainEntryStatus[];
   engineType?: string;

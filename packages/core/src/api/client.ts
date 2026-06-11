@@ -172,6 +172,43 @@ export class BitcoinBabyClient {
   }
 
   /**
+   * Verify AI PoUW submission server-side
+   *
+   * This is the security-critical step that prevents users from
+   * spoofing AI inference results. The server validates:
+   * - Task exists and is active (not expired or already used)
+   * - Output meets quality requirements
+   * - The submission is properly signed
+   *
+   * Only after server verification is the user credited.
+   */
+  async verifyPouwTask(
+    address: string,
+    proof: {
+      taskId: string;
+      output: string;
+      computeTime: number;
+      signature: string;
+      publicKey: string;
+    },
+  ): Promise<
+    ApiResponse<{ taskId: string; verified: boolean; reward: number }>
+  > {
+    const response = await fetchWithRetry(
+      `${this.baseUrl}/api/pouw/${address}/verify`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(proof),
+      },
+      0, // No retries for POST — server handles idempotency
+    );
+    return response.json() as Promise<
+      ApiResponse<{ taskId: string; verified: boolean; reward: number }>
+    >;
+  }
+
+  /**
    * Credit mining reward to user's balance
    * Note: No retry on POST to prevent double-crediting
    */
@@ -1098,11 +1135,17 @@ let clientInstance: BitcoinBabyClient | null = null;
 export function getApiClient(env?: Environment): BitcoinBabyClient {
   if (!clientInstance) {
     let resolvedEnv: Environment = "production";
-    
+
     // Auto-detect development mode if running on localhost/127.0.0.1 or NEXT_PUBLIC_WORKERS_API_URL is configured
-    const hasNextPublicUrl = typeof process !== "undefined" && process?.env && process.env.NEXT_PUBLIC_WORKERS_API_URL;
-    const isLocalhost = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-    
+    const hasNextPublicUrl =
+      typeof process !== "undefined" &&
+      process?.env &&
+      process.env.NEXT_PUBLIC_WORKERS_API_URL;
+    const isLocalhost =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1");
+
     if (env) {
       resolvedEnv = env;
     } else if (hasNextPublicUrl || isLocalhost) {
@@ -1112,7 +1155,11 @@ export function getApiClient(env?: Environment): BitcoinBabyClient {
     clientInstance = new BitcoinBabyClient(resolvedEnv);
 
     // Apply custom URL override if configured
-    if (typeof process !== "undefined" && process?.env && process.env.NEXT_PUBLIC_WORKERS_API_URL) {
+    if (
+      typeof process !== "undefined" &&
+      process?.env &&
+      process.env.NEXT_PUBLIC_WORKERS_API_URL
+    ) {
       clientInstance.setBaseUrl(process.env.NEXT_PUBLIC_WORKERS_API_URL);
     }
   }

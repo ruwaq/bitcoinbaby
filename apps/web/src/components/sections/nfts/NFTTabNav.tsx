@@ -2,12 +2,13 @@
 
 import { TabButton } from "@bitcoinbaby/ui";
 
-export type SubTab = "collection" | "mint" | "explorer";
+export type SubTab = "collection" | "mint" | "explorer" | "marketplace";
 
 interface NFTTabNavProps {
   activeTab: SubTab;
   explorerCount: number;
   collectionCount: number;
+  marketplaceCount?: number;
   onTabChange: (tab: SubTab) => void;
   onMintTabClick: () => void;
 }
@@ -16,6 +17,7 @@ export function NFTTabNav({
   activeTab,
   explorerCount,
   collectionCount,
+  marketplaceCount = 0,
   onTabChange,
   onMintTabClick,
 }: NFTTabNavProps) {
@@ -41,6 +43,13 @@ export function NFTTabNav({
         variant="secondary"
       >
         Explorer ({explorerCount})
+      </TabButton>
+      <TabButton
+        active={activeTab === "marketplace"}
+        onClick={() => onTabChange("marketplace")}
+        variant="warning"
+      >
+        Market ({marketplaceCount > 0 ? marketplaceCount : ""})
       </TabButton>
     </div>
   );

@@ -16,6 +16,8 @@ out/
 .env.local
 .env.*.local
 .dev.vars
+# .env.example is committed intentionally — it documents required variables
+!.env.example
 
 # IDE
 .vscode/

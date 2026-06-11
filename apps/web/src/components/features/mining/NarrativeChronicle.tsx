@@ -11,7 +11,11 @@
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useNarrativeStore } from "@bitcoinbaby/core";
-import type { NarrativeEvent, NarrativeEventType, BabyNFTState } from "@bitcoinbaby/ai";
+import type {
+  NarrativeEvent,
+  NarrativeEventType,
+  BabyNFTState,
+} from "@bitcoinbaby/ai";
 import { NarrativeEngine } from "@bitcoinbaby/ai";
 import { clsx } from "clsx";
 
@@ -184,17 +188,13 @@ export function NarrativeChronicle({
       });
       setLastSeenCount(events.length);
     }
-  }, [events.length, lastSeenCount]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- lastSeenCount is intentionally excluded to avoid loops
+  }, [events.length]);
 
   // Empty state
   if (!tokenId) {
     return (
-      <div
-        className={clsx(
-          "p-4 text-center",
-          className,
-        )}
-      >
+      <div className={clsx("p-4 text-center", className)}>
         <div className="font-pixel text-[9px] text-pixel-text-muted">
           No baby selected
         </div>
@@ -207,12 +207,7 @@ export function NarrativeChronicle({
 
   if (events.length === 0) {
     return (
-      <div
-        className={clsx(
-          "p-4 text-center",
-          className,
-        )}
-      >
+      <div className={clsx("p-4 text-center", className)}>
         <div className="text-2xl mb-2">📖</div>
         <div className="font-pixel text-[9px] text-pixel-text-muted">
           The Chronicle Awaits
@@ -227,11 +222,7 @@ export function NarrativeChronicle({
   return (
     <div
       ref={scrollRef}
-      className={clsx(
-        "overflow-y-auto",
-        "scrollbar-thin",
-        className,
-      )}
+      className={clsx("overflow-y-auto", "scrollbar-thin", className)}
       style={{
         maxHeight: "400px",
         scrollbarWidth: "thin",

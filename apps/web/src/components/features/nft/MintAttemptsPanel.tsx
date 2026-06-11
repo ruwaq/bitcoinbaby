@@ -6,6 +6,7 @@
  * Displays mint attempt status so users know what happened to their mints.
  */
 
+import { useMemo, useEffect, useState } from "react";
 import { PixelCard, PixelButton } from "@bitcoinbaby/ui";
 import { useNetworkStore, type MintAttempt } from "@bitcoinbaby/core";
 
@@ -94,21 +95,32 @@ export function MintAttemptsPanel({
   const { config } = useNetworkStore();
   const hasFailed = failedAttempts.length > 0;
 
+  // Track current time via state to avoid impure Date.now() during render
+  // Updates every 60 seconds to keep "time ago" displays fresh
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Filter to show only recent or relevant attempts
+  // Must be before any early return (rules-of-hooks)
+  const relevantAttempts = useMemo(() => {
+    return attempts.filter((a) => {
+      // Always show non-confirmed statuses
+      if (a.status !== "confirmed") {
+        return true;
+      }
+      // Show confirmed from last hour
+      const oneHourAgo = now - 60 * 60 * 1000;
+      return a.lastUpdatedAt > oneHourAgo;
+    });
+  }, [attempts, now]);
+
   // Don't show if no attempts
   if (attempts.length === 0) {
     return null;
   }
-
-  // Filter to show only recent or relevant attempts
-  const relevantAttempts = attempts.filter((a) => {
-    // Always show non-confirmed statuses
-    if (a.status !== "confirmed") {
-      return true;
-    }
-    // Show confirmed from last hour
-    const oneHourAgo = Date.now() - 60 * 60 * 1000;
-    return a.lastUpdatedAt > oneHourAgo;
-  });
 
   if (relevantAttempts.length === 0) {
     return null;

@@ -12,7 +12,7 @@
  * - success: Show minted NFT with Motion sparkles
  */
 
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import {
   NFTInfoPanel,
   NFTCard,
@@ -26,17 +26,56 @@ import type { MintStep } from "@/hooks/useMintNFT";
 // Re-export MintStep for convenience
 export type { MintStep };
 
-const MINT_STEPS: Record<MintStep, { label: string; icon: string; description: string }> = {
+const MINT_STEPS: Record<
+  MintStep,
+  { label: string; icon: string; description: string }
+> = {
   idle: { label: "Ready", icon: "⏳", description: "Preparing to mint..." },
-  checking_prover: { label: "Checking Prover", icon: "🔍", description: "Verifying prover is available..." },
-  reserving: { label: "Reserving Token", icon: "🔢", description: "Reserving your unique token ID..." },
-  generating_traits: { label: "Generating Traits", icon: "🧬", description: "Creating your unique baby DNA..." },
-  proving: { label: "Generating ZK Proof", icon: "🔐", description: "Generating zero-knowledge proof..." },
-  signing_commit: { label: "Signing Commit", icon: "✍️", description: "Please sign the commit transaction..." },
-  signing_spell: { label: "Signing Spell", icon: "🪄", description: "Please sign the spell transaction..." },
-  broadcasting_commit: { label: "Broadcasting Commit", icon: "📡", description: "Sending commit to the network..." },
-  broadcasting_spell: { label: "Broadcasting Spell", icon: "✨", description: "Sending spell to the network..." },
-  confirming: { label: "Confirming", icon: "✅", description: "Confirming your mint..." },
+  checking_prover: {
+    label: "Checking Prover",
+    icon: "🔍",
+    description: "Verifying prover is available...",
+  },
+  reserving: {
+    label: "Reserving Token",
+    icon: "🔢",
+    description: "Reserving your unique token ID...",
+  },
+  generating_traits: {
+    label: "Generating Traits",
+    icon: "🧬",
+    description: "Creating your unique baby DNA...",
+  },
+  proving: {
+    label: "Generating ZK Proof",
+    icon: "🔐",
+    description: "Generating zero-knowledge proof...",
+  },
+  signing_commit: {
+    label: "Signing Commit",
+    icon: "✍️",
+    description: "Please sign the commit transaction...",
+  },
+  signing_spell: {
+    label: "Signing Spell",
+    icon: "🪄",
+    description: "Please sign the spell transaction...",
+  },
+  broadcasting_commit: {
+    label: "Broadcasting Commit",
+    icon: "📡",
+    description: "Sending commit to the network...",
+  },
+  broadcasting_spell: {
+    label: "Broadcasting Spell",
+    icon: "✨",
+    description: "Sending spell to the network...",
+  },
+  confirming: {
+    label: "Confirming",
+    icon: "✅",
+    description: "Confirming your mint...",
+  },
   success: { label: "Success!", icon: "🎉", description: "Mint complete!" },
   error: { label: "Error", icon: "⚠️", description: "Mint failed" },
 };
@@ -146,7 +185,9 @@ export function NFTMintFlow({
     const isRevealing = state === "revealing";
 
     return (
-      <div className={`bg-pixel-bg-medium ${pixelBorders.accent} p-6 ${pixelShadows.lg}`}>
+      <div
+        className={`bg-pixel-bg-medium ${pixelBorders.accent} p-6 ${pixelShadows.lg}`}
+      >
         {isRevealing ? (
           <div className="relative">
             <motion.div
@@ -165,7 +206,11 @@ export function NFTMintFlow({
             </div>
           </div>
         ) : (
-          <motion.div className="text-6xl mb-4" animate={{ y: [0, -4, 0] }} transition={{ duration: 1, repeat: Infinity }}>
+          <motion.div
+            className="text-6xl mb-4"
+            animate={{ y: [0, -4, 0] }}
+            transition={{ duration: 1, repeat: Infinity }}
+          >
             {stepInfo.icon || "⛏️"}
           </motion.div>
         )}
@@ -185,7 +230,18 @@ export function NFTMintFlow({
               </span>
             </div>
             <div className="grid grid-cols-10 gap-1">
-              {["checking_prover","reserving","generating_traits","proving","signing_commit","signing_spell","broadcasting_commit","broadcasting_spell","confirming","success"].map((step, i) => {
+              {[
+                "checking_prover",
+                "reserving",
+                "generating_traits",
+                "proving",
+                "signing_commit",
+                "signing_spell",
+                "broadcasting_commit",
+                "broadcasting_spell",
+                "confirming",
+                "success",
+              ].map((step, i) => {
                 const stepIdx = Object.keys(MINT_STEPS).indexOf(currentStep);
                 const isDone = i < stepIdx;
                 const isCurrent = i === stepIdx;
@@ -193,17 +249,23 @@ export function NFTMintFlow({
                   <div
                     key={step}
                     className={`h-2 border pixel-border ${
-                      isDone ? "bg-pixel-success border-pixel-success" :
-                      isCurrent ? "bg-pixel-primary border-pixel-primary animate-pulse" :
-                      "bg-pixel-bg-dark border-pixel-border/30"
+                      isDone
+                        ? "bg-pixel-success border-pixel-success"
+                        : isCurrent
+                          ? "bg-pixel-primary border-pixel-primary animate-pulse"
+                          : "bg-pixel-bg-dark border-pixel-border/30"
                     }`}
                   />
                 );
               })}
             </div>
             <div className="flex justify-between mt-1">
-              <span className="font-pixel text-[6px] text-pixel-text-muted">Start</span>
-              <span className="font-pixel text-[6px] text-pixel-text-muted">Complete</span>
+              <span className="font-pixel text-[6px] text-pixel-text-muted">
+                Start
+              </span>
+              <span className="font-pixel text-[6px] text-pixel-text-muted">
+                Complete
+              </span>
             </div>
           </div>
         )}
@@ -222,7 +284,9 @@ export function NFTMintFlow({
   if (state === "error") {
     const action = suggestedAction || error || "An unexpected error occurred.";
     return (
-      <div className={`bg-pixel-bg-medium ${pixelBorders.error} p-6 ${pixelShadows.lg} text-center`}>
+      <div
+        className={`bg-pixel-bg-medium ${pixelBorders.error} p-6 ${pixelShadows.lg} text-center`}
+      >
         <motion.div
           className="text-5xl mb-4"
           animate={{ rotate: [0, -5, 5, -5, 0] }}
@@ -247,11 +311,15 @@ export function NFTMintFlow({
         <div className="flex gap-2 justify-center mt-4">
           {onRetry && (
             <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
-              <Button onClick={onRetry} variant="secondary" size="sm">Try Again</Button>
+              <Button onClick={onRetry} variant="secondary" size="sm">
+                Try Again
+              </Button>
             </motion.div>
           )}
           {onDismissError && (
-            <Button onClick={onDismissError} variant="ghost" size="sm">Dismiss</Button>
+            <Button onClick={onDismissError} variant="ghost" size="sm">
+              Dismiss
+            </Button>
           )}
         </div>
       </div>
@@ -260,7 +328,9 @@ export function NFTMintFlow({
 
   if (state === "success" && lastMinted) {
     return (
-      <div className={`bg-pixel-bg-medium ${pixelBorders.success} p-6 ${pixelShadows.lg} relative overflow-hidden`}>
+      <div
+        className={`bg-pixel-bg-medium ${pixelBorders.success} p-6 ${pixelShadows.lg} relative overflow-hidden`}
+      >
         {/* 8-bit Celebration — Motion Sparkles */}
         <div className="absolute inset-0 pointer-events-none">
           {SPARKLES.map(({ char, x, y, delay, size }, i) => (
@@ -272,8 +342,8 @@ export function NFTMintFlow({
               animate={{
                 opacity: [0, 1, 0],
                 scale: [0, 1.5, 0],
-                x: [0, (i % 2 ? 30 : -30) * (i % 3 + 1)],
-                y: [0, (i % 2 ? -40 : -50) * (i % 3 + 1)],
+                x: [0, (i % 2 ? 30 : -30) * ((i % 3) + 1)],
+                y: [0, (i % 2 ? -40 : -50) * ((i % 3) + 1)],
                 rotate: [0, i * 45],
               }}
               transition={{ duration: 1.2, delay, ease: "easeOut" }}
@@ -294,7 +364,11 @@ export function NFTMintFlow({
                 y: (i % 2 === 0 ? -1 : 1) * 45,
                 rotate: i * 60,
               }}
-              transition={{ duration: 1.2, delay: 0.5 + i * 0.1, ease: "easeOut" }}
+              transition={{
+                duration: 1.2,
+                delay: 0.5 + i * 0.1,
+                ease: "easeOut",
+              }}
             >
               {char}
             </motion.span>
@@ -304,7 +378,15 @@ export function NFTMintFlow({
         {/* Rainbow border glow */}
         <motion.div
           className="absolute inset-0 pointer-events-none border-4 rounded-lg"
-          animate={{ borderColor: ["rgba(34,197,94,0.3)", "rgba(168,85,247,0.3)", "rgba(59,130,246,0.3)", "rgba(251,146,60,0.3)", "rgba(34,197,94,0.3)"] }}
+          animate={{
+            borderColor: [
+              "rgba(34,197,94,0.3)",
+              "rgba(168,85,247,0.3)",
+              "rgba(59,130,246,0.3)",
+              "rgba(251,146,60,0.3)",
+              "rgba(34,197,94,0.3)",
+            ],
+          }}
           transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
         />
 
@@ -316,8 +398,12 @@ export function NFTMintFlow({
           transition={{ duration: 0.6, ease: "easeOut" }}
         >
           <div className="text-center mb-4">
-            <p className="font-pixel text-sm text-pixel-success uppercase mb-2">Congratulations!</p>
-            <p className="font-pixel text-[8px] text-pixel-text-muted">You got a new Genesis Baby!</p>
+            <p className="font-pixel text-sm text-pixel-success uppercase mb-2">
+              Congratulations!
+            </p>
+            <p className="font-pixel text-[8px] text-pixel-text-muted">
+              You got a new Genesis Baby!
+            </p>
           </div>
 
           <div className="mb-4">
@@ -332,8 +418,12 @@ export function NFTMintFlow({
               { label: "Mining Boost", value: `+${lastMinted.level * 10}%` },
             ].map(({ label, value }) => (
               <div key={label}>
-                <span className="font-pixel text-[6px] text-pixel-text-muted uppercase">{label}</span>
-                <p className="font-pixel text-[10px] text-pixel-secondary capitalize">{value}</p>
+                <span className="font-pixel text-[6px] text-pixel-text-muted uppercase">
+                  {label}
+                </span>
+                <p className="font-pixel text-[10px] text-pixel-secondary capitalize">
+                  {value}
+                </p>
               </div>
             ))}
           </div>
@@ -341,16 +431,30 @@ export function NFTMintFlow({
           <div className="mb-4 space-y-2">
             {commitTxid && (
               <div className="p-2 bg-pixel-bg-dark border-2 border-pixel-border">
-                <p className="font-pixel text-[6px] text-pixel-text-muted uppercase mb-1">Commit TX</p>
-                <a href={`https://mempool.space/testnet4/tx/${commitTxid}`} target="_blank" rel="noopener noreferrer" className="font-pixel-body text-[9px] text-pixel-primary hover:text-pixel-secondary break-all underline">
+                <p className="font-pixel text-[6px] text-pixel-text-muted uppercase mb-1">
+                  Commit TX
+                </p>
+                <a
+                  href={`https://mempool.space/testnet4/tx/${commitTxid}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-pixel-body text-[9px] text-pixel-primary hover:text-pixel-secondary break-all underline"
+                >
                   {commitTxid}
                 </a>
               </div>
             )}
             {txid && (
               <div className="p-2 bg-pixel-bg-dark border-2 border-pixel-success">
-                <p className="font-pixel text-[6px] text-pixel-success uppercase mb-1">Spell TX (NFT Location)</p>
-                <a href={`https://mempool.space/testnet4/tx/${txid}`} target="_blank" rel="noopener noreferrer" className="font-pixel-body text-[9px] text-pixel-primary hover:text-pixel-secondary break-all underline">
+                <p className="font-pixel text-[6px] text-pixel-success uppercase mb-1">
+                  Spell TX (NFT Location)
+                </p>
+                <a
+                  href={`https://mempool.space/testnet4/tx/${txid}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-pixel-body text-[9px] text-pixel-primary hover:text-pixel-secondary break-all underline"
+                >
                   {txid}
                 </a>
               </div>
@@ -358,18 +462,43 @@ export function NFTMintFlow({
           </div>
 
           <div className="mb-4 p-2 bg-pixel-bg-dark border-2 border-pixel-accent rounded">
-            <p className="font-pixel text-[6px] text-pixel-accent mb-1">Charms NFT</p>
+            <p className="font-pixel text-[6px] text-pixel-accent mb-1">
+              Charms NFT
+            </p>
             <p className="font-pixel-body text-[8px] text-pixel-text-muted">
-              This is a real Charms NFT on Bitcoin Testnet4. It will appear in the Scrolls indexer once confirmed.
+              This is a real Charms NFT on Bitcoin Testnet4. It will appear in
+              the Scrolls indexer once confirmed.
             </p>
           </div>
 
           <div className="flex gap-2">
-            <motion.div className="flex-1" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-              <Button onClick={onViewCollection} variant="ghost" size="sm" className="w-full">View Collection</Button>
+            <motion.div
+              className="flex-1"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+            >
+              <Button
+                onClick={onViewCollection}
+                variant="ghost"
+                size="sm"
+                className="w-full"
+              >
+                View Collection
+              </Button>
             </motion.div>
-            <motion.div className="flex-1" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-              <Button onClick={onMintAnother} variant="success" size="sm" className="w-full">Mint Another</Button>
+            <motion.div
+              className="flex-1"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+            >
+              <Button
+                onClick={onMintAnother}
+                variant="success"
+                size="sm"
+                className="w-full"
+              >
+                Mint Another
+              </Button>
             </motion.div>
           </div>
         </motion.div>

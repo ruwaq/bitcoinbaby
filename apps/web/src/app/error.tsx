@@ -2,15 +2,14 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { pixelShadows, pixelBorders } from "@bitcoinbaby/ui";
+import { pixelBorders } from "@bitcoinbaby/ui";
 
-export default function Error({
-  error,
-  reset,
-}: {
+interface AppErrorProps {
   error: Error & { digest?: string };
   reset: () => void;
-}) {
+}
+
+export default function Error({ error, reset }: AppErrorProps) {
   useEffect(() => {
     // Log the error to an error reporting service
     console.error("Application error:", error);
@@ -21,7 +20,7 @@ export default function Error({
       <div className="max-w-md w-full">
         {/* Error Card */}
         <div
-          className={`bg-pixel-bg-medium ${pixelBorders.medium} p-8 ${pixelShadows.lg} text-center`}
+          className={`bg-pixel-bg-medium ${pixelBorders.medium} p-8 shadow-[8px_8px_0_0_#000] text-center`}
         >
           {/* Error Icon - Pixel Art Style */}
           <div className="mb-6">
@@ -78,13 +77,13 @@ export default function Error({
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
               onClick={reset}
-              className={`px-6 py-3 font-pixel text-[10px] bg-pixel-primary text-black ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none`}
+              className={`px-6 py-3 font-pixel text-[10px] bg-pixel-primary text-black ${pixelBorders.thick} shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0_0_#000] transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none`}
             >
               TRY AGAIN
             </button>
             <Link
               href="/"
-              className={`px-6 py-3 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text ${pixelBorders.thick} ${pixelShadows.md} hover:translate-x-[2px] hover:translate-y-[2px] ${pixelShadows.smHover} transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none text-center`}
+              className={`px-6 py-3 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text ${pixelBorders.thick} shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0_0_#000] transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none text-center`}
             >
               GO HOME
             </Link>

@@ -9,8 +9,6 @@ import { useWallet, useTransactionHistory } from "@/hooks";
 import {
   TransactionList,
   NetworkBadge,
-  pixelShadows,
-  pixelBorders,
   type TransactionDisplay,
 } from "@bitcoinbaby/ui";
 import { useNetworkStore } from "@bitcoinbaby/core";
@@ -84,7 +82,7 @@ function StatCard({
 
 export function HistoryView({ onBack }: HistoryViewProps) {
   const { network, config } = useNetworkStore();
-  const { wallet, isLocked } = useWallet();
+  const { wallet } = useWallet();
 
   const {
     transactions,

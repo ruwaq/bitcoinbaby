@@ -29,7 +29,7 @@ import {
   InfoBanner,
   CopyButton,
 } from "@bitcoinbaby/ui";
-import { pixelCard, pixelBorders, pixelShadows } from "@bitcoinbaby/ui";
+import { pixelCard, pixelBorders } from "@bitcoinbaby/ui";
 import {
   generateMnemonicFromEntropy,
   validateMnemonic,
@@ -112,7 +112,7 @@ export function WalletSection() {
         <SectionHeader
           title="Wallet"
           description={`Bitcoin ${network.current === "mainnet" ? "Mainnet" : "Testnet4"} - Taproot (P2TR/BIP86)`}
-          icon="&#128176;"
+          icon="💰"
           size="lg"
           helpTooltip={
             <HelpTooltip
@@ -205,7 +205,8 @@ export function WalletSection() {
 
                   {balances.btc.lastUpdated && (
                     <p className="font-pixel text-pixel-2xs text-pixel-text-muted text-center">
-                      Last updated: {balances.btc.lastUpdated.toLocaleTimeString()}
+                      Last updated:{" "}
+                      {balances.btc.lastUpdated.toLocaleTimeString()}
                     </p>
                   )}
 
@@ -250,14 +251,18 @@ export function WalletSection() {
                 <ClaimSection />
 
                 {/* Help Text */}
-                <div className={`p-4 bg-pixel-bg-medium ${pixelBorders.medium}`}>
+                <div
+                  className={`p-4 bg-pixel-bg-medium ${pixelBorders.medium}`}
+                >
                   <h3 className="font-pixel text-pixel-2xs text-pixel-primary mb-2">
                     HOW CLAIMING WORKS
                   </h3>
                   <ul className="space-y-1.5 text-xs text-pixel-text-muted">
                     <li className="flex items-start gap-2">
                       <span className="text-pixel-success">1.</span>
-                      <span>Mine to earn virtual work points (free, unlimited)</span>
+                      <span>
+                        Mine to earn virtual work points (free, unlimited)
+                      </span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-pixel-success">2.</span>
@@ -265,11 +270,16 @@ export function WalletSection() {
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-pixel-success">3.</span>
-                      <span>Create and broadcast a Bitcoin transaction (~1000 sats)</span>
+                      <span>
+                        Create and broadcast a Bitcoin transaction (~1000 sats)
+                      </span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-pixel-success">4.</span>
-                      <span>After confirmation, your $BABTC tokens are minted on Bitcoin</span>
+                      <span>
+                        After confirmation, your $BABTC tokens are minted on
+                        Bitcoin
+                      </span>
                     </li>
                   </ul>
 
@@ -278,10 +288,10 @@ export function WalletSection() {
                       WHY PAY FEES?
                     </p>
                     <p className="text-xs text-gray-400">
-                      Unlike games where the team pays transaction fees, BitcoinBaby
-                      lets you claim when YOU want at YOUR preferred fee rate. This
-                      makes the game sustainable and gives you full control over your
-                      tokens.
+                      Unlike games where the team pays transaction fees,
+                      BitcoinBaby lets you claim when YOU want at YOUR preferred
+                      fee rate. This makes the game sustainable and gives you
+                      full control over your tokens.
                     </p>
                   </div>
                 </div>
@@ -298,7 +308,7 @@ export function WalletSection() {
 
         {/* Error display */}
         {wallet.error && (
-          <InfoBanner variant="error" icon="&#9888;" className="mt-4">
+          <InfoBanner variant="error" icon="⚠️" className="mt-4">
             {wallet.error}
           </InfoBanner>
         )}

@@ -29,3 +29,13 @@ export {
   hasAvailableWallet,
   getBestProvider,
 } from "./registry";
+
+// Dev Fund (local testing)
+export {
+  DevFundProvider,
+  getDevFundProvider,
+  isDevFundEnabled,
+  enableDevFund,
+  disableDevFund,
+  DEV_FUND,
+} from "./dev-fund-provider";

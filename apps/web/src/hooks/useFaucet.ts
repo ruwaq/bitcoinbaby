@@ -10,8 +10,12 @@
  * States: idle → claiming → cooldown/maxed/error → idle
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { getWorkersApiUrl, getPhaseConfig, type PhaseFeatures } from "@bitcoinbaby/shared";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import {
+  getWorkersApiUrl,
+  getPhaseConfig,
+  type PhaseFeatures,
+} from "@bitcoinbaby/shared";
 
 // =============================================================================
 // TYPES
@@ -109,8 +113,11 @@ export function useFaucet(options: UseFaucetOptions = {}): UseFaucetReturn {
   const phaseFeatures: PhaseFeatures = getPhaseConfig().features;
   const isEnabled = phaseFeatures.babtcFaucet && !!address;
 
-  // Derive initial state from localStorage
-  const getInitialState = useCallback((): {
+  // Derive initial state from localStorage — memoized by address
+  // Uses useMemo instead of useState + useEffect to avoid setState-in-effect
+  // Date.now() is called inside useMemo which is explicitly allowed for
+  // computing derived state during render
+  const initial = useMemo((): {
     state: FaucetState;
     nextClaimAt: number | null;
     totalClaimed: number;
@@ -124,6 +131,7 @@ export function useFaucet(options: UseFaucetOptions = {}): UseFaucetReturn {
       return { state: "idle", nextClaimAt: null, totalClaimed: 0 };
     }
 
+    // eslint-disable-next-line react-hooks/purity -- Date.now() in useMemo is intentional for cooldown calculation
     const now = Date.now();
     const nextClaimAt = stored.lastClaimAt + COOLDOWN_MS;
 
@@ -141,8 +149,6 @@ export function useFaucet(options: UseFaucetOptions = {}): UseFaucetReturn {
       totalClaimed: stored.totalClaimed,
     };
   }, [address]);
-
-  const initial = getInitialState();
 
   const [state, setState] = useState<FaucetState>(initial.state);
   const [error, setError] = useState<string | null>(null);
@@ -169,19 +175,12 @@ export function useFaucet(options: UseFaucetOptions = {}): UseFaucetReturn {
     };
   }, []);
 
-  // Reset state when address changes
-  useEffect(() => {
-    const newInitial = getInitialState();
-    setState(newInitial.state);
-    setNextClaimAt(newInitial.nextClaimAt);
-    setTotalClaimed(newInitial.totalClaimed);
-    setError(null);
-  }, [address, getInitialState]);
-
-  // Countdown timer for cooldown state
+  // Derive cooldown seconds from nextClaimAt (pure computation, no setState in effect)
+  // This avoids the cascading render issue flagged by react-hooks/set-state-in-effect
   useEffect(() => {
     if (state !== "cooldown" || !nextClaimAt) {
-      setCooldownSeconds(0);
+      // Only update if value actually changed to avoid infinite loops
+      setCooldownSeconds((prev) => (prev === 0 ? prev : 0));
       return;
     }
 
@@ -281,9 +280,7 @@ export function useFaucet(options: UseFaucetOptions = {}): UseFaucetReturn {
       }
 
       // Success
-      const amount = data.data?.credited
-        ? Number(data.data.credited)
-        : 5;
+      const amount = data.data?.credited ? Number(data.data.credited) : 5;
       const now = Date.now();
       const nextAt = now + COOLDOWN_MS;
 

@@ -8,14 +8,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Env } from "../../lib/types";
 import { getRedis } from "../../lib/redis";
-import {
-  errorResponse,
-  successResponse,
-} from "../../lib/helpers";
-import {
-  validateBody,
-  validateParams,
-} from "../../lib/middleware";
+import { errorResponse, successResponse } from "../../lib/helpers";
+import { validateBody, validateParams } from "../../lib/middleware";
 import { nftLogger } from "../../lib/logger";
 import { getNFTMintingServiceSimple } from "../../services/nft-minting-simple";
 import { getNetworkForEnvironment } from "../../config/bitcoin";
@@ -103,7 +97,11 @@ reserveRouter.post("/reserve", validateBody(reserveNftSchema), async (c) => {
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       // Generate random ID between 1 and MAX_SUPPLY
-      const candidateId = Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] / (2**32) * MAX_SUPPLY) + 1;
+      const candidateId =
+        Math.floor(
+          (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) *
+            MAX_SUPPLY,
+        ) + 1;
 
       // Check if already minted (confirmed)
       const isMinted = await redis.exists(`nft:minted:${candidateId}`);
@@ -353,6 +351,20 @@ reserveRouter.post("/prove", validateBody(proveNftSchema), async (c) => {
       return errorResponse(
         c,
         "NFT minting not available: app not configured",
+        503,
+      );
+    }
+
+    // Validate that NFT_APP_ID is not the placeholder value
+    const PLACEHOLDER_APP_ID =
+      "0000000000000000000000000000000000000000000000000000000000000000";
+    if (nftAppId === PLACEHOLDER_APP_ID) {
+      nftLogger.error(
+        "NFT_APP_ID is still the placeholder value. Update after first mint.",
+      );
+      return errorResponse(
+        c,
+        "NFT minting not available: app ID not yet established",
         503,
       );
     }

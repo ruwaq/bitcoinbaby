@@ -212,6 +212,8 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     `);
 
     // PoUW Submissions table
+    // Note: No foreign key constraint on task_id to avoid issues with
+    // task lifecycle (tasks can be expired independently of submissions)
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS pouw_submissions (
         task_id TEXT NOT NULL,
@@ -220,8 +222,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         compute_time REAL NOT NULL,
         signature TEXT NOT NULL,
         created_at INTEGER NOT NULL,
-        PRIMARY KEY (task_id, address),
-        FOREIGN KEY (task_id) REFERENCES pouw_tasks(id)
+        PRIMARY KEY (task_id, address)
       )
     `);
 
@@ -229,15 +230,37 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       `CREATE INDEX IF NOT EXISTS idx_submissions_task ON pouw_submissions(task_id)`,
     );
 
+    // Credit history table (PoUW rewards, mining credits, faucet claims)
+    this.sql.exec(`
+      CREATE TABLE IF NOT EXISTS credit_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        address TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        type TEXT NOT NULL DEFAULT 'mining',
+        proof_id TEXT,
+        created_at INTEGER NOT NULL
+      )
+    `);
+    this.sql.exec(
+      `CREATE INDEX IF NOT EXISTS idx_credit_history_address ON credit_history(address)`,
+    );
+    this.sql.exec(
+      `CREATE INDEX IF NOT EXISTS idx_credit_history_created ON credit_history(created_at)`,
+    );
+
     // Add reputation_score column to balance if not exists
     try {
-      this.sql.exec(`ALTER TABLE balance ADD COLUMN reputation_score INTEGER DEFAULT 100`);
+      this.sql.exec(
+        `ALTER TABLE balance ADD COLUMN reputation_score INTEGER DEFAULT 100`,
+      );
     } catch {
       /* exists */
     }
     // Add lockout_until column to balance if not exists
     try {
-      this.sql.exec(`ALTER TABLE balance ADD COLUMN lockout_until INTEGER DEFAULT 0`);
+      this.sql.exec(
+        `ALTER TABLE balance ADD COLUMN lockout_until INTEGER DEFAULT 0`,
+      );
     } catch {
       /* exists */
     }
@@ -269,7 +292,8 @@ export class VirtualBalanceDO extends DurableObject<Env> {
           }
           if (action === "claimable") return this.handleGetClaimableBalance();
           if (action === "claim-history") return this.handleGetClaimHistory();
-          if (action === "retriable-claims") return this.handleGetRetriableClaims();
+          if (action === "retriable-claims")
+            return this.handleGetRetriableClaims();
           if (action === "claim-status") {
             const claimId = pathParts[3];
             if (!claimId) return this.errorResponse("Claim ID required", 400);
@@ -280,6 +304,8 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         case "POST":
           if (action === "credit") return this.handleCreditMining(request);
           if (action === "faucet") return this.handleFaucetCredit(request);
+          if (action === "pouw-verify")
+            return this.handleVerifyPouwTask(request);
           if (action === "reserve") return this.handleReserveWithdraw(request);
           if (action === "confirm-withdraw")
             return this.handleConfirmWithdraw(request);
@@ -380,7 +406,13 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       return this.errorResponse("Invalid JSON body", 400);
     }
 
-    if (!proof || !proof.taskId || !proof.output || !proof.signature || !proof.publicKey) {
+    if (
+      !proof ||
+      !proof.taskId ||
+      !proof.output ||
+      !proof.signature ||
+      !proof.publicKey
+    ) {
       return this.errorResponse("Invalid proof: missing required fields", 400);
     }
 
@@ -394,7 +426,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         .exec(
           "SELECT COUNT(*) as cnt FROM pouw_submissions WHERE address = ? AND created_at > ?",
           this.address,
-          oneHourAgo
+          oneHourAgo,
         )
         .toArray();
       submissionsInLastHour = (countRows[0]?.cnt as number) || 0;
@@ -425,10 +457,13 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         proof.output,
         proof.computeTime,
         proof.signature,
-        Date.now()
+        Date.now(),
       );
     } catch (err) {
-      balanceLogger.error("Failed to store pouw submission in SQLite", { err, address: this.address });
+      balanceLogger.error("Failed to store pouw submission in SQLite", {
+        err,
+        address: this.address,
+      });
       return this.errorResponse("Internal database error storing proof", 500);
     }
 
@@ -444,8 +479,8 @@ export class VirtualBalanceDO extends DurableObject<Env> {
           proof,
           this.address,
           result.reward!,
-          this.balanceRepo
-        )
+          this.balanceRepo,
+        ),
       );
     }
 
@@ -476,12 +511,18 @@ export class VirtualBalanceDO extends DurableObject<Env> {
 
     try {
       const network = getNetworkForEnvironment(this.env.ENVIRONMENT);
-      const mempoolService = initMempoolService(network, this.env.CACHE || null);
+      const mempoolService = initMempoolService(
+        network,
+        this.env.CACHE || null,
+      );
       const blockHash = await mempoolService.getCurrentBlockHash();
 
       // Check if there is an active task for this blockHash in the database
       const rows = this.sql
-        .exec("SELECT * FROM pouw_tasks WHERE block_hash = ? AND status = 'active' LIMIT 1", blockHash)
+        .exec(
+          "SELECT * FROM pouw_tasks WHERE block_hash = ? AND status = 'active' LIMIT 1",
+          blockHash,
+        )
         .toArray();
 
       if (rows.length > 0) {
@@ -505,7 +546,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         "Describe how a baby miner operates a tiny WebGPU mining rig in their crib.",
         "Write a story about a baby discovering Satoshi's whitepaper in their toy chest.",
         "Describe the Genesis Baby's first encounter with a Lightning Network node.",
-        "Write a legend about how the Golden Pacifier was forged in a blocks mined by Satoshi."
+        "Write a legend about how the Golden Pacifier was forged in a blocks mined by Satoshi.",
       ];
       const prompt = prompts[Math.floor(Math.random() * prompts.length)];
       const taskId = `pouw-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -517,7 +558,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         blockHash,
         prompt,
         blockHash,
-        Date.now()
+        Date.now(),
       );
 
       return Response.json({
@@ -531,8 +572,264 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         },
       });
     } catch (error) {
-      balanceLogger.error("Failed to generate/retrieve PoUW task", { error, address: this.address });
+      balanceLogger.error("Failed to generate/retrieve PoUW task", {
+        error,
+        address: this.address,
+      });
       return this.errorResponse("Failed to generate PoUW task", 500);
+    }
+  }
+
+  /**
+   * POST /balance/:address/pouw-verify - Verify AI PoUW submission
+   *
+   * Server-side verification of AI inference results. This is the critical
+   * security layer that prevents users from spoofing AI work.
+   *
+   * Verification steps:
+   * 1. Task exists and is in 'active' status
+   * 2. Task hasn't expired (5 minute TTL from creation)
+   * 3. Output meets minimum quality requirements:
+   *    - Minimum 50 characters (non-trivial response)
+   *    - Not a copy of the prompt itself
+   *    - Contains actual content (not just whitespace/punctuation)
+   * 4. Task is marked as 'completed' to prevent double-claiming
+   *
+   * On success, the submission is stored and the user receives credit.
+   */
+  private async handleVerifyPouwTask(request: Request): Promise<Response> {
+    if (!this.address) return this.errorResponse("Address required", 400);
+
+    try {
+      const body = (await request.json()) as {
+        taskId: string;
+        output: string;
+        computeTime: string;
+        signature: string;
+        publicKey: string;
+      };
+
+      const { taskId, output, computeTime, signature } = body;
+      // publicKey and signature are stored for audit trail;
+      // full cryptographic verification can be added in a future iteration
+      void body.publicKey;
+
+      // ---- Step 1: Validate task exists and is active ----
+      const taskRows = this.sql
+        .exec(
+          "SELECT * FROM pouw_tasks WHERE id = ? AND status = 'active' LIMIT 1",
+          taskId,
+        )
+        .toArray();
+
+      if (taskRows.length === 0) {
+        balanceLogger.warn(
+          "PoUW verification failed: task not found or not active",
+          {
+            taskId,
+            address: this.address,
+          },
+        );
+        return this.errorResponse(
+          "Task not found, already completed, or expired",
+          404,
+        );
+      }
+
+      const task = taskRows[0];
+      const taskCreatedAt = task.created_at as number;
+      const TASK_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+      if (Date.now() - taskCreatedAt > TASK_TTL_MS) {
+        // Mark expired task as 'expired'
+        this.sql.exec(
+          "UPDATE pouw_tasks SET status = 'expired' WHERE id = ?",
+          taskId,
+        );
+        balanceLogger.warn("PoUW verification failed: task expired", {
+          taskId,
+          age: Date.now() - taskCreatedAt,
+        });
+        return this.errorResponse(
+          "Task has expired. Please request a new one.",
+          410,
+        );
+      }
+
+      // ---- Step 2: Validate output quality ----
+      const trimmedOutput = output.trim();
+
+      if (trimmedOutput.length < 50) {
+        balanceLogger.warn("PoUW verification failed: output too short", {
+          taskId,
+          outputLength: trimmedOutput.length,
+        });
+        return this.errorResponse(
+          "Output too short. AI inference must produce meaningful results.",
+          400,
+        );
+      }
+
+      // Check that output is not just the prompt echoed back
+      const prompt = task.prompt as string;
+      if (
+        trimmedOutput === prompt.trim() ||
+        trimmedOutput.includes(prompt.trim().slice(0, 20))
+      ) {
+        balanceLogger.warn("PoUW verification failed: output matches prompt", {
+          taskId,
+        });
+        return this.errorResponse(
+          "Output appears to be a copy of the input prompt. Please run actual inference.",
+          400,
+        );
+      }
+
+      // Check for obviously fake outputs (just repeated characters)
+      const uniqueChars = new Set(trimmedOutput.slice(0, 100)).size;
+      if (uniqueChars < 5) {
+        balanceLogger.warn("PoUW verification failed: output lacks diversity", {
+          taskId,
+          uniqueChars,
+        });
+        return this.errorResponse(
+          "Output lacks sufficient content diversity. Please run actual inference.",
+          400,
+        );
+      }
+
+      // ---- Step 3: Store verified submission ----
+      const computeTimeNum = parseInt(computeTime, 10) || 0;
+      const now = Date.now();
+
+      try {
+        this.sql.exec(
+          `INSERT INTO pouw_submissions (task_id, address, output, compute_time, signature, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          taskId,
+          this.address,
+          trimmedOutput,
+          computeTimeNum,
+          signature,
+          now,
+        );
+      } catch (insertErr) {
+        balanceLogger.error("Failed to insert pouw submission", {
+          error: String(insertErr),
+          taskId,
+          address: this.address,
+        });
+        return this.errorResponse(
+          "Failed to record submission. Please try again.",
+          500,
+        );
+      }
+
+      // Mark task as completed to prevent double-claiming
+      this.sql.exec(
+        "UPDATE pouw_tasks SET status = 'completed' WHERE id = ?",
+        taskId,
+      );
+
+      // ---- Step 4: Credit the user for useful work ----
+      // Base reward: proportional to compute time (capped)
+      const baseReward = Math.min(Math.ceil(computeTimeNum / 100), 10);
+      // Quality bonus: longer outputs get a small bonus
+      const qualityBonus = Math.min(Math.floor(trimmedOutput.length / 200), 5);
+
+      const totalReward = baseReward + qualityBonus;
+
+      // Update virtual balance
+      // First try to update existing row
+      this.sql.exec(
+        `UPDATE balance
+         SET virtual_balance = CAST(virtual_balance AS INTEGER) + ?,
+             total_mined = CAST(total_mined AS INTEGER) + ?,
+             last_mining_at = ?
+         WHERE address = ?`,
+        totalReward,
+        totalReward,
+        now,
+        this.address,
+      );
+
+      // If the address doesn't have a balance row yet, create one.
+      // We detect this by checking if the row exists after the UPDATE.
+      const checkRow = this.sql
+        .exec("SELECT address FROM balance WHERE address = ?", this.address)
+        .toArray();
+
+      if (checkRow.length === 0) {
+        this.sql.exec(
+          `INSERT INTO balance (address, virtual_balance, total_mined, last_mining_at, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          this.address,
+          String(totalReward),
+          String(totalReward),
+          now,
+          now,
+          now,
+        );
+      }
+
+      // Record the credit transaction
+      this.sql.exec(
+        `INSERT INTO credit_history (address, amount, type, proof_id, created_at)
+         VALUES (?, ?, 'pouw', ?, ?)`,
+        this.address,
+        totalReward,
+        taskId,
+        now,
+      );
+
+      balanceLogger.info("PoUW verification successful", {
+        taskId,
+        address: this.address,
+        outputLength: trimmedOutput.length,
+        computeTime: computeTimeNum,
+        reward: totalReward,
+      });
+
+      return Response.json({
+        success: true,
+        data: {
+          taskId,
+          verified: true,
+          reward: totalReward,
+          outputLength: trimmedOutput.length,
+          computeTime: computeTimeNum,
+        },
+        timestamp: now,
+      });
+    } catch (error) {
+      // Extract meaningful error info from SQLite/DO errors
+      const errorInfo: Record<string, unknown> = {};
+      if (error instanceof Error) {
+        errorInfo.message = error.message;
+        errorInfo.name = error.name;
+        errorInfo.stack = error.stack;
+      } else if (typeof error === "object" && error !== null) {
+        // Try to extract properties from SQLite error objects
+        for (const key of Object.getOwnPropertyNames(error)) {
+          try {
+            errorInfo[key] = (error as Record<string, unknown>)[key];
+          } catch {
+            errorInfo[key] = "[unable to access]";
+          }
+        }
+      } else {
+        errorInfo.message = String(error);
+      }
+
+      balanceLogger.error(
+        "Failed to verify PoUW task",
+        error instanceof Error ? error : new Error(JSON.stringify(errorInfo)),
+        { address: this.address },
+      );
+      return this.errorResponse(
+        `Failed to verify PoUW submission: ${JSON.stringify(errorInfo)}`,
+        500,
+      );
     }
   }
 

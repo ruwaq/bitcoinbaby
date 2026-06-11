@@ -375,6 +375,13 @@ export {
   getAvailableProviders,
   hasAvailableWallet,
   getBestProvider,
+  // Dev Fund (local testing)
+  DevFundProvider,
+  getDevFundProvider,
+  isDevFundEnabled,
+  enableDevFund,
+  disableDevFund,
+  DEV_FUND,
 } from "./providers";
 
 // Marketplace (PSBT-based NFT Trading)

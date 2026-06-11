@@ -195,7 +195,7 @@ canvas,
    Pixelify Sans is more flexible but still looks best at discrete sizes
    ======================================== */
 
-/* Pixel font sizes with fluid scaling */
+/* Pixel font sizes with fluid scaling — keeps the beautiful pixel look at any screen size */
 :root {
   /* Press Start 2P - Pixel perfect sizes (8, 10, 12, 16, 24px) */
   --font-pixel-2xs: clamp(8px, 1.8vw, 8px);      /* Minimum readable */
@@ -222,9 +222,9 @@ canvas,
 /* ========================================
    UTILITY CLASSES
    ======================================== */
-/* Font utilities - using CSS variables from next/font for optimized loading */
+/* Font utilities - using CSS variables from next/font/local for offline-first loading */
 .font-pixel {
-  font-family: var(--font-pixel), 'Press Start 2P', cursive;
+  font-family: var(--font-pixel), 'Press Start 2P', monospace;
 }
 .font-pixel-body {
   font-family: var(--font-pixel-body), 'Pixelify Sans', sans-serif;

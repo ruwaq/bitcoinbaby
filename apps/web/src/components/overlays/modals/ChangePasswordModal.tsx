@@ -62,7 +62,7 @@ export function ChangePasswordModal() {
   return (
     <div className="p-6 max-w-sm w-full">
       <div className="text-center mb-6">
-        <div className="text-4xl mb-3">&#128272;</div>
+        <div className="text-4xl mb-3">🔐</div>
         <h2 className="font-pixel text-lg text-pixel-primary">
           CHANGE PASSWORD
         </h2>

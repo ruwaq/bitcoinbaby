@@ -156,9 +156,7 @@ async function processConfirmationQueue(): Promise<void> {
 
   saveConfirmationQueue(remaining);
   if (remaining.length > 0) {
-    log.warn(
-      `${remaining.length} confirmations still pending after retry`,
-    );
+    log.warn(`${remaining.length} confirmations still pending after retry`);
   }
 }
 
@@ -418,10 +416,8 @@ export function useMintNFT(): UseMintNFTReturn {
           error: errorMsg,
         };
       }
-      log.info(
-        `Prover health OK (latency: ${healthResult.data.latencyMs}ms)`,
-      );
-    } catch (healthError) {
+      log.info(`Prover health OK (latency: ${healthResult.data.latencyMs}ms)`);
+    } catch {
       log.warn("Prover health check failed, proceeding anyway");
       // Don't block on health check failure - prover might still work
     }
@@ -617,9 +613,7 @@ export function useMintNFT(): UseMintNFTReturn {
           finalCommitHex = commitTxHex;
         }
       } else {
-        log.info(
-          "No commit transaction from prover, skipping commit",
-        );
+        log.info("No commit transaction from prover, skipping commit");
       }
 
       // Step 5: Handle spell transaction
@@ -655,10 +649,7 @@ export function useMintNFT(): UseMintNFTReturn {
           finalSpellHex = signed;
           log.info("Spell transaction signed successfully");
         } catch (convertError) {
-          log.error(
-            "Failed to convert/sign raw TX:",
-            { error: convertError },
-          );
+          log.error("Failed to convert/sign raw TX:", { error: convertError });
           throw new Error(
             `Failed to sign transaction: ${convertError instanceof Error ? convertError.message : "Unknown error"}`,
           );
@@ -734,10 +725,7 @@ export function useMintNFT(): UseMintNFTReturn {
 
             // Exponential backoff polling: 1s, 2s, 4s, 8s, 16s (capped)
             const elapsed = Date.now() - startTime;
-            const nextDelay = Math.min(
-              Math.max(1000, elapsed / 2),
-              16000,
-            );
+            const nextDelay = Math.min(Math.max(1000, elapsed / 2), 16000);
             setTimeout(poll, nextDelay);
           };
 
@@ -776,12 +764,12 @@ export function useMintNFT(): UseMintNFTReturn {
           throw new Error("Failed to broadcast spell transaction");
         }
       } catch (broadcastError) {
-        log.error(
-          "Spell broadcast failed:",
-          { error: broadcastError instanceof Error
-            ? broadcastError.message
-            : broadcastError },
-        );
+        log.error("Spell broadcast failed:", {
+          error:
+            broadcastError instanceof Error
+              ? broadcastError.message
+              : broadcastError,
+        });
         throw broadcastError;
       }
       setSpellTxid(broadcastSpellTxid);
@@ -886,24 +874,19 @@ export function useMintNFT(): UseMintNFTReturn {
 
       // Release reserved token ID if mint failed after reservation
       if (reservedTokenId !== null) {
-        log.info(
-          `Releasing reserved token ID ${reservedTokenId} due to error`,
+        log.info(`Releasing reserved token ID ${reservedTokenId} due to error`);
+        apiClient.releaseNFT(reservedTokenId).catch((releaseErr) =>
+          log.warn(`Failed to release token ${reservedTokenId}:`, {
+            error: releaseErr,
+          }),
         );
-        apiClient
-          .releaseNFT(reservedTokenId)
-          .catch((releaseErr) =>
-            log.warn(
-              `Failed to release token ${reservedTokenId}:`,
-              { error: releaseErr },
-            ),
-          );
       }
 
       return { success: false, error: message };
     } finally {
       setIsLoading(false);
     }
-  }, [wallet, signPsbt, mempoolClient, addTransaction, startTracking]);
+  }, [wallet, signPsbt, mempoolClient, addTransaction, startTracking, network]);
 
   /**
    * Reset state

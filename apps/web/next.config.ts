@@ -52,6 +52,20 @@ const nextConfig: NextConfig = {
       ...config.experiments,
       asyncWebAssembly: true,
     };
+    // Tell webpack the target environment supports async/await, arrow functions,
+    // and other modern JS features. This silences the "target environment does
+    // not appear to support async/await" warning caused by asyncWebAssembly.
+    // All modern browsers (2020+) support these features.
+    config.output.environment = {
+      ...config.output.environment,
+      arrowFunction: true,
+      asyncFunction: true,
+      const: true,
+      destructuring: true,
+      forOf: true,
+      optionalChaining: true,
+      templateLiteral: true,
+    };
     config.resolve.alias = {
       ...config.resolve.alias,
       sharp: false,

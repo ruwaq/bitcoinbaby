@@ -5,10 +5,80 @@
  * - 'unsafe-inline' for Next.js hydration compatibility
  * - 'wasm-unsafe-eval' for crypto libraries (secp256k1)
  * - Allows wallet extensions to function
+ *
+ * Rate limiting:
+ * - In-memory token bucket per IP for basic DoS protection
+ * - Edge-compatible (no KV/Redis needed at this layer)
+ * - Backend Workers handle distributed rate limiting for API calls
  */
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+
+// =============================================================================
+// RATE LIMITER (In-Memory Token Bucket)
+// =============================================================================
+// Edge Middleware runs in a lightweight runtime without access to KV or Redis.
+// This in-memory rate limiter provides basic DoS protection per Edge instance.
+// For distributed rate limiting, the Workers API handles it at the backend layer.
+
+interface RateLimitEntry {
+  tokens: number;
+  lastRefill: number;
+}
+
+const rateLimitStore = new Map<string, RateLimitEntry>();
+
+/** Maximum requests per window per IP */
+const MAX_REQUESTS = 200;
+/** Time window in ms (1 minute) */
+const WINDOW_MS = 60_000;
+/** Max entries before cleanup triggers */
+const MAX_STORE_SIZE = 10_000;
+
+function checkRateLimit(ip: string): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const entry = rateLimitStore.get(ip);
+
+  if (!entry) {
+    // First request from this IP — create new bucket
+    rateLimitStore.set(ip, { tokens: MAX_REQUESTS - 1, lastRefill: now });
+    return { allowed: true, remaining: MAX_REQUESTS - 1 };
+  }
+
+  // Refill tokens based on elapsed time (token bucket algorithm)
+  const elapsed = now - entry.lastRefill;
+  const refillAmount = Math.floor((elapsed / WINDOW_MS) * MAX_REQUESTS);
+
+  if (refillAmount > 0) {
+    entry.tokens = Math.min(MAX_REQUESTS, entry.tokens + refillAmount);
+    entry.lastRefill = now;
+  }
+
+  if (entry.tokens <= 0) {
+    return { allowed: false, remaining: 0 };
+  }
+
+  entry.tokens--;
+  return { allowed: true, remaining: entry.tokens };
+}
+
+/** Periodic cleanup to prevent memory leaks */
+function cleanupRateLimitStore(): void {
+  if (rateLimitStore.size > MAX_STORE_SIZE) {
+    const now = Date.now();
+    const staleThreshold = now - WINDOW_MS * 2;
+    for (const [ip, entry] of rateLimitStore) {
+      if (entry.lastRefill < staleThreshold) {
+        rateLimitStore.delete(ip);
+      }
+    }
+  }
+}
+
+// =============================================================================
+// NONCE GENERATION
+// =============================================================================
 
 /**
  * Generate a cryptographically secure random nonce
@@ -25,7 +95,32 @@ function generateNonce(): string {
   return btoa(binary);
 }
 
+// =============================================================================
+// MIDDLEWARE
+// =============================================================================
+
 export function proxy(request: NextRequest) {
+  // ---- Rate Limiting ----
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "anonymous";
+  const { allowed, remaining } = checkRateLimit(ip);
+
+  // Periodic cleanup (best-effort, runs inline)
+  cleanupRateLimitStore();
+
+  if (!allowed) {
+    return new NextResponse("Too Many Requests", {
+      status: 429,
+      headers: {
+        "Retry-After": "60",
+        "X-RateLimit-Limit": String(MAX_REQUESTS),
+        "X-RateLimit-Remaining": "0",
+      },
+    });
+  }
+
   // Generate nonce for this request
   const nonce = generateNonce();
   const isDev = process.env.NODE_ENV !== "production";
@@ -94,6 +189,10 @@ export function proxy(request: NextRequest) {
 
   // Store nonce for use in pages
   response.headers.set("x-nonce", nonce);
+
+  // Rate limit headers (informational)
+  response.headers.set("X-RateLimit-Limit", String(MAX_REQUESTS));
+  response.headers.set("X-RateLimit-Remaining", String(remaining));
 
   return response;
 }

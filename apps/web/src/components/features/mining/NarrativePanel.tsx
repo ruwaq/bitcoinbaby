@@ -7,7 +7,7 @@
  * 8-bit pixel art aesthetic with typewriter text reveal effect.
  */
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNarrativeStore } from "@bitcoinbaby/core";
 import type { NarrativeEvent, NarrativeEventType } from "@bitcoinbaby/ai";
 
@@ -42,6 +42,7 @@ function useTypewriter(text: string, speed = 30) {
   const indexRef = useRef(0);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- animation reset is intended when text changes
     setDisplayed("");
     indexRef.current = 0;
 
@@ -81,33 +82,30 @@ export function NarrativePanel({
   const [visible, setVisible] = useState(false);
   const [currentEvent, setCurrentEvent] = useState<NarrativeEvent | null>(null);
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Track event count for display (read-only, stable primitive)
-  const _eventCount =
-    tokenId !== null
-      ? useNarrativeStore((s) => {
-          const st = s.states[tokenId];
-          return st ? st.events.length : 0;
-        })
-      : 0;
+  // Track event count for display — always call hook unconditionally
+  // Use a stable selector that handles null tokenId
+  const _eventCount = useNarrativeStore((s) => {
+    if (tokenId === null) return 0;
+    const st = s.states[tokenId];
+    return st ? st.events.length : 0;
+  });
   void _eventCount; // used for reactive re-render when new events arrive
 
   // Show event when latestEvent changes
-  const showEvent = useCallback((event: NarrativeEvent) => {
-    setCurrentEvent(event);
-    setVisible(true);
-
-    // Auto-dismiss after 15 seconds
-    if (dismissTimer.current) clearTimeout(dismissTimer.current);
-    dismissTimer.current = setTimeout(() => {
-      setVisible(false);
-    }, 15_000);
-  }, []);
-
+  // Auto-dismiss timer with setTimeout is the standard pattern for temporary UI
   useEffect(() => {
     if (latestEvent) {
-      showEvent(latestEvent);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- auto-dismiss timer is intentional UX behavior
+      setCurrentEvent(latestEvent);
+      setVisible(true);
+
+      // Auto-dismiss after 15 seconds
+      if (dismissTimer.current) clearTimeout(dismissTimer.current);
+      dismissTimer.current = setTimeout(() => {
+        setVisible(false);
+      }, 15_000);
     }
-  }, [latestEvent, showEvent]);
+  }, [latestEvent]);
 
   // Cleanup timer
   useEffect(() => {

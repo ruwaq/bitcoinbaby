@@ -564,17 +564,14 @@ class SyncManager {
       // Send to API
       let response;
       if (share.isAI) {
-        response = await client.creditMining(share.address, {
+        // AI PoUW submissions go through server-side verification
+        // This prevents users from spoofing AI inference results
+        response = await client.verifyPouwTask(share.address, {
           taskId: share.taskId || "",
-          taskType: share.taskType || "pouw",
-          inputPrompt: share.inputPrompt || "",
-          seed: share.seed || "",
           output: share.output || "",
           computeTime: share.computeTime || 0,
-          modelId: share.modelId || "",
-          timestamp: share.timestamp,
-          publicKey: share.publicKey || "",
           signature: share.signature || "",
+          publicKey: share.publicKey || "",
         });
       } else {
         response = await client.creditMining(share.address, {
@@ -598,13 +595,22 @@ class SyncManager {
         );
 
         // Apply VarDiff adjustment if server suggested a new difficulty
+        // Note: AI PoUW verification responses don't include varDiff
+        const responseData = response.data as
+          | Record<string, unknown>
+          | undefined;
         if (
-          response.data?.varDiff?.difficultyChanged &&
-          typeof response.data.varDiff.suggestedDifficulty === "number" &&
-          response.data.varDiff.suggestedDifficulty > 0
+          responseData?.varDiff &&
+          typeof responseData.varDiff === "object" &&
+          (responseData.varDiff as Record<string, unknown>).difficultyChanged &&
+          typeof (responseData.varDiff as Record<string, unknown>)
+            .suggestedDifficulty === "number" &&
+          ((responseData.varDiff as Record<string, unknown>)
+            .suggestedDifficulty as number) > 0
         ) {
           this.applyVarDiffAdjustment(
-            response.data.varDiff.suggestedDifficulty,
+            (responseData.varDiff as Record<string, unknown>)
+              .suggestedDifficulty as number,
           );
         }
 

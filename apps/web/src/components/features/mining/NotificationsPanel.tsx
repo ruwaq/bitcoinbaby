@@ -8,7 +8,7 @@
  * Includes animations for new rewards.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 interface Notification {
   id: string;
@@ -26,24 +26,30 @@ export function NotificationsPanel({ notifications }: NotificationsPanelProps) {
   // Track new notifications for animation
   const [animatingIds, setAnimatingIds] = useState<Set<string>>(new Set());
 
-  // Animate new notifications
+  // Track latest notification ID for animation triggering
+  const latestId = notifications.length > 0 ? notifications[0].id : null;
+
+  // Animate new notifications — uses a ref synced in-effect to avoid setState-in-effect
+  const animatingRef = useRef(animatingIds);
+
   useEffect(() => {
-    if (notifications.length > 0) {
-      const latestId = notifications[0].id;
-      if (!animatingIds.has(latestId)) {
-        setAnimatingIds((prev) => new Set([...prev, latestId]));
-        // Remove animation after it completes
-        const timeout = setTimeout(() => {
-          setAnimatingIds((prev) => {
-            const next = new Set(prev);
-            next.delete(latestId);
-            return next;
-          });
-        }, 1000);
-        return () => clearTimeout(timeout);
-      }
+    // Sync ref with current state at the start of the effect (not during render)
+    animatingRef.current = animatingIds;
+
+    if (latestId && !animatingRef.current.has(latestId)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- animation trigger is the intended behavior
+      setAnimatingIds((prev) => new Set([...prev, latestId]));
+      // Remove animation after it completes
+      const timeout = setTimeout(() => {
+        setAnimatingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(latestId);
+          return next;
+        });
+      }, 1000);
+      return () => clearTimeout(timeout);
     }
-  }, [notifications, animatingIds]);
+  }, [latestId, animatingIds]);
 
   return (
     <div className="mb-6 min-h-[80px] overflow-hidden">
@@ -68,7 +74,7 @@ export function NotificationsPanel({ notifications }: NotificationsPanelProps) {
                   <span className="font-pixel text-pixel-xs text-pixel-text truncate flex items-center gap-2">
                     {isSuccess && isAnimating && (
                       <span className="text-pixel-success animate-bounce">
-                        &#10004;
+                        ✔
                       </span>
                     )}
                     {notification.title}
