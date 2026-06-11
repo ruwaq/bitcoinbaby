@@ -22,10 +22,7 @@ import { createLogger } from "@bitcoinbaby/shared";
 import { getApiClient } from "../api/client";
 
 const log = createLogger("Orchestrator");
-import {
-  AIWorkIntegration,
-  type AIWorkResult,
-} from "./ai-integration";
+import { AIWorkIntegration, type AIWorkResult } from "./ai-integration";
 
 const defaultConfig: OrchestratorConfig = {
   preferWebGPU: true,
@@ -58,6 +55,7 @@ export class MiningOrchestrator {
   private aiHashrate = 0;
   private aiTotalTokens = 0;
   private isPaused = false;
+  private abortController: AbortController | null = null; // For cancelling in-flight operations
 
   constructor(config: Partial<OrchestratorConfig> = {}) {
     this.config = { ...defaultConfig, ...config };
@@ -325,12 +323,19 @@ export class MiningOrchestrator {
    * Stop the active miner
    *
    * Thread-safe: Handles concurrent calls and in-progress operations.
+   * Uses AbortController to cancel in-flight async operations (fetch, AI tasks).
    * Sets flags atomically to ensure clean shutdown.
    */
   stop(): void {
     // Cancel any in-progress start() operation
     if (this.isStarting) {
       this.startCancelled = true;
+    }
+
+    // Abort any in-flight async operations (AI tasks, network requests)
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
     }
 
     // Set isRunning to false FIRST to signal other operations to abort
@@ -687,12 +692,21 @@ export class MiningOrchestrator {
 
   /**
    * Run the sequential AI Proof of Useful Work loop
+   *
+   * Creates an AbortController for clean cancellation of in-flight
+   * operations (fetch requests, AI inference). The controller is
+   * aborted when stop() is called, allowing the loop to exit cleanly
+   * without leaving dangling promises.
    */
   private async runAILoop(): Promise<void> {
+    // Create fresh AbortController for this mining session
+    this.abortController = new AbortController();
+    const signal = this.abortController.signal;
+
     log.info("Starting AI PoUW loop...");
     const client = getApiClient();
 
-    while (this.isRunning) {
+    while (this.isRunning && !signal.aborted) {
       if (this.isPaused) {
         await new Promise((resolve) => setTimeout(resolve, 100));
         continue;
@@ -702,7 +716,10 @@ export class MiningOrchestrator {
 
       // Validate address to avoid useless requests and console 400 errors (e.g. during wallet loading or status-bar placeholder)
       if (!address || address === "status-bar" || address.length < 26) {
-        log.debug("Skipping JIT AI task fetch: Miner address is invalid, empty or status-bar placeholder", { address });
+        log.debug(
+          "Skipping JIT AI task fetch: Miner address is invalid, empty or status-bar placeholder",
+          { address },
+        );
         await new Promise((resolve) => setTimeout(resolve, 3000));
         continue;
       }
@@ -720,7 +737,9 @@ export class MiningOrchestrator {
         }
 
         const task = response.data;
-        log.info(`Received AI Task ${task.id} based on block ${task.blockHash}`);
+        log.info(
+          `Received AI Task ${task.id} based on block ${task.blockHash}`,
+        );
 
         // Map PouwTaskResponse to AITask
         const aiTask: AITask = {
@@ -742,7 +761,9 @@ export class MiningOrchestrator {
           continue;
         }
 
-        log.info(`AI Task ${task.id} completed. Resolving and requesting signature...`);
+        log.info(
+          `AI Task ${task.id} completed. Resolving and requesting signature...`,
+        );
 
         // Deserialize unsigned proof
         const proofObj = JSON.parse(aiResult.proof) as AIProof;
@@ -752,9 +773,9 @@ export class MiningOrchestrator {
           this.events.onAILocalTaskResolved(proofObj, aiTask);
         }
 
-        // Simulate onXPGained event
+        // Emit onXPGained event for AI work — uses task metadata as the mining result
         const baseXP = this.calculateBaseXP(MIN_DIFFICULTY);
-        const mockMiningResult: MiningResult = {
+        const aiMiningResult: MiningResult = {
           hash: proofObj.taskId,
           nonce: 0,
           difficulty: MIN_DIFFICULTY,
@@ -762,7 +783,7 @@ export class MiningOrchestrator {
           blockData: task.blockHash,
           aiProof: aiResult.proof,
         };
-        this.emitXPGained(mockMiningResult, baseXP);
+        this.emitXPGained(aiMiningResult, baseXP);
 
         // Estimate tokens/s
         const tokenEstimate = Math.ceil(proofObj.output.length / 4) + 1;
@@ -773,11 +794,12 @@ export class MiningOrchestrator {
 
         // Throttle between tasks to prevent overheating
         await new Promise((resolve) => setTimeout(resolve, 1000));
-
       } catch (error) {
         log.error("Error in AI mining loop", { error });
         this.events.onError?.(
-          error instanceof Error ? error : new Error("AI mining loop encountered an error")
+          error instanceof Error
+            ? error
+            : new Error("AI mining loop encountered an error"),
         );
         await new Promise((resolve) => setTimeout(resolve, 5000));
       }
