@@ -1,7 +1,12 @@
 /**
  * Game Engine
  *
- * Main game loop that manages state updates, saves, and events.
+ * Main game logic that manages state updates, saves, and events.
+ * Uses the unified GameLoop for timing instead of its own setInterval timers.
+ *
+ * The engine registers two tasks with the global GameLoop:
+ * - tick (every 10s): stat decay, visual state, critical stat checks
+ * - save (every 30s): persist game state to storage
  */
 
 import { GAME_CONFIG, STAGE_NAMES, MINING_BONUS } from "./constants";
@@ -33,17 +38,25 @@ import {
 } from "./achievements";
 import { GameStorage } from "../storage";
 import type { GameAction, BabyStage } from "./constants";
+import { getGameLoop } from "./game-loop";
 
 /**
  * Game Engine class
+ *
+ * Registers with the unified GameLoop instead of creating its own timers.
+ * This ensures all time-based game updates are coordinated through a single
+ * requestAnimationFrame loop.
  */
 export class GameEngine {
   private state: GameState;
-  private tickInterval: ReturnType<typeof setInterval> | null = null;
-  private saveInterval: ReturnType<typeof setInterval> | null = null;
   private lastTickTime: number = 0;
   private eventHandlers: Set<GameEventHandler> = new Set();
   private isInitialized: boolean = false;
+  private isRunning: boolean = false;
+
+  // Task IDs registered with the GameLoop
+  private readonly TICK_TASK_ID = "game-engine-tick";
+  private readonly SAVE_TASK_ID = "game-engine-save";
 
   constructor() {
     this.state = { ...DEFAULT_GAME_STATE };
@@ -71,41 +84,58 @@ export class GameEngine {
   }
 
   /**
-   * Start the game loop
+   * Start the game loop — registers tasks with the unified GameLoop.
+   * Safe to call multiple times.
    */
   start(): void {
-    if (this.tickInterval) return;
+    if (this.isRunning) return;
 
     this.lastTickTime = Date.now();
+    const loop = getGameLoop();
 
-    // Start tick loop
-    this.tickInterval = setInterval(() => {
-      this.tick();
-    }, GAME_CONFIG.TICK_INTERVAL);
+    // Register tick task: stat decay, visual state, critical checks
+    loop.registerTask({
+      id: this.TICK_TASK_ID,
+      intervalMs: GAME_CONFIG.TICK_INTERVAL, // 10s
+      update: (_dt: number) => {
+        this.tick();
+      },
+    });
 
-    // Start auto-save
-    this.saveInterval = setInterval(() => {
-      this.save();
-    }, GAME_CONFIG.SAVE_INTERVAL);
+    // Register save task: persist game state
+    loop.registerTask({
+      id: this.SAVE_TASK_ID,
+      intervalMs: GAME_CONFIG.SAVE_INTERVAL, // 30s
+      update: (_dt: number) => {
+        this.save();
+      },
+    });
+
+    // Ensure the loop itself is running
+    if (!loop.running) {
+      loop.start();
+    }
+
+    this.isRunning = true;
   }
 
   /**
-   * Stop the game loop
+   * Stop the game loop — unregisters tasks from the unified GameLoop.
+   * Safe to call multiple times.
    */
   stop(): void {
-    if (this.tickInterval) {
-      clearInterval(this.tickInterval);
-      this.tickInterval = null;
-    }
+    if (!this.isRunning) return;
 
-    if (this.saveInterval) {
-      clearInterval(this.saveInterval);
-      this.saveInterval = null;
-    }
+    const loop = getGameLoop();
+    loop.unregisterTask(this.TICK_TASK_ID);
+    loop.unregisterTask(this.SAVE_TASK_ID);
+
+    this.isRunning = false;
   }
 
   /**
-   * Execute a single game tick
+   * Execute a single game tick.
+   * Called by the unified GameLoop at TICK_INTERVAL (10s).
    */
   tick(): void {
     if (!this.state.baby) return;

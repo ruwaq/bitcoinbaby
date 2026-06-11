@@ -1,5 +1,5 @@
 /**
- * useEngagement Hook
+ * useEngagement Hook — Unified Game Loop Powered
  *
  * Tracks user engagement for mining bonuses:
  * - Baby Care: +50% for healthy baby
@@ -7,9 +7,13 @@
  * - Play Time: +20% for active play
  *
  * Maximum bonus: 2.0x multiplier
+ *
+ * Uses the unified GameLoop for periodic tasks instead of
+ * spawning independent setInterval timers.
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { getGameLoop } from "../game/game-loop";
 import {
   calculateEngagementMultiplier,
   updateDailyStreak,
@@ -27,6 +31,11 @@ import {
 // =============================================================================
 
 const ENGAGEMENT_STORAGE_KEY = "bitcoinbaby:engagement";
+
+// Task IDs for the unified game loop
+const PLAY_TIME_TASK = "engagement-play-time";
+const MIDNIGHT_CHECK_TASK = "engagement-midnight-check";
+const AUTO_SAVE_TASK = "engagement-auto-save";
 
 // =============================================================================
 // HOOK
@@ -133,43 +142,62 @@ export function useEngagement(
     }
   }, [recordLogin]);
 
-  // Auto-save periodically
+  // ---- Unified Game Loop Integration ----
+  // Replaces 3 independent setInterval timers with tasks on the shared loop
+
   useEffect(() => {
-    const interval = setInterval(save, autoSaveInterval);
-    return () => clearInterval(interval);
-  }, [save, autoSaveInterval]);
+    const loop = getGameLoop();
+
+    // Ensure the loop is running
+    if (!loop.running) {
+      loop.start();
+    }
+
+    // Task 1: Track play time every 60 seconds
+    loop.registerTask({
+      id: PLAY_TIME_TASK,
+      intervalMs: 60_000,
+      update: (_dt: number) => {
+        trackPlayTime(1);
+      },
+    });
+
+    // Task 2: Check for midnight reset every 60 seconds
+    loop.registerTask({
+      id: MIDNIGHT_CHECK_TASK,
+      intervalMs: 60_000,
+      update: (_dt: number) => {
+        const today = new Date().toISOString().split("T")[0];
+        // We read state via closure — the setState callback ensures we get latest
+        setState((prev) => {
+          if (prev.lastLoginDay && prev.lastLoginDay !== today) {
+            return { ...prev, playTimeToday: 0, lastLoginDay: today };
+          }
+          return prev;
+        });
+      },
+    });
+
+    // Task 3: Auto-save periodically
+    loop.registerTask({
+      id: AUTO_SAVE_TASK,
+      intervalMs: autoSaveInterval,
+      update: (_dt: number) => {
+        save();
+      },
+    });
+
+    return () => {
+      loop.unregisterTask(PLAY_TIME_TASK);
+      loop.unregisterTask(MIDNIGHT_CHECK_TASK);
+      loop.unregisterTask(AUTO_SAVE_TASK);
+    };
+  }, [trackPlayTime, save, autoSaveInterval]);
 
   // Save on unmount
   useEffect(() => {
     return () => save();
   }, [save]);
-
-  // Track play time automatically (1 minute intervals)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      trackPlayTime(1);
-    }, 60_000); // Every minute
-
-    return () => clearInterval(interval);
-  }, [trackPlayTime]);
-
-  // Reset play time at midnight
-  useEffect(() => {
-    const checkMidnight = () => {
-      const today = new Date().toISOString().split("T")[0];
-      if (state.lastLoginDay && state.lastLoginDay !== today) {
-        setState((prev) => ({
-          ...prev,
-          playTimeToday: 0,
-          lastLoginDay: today,
-        }));
-      }
-    };
-
-    // Check every minute
-    const interval = setInterval(checkMidnight, 60_000);
-    return () => clearInterval(interval);
-  }, [state.lastLoginDay]);
 
   // Update baby health score when stats change
   useEffect(() => {

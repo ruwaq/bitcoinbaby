@@ -23,6 +23,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { getGameLoop } from "../game/game-loop";
 import {
   getMiningManager,
   type MiningManagerState,
@@ -172,17 +173,29 @@ export function useGlobalMining(
   // The initialNftBoost option is deprecated - boost comes from owned NFTs
 
   // Uptime timer
+  // Uptime counter — uses unified GameLoop instead of independent setInterval
+  const UPTIME_TASK_ID = "mining-uptime";
+
   useEffect(() => {
     if (!managerState.isRunning) {
       setUptime(0);
       return;
     }
 
-    const interval = setInterval(() => {
-      setUptime(manager.getUptime());
-    }, 1000);
+    const loop = getGameLoop();
+    if (!loop.running) loop.start();
 
-    return () => clearInterval(interval);
+    loop.registerTask({
+      id: UPTIME_TASK_ID,
+      intervalMs: 1000,
+      update: (_dt: number) => {
+        setUptime(manager.getUptime());
+      },
+    });
+
+    return () => {
+      loop.unregisterTask(UPTIME_TASK_ID);
+    };
   }, [managerState.isRunning, manager]);
 
   // Calculate effective hashrate with boosts

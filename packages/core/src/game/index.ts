@@ -78,6 +78,16 @@ export {
 // Engine
 export { GameEngine, getGameEngine, createGameEngine } from "./engine";
 
+// Game Loop (unified timing)
+export {
+  GameLoop,
+  getGameLoop,
+  initGameLoop,
+  destroyGameLoop,
+  type LoopTask,
+  type GameLoopConfig,
+} from "./game-loop";
+
 // Tokenomics (eCash-inspired)
 export {
   TOKEN_DISTRIBUTION,
