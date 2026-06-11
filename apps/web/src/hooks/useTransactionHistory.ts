@@ -1,19 +1,19 @@
 "use client";
 
 /**
- * useTransactionHistory Hook
+ * useTransactionHistory Hook — TanStack Query powered
  *
  * Fetches and manages transaction history from Mempool.space API.
  * Supports pagination via "load more" pattern with cursor-based loading.
  *
- * Features:
- * - Automatic calculation of incoming vs outgoing amounts
- * - Confirmation tracking based on current block height
- * - Mining submission detection (based on OP_RETURN patterns)
- * - Paginated loading with cursor support
+ * Uses TanStack Query for caching and background refetch.
+ * Pagination is handled via infinite query pattern (useInfiniteQuery).
+ *
+ * Query key: ['tx-history', address, network]
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useCallback, useRef, useEffect } from "react";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
   createMempoolClient,
   type TransactionInfo,
@@ -23,7 +23,6 @@ import type { TransactionDisplay } from "@bitcoinbaby/ui";
 
 /**
  * Extended transaction info from Mempool API
- * (includes vin/vout which aren't in the base TransactionInfo type)
  */
 interface ExtendedTransactionInfo extends TransactionInfo {
   vin: Array<{
@@ -49,8 +48,6 @@ interface ExtendedTransactionInfo extends TransactionInfo {
 export interface TransactionHistoryState {
   /** Processed transactions ready for display */
   transactions: TransactionDisplay[];
-  /** Raw transaction data from API */
-  rawTransactions: ExtendedTransactionInfo[];
   /** Whether initial load is in progress */
   isLoading: boolean;
   /** Whether more transactions are being loaded */
@@ -94,52 +91,36 @@ export interface UseTransactionHistoryOptions {
   fetchOnMount?: boolean;
 }
 
-/**
- * Number of transactions per page (Mempool API default is 25)
- */
 const PAGE_SIZE = 25;
 
-/**
- * Check if a transaction is a mining submission
- * (looks for OP_RETURN outputs with specific patterns)
- */
 function isMiningSubmission(tx: ExtendedTransactionInfo): boolean {
   return tx.vout.some(
     (output) =>
       output.scriptpubkey_type === "op_return" ||
-      // Check for Charms/Scrolls pattern
-      output.scriptpubkey?.startsWith("6a"), // OP_RETURN opcode
+      output.scriptpubkey?.startsWith("6a"),
   );
 }
 
-/**
- * Calculate transaction amount relative to an address
- * Returns positive for incoming, negative for outgoing
- */
 function calculateAmount(
   tx: ExtendedTransactionInfo,
   address: string,
 ): { amount: number; type: "incoming" | "outgoing" | "self" } {
-  // Sum of inputs from this address
   const inputSum = tx.vin
     .filter((input) => input.prevout?.scriptpubkey_address === address)
     .reduce((sum, input) => sum + (input.prevout?.value || 0), 0);
 
-  // Sum of outputs to this address
   const outputSum = tx.vout
     .filter((output) => output.scriptpubkey_address === address)
     .reduce((sum, output) => sum + output.value, 0);
 
   const netAmount = outputSum - inputSum;
 
-  // Determine transaction type
   let type: "incoming" | "outgoing" | "self";
   if (inputSum === 0 && outputSum > 0) {
     type = "incoming";
   } else if (inputSum > 0 && outputSum === 0) {
     type = "outgoing";
   } else if (inputSum > 0 && outputSum > 0) {
-    // Has both inputs and outputs - could be self-send or change
     type = netAmount >= 0 ? "self" : "outgoing";
   } else {
     type = "incoming";
@@ -148,9 +129,6 @@ function calculateAmount(
   return { amount: netAmount, type };
 }
 
-/**
- * Process raw transaction into display format
- */
 function processTransaction(
   tx: ExtendedTransactionInfo,
   address: string,
@@ -158,7 +136,6 @@ function processTransaction(
 ): TransactionDisplay {
   const { amount, type } = calculateAmount(tx, address);
 
-  // Calculate confirmations
   let confirmations = 0;
   if (tx.status.confirmed && tx.status.block_height && currentBlockHeight) {
     confirmations = currentBlockHeight - tx.status.block_height + 1;
@@ -176,22 +153,7 @@ function processTransaction(
 }
 
 /**
- * useTransactionHistory Hook
- *
- * @example
- * ```tsx
- * const {
- *   transactions,
- *   isLoading,
- *   error,
- *   hasMore,
- *   loadMore,
- *   refresh,
- * } = useTransactionHistory({
- *   address: wallet?.address,
- *   network: 'testnet4',
- * });
- * ```
+ * useTransactionHistory Hook — TanStack Query with infinite pagination
  */
 export function useTransactionHistory(
   options: UseTransactionHistoryOptions,
@@ -204,176 +166,81 @@ export function useTransactionHistory(
     fetchOnMount = true,
   } = options;
 
-  // Create mempool client
   const clientRef = useRef(createMempoolClient({ network }));
 
-  // Update client when network changes
   useEffect(() => {
     clientRef.current = createMempoolClient({ network });
   }, [network]);
 
-  // State
-  const [state, setState] = useState<TransactionHistoryState>({
-    transactions: [],
-    rawTransactions: [],
-    isLoading: false,
-    isLoadingMore: false,
-    error: null,
-    hasMore: false,
-    currentBlockHeight: null,
-    lastUpdated: null,
+  // ---- Block height query (needed for confirmation calculation) ----
+  const { data: blockHeight } = useQuery({
+    queryKey: ["block-height", network],
+    queryFn: async () => {
+      try {
+        return await clientRef.current.getBlockHeight();
+      } catch {
+        return null;
+      }
+    },
+    staleTime: 60_000, // Block height changes slowly
+    enabled: !!address,
   });
 
-  /**
-   * Fetch current block height
-   */
-  const fetchBlockHeight = useCallback(async (): Promise<number | null> => {
-    try {
-      return await clientRef.current.getBlockHeight();
-    } catch {
-      return null;
-    }
-  }, []);
-
-  /**
-   * Fetch transactions with optional cursor
-   */
-  const fetchTransactions = useCallback(
-    async (afterTxid?: string): Promise<ExtendedTransactionInfo[]> => {
-      if (!address) return [];
-
-      const txs = await clientRef.current.getAddressTransactions(
+  // ---- Infinite query for transactions ----
+  const {
+    data,
+    isLoading,
+    isFetchingNextPage,
+    error: queryError,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+    dataUpdatedAt,
+  } = useInfiniteQuery({
+    queryKey: ["tx-history", address, network],
+    queryFn: async ({ pageParam }: { pageParam: string | undefined }) => {
+      if (!address) return { txs: [], nextCursor: undefined };
+      const rawTxs = (await clientRef.current.getAddressTransactions(
         address,
-        afterTxid,
+        pageParam,
+      )) as ExtendedTransactionInfo[];
+      const processed = rawTxs.map((tx) =>
+        processTransaction(tx, address, blockHeight ?? null),
       );
-
-      // Cast to extended type (Mempool API returns full tx data)
-      return txs as ExtendedTransactionInfo[];
+      const nextCursor =
+        rawTxs.length >= PAGE_SIZE
+          ? rawTxs[rawTxs.length - 1]?.txid
+          : undefined;
+      return { txs: processed, nextCursor };
     },
-    [address],
-  );
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    enabled: !!address && fetchOnMount,
+    refetchInterval: autoRefresh && address ? refreshInterval : false,
+    placeholderData: (prev) => prev,
+  });
 
-  /**
-   * Initial fetch / refresh
-   */
-  const refresh = useCallback(async (): Promise<void> => {
-    if (!address) {
-      setState((prev) => ({
-        ...prev,
-        transactions: [],
-        rawTransactions: [],
-        error: null,
-        hasMore: false,
-      }));
-      return;
-    }
+  // Flatten all pages into a single array
+  const transactions = data?.pages.flatMap((page) => page.txs) ?? [];
 
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
-
-    try {
-      // Fetch block height and transactions in parallel
-      const [blockHeight, rawTxs] = await Promise.all([
-        fetchBlockHeight(),
-        fetchTransactions(),
-      ]);
-
-      // Process transactions
-      const processedTxs = rawTxs.map((tx) =>
-        processTransaction(tx, address, blockHeight),
-      );
-
-      setState({
-        transactions: processedTxs,
-        rawTransactions: rawTxs,
-        isLoading: false,
-        isLoadingMore: false,
-        error: null,
-        hasMore: rawTxs.length >= PAGE_SIZE,
-        currentBlockHeight: blockHeight,
-        lastUpdated: Date.now(),
-      });
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        isLoading: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to fetch transactions",
-      }));
-    }
-  }, [address, fetchBlockHeight, fetchTransactions]);
-
-  /**
-   * Load more transactions (pagination)
-   */
   const loadMore = useCallback(async (): Promise<void> => {
-    if (!address || state.isLoadingMore || !state.hasMore) return;
-
-    const lastTx = state.rawTransactions[state.rawTransactions.length - 1];
-    if (!lastTx) return;
-
-    setState((prev) => ({ ...prev, isLoadingMore: true, error: null }));
-
-    try {
-      const newRawTxs = await fetchTransactions(lastTx.txid);
-
-      // Process new transactions
-      const newProcessedTxs = newRawTxs.map((tx) =>
-        processTransaction(tx, address, state.currentBlockHeight),
-      );
-
-      setState((prev) => ({
-        ...prev,
-        transactions: [...prev.transactions, ...newProcessedTxs],
-        rawTransactions: [...prev.rawTransactions, ...newRawTxs],
-        isLoadingMore: false,
-        hasMore: newRawTxs.length >= PAGE_SIZE,
-      }));
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        isLoadingMore: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to load more transactions",
-      }));
+    if (hasNextPage && !isFetchingNextPage) {
+      await fetchNextPage();
     }
-  }, [
-    address,
-    state.isLoadingMore,
-    state.hasMore,
-    state.rawTransactions,
-    state.currentBlockHeight,
-    fetchTransactions,
-  ]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  /**
-   * Initial fetch on mount
-   */
-  useEffect(() => {
-    if (fetchOnMount && address) {
-      refresh();
-    }
-  }, [address, fetchOnMount]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  /**
-   * Auto-refresh interval
-   */
-  useEffect(() => {
-    if (!autoRefresh || !address) return;
-
-    const intervalId = setInterval(() => {
-      refresh();
-    }, refreshInterval);
-
-    return () => clearInterval(intervalId);
-  }, [autoRefresh, address, refreshInterval, refresh]);
+  const refresh = useCallback(async (): Promise<void> => {
+    await refetch();
+  }, [refetch]);
 
   return {
-    ...state,
-    isLoading: state.isLoading || state.isLoadingMore,
+    transactions,
+    isLoading,
+    isLoadingMore: isFetchingNextPage,
+    error: queryError instanceof Error ? queryError.message : null,
+    hasMore: hasNextPage,
+    currentBlockHeight: blockHeight ?? null,
+    lastUpdated: dataUpdatedAt ?? null,
     loadMore,
     refresh,
   };

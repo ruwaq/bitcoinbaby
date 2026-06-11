@@ -1,17 +1,21 @@
 "use client";
 
 /**
- * useTokenBalance Hook
+ * useTokenBalance Hook — TanStack Query powered
  *
  * Tracks $BABY token balance using a hybrid approach:
- * - Queries confirmed balance from Scrolls API (Charms indexer)
- * - Tracks local pending rewards from mining
+ * - Queries confirmed balance from Scrolls API (Charms indexer) via TanStack Query
+ * - Tracks local pending rewards from mining via useState (client state)
  * - Merges both for total display
  *
  * Tokens in Charms are embedded in UTXOs and indexed by Scrolls.
+ *
+ * Query key: ['token-balance', address, network, ticker]
+ * Refetch interval: configurable (default 60s)
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNetworkStore } from "@bitcoinbaby/core";
 import {
   createScrollsClient,
@@ -88,64 +92,32 @@ interface UseTokenBalanceOptions {
   initialPendingBalance?: bigint;
   /** Auto-refresh interval in ms (default: 60000, 0 to disable) */
   refreshInterval?: number;
-  /** Cache duration in ms (default: 30000) */
-  cacheDuration?: number;
 }
 
-// Cache configuration
-const CACHE_MAX_SIZE = 50; // Maximum entries in cache
-const CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes max age for any entry
-
-// Global cache for token balances to avoid excessive API calls
-const balanceCache = new Map<
-  string,
-  {
-    balance: TokenBalance | null;
-    timestamp: number;
-  }
->();
-
 /**
- * Generate cache key for address + network + ticker
+ * Fetch on-chain balance from Scrolls API.
+ * Returns null if the API is unavailable (404) so the query stays successful.
  */
-function getCacheKey(
+async function fetchOnChainBalance(
   address: string,
-  network: ScrollsNetwork,
   ticker: string,
-): string {
-  return `${network}:${address}:${ticker}`;
-}
-
-/**
- * Clean up expired and excess cache entries (LRU-style)
- */
-function cleanupCache(): void {
-  const now = Date.now();
-
-  // Remove expired entries
-  for (const [key, value] of balanceCache.entries()) {
-    if (now - value.timestamp > CACHE_MAX_AGE) {
-      balanceCache.delete(key);
+  client: ScrollsClient,
+): Promise<TokenBalance | null> {
+  try {
+    return await client.getTokenBalance(address, ticker);
+  } catch (error) {
+    // 404 means the API doesn't support token balances yet — not an error
+    if (error instanceof Error && error.message.includes("404")) {
+      return null;
     }
-  }
-
-  // If still over max size, remove oldest entries
-  if (balanceCache.size > CACHE_MAX_SIZE) {
-    const entries = Array.from(balanceCache.entries()).sort(
-      (a, b) => a[1].timestamp - b[1].timestamp,
-    );
-
-    const toRemove = entries.slice(0, balanceCache.size - CACHE_MAX_SIZE);
-    for (const [key] of toRemove) {
-      balanceCache.delete(key);
-    }
+    throw error;
   }
 }
 
 /**
  * useTokenBalance Hook
  *
- * Tracks $BABY token balance using hybrid local + on-chain approach.
+ * Hybrid: TanStack Query for on-chain data, useState for local pending tokens.
  *
  * @example
  * ```tsx
@@ -159,9 +131,6 @@ function cleanupCache(): void {
  *
  * // After mining success, add pending tokens
  * addPendingTokens(BigInt(1000));
- *
- * // Display balance
- * console.log(`Total: ${balance}, Confirmed: ${confirmedBalance}, Pending: ${pendingBalance}`);
  * ```
  */
 export function useTokenBalance(
@@ -171,329 +140,120 @@ export function useTokenBalance(
     address,
     tokenTicker = "BABY",
     initialPendingBalance = BigInt(0),
-    refreshInterval = 60000, // 1 minute default
-    cacheDuration = 30000, // 30 seconds cache
+    refreshInterval = 60000,
   } = options;
+
+  const queryClient = useQueryClient();
 
   // Network configuration
   const { config } = useNetworkStore();
   const scrollsNetwork: ScrollsNetwork = config.scrolls;
 
-  // Scrolls client ref (recreated on network change)
+  // Scrolls client ref — stable across renders
   const clientRef = useRef<ScrollsClient | null>(null);
+  if (!clientRef.current) {
+    clientRef.current = createScrollsClient({
+      baseUrl: config.scrollsApi.replace("/api/v1", ""),
+      network: scrollsNetwork,
+    });
+  }
 
-  // Initialize client when network changes
   useEffect(() => {
     clientRef.current = createScrollsClient({
-      baseUrl: config.scrollsApi.replace("/api/v1", ""), // Base URL without path
+      baseUrl: config.scrollsApi.replace("/api/v1", ""),
       network: scrollsNetwork,
     });
   }, [config.scrollsApi, scrollsNetwork]);
 
-  // State
-  const [state, setState] = useState<TokenBalanceState>({
-    balance: initialPendingBalance,
-    confirmedBalance: BigInt(0),
-    pendingBalance: initialPendingBalance,
-    tokens:
-      initialPendingBalance > BigInt(0)
-        ? [
-            {
-              ticker: tokenTicker,
-              confirmed: BigInt(0),
-              pending: initialPendingBalance,
-              total: initialPendingBalance,
-              lastUpdated: Date.now(),
-            },
-          ]
-        : [],
-    isLoading: false,
-    error: null,
-    lastUpdated: initialPendingBalance > BigInt(0) ? Date.now() : null,
-    isApiAvailable: true, // Assume available until proven otherwise
-    network: scrollsNetwork,
+  // ---- Client state: pending tokens (local, not from server) ----
+  const [pendingBalance, setPendingBalance] = useState<bigint>(
+    initialPendingBalance,
+  );
+
+  // ---- TanStack Query: on-chain confirmed balance ----
+  const {
+    data: onChainData,
+    isLoading,
+    error: queryError,
+    dataUpdatedAt,
+  } = useQuery({
+    queryKey: ["token-balance", address, scrollsNetwork, tokenTicker],
+    queryFn: async () => {
+      if (!address || !clientRef.current) return null;
+      return fetchOnChainBalance(address, tokenTicker, clientRef.current);
+    },
+    enabled: !!address,
+    refetchInterval: address ? refreshInterval : false,
+    placeholderData: (prev) => prev,
   });
 
-  // Refresh interval ref
-  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
-    null,
-  );
+  // Derive confirmed balance from query
+  const confirmedBalance = onChainData?.amount ?? BigInt(0);
+  const isApiAvailable = onChainData !== undefined; // null = API returned 404 gracefully
 
-  /**
-   * Fetch balance from Scrolls API with caching
-   */
-  const fetchBalance = useCallback(
-    async (ignoreCache = false): Promise<TokenBalance | null> => {
-      if (!address || !clientRef.current) return null;
+  // Total = confirmed (server) + pending (local)
+  const totalBalance = confirmedBalance + pendingBalance;
 
-      const cacheKey = getCacheKey(address, scrollsNetwork, tokenTicker);
+  // ---- Actions ----
 
-      // Check cache
-      if (!ignoreCache) {
-        const cached = balanceCache.get(cacheKey);
-        if (cached && Date.now() - cached.timestamp < cacheDuration) {
-          return cached.balance;
-        }
-      }
-
-      try {
-        const balance = await clientRef.current.getTokenBalance(
-          address,
-          tokenTicker,
-        );
-
-        // Update cache and cleanup old entries
-        balanceCache.set(cacheKey, {
-          balance,
-          timestamp: Date.now(),
-        });
-        cleanupCache();
-
-        return balance;
-      } catch (error) {
-        // Clear cache on error
-        balanceCache.delete(cacheKey);
-        throw error;
-      }
-    },
-    [address, scrollsNetwork, tokenTicker, cacheDuration],
-  );
-
-  /**
-   * Refresh balance from Scrolls API
-   */
   const refresh = useCallback(async (): Promise<void> => {
     if (!address) return;
+    await queryClient.invalidateQueries({
+      queryKey: ["token-balance", address, scrollsNetwork, tokenTicker],
+    });
+  }, [address, scrollsNetwork, tokenTicker, queryClient]);
 
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
-
-    try {
-      const onChainBalance = await fetchBalance();
-
-      const confirmedBalance = onChainBalance?.amount ?? BigInt(0);
-
-      setState((prev) => {
-        const total = confirmedBalance + prev.pendingBalance;
-        return {
-          ...prev,
-          balance: total,
-          confirmedBalance,
-          tokens: [
-            {
-              ticker: tokenTicker,
-              confirmed: confirmedBalance,
-              pending: prev.pendingBalance,
-              total,
-              lastUpdated: Date.now(),
-            },
-          ],
-          isLoading: false,
-          isApiAvailable: true,
-          lastUpdated: Date.now(),
-          network: scrollsNetwork,
-        };
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to fetch balance";
-
-      // Check if it's a 404 (API not available for token balances)
-      const isNotFound =
-        error instanceof Error && error.message.includes("404");
-
-      setState((prev) => ({
-        ...prev,
-        isLoading: false,
-        error: isNotFound ? null : errorMessage, // Don't show error for 404
-        isApiAvailable: !isNotFound,
-        lastUpdated: Date.now(),
-      }));
-    }
-  }, [address, fetchBalance, tokenTicker, scrollsNetwork]);
-
-  /**
-   * Force refresh ignoring cache
-   */
   const forceRefresh = useCallback(async (): Promise<void> => {
     if (!address) return;
-
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
-
-    try {
-      const onChainBalance = await fetchBalance(true); // Ignore cache
-
-      const confirmedBalance = onChainBalance?.amount ?? BigInt(0);
-
-      setState((prev) => {
-        const total = confirmedBalance + prev.pendingBalance;
-        return {
-          ...prev,
-          balance: total,
-          confirmedBalance,
-          tokens: [
-            {
-              ticker: tokenTicker,
-              confirmed: confirmedBalance,
-              pending: prev.pendingBalance,
-              total,
-              lastUpdated: Date.now(),
-            },
-          ],
-          isLoading: false,
-          isApiAvailable: true,
-          lastUpdated: Date.now(),
-          network: scrollsNetwork,
-        };
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to fetch balance";
-
-      setState((prev) => ({
-        ...prev,
-        isLoading: false,
-        error: errorMessage,
-        lastUpdated: Date.now(),
-      }));
-    }
-  }, [address, fetchBalance, tokenTicker, scrollsNetwork]);
-
-  /**
-   * Add tokens to pending balance (from mining rewards)
-   */
-  const addPendingTokens = useCallback(
-    (amount: bigint): void => {
-      setState((prev) => {
-        const newPending = prev.pendingBalance + amount;
-        const newTotal = prev.confirmedBalance + newPending;
-        return {
-          ...prev,
-          balance: newTotal,
-          pendingBalance: newPending,
-          tokens: [
-            {
-              ticker: tokenTicker,
-              confirmed: prev.confirmedBalance,
-              pending: newPending,
-              total: newTotal,
-              lastUpdated: Date.now(),
-            },
-          ],
-          lastUpdated: Date.now(),
-        };
-      });
-    },
-    [tokenTicker],
-  );
-
-  /**
-   * Move pending tokens to confirmed (after tx confirmation)
-   */
-  const confirmTokens = useCallback(
-    (amount: bigint): void => {
-      setState((prev) => {
-        // Don't confirm more than pending
-        const toConfirm =
-          amount > prev.pendingBalance ? prev.pendingBalance : amount;
-        const newPending = prev.pendingBalance - toConfirm;
-        const newConfirmed = prev.confirmedBalance + toConfirm;
-        const newTotal = newConfirmed + newPending;
-
-        return {
-          ...prev,
-          balance: newTotal,
-          confirmedBalance: newConfirmed,
-          pendingBalance: newPending,
-          tokens: [
-            {
-              ticker: tokenTicker,
-              confirmed: newConfirmed,
-              pending: newPending,
-              total: newTotal,
-              lastUpdated: Date.now(),
-            },
-          ],
-          lastUpdated: Date.now(),
-        };
-      });
-    },
-    [tokenTicker],
-  );
-
-  /**
-   * Reset all balances
-   */
-  const reset = useCallback((): void => {
-    // Clear cache for this address
-    if (address) {
-      const cacheKey = getCacheKey(address, scrollsNetwork, tokenTicker);
-      balanceCache.delete(cacheKey);
-    }
-
-    setState({
-      balance: BigInt(0),
-      confirmedBalance: BigInt(0),
-      pendingBalance: BigInt(0),
-      tokens: [],
-      isLoading: false,
-      error: null,
-      lastUpdated: Date.now(),
-      isApiAvailable: true,
-      network: scrollsNetwork,
+    await queryClient.refetchQueries({
+      queryKey: ["token-balance", address, scrollsNetwork, tokenTicker],
     });
-  }, [address, scrollsNetwork, tokenTicker]);
+  }, [address, scrollsNetwork, tokenTicker, queryClient]);
 
-  /**
-   * Reset and refresh when address or network changes
-   */
-  useEffect(() => {
-    if (!address) {
-      setState({
-        balance: BigInt(0),
-        confirmedBalance: BigInt(0),
-        pendingBalance: BigInt(0),
-        tokens: [],
-        isLoading: false,
-        error: null,
-        lastUpdated: null,
-        isApiAvailable: true,
-        network: scrollsNetwork,
+  const addPendingTokens = useCallback((amount: bigint): void => {
+    setPendingBalance((prev) => prev + amount);
+  }, []);
+
+  const confirmTokens = useCallback((amount: bigint): void => {
+    setPendingBalance((prev) => {
+      const toConfirm = amount > prev ? prev : amount;
+      return prev - toConfirm;
+    });
+  }, []);
+
+  const reset = useCallback((): void => {
+    setPendingBalance(BigInt(0));
+    if (address) {
+      queryClient.removeQueries({
+        queryKey: ["token-balance", address, scrollsNetwork, tokenTicker],
       });
-      return;
     }
+  }, [address, scrollsNetwork, tokenTicker, queryClient]);
 
-    // Refresh balance when address or network changes
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, scrollsNetwork]); // Don't include refresh to avoid loop
-
-  /**
-   * Set up auto-refresh interval
-   */
-  useEffect(() => {
-    // Clear existing interval
-    if (refreshIntervalRef.current) {
-      clearInterval(refreshIntervalRef.current);
-      refreshIntervalRef.current = null;
-    }
-
-    // Set up new interval if enabled and address is set
-    if (refreshInterval > 0 && address) {
-      refreshIntervalRef.current = setInterval(() => {
-        refresh();
-      }, refreshInterval);
-    }
-
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-        refreshIntervalRef.current = null;
-      }
-    };
-  }, [refreshInterval, address, refresh]);
+  // Build token info list
+  const tokens: TokenInfo[] =
+    confirmedBalance > BigInt(0) || pendingBalance > BigInt(0)
+      ? [
+          {
+            ticker: tokenTicker,
+            confirmed: confirmedBalance,
+            pending: pendingBalance,
+            total: totalBalance,
+            lastUpdated: dataUpdatedAt ?? Date.now(),
+          },
+        ]
+      : [];
 
   return {
-    ...state,
+    balance: totalBalance,
+    confirmedBalance,
+    pendingBalance,
+    tokens,
+    isLoading,
+    error: queryError instanceof Error ? queryError.message : null,
+    lastUpdated: dataUpdatedAt ?? null,
+    isApiAvailable,
+    network: scrollsNetwork,
     refresh,
     forceRefresh,
     addPendingTokens,
@@ -533,22 +293,28 @@ export function formatTokenBalance(
 }
 
 /**
- * Clear all cached balances
+ * Clear all cached token balances from React Query cache.
+ * Useful when switching networks or resetting state.
  */
 export function clearBalanceCache(): void {
-  balanceCache.clear();
+  // React Query cache is automatically managed.
+  // To force-clear, the consumer should use queryClient.removeQueries
+  // with the appropriate key pattern. This function is kept for
+  // backward compatibility with the old API.
 }
 
 /**
- * Clear cached balance for specific address
+ * Clear cached balance for a specific address.
+ * Kept for backward compatibility.
  */
 export function clearAddressBalanceCache(
-  address: string,
-  network: ScrollsNetwork,
-  ticker: string = "BABY",
+  _address: string,
+  _network: ScrollsNetwork,
+  _ticker: string = "BABY",
 ): void {
-  const cacheKey = getCacheKey(address, network, ticker);
-  balanceCache.delete(cacheKey);
+  // React Query cache is keyed by ['token-balance', address, network, ticker].
+  // Consumers should use queryClient.invalidateQueries or removeQueries
+  // for fine-grained cache control.
 }
 
 export type {

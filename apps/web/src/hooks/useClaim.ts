@@ -14,13 +14,9 @@
  */
 
 import { useState, useCallback, useEffect } from "react";
-import { createLogger } from "@bitcoinbaby/shared";
+import { createLogger, getWorkersApiUrl } from "@bitcoinbaby/shared";
 
 const log = createLogger("Claim");
-
-const WORKERS_API_URL =
-  process.env.NEXT_PUBLIC_WORKERS_API_URL ||
-  "https://bitcoinbaby-api.andeanlabs-58f.workers.dev";
 
 // =============================================================================
 // TYPES
@@ -136,7 +132,7 @@ export function useClaim({
   );
   const [completedTxid, setCompletedTxid] = useState<string | null>(null);
 
-  const apiUrl = WORKERS_API_URL;
+  const apiUrl = getWorkersApiUrl();
 
   // Derived state
   const canClaim = Boolean(

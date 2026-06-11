@@ -1,6 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+/**
+ * useBalance Hook — TanStack Query powered
+ *
+ * Fetches BTC balance, UTXOs, and fee estimates from Mempool.space API.
+ * Uses TanStack Query for caching, background refetch, and stale-while-revalidate.
+ *
+ * Query key: ['btc-balance', address, network]
+ * Stale time: 30s (BTC data changes slowly on testnet)
+ */
+
+import { useRef, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   type BlockchainAPI,
   createMempoolClient,
@@ -26,6 +37,26 @@ interface UseBalanceOptions {
   refreshInterval?: number; // ms
 }
 
+/**
+ * Raw data fetcher — called by TanStack Query.
+ * Returns all three data points in parallel via Promise.all.
+ */
+async function fetchBtcData(
+  address: string,
+  client: BlockchainAPI,
+): Promise<{
+  balance: AddressBalance;
+  utxos: UTXO[];
+  fees: FeeEstimates;
+}> {
+  const [balance, utxos, fees] = await Promise.all([
+    client.getBalance(address),
+    client.getUTXOs(address),
+    client.getFeeEstimates(),
+  ]);
+  return { balance, utxos, fees };
+}
+
 export function useBalance(options: UseBalanceOptions = {}) {
   const {
     address,
@@ -34,105 +65,69 @@ export function useBalance(options: UseBalanceOptions = {}) {
     refreshInterval = 30000,
   } = options;
 
+  // Stable client ref — recreated when network changes
   const clientRef = useRef<BlockchainAPI | null>(null);
-  // Track mounted state to prevent setState on unmounted component
-  const isMountedRef = useRef(true);
+  if (!clientRef.current) {
+    clientRef.current = createMempoolClient({ network });
+  }
 
-  const [state, setState] = useState<BalanceState>({
-    balance: null,
-    utxos: [],
-    fees: null,
-    isLoading: false,
-    error: null,
-    lastUpdated: null,
-  });
-
-  // Track mounted state
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
-  // Initialize client
   useEffect(() => {
     clientRef.current = createMempoolClient({ network });
-    return () => {
-      clientRef.current = null;
-    };
   }, [network]);
 
-  // Fetch balance
-  const fetchBalance = useCallback(async () => {
-    if (!address || !clientRef.current) return;
+  // ---- TanStack Query ----
+  const {
+    data,
+    isLoading,
+    error: queryError,
+    dataUpdatedAt,
+    refetch,
+  } = useQuery({
+    queryKey: ["btc-balance", address, network],
+    queryFn: async () => {
+      if (!address || !clientRef.current) return null;
+      return fetchBtcData(address, clientRef.current);
+    },
+    enabled: !!address && autoRefresh,
+    // Only poll when autoRefresh is enabled
+    refetchInterval: autoRefresh && address ? refreshInterval : false,
+    // Keep stale data visible while refetching
+    placeholderData: (prev) => prev,
+    // Don't refetch on mount if we already have data (manual refresh pattern)
+    refetchOnMount: false,
+  });
 
-    // Check if mounted before setState
-    if (!isMountedRef.current) return;
-
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
-
-    try {
-      const [balance, utxos, fees] = await Promise.all([
-        clientRef.current.getBalance(address),
-        clientRef.current.getUTXOs(address),
-        clientRef.current.getFeeEstimates(),
-      ]);
-
-      // Check if still mounted after async operation
-      if (!isMountedRef.current) return;
-
-      setState({
-        balance,
-        utxos,
-        fees,
-        isLoading: false,
-        error: null,
-        lastUpdated: Date.now(),
-      });
-    } catch (err) {
-      // Check if still mounted after async operation
-      if (!isMountedRef.current) return;
-
-      setState((prev) => ({
-        ...prev,
-        isLoading: false,
-        error: err instanceof Error ? err.message : "Failed to fetch balance",
-      }));
-    }
-  }, [address]);
-
-  // Auto-refresh
-  useEffect(() => {
-    if (!address || !autoRefresh) return;
-
-    fetchBalance();
-
-    const intervalId = setInterval(fetchBalance, refreshInterval);
-    return () => clearInterval(intervalId);
-  }, [address, autoRefresh, refreshInterval, fetchBalance]);
-
-  // Manual refresh
+  // Manual refresh — triggers a fresh fetch
   const refresh = useCallback(() => {
-    fetchBalance();
-  }, [fetchBalance]);
+    if (address) {
+      refetch();
+    }
+  }, [address, refetch]);
 
-  // Format balance as BTC
-  const btcBalance = state.balance
-    ? (state.balance.total / 100_000_000).toFixed(8)
+  // Derived values
+  const balance = data?.balance ?? null;
+  const utxos = data?.utxos ?? [];
+  const fees = data?.fees ?? null;
+
+  const btcBalance = balance
+    ? (balance.total / 100_000_000).toFixed(8)
     : "0.00000000";
 
-  // Get confirmed vs unconfirmed
-  const confirmed = state.balance?.confirmed ?? 0;
-  const unconfirmed = state.balance?.unconfirmed ?? 0;
+  const confirmed = balance?.confirmed ?? 0;
+  const unconfirmed = balance?.unconfirmed ?? 0;
 
   return {
-    ...state,
+    balance,
+    utxos,
+    fees,
+    isLoading,
+    error: queryError instanceof Error ? queryError.message : null,
+    lastUpdated: dataUpdatedAt ?? null,
     btcBalance,
     confirmed,
     unconfirmed,
     refresh,
-    hasBalance: (state.balance?.total ?? 0) > 0,
+    hasBalance: (balance?.total ?? 0) > 0,
   };
 }
 

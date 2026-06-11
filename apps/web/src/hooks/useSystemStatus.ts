@@ -1,19 +1,18 @@
 /**
- * useSystemStatus Hook
+ * useSystemStatus Hook — TanStack Query powered
  *
  * Fetches the Treasury/Signer system status from the Workers API.
  * Used to show users if the claim system is fully operational.
+ *
+ * Query key: ['system-status']
+ * Refetch interval: 5 minutes (system status changes slowly)
  */
 
-import { useState, useEffect, useCallback } from "react";
-import { createLogger } from "@bitcoinbaby/shared";
+import { useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { createLogger, getWorkersApiUrl } from "@bitcoinbaby/shared";
 
 const log = createLogger("SystemStatus");
-
-// Workers API URL from environment or default
-const WORKERS_API_URL =
-  process.env.NEXT_PUBLIC_WORKERS_API_URL ||
-  "https://bitcoinbaby-api.andeanlabs-58f.workers.dev";
 
 export type SystemStatus =
   | "operational"
@@ -49,103 +48,64 @@ const DEFAULT_HEALTH: SystemHealth = {
   message: "Loading...",
 };
 
-export function useSystemStatus(): UseSystemStatusResult {
-  const [health, setHealth] = useState<SystemHealth | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+async function fetchSystemHealth(): Promise<SystemHealth> {
+  const response = await fetch(
+    `${getWorkersApiUrl()}/api/admin/signer/health`,
+    {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    },
+  );
 
-  const fetchStatus = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  if (!response.ok) {
+    return { ...DEFAULT_HEALTH, message: "System status unavailable" };
+  }
 
-    try {
-      // Try to fetch from the signer health endpoint
-      // This endpoint doesn't require auth for read-only status
-      const response = await fetch(
-        `${WORKERS_API_URL}/api/admin/signer/health`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
-      );
-
-      if (!response.ok) {
-        // API might not have this endpoint yet or requires auth
-        // Fall back to pending_signer status
-        setHealth({
-          ...DEFAULT_HEALTH,
-          message: "System status unavailable",
-        });
-        return;
-      }
-
-      const data = (await response.json()) as {
-        success: boolean;
-        data: SystemHealth;
-      };
-
-      if (data.success && data.data) {
-        setHealth(data.data);
-      } else {
-        setHealth({
-          ...DEFAULT_HEALTH,
-          message: "Invalid response from API",
-        });
-      }
-    } catch (error) {
-      log.error("Failed to fetch system status", { error });
-      // Network error or API not available
-      setError("Could not fetch system status");
-      setHealth({
-        ...DEFAULT_HEALTH,
-        message: "Unable to check system status",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchStatus();
-
-    // Refresh every 5 minutes
-    const interval = setInterval(fetchStatus, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [fetchStatus]);
-
-  // Determine status from health data
-  const getStatus = (): SystemStatus => {
-    if (!health) {
-      return "pending_signer";
-    }
-
-    if (health.healthy) {
-      return "operational";
-    }
-
-    // Check specific conditions
-    if (!health.configuredForSigning) {
-      return "pending_signer";
-    }
-
-    if (health.treasuryBalance === "0") {
-      return "pending_signer";
-    }
-
-    if (!health.scrollsApiAvailable) {
-      return "maintenance";
-    }
-
-    return "error";
+  const data = (await response.json()) as {
+    success: boolean;
+    data: SystemHealth;
   };
 
-  return {
-    status: getStatus(),
-    health,
+  if (data.success && data.data) {
+    return data.data;
+  }
+
+  return { ...DEFAULT_HEALTH, message: "Invalid response from API" };
+}
+
+function deriveStatus(health: SystemHealth | null): SystemStatus {
+  if (!health) return "pending_signer";
+  if (health.healthy) return "operational";
+  if (!health.configuredForSigning) return "pending_signer";
+  if (health.treasuryBalance === "0") return "pending_signer";
+  if (!health.scrollsApiAvailable) return "maintenance";
+  return "error";
+}
+
+export function useSystemStatus(): UseSystemStatusResult {
+  const {
+    data: health,
     isLoading,
-    error,
-    refresh: fetchStatus,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: ["system-status"],
+    queryFn: fetchSystemHealth,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
+    placeholderData: (prev) => prev,
+    retry: 1, // Only retry once for system status
+  });
+
+  const refresh = useCallback(async (): Promise<void> => {
+    await refetch();
+  }, [refetch]);
+
+  return {
+    status: deriveStatus(health ?? null),
+    health: health ?? null,
+    isLoading,
+    error: queryError instanceof Error ? queryError.message : null,
+    refresh,
   };
 }

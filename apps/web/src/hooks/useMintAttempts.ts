@@ -1,18 +1,21 @@
 "use client";
 
 /**
- * useMintAttempts Hook
+ * useMintAttempts Hook — TanStack Query powered
  *
  * Fetches and tracks mint attempts for a user address.
  * Shows pending, failed, and recent successful mints.
  * Supports clearing failed attempts and auto-cleanup after 5 minutes.
+ *
+ * Query key: ['mint-attempts', address]
+ * Refetch interval: 30s when there are pending attempts, disabled otherwise
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getApiClient, type MintAttempt } from "@bitcoinbaby/core";
 
-// Auto-cleanup failed attempts after this many milliseconds
-const FAILED_CLEANUP_DELAY_MS = 5 * 60 * 1000; // 5 minutes
+const FAILED_CLEANUP_DELAY_MS = 5 * 60 * 1000;
 
 interface UseMintAttemptsOptions {
   address?: string;
@@ -33,15 +36,22 @@ interface UseMintAttemptsReturn {
   clearFailed: () => void;
 }
 
+async function fetchMintAttempts(address: string): Promise<MintAttempt[]> {
+  const apiClient = getApiClient();
+  const result = await apiClient.getMintAttempts(address);
+  if (result.success && result.data) {
+    return result.data.attempts;
+  }
+  throw new Error(result.error || "Failed to fetch mint attempts");
+}
+
 export function useMintAttempts({
   address,
   autoRefresh = true,
   refreshInterval = 30000,
   autoCleanupFailed = true,
 }: UseMintAttemptsOptions): UseMintAttemptsReturn {
-  const [attempts, setAttempts] = useState<MintAttempt[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // Track manually cleared failed attempt IDs
   const [clearedFailedIds, setClearedFailedIds] = useState<Set<string>>(
@@ -51,68 +61,51 @@ export function useMintAttempts({
   // Track when failed attempts were first seen (for auto-cleanup)
   const failedFirstSeenRef = useRef<Map<string, number>>(new Map());
 
-  const refresh = useCallback(async () => {
-    if (!address) return;
+  // ---- TanStack Query ----
+  const {
+    data: rawAttempts = [],
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: ["mint-attempts", address],
+    queryFn: async () => {
+      if (!address) return [];
+      const attempts = await fetchMintAttempts(address);
 
-    setIsLoading(true);
-    setError(null);
+      // Track first-seen timestamps for auto-cleanup
+      const now = Date.now();
+      attempts.forEach((attempt) => {
+        if (
+          attempt.status === "failed" &&
+          !failedFirstSeenRef.current.has(attempt.attemptId)
+        ) {
+          failedFirstSeenRef.current.set(attempt.attemptId, now);
+        }
+      });
 
-    try {
-      const apiClient = getApiClient();
-      const result = await apiClient.getMintAttempts(address);
+      return attempts;
+    },
+    enabled: !!address,
+    // Only poll when there are pending attempts
+    refetchInterval: false, // We handle conditional polling below
+    placeholderData: (prev) => prev,
+  });
 
-      if (result.success && result.data) {
-        const now = Date.now();
+  // Filter attempts: remove manually cleared and auto-expired
+  const attempts = rawAttempts.filter((attempt) => {
+    if (clearedFailedIds.has(attempt.attemptId)) return false;
 
-        // Track when failed attempts are first seen
-        result.data.attempts.forEach((attempt) => {
-          if (
-            attempt.status === "failed" &&
-            !failedFirstSeenRef.current.has(attempt.attemptId)
-          ) {
-            failedFirstSeenRef.current.set(attempt.attemptId, now);
-          }
-        });
-
-        // Filter out manually cleared and auto-expired failed attempts
-        const filteredAttempts = result.data.attempts.filter((attempt) => {
-          // Skip manually cleared
-          if (clearedFailedIds.has(attempt.attemptId)) {
-            return false;
-          }
-
-          // Auto-cleanup old failed attempts
-          if (autoCleanupFailed && attempt.status === "failed") {
-            const firstSeen = failedFirstSeenRef.current.get(attempt.attemptId);
-            if (firstSeen && now - firstSeen > FAILED_CLEANUP_DELAY_MS) {
-              return false;
-            }
-          }
-
-          return true;
-        });
-
-        setAttempts(filteredAttempts);
-      } else {
-        setError(result.error || "Failed to fetch mint attempts");
+    if (autoCleanupFailed && attempt.status === "failed") {
+      const firstSeen = failedFirstSeenRef.current.get(attempt.attemptId);
+      if (firstSeen && Date.now() - firstSeen > FAILED_CLEANUP_DELAY_MS) {
+        return false;
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setIsLoading(false);
     }
-  }, [address, clearedFailedIds, autoCleanupFailed]);
 
-  // Initial fetch
-  useEffect(() => {
-    if (address) {
-      refresh();
-    } else {
-      setAttempts([]);
-    }
-  }, [address, refresh]);
+    return true;
+  });
 
-  // Auto-refresh when there are pending attempts
   const pendingAttempts = attempts.filter(
     (a) =>
       a.status === "reserved" ||
@@ -123,21 +116,22 @@ export function useMintAttempts({
 
   const hasPending = pendingAttempts.length > 0;
 
+  // Conditional polling: only poll when there are pending attempts
   useEffect(() => {
     if (!autoRefresh || !hasPending || !address) return;
 
     const interval = setInterval(() => {
-      refresh();
+      refetch();
     }, refreshInterval);
 
     return () => clearInterval(interval);
-  }, [autoRefresh, hasPending, address, refreshInterval, refresh]);
+  }, [autoRefresh, hasPending, address, refreshInterval, refetch]);
 
-  // Also refresh on visibility change
+  // Refresh on visibility change (tab becomes visible)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible" && address) {
-        refresh();
+        refetch();
       }
     };
 
@@ -145,22 +139,20 @@ export function useMintAttempts({
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [address, refresh]);
+  }, [address, refetch]);
+
+  const refresh = useCallback(async (): Promise<void> => {
+    await refetch();
+  }, [refetch]);
 
   const failedAttempts = attempts.filter((a) => a.status === "failed");
 
-  // Clear all failed attempts from view
   const clearFailed = useCallback(() => {
     const newCleared = new Set(clearedFailedIds);
     failedAttempts.forEach((attempt) => {
       newCleared.add(attempt.attemptId);
     });
     setClearedFailedIds(newCleared);
-
-    // Remove from attempts immediately
-    setAttempts((prev) =>
-      prev.filter((a) => a.status !== "failed" || !newCleared.has(a.attemptId)),
-    );
   }, [failedAttempts, clearedFailedIds]);
 
   return {
@@ -168,7 +160,7 @@ export function useMintAttempts({
     pendingAttempts,
     failedAttempts,
     isLoading,
-    error,
+    error: queryError instanceof Error ? queryError.message : null,
     refresh,
     hasPending,
     hasFailed: failedAttempts.length > 0,
