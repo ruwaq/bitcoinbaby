@@ -1,0 +1,10 @@
+# BitcoinBaby Pre-commit Hook
+# Runs lint-staged (formatting + linting) and secret scanning on staged files
+
+echo "🔍 BitcoinBaby pre-commit checks..."
+
+# Phase 1: Secret scanning (always runs first — blocks commit if secrets found)
+./scripts/scan-secrets.sh || exit 1
+
+# Phase 2: Lint-staged (format + lint only staged files)
+npx lint-staged
