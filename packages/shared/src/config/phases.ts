@@ -44,7 +44,7 @@ export type Phase = (typeof PHASES)[keyof typeof PHASES];
  * Tab identifiers used in the app navigation.
  * Canonical source of truth — imported by AppShell, BottomNav, and phase config.
  */
-export type TabType = "dashboard" | "nfts" | "wallet" | "more";
+export type TabType = "home" | "explore" | "you";
 
 // =============================================================================
 // CURRENT PHASE DETECTION
@@ -165,20 +165,20 @@ const PHASE_CONFIGS: Record<Phase, Omit<PhaseConfig, "features">> = {
   [PHASES.NFTS]: {
     phase: PHASES.NFTS,
     name: "NFTs + Faucet",
-    defaultTab: "dashboard",
-    visibleTabs: ["dashboard", "nfts", "wallet", "more"],
+    defaultTab: "home",
+    visibleTabs: ["home", "explore", "you"],
   },
   [PHASES.MINING]: {
     phase: PHASES.MINING,
     name: "Mining",
-    defaultTab: "dashboard",
-    visibleTabs: ["dashboard", "nfts", "wallet", "more"],
+    defaultTab: "home",
+    visibleTabs: ["home", "explore", "you"],
   },
   [PHASES.GAME]: {
     phase: PHASES.GAME,
     name: "Game",
-    defaultTab: "dashboard",
-    visibleTabs: ["dashboard", "nfts", "wallet", "more"],
+    defaultTab: "home",
+    visibleTabs: ["home", "explore", "you"],
   },
 };
 

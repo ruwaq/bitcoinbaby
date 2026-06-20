@@ -64,7 +64,7 @@ export function TokenActions({
 
         {/* Start Mining Button */}
         <button
-          onClick={() => router.push("/?tab=mining")}
+          onClick={() => router.push("/?tab=home")}
           className={`flex flex-col items-center justify-center p-4 bg-pixel-primary/20 ${pixelBorders.thin} border-pixel-primary hover:bg-pixel-primary/30 transition-all cursor-pointer`}
         >
           <span className="text-2xl mb-2">⛏️</span>
@@ -75,7 +75,7 @@ export function TokenActions({
 
         {/* Buy NFT Button */}
         <button
-          onClick={() => router.push("/?tab=nfts")}
+          onClick={() => router.push("/?tab=explore")}
           className={`flex flex-col items-center justify-center p-4 bg-pixel-secondary/20 ${pixelBorders.thin} border-pixel-secondary hover:bg-pixel-secondary/30 transition-all cursor-pointer`}
         >
           <span className="text-2xl mb-2">🎨</span>

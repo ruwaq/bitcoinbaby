@@ -3,10 +3,8 @@
 /**
  * AppShell - Main application shell
  *
- * Unified dashboard with:
- * - Persistent header with mining status
- * - Tab navigation
- * - Content area that switches without unmounting mining
+ * Fase 4 Redesign: 3-tab navigation (HOME | EXPLORE | YOU).
+ * Persistent header with mining status + bottom nav.
  */
 
 import {
@@ -23,7 +21,6 @@ import { useSearchParams, useRouter } from "next/navigation";
  * Reset all app data - clears IndexedDB and localStorage
  */
 async function resetAllData() {
-  // Clear localStorage keys
   const keysToRemove = [
     "bitcoinsparks-spark-store",
     "bitcoinsparks-mining-store",
@@ -38,7 +35,6 @@ async function resetAllData() {
   ];
   keysToRemove.forEach((key) => localStorage.removeItem(key));
 
-  // Clear IndexedDB
   if (typeof indexedDB !== "undefined") {
     try {
       const databases = await indexedDB.databases();
@@ -48,14 +44,13 @@ async function resetAllData() {
         }
       }
     } catch {
-      // Fallback for browsers that don't support databases()
       indexedDB.deleteDatabase("bitcoinsparks");
     }
   }
 
-  // Reload
   window.location.reload();
 }
+
 import { getPhaseConfig, type TabType } from "@bitcoinbaby/shared";
 import {
   usePendingTxStore,
@@ -83,17 +78,14 @@ function ResetConfirmationModal({
   const [confirmText, setConfirmText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Focus input when modal opens
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isOpen]);
 
-  // Reset input when modal opens (not on close to avoid cascading renders)
   useEffect(() => {
     if (isOpen) {
-      // Clear any previous text when opening
       queueMicrotask(() => setConfirmText(""));
     }
   }, [isOpen]);
@@ -117,7 +109,6 @@ function ResetConfirmationModal({
       onKeyDown={handleKeyDown}
     >
       <div className="bg-pixel-bg-dark border-4 border-pixel-error p-6 shadow-[8px_8px_0_0_#000] max-w-md mx-4">
-        {/* Warning Icon */}
         <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center bg-pixel-error/20 border-4 border-pixel-error">
           <span className="font-pixel text-2xl text-pixel-error">!</span>
         </div>
@@ -141,7 +132,7 @@ function ResetConfirmationModal({
               <span className="text-pixel-error">X</span> Mining progress
             </li>
             <li className="flex items-center gap-2">
-              <span className="text-pixel-error">X</span> Baby evolution state
+              <span className="text-pixel-error">X</span> Spark evolution state
             </li>
             <li className="flex items-center gap-2">
               <span className="text-pixel-error">X</span> All local settings
@@ -152,7 +143,6 @@ function ResetConfirmationModal({
           </p>
         </div>
 
-        {/* Confirmation input */}
         <div className="mb-4">
           <label
             htmlFor="reset-confirm-input"
@@ -197,29 +187,24 @@ function ResetConfirmationModal({
 // Lazy load sections for better performance
 import dynamic from "next/dynamic";
 
-const DashboardSection = dynamic(
-  () => import("../sections/DashboardSection").then((m) => m.DashboardSection),
+const HomeSection = dynamic(
+  () => import("../sections/HomeSection").then((m) => m.HomeSection),
   { ssr: false },
 );
-const NFTsSection = dynamic(
-  () => import("../sections/NFTsSection").then((m) => m.NFTsSection),
+const ExploreSection = dynamic(
+  () => import("../sections/ExploreSection").then((m) => m.ExploreSection),
   { ssr: false },
 );
-const WalletSection = dynamic(
-  () => import("../sections/WalletSection").then((m) => m.WalletSection),
-  { ssr: false },
-);
-const MoreSection = dynamic(
-  () => import("../sections/MoreSection").then((m) => m.MoreSection),
+const YouSection = dynamic(
+  () => import("../sections/YouSection").then((m) => m.YouSection),
   { ssr: false },
 );
 
-// Loading placeholder — shown during lazy-load and tab transitions
+// Loading placeholder
 function SectionLoader() {
   return (
     <div className="flex items-center justify-center min-h-[400px]">
       <div className="flex flex-col items-center gap-4">
-        {/* Pixel art loading animation — 3 bouncing blocks */}
         <div className="flex gap-2">
           <div className="w-3 h-3 bg-pixel-primary animate-pixel-float" />
           <div
@@ -244,13 +229,10 @@ function AppShellInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Phase configuration
   const phaseConfig = getPhaseConfig();
 
-  // Onboarding tour
   const onboarding = useOnboarding();
 
-  // Badge counts for notification dots on tabs
   const pendingTxCount = usePendingTxStore(
     (s) => s.transactions.filter((tx) => tx.status === "pending").length,
   );
@@ -262,22 +244,20 @@ function AppShellInner() {
   });
 
   const tabBadges: Partial<Record<TabType, number>> = {
-    dashboard: sparkExists ? 0 : 1,
-    wallet: pendingTxCount > 0 ? pendingTxCount : 0,
-    nfts: narrativeEventCount > 0 ? Math.min(narrativeEventCount, 99) : 0,
+    home: sparkExists ? 0 : 1,
+    you: pendingTxCount > 0 ? pendingTxCount : 0,
+    explore: narrativeEventCount > 0 ? Math.min(narrativeEventCount, 99) : 0,
   };
 
   // Get tab from URL or default from phase config
   const urlTab = searchParams.get("tab") as TabType | null;
   const defaultTab = phaseConfig.defaultTab;
 
-  // Validate urlTab is in visibleTabs, fall back to defaultTab
   const isValidUrlTab = urlTab && phaseConfig.visibleTabs.includes(urlTab);
   const initialTab = isValidUrlTab ? urlTab : defaultTab;
 
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
 
-  // Reset confirmation modal state
   const [showResetModal, setShowResetModal] = useState(false);
 
   const handleResetConfirm = useCallback(() => {
@@ -289,7 +269,6 @@ function AppShellInner() {
   const handleTabChange = useCallback(
     (tab: TabType) => {
       setActiveTab(tab);
-      // Update URL without full navigation
       const url = tab === defaultTab ? "/" : `/?tab=${tab}`;
       router.push(url, { scroll: false });
     },
@@ -305,13 +284,12 @@ function AppShellInner() {
     }
   }, [urlTab, activeTab, defaultTab]);
 
-  // Quick navigation handlers
-  const goToDashboard = useCallback(
-    () => handleTabChange("dashboard"),
+  const goToHome = useCallback(
+    () => handleTabChange("home"),
     [handleTabChange],
   );
-  const goToWallet = useCallback(
-    () => handleTabChange("wallet"),
+  const goToYou = useCallback(
+    () => handleTabChange("you"),
     [handleTabChange],
   );
 
@@ -320,20 +298,19 @@ function AppShellInner() {
       {/* Testnet Banner */}
       <TestnetBanner />
 
-      {/* Compact Header — status bar style */}
-      <AppHeader onMiningClick={goToDashboard} onWalletClick={goToWallet} />
+      {/* Compact Header */}
+      <AppHeader onMiningClick={goToHome} onWalletClick={goToYou} />
 
-      {/* Content Area — scrollable, with bottom padding for nav */}
+      {/* Content Area */}
       <main className="flex-1 overflow-auto pb-20">
         <Suspense fallback={<SectionLoader />}>
-          {activeTab === "dashboard" && <DashboardSection />}
-          {activeTab === "nfts" && <NFTsSection />}
-          {activeTab === "wallet" && <WalletSection />}
-          {activeTab === "more" && <MoreSection />}
+          {activeTab === "home" && <HomeSection />}
+          {activeTab === "explore" && <ExploreSection />}
+          {activeTab === "you" && <YouSection />}
         </Suspense>
       </main>
 
-      {/* Bottom Navigation — always visible, game-style */}
+      {/* Bottom Navigation */}
       <BottomNav />
 
       {/* Reset Confirmation Modal */}

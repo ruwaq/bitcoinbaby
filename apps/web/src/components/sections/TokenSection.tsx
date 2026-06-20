@@ -43,7 +43,7 @@ export function TokenSection() {
 
   const handleClaim = async () => {
     // Navigate to wallet tab with claim view for on-chain minting
-    router.push("/?tab=wallet&view=claim");
+    router.push("/?tab=you&view=claim");
   };
 
   return (

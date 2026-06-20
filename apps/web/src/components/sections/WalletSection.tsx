@@ -75,7 +75,7 @@ export function WalletSection() {
   const handleViewChange = useCallback(
     (view: "dashboard" | "send" | "claim" | "history") => {
       const params = new URLSearchParams(searchParams.toString());
-      params.set("tab", "wallet");
+      params.set("tab", "you");
       if (view === "dashboard") {
         params.delete("view");
       } else {

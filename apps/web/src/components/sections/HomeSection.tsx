@@ -1,18 +1,18 @@
 "use client";
 
 /**
- * DashboardSection — Tamagotchi-style main screen
+ * HomeSection — Immersive Spark home screen
  *
- * The baby is the CENTER of the experience. Mining, stats, and actions
- * orbit around the baby sprite. Single scrollable view.
- *
- * Layout:
+ * Fase 4 Redesign: The spark is the CENTER of the experience.
+ * Full-screen layout with:
  *   [Baby Room Background]
- *     [Baby Sprite - large, centered]
- *     [Stats HUD - energy, happiness, hunger, health]
- *     [Action Buttons - FEED, PLAY, LEARN, SLEEP, MINE]
- *     [Mining Status - compact secondary info]
- *     [Narrative Panel - AI stories]
+ *     [Spark Sprite - large, centered hero]
+ *     [Stats HUD - compact, beside/below spark]
+ *     [Narrative Speech Bubble - floating near spark]
+ *     [Action Buttons - compact row]
+ *     [Mining Status - bottom bar]
+ *
+ * Replaces the old DashboardSection tab.
  */
 
 import { useCallback, useMemo } from "react";
@@ -36,23 +36,13 @@ import type { SparkNFTState } from "@bitcoinbaby/ai";
 
 /**
  * Build a SparkNFTState from a GameSpark for the NarrativeEngine.
- *
- * When the user has a free baby (no NFT minted), we generate a deterministic
- * "virtual NFT state" from the baby's id. This gives the NarrativeEngine
- * enough context (personality, bloodline, archetype) to generate unique,
- * personalized stories even without an on-chain NFT.
- *
- * The dna is derived from the baby's id via a simple hash — same baby,
- * same personality forever. Different babies get different stories.
  */
 function buildNftStateFromBaby(baby: GameSpark): SparkNFTState {
-  // Deterministic "dna" from baby id — simple hash for personality seeding
   let hash = 0;
   for (let i = 0; i < baby.id.length; i++) {
     hash = (hash * 31 + baby.id.charCodeAt(i)) & 0xffffffff;
   }
 
-  // Map hash to bloodline and baseType deterministically
   const bloodlines: SparkNFTState["bloodline"][] = [
     "royal",
     "warrior",
@@ -76,7 +66,7 @@ function buildNftStateFromBaby(baby: GameSpark): SparkNFTState {
     tokenId: Math.abs(hash) % 100000,
     level: baby.progression.level,
     xp: baby.progression.xp,
-    totalXp: baby.progression.xp, // GameSpark doesn't track cumulative XP separately
+    totalXp: baby.progression.xp,
     workCount: baby.progression.level * 10,
     lastWorkBlock: 0,
     evolutionCount: baby.evolutionHistory.length,
@@ -86,7 +76,7 @@ function buildNftStateFromBaby(baby: GameSpark): SparkNFTState {
   };
 }
 
-export function DashboardSection() {
+export function HomeSection() {
   const router = useRouter();
   const { wallet, miner, controls, balance, shares, capabilities } =
     useMining();
@@ -102,8 +92,6 @@ export function DashboardSection() {
   const miningState = useGlobalMining();
   const isMining = miningState.isRunning;
 
-  // Build NFT state from the real baby so NarrativeEngine has context
-  // (personality, bloodline, archetype) to generate personalized stories
   const nftState = useMemo<SparkNFTState | null>(() => {
     if (!baby) return null;
     return buildNftStateFromBaby(baby);
@@ -129,12 +117,12 @@ export function DashboardSection() {
   if (!wallet) {
     return (
       <div className="min-h-screen-safe bg-pixel-bg-dark flex flex-col items-center justify-center p-4">
-        <div className="text-6xl mb-6 animate-pixel-float">👶</div>
+        <div className="text-6xl mb-6 animate-pixel-float">⚡</div>
         <h1 className="font-pixel text-pixel-lg text-pixel-primary text-center mb-4">
-          Welcome to BitcoinBaby
+          BitcoinSparks
         </h1>
         <p className="font-pixel-body text-body-sm text-pixel-text-muted text-center mb-8 max-w-sm">
-          Raise your AI-powered pixel baby while mining Bitcoin. Create a wallet
+          Raise your AI-powered pixel spark while mining Bitcoin. Create a wallet
           to begin!
         </p>
         <button
@@ -147,15 +135,15 @@ export function DashboardSection() {
     );
   }
 
-  // ---- No baby yet ----
+  // ---- No spark yet ----
   if (!baby) {
     return (
       <div className="min-h-screen-safe bg-pixel-bg-dark p-4">
         <div className="max-w-md mx-auto space-y-6">
           <div className="text-center">
-            <div className="text-5xl mb-4 animate-pixel-float">👶</div>
+            <div className="text-5xl mb-4 animate-pixel-float">⚡</div>
             <h2 className="font-pixel text-pixel-sm text-pixel-primary mb-2">
-              Create Your Baby
+              Create Your Spark
             </h2>
             <p className="font-pixel-body text-body-xs text-pixel-text-muted">
               Your AI-powered companion — FREE!
@@ -190,10 +178,10 @@ export function DashboardSection() {
     );
   }
 
-  // ---- Full Tamagotchi Dashboard ----
+  // ---- Full Immersive HOME ----
   return (
     <div className="min-h-screen-safe bg-pixel-bg-dark">
-      {/* Baby Room: wall + floor background */}
+      {/* Spark Room: wall + floor background */}
       <div className="relative px-4 pt-4 pb-2">
         <div className="absolute inset-0 top-0 bottom-1/2 bg-[#1a1a2e]" />
         <div className="absolute inset-0 top-1/2 bottom-0 bg-[#2d2818] border-t-4 border-[#5c3d2e]" />
@@ -211,9 +199,9 @@ export function DashboardSection() {
             </div>
           )}
 
-          {/* Baby — the centerpiece */}
+          {/* Spark — the centerpiece */}
           <SparkDisplay
-            name={baby.name || "Baby"}
+            name={baby.name || "My Spark"}
             sparkState={sparkState}
             daysUntilDecay={daysUntilDecay ?? undefined}
             isMining={isMining}
@@ -221,7 +209,7 @@ export function DashboardSection() {
             onAction={handleAction}
           />
 
-          {/* Quick Stats */}
+          {/* Quick Stats — compact row */}
           <div className="flex gap-3 mt-3 mb-4">
             <div className="bg-pixel-bg-dark border-2 border-pixel-border px-3 py-1 text-center">
               <p className="font-pixel text-[7px] text-pixel-text-muted">
@@ -250,17 +238,17 @@ export function DashboardSection() {
             </div>
           </div>
 
-          {/* Dead baby */}
+          {/* Dead spark warning */}
           {isDead && (
             <div className="w-full max-w-sm bg-pixel-error/20 border-4 border-pixel-error p-4 text-center mb-4">
               <p className="font-pixel text-xs text-pixel-error mb-2">
-                BABY NEEDS REVIVAL
+                SPARK NEEDS REVIVAL
               </p>
               <button
                 onClick={actions.revive}
                 className="px-6 py-2 font-pixel text-[10px] bg-pixel-primary text-black border-2 border-black"
               >
-                REVIVE BABY
+                REVIVE SPARK
               </button>
             </div>
           )}
@@ -273,7 +261,7 @@ export function DashboardSection() {
               <div className="w-full max-w-sm mb-4">
                 <InfoBanner variant="warning" icon="⚠️">
                   <p className="font-pixel text-pixel-2xs uppercase">
-                    Baby needs care in {daysUntilDecay} day
+                    Spark needs care in {daysUntilDecay} day
                     {daysUntilDecay === 1 ? "" : "s"}!
                   </p>
                 </InfoBanner>
@@ -282,7 +270,7 @@ export function DashboardSection() {
         </div>
       </div>
 
-      {/* Mining — secondary, below the baby room */}
+      {/* Mining — below the spark room */}
       <div className="relative z-10 px-4 pb-4 space-y-3">
         <div className="max-w-sm mx-auto space-y-3">
           <MiningVisualization
@@ -304,7 +292,7 @@ export function DashboardSection() {
         </div>
       </div>
 
-      {/* Narrative */}
+      {/* Narrative — speech bubble style */}
       <div className="relative z-10 px-4 pb-24">
         <div className="max-w-sm mx-auto">
           <NarrativePanel
@@ -317,4 +305,4 @@ export function DashboardSection() {
   );
 }
 
-export default DashboardSection;
+export default HomeSection;

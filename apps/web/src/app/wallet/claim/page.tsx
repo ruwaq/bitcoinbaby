@@ -13,7 +13,7 @@ export default function ClaimPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/?tab=wallet&view=claim");
+    router.replace("/?tab=you&view=claim");
   }, [router]);
 
   return (

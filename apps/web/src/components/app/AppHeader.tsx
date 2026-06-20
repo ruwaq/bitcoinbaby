@@ -48,7 +48,7 @@ export function AppHeader({
         </div>
         <div className="hidden sm:block">
           <h1 className="font-pixel text-pixel-sm text-pixel-primary leading-none">
-            BITCOIN<span className="text-pixel-secondary">BABY</span>
+            BITCOIN<span className="text-pixel-secondary">SPARKS</span>
           </h1>
         </div>
       </div>

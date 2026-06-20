@@ -1,33 +1,21 @@
 # BitcoinSparks — Memoria de Proyecto
 
-**Última actualización:** 2026-06-20 (Sesión de rediseño completo)
+**Última actualización:** 2026-06-20 (Sesión Fase 4 — UI Redesign)
 **Branch:** `main`
-**Estado:** Workers API ✅ | Vercel ❌ Colgado | Charms v15 recién lanzado | Plan 5 fases aprobado
+**Estado:** ✅ Workers API | ✅ Charms v15 | ✅ Typecheck limpio | ✅ AI BYO keys | ✅ UI Redesign HOME/EXPLORE/YOU | ⏳ Mainnet
 
 ---
 
 ## 🔥 LO MÁS IMPORTANTE AHORA
 
-### Charms v15.0.0 salió el 15 Jun 2026
-- **v15.charms.dev/ready → 200 OK** (confirmado live)
-- v14 será deprecado pronto
-- **Migrar YA:** cambiar `v15.charms.dev` → `v15.charms.dev`
+### ✅ Fases completadas
+- **Fase 1:** Limpieza (~40 archivos muertos) + Migrar Charms v14 → v15
+- **Fase 2:** Renombre completo baby→spark (tipos, stores, UI, docs, BABTC→SPARK)
+- **Fase 3:** AI Provider System (Ollama, OpenAI, Anthropic, Google + Worker proxy + Settings UI)
+- **Fase 4:** UI Redesign HOME | EXPLORE | YOU (3 pantallas, landing page, BottomNav 3 tabs)
 
-### Renombre completo: BitcoinBaby → BitcoinSparks
-- Entidad: **Spark** (antes Baby/GameBaby/BabyNFTState)
-- Token: **$SPARK** (nuevo deploy, antes $BABTC)
-- NFT: **Genesis Sparks** (antes Genesis Babies)
-- Store: **spark-store** (unificado de baby-store + nft-store)
-- Principio: **1 Spark = 1 NFT. El NFT ES el spark.**
-
-### Plan de 5 Fases (aprobado 2026-06-20)
-
-```
-Fase 1: LIMPIAR + v15        → base limpia, prover actualizado
-Fase 2: RENOMBRAR + UNIFICAR → Spark, 1 tipo, 1 store, contratos fresh
-Fase 3: AI PROVIDER SYSTEM   → BYO keys (Ollama, GPT, Claude, Gemini)
-Fase 4: UI HOME/EXPLORE/YOU  → 3 pantallas pixel art
-Fase 5: PRODUCCIÓN           → mainnet + app stores
+### ⏳ Pendiente
+- **Fase 5:** Producción (mainnet deploy, app stores)
 ```
 
 **Spec completo:** `docs/superpowers/specs/2026-06-20-bitcoinsparks-redesign.md`
@@ -81,11 +69,14 @@ bitcoinsparks/
 - Settings UI para configurar provider
 - Tier orchestrator con fallback
 
-### Fase 4: UI REDESIGN
+### ✅ Fase 4: UI REDESIGN (HOME | EXPLORE | YOU) — COMPLETED 2026-06-20
 - 3 pantallas: HOME (spark + mining) | EXPLORE (marketplace) | YOU (wallet)
-- Eliminar 4 tabs genéricos actuales
-- Landing page separada con SEO
-- Pixel art consistente NES/SNES
+- BottomNav 3 tabs con pixel icons (⚡ HOME, 🔍 EXPLORE, 👤 YOU)
+- Landing page condicional con SEO
+- Eliminados 4 tabs genéricos (dashboard, nfts, wallet, more)
+- AppHeader branding: BITCOINBABY → BITCOINSPARKS
+- MoreSection + páginas standalone absorbidas en nuevas secciones
+- Typecheck limpio (7/7 packages)
 
 ### Fase 5: PRODUCCIÓN
 - Auditoría de seguridad final

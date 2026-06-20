@@ -1,17 +1,15 @@
 "use client";
 
 /**
- * Main entry point - Dashboard with unified tabs
+ * Main entry point — BitcoinSparks
  *
- * All content is rendered through AppShell which manages:
- * - Persistent header with mining status
- * - Tab navigation (Baby, Mining, NFTs, Wallet, More)
- * - Content switching without page reloads
- * - Mining never interrupts when changing tabs
+ * Renders the LandingPage which conditionally shows:
+ * - Landing page (when no wallet) — SEO-friendly hero + features
+ * - AppShell SPA (when wallet exists) — HOME | EXPLORE | YOU
  */
 
-import { AppShell } from "@/components/app";
+import { LandingPage } from "@/components/landing/LandingPage";
 
 export default function Home() {
-  return <AppShell />;
+  return <LandingPage />;
 }

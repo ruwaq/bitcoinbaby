@@ -13,7 +13,7 @@ export default function SendPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/?tab=wallet&view=send");
+    router.replace("/?tab=you&view=send");
   }, [router]);
 
   return (

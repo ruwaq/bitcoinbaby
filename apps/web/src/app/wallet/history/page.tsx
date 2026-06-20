@@ -13,7 +13,7 @@ export default function HistoryPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/?tab=wallet&view=history");
+    router.replace("/?tab=you&view=history");
   }, [router]);
 
   return (

@@ -3,49 +3,37 @@
 /**
  * BottomNav Component
  *
- * Mobile/Native bottom navigation bar.
- * Only visible on mobile devices, PWA, or native apps.
+ * Mobile/Native bottom navigation bar — 3 tabs.
+ * Fase 4 Redesign: HOME | EXPLORE | YOU
  */
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCapacitor, usePlatform } from "@/hooks";
 
-// BottomNav uses the same URL scheme as TabNavigation (/?tab=...)
-// This ensures both navigation systems stay in sync
 const navItems = [
   {
-    href: "/?tab=dashboard",
-    label: "Home",
-    icon: "\u{1F3E0}",
-    activeIcon: "\u{1F3E1}",
+    href: "/?tab=home",
+    label: "HOME",
+    icon: "⚡",
   },
   {
-    href: "/?tab=nfts",
-    label: "NFTs",
-    icon: "\u{1F3A8}",
-    activeIcon: "\u{1F5BC}\u{FE0F}",
+    href: "/?tab=explore",
+    label: "EXPLORE",
+    icon: "🔍",
   },
   {
-    href: "/?tab=wallet",
-    label: "Wallet",
-    icon: "\u{1F4B0}",
-    activeIcon: "\u{1F4B5}",
-  },
-  {
-    href: "/?tab=more",
-    label: "More",
-    icon: "\u{2699}\u{FE0F}",
-    activeIcon: "\u{2699}\u{FE0F}",
+    href: "/?tab=you",
+    label: "YOU",
+    icon: "👤",
   },
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
   const { haptic, isNative } = useCapacitor();
-  const { isMobile, isPWA, isReady } = usePlatform();
+  const { isReady } = usePlatform();
 
-  // Always show — consistent mobile-game-like navigation on all devices
   const shouldShow = isReady;
 
   const handlePress = async () => {
@@ -64,7 +52,6 @@ export function BottomNav() {
     >
       <div className="flex justify-around items-center h-16">
         {navItems.map((item) => {
-          // Match tab parameter in URL for active state detection
           const itemTab = new URLSearchParams(
             item.href.split("?")[1] || "",
           ).get("tab");
@@ -73,7 +60,7 @@ export function BottomNav() {
           ).get("tab");
           const isActive = itemTab
             ? currentTab === itemTab ||
-              (!currentTab && itemTab === "baby" && pathname === "/")
+              (!currentTab && itemTab === "home" && pathname === "/")
             : pathname === item.href;
 
           return (
@@ -88,7 +75,7 @@ export function BottomNav() {
               }`}
             >
               <span className="text-2xl" aria-hidden="true">
-                {isActive ? item.activeIcon : item.icon}
+                {item.icon}
               </span>
               <span
                 className={`font-pixel text-[8px] mt-1 ${
