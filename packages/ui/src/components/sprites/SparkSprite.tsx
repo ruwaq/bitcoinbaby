@@ -5,17 +5,17 @@
  * Multiple states and evolution stages.
  */
 
-export type BabyState = 'idle' | 'happy' | 'sleeping' | 'hungry' | 'mining' | 'learning' | 'evolving';
-export type BabyStage = 'egg' | 'baby' | 'teen' | 'master';
+export type SparkState = 'idle' | 'happy' | 'sleeping' | 'hungry' | 'mining' | 'learning' | 'evolving';
+export type SparkStage = 'egg' | 'baby' | 'teen' | 'master';
 
-interface BabySpriteProps {
+interface SparkSpriteProps {
   size?: number;
-  state?: BabyState;
+  state?: SparkState;
   className?: string;
 }
 
-export function BabySprite({ size = 192, state = 'idle', className = '' }: BabySpriteProps) {
-  const stateClasses: Record<BabyState, string> = {
+export function SparkSprite({ size = 192, state = 'idle', className = '' }: SparkSpriteProps) {
+  const stateClasses: Record<SparkState, string> = {
     idle: 'animate-pixel-float',
     happy: 'animate-bounce',
     sleeping: 'baby-sleeping',

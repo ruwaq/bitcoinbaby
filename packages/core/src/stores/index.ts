@@ -1,4 +1,4 @@
-export { useSparkStore } from "./baby-store";
+export { useSparkStore } from "./spark-store";
 export { useMiningStore } from "./mining-store";
 export {
   useWalletStore,
@@ -124,7 +124,7 @@ export {
   selectWalletPublicKey,
   selectIsWalletConnected,
   selectWalletBalance,
-  selectBabyTokens,
+  selectSparkTokens,
   selectSignPsbt,
   selectBroadcastTx,
   selectSetWallet,
@@ -139,18 +139,18 @@ export {
   selectNFTError,
   selectSetOwnedNFTs,
   selectSelectNFT,
-  // Baby selectors
-  selectBaby,
-  selectBabyLevel,
-  selectBabyXP,
-  selectBabyName,
+  // Spark selectors
+  selectSpark,
+  selectSparkLevel,
+  selectSparkXP,
+  selectSparkName,
   selectSparkState,
-  selectSetBaby,
+  selectSetSpark,
   selectAddExperience,
   selectFeed,
   selectLevelUp,
   // Composed selectors
   selectMiningDisplay,
   selectWalletDisplay,
-  selectBabyStatus,
+  selectSparkStatus,
 } from "./selectors";

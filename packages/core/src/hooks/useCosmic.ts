@@ -251,7 +251,7 @@ export function useCosmicEvents() {
  * Hook that combines cosmic energy with status messages
  * Useful for UI display
  */
-export function useBabyCosmicStatus(
+export function useSparkCosmicStatus(
   baby: BabyForCosmic | null,
   options: UseCosmicEnergyOptions = {},
 ) {

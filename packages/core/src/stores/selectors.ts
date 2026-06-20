@@ -16,7 +16,7 @@
 import { useMiningStore } from "./mining-store";
 import { useWalletStore } from "./wallet-store";
 import { useNFTStore } from "./nft-store";
-import { useSparkStore } from "./baby-store";
+import { useSparkStore } from "./spark-store";
 
 // =============================================================================
 // MINING SELECTORS
@@ -86,8 +86,8 @@ export const selectIsWalletConnected = (s: WalletState) => s.wallet !== null;
 /** Select wallet balance in satoshis */
 export const selectWalletBalance = (s: WalletState) => s.wallet?.balance ?? 0n;
 
-/** Select baby tokens balance */
-export const selectBabyTokens = (s: WalletState) => s.wallet?.sparkTokens ?? 0n;
+/** Select spark tokens balance */
+export const selectSparkTokens = (s: WalletState) => s.wallet?.sparkTokens ?? 0n;
 
 /** Select sign PSBT function */
 export const selectSignPsbt = (s: WalletState) => s.signPsbt;
@@ -138,34 +138,34 @@ export const selectSelectNFT = (s: NFTState) => s.selectNFT;
 // BABY SELECTORS
 // =============================================================================
 
-type BabyStoreState = ReturnType<typeof useSparkStore.getState>;
+type SparkStoreState = ReturnType<typeof useSparkStore.getState>;
 
-/** Select baby object */
-export const selectBaby = (s: BabyStoreState) => s.baby;
+/** Select spark object */
+export const selectSpark = (s: SparkStoreState) => s.spark;
 
-/** Select baby level */
-export const selectBabyLevel = (s: BabyStoreState) => s.baby?.level ?? 0;
+/** Select spark level */
+export const selectSparkLevel = (s: SparkStoreState) => s.spark?.level ?? 0;
 
-/** Select baby XP */
-export const selectBabyXP = (s: BabyStoreState) => s.baby?.experience ?? 0;
+/** Select spark XP */
+export const selectSparkXP = (s: SparkStoreState) => s.spark?.experience ?? 0;
 
-/** Select baby name */
-export const selectBabyName = (s: BabyStoreState) => s.baby?.name ?? null;
+/** Select spark name */
+export const selectSparkName = (s: SparkStoreState) => s.spark?.name ?? null;
 
-/** Select baby state */
-export const selectSparkState = (s: BabyStoreState) => s.baby?.state ?? null;
+/** Select spark state */
+export const selectSparkState = (s: SparkStoreState) => s.spark?.state ?? null;
 
-/** Select setBaby action */
-export const selectSetBaby = (s: BabyStoreState) => s.setBaby;
+/** Select setSpark action */
+export const selectSetSpark = (s: SparkStoreState) => s.setSpark;
 
 /** Select addExperience action */
-export const selectAddExperience = (s: BabyStoreState) => s.addExperience;
+export const selectAddExperience = (s: SparkStoreState) => s.addExperience;
 
 /** Select feed action */
-export const selectFeed = (s: BabyStoreState) => s.feed;
+export const selectFeed = (s: SparkStoreState) => s.feed;
 
 /** Select levelUp action */
-export const selectLevelUp = (s: BabyStoreState) => s.levelUp;
+export const selectLevelUp = (s: SparkStoreState) => s.levelUp;
 
 // =============================================================================
 // COMPOSED SELECTORS
@@ -193,11 +193,11 @@ export const selectWalletDisplay = (s: WalletState) => ({
 });
 
 /**
- * Baby status data (for status bar)
+ * Spark status data (for status bar)
  */
-export const selectBabyStatus = (s: BabyStoreState) => ({
-  level: s.baby?.level ?? 0,
-  xp: s.baby?.experience ?? 0,
-  name: s.baby?.name ?? null,
-  state: s.baby?.state ?? null,
+export const selectSparkStatus = (s: SparkStoreState) => ({
+  level: s.spark?.level ?? 0,
+  xp: s.spark?.experience ?? 0,
+  name: s.spark?.name ?? null,
+  state: s.spark?.state ?? null,
 });

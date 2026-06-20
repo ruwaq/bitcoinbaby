@@ -1,19 +1,19 @@
 /**
- * useMiningXPIntegration - Award XP to baby when mining is active
+ * useMiningXPIntegration - Award XP to spark when mining is active
  *
- * This hook connects the mining system with the baby progression system,
+ * This hook connects the mining system with the spark progression system,
  * awarding XP based on mining activity with cosmic multiplier applied.
  *
  * XP Calculation:
  * - Base XP: 1 per 1M hashes mined
  * - Cosmic multiplier: 0.5x to 2.0x based on cosmic conditions
- * - Level bonus: +5% per baby level
+ * - Level bonus: +5% per spark level
  */
 
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useSparkStore } from "../stores/baby-store";
+import { useSparkStore } from "../stores/spark-store";
 import { useMiningStore } from "../stores/mining-store";
 
 // =============================================================================
@@ -62,7 +62,7 @@ export function useMiningXPIntegration(
   } = options;
 
   // Stores
-  const baby = useSparkStore((s) => s.baby);
+  const spark = useSparkStore((s) => s.spark);
   const addExperience = useSparkStore((s) => s.addExperience);
   const stats = useMiningStore((s) => s.stats);
   const persistedStats = useMiningStore((s) => s.persistedStats);
@@ -81,9 +81,9 @@ export function useMiningXPIntegration(
     // Apply cosmic multiplier (0.5 - 2.0)
     rate *= cosmicMultiplier;
 
-    // Apply level bonus if enabled and baby exists
-    if (enableLevelBonus && baby) {
-      const levelBonus = 1 + baby.level * LEVEL_BONUS_PERCENT;
+    // Apply level bonus if enabled and spark exists
+    if (enableLevelBonus && spark) {
+      const levelBonus = 1 + spark.level * LEVEL_BONUS_PERCENT;
       rate *= levelBonus;
     }
 
@@ -92,7 +92,7 @@ export function useMiningXPIntegration(
 
   // Watch for mining progress and award XP
   useEffect(() => {
-    if (!baby) return;
+    if (!spark) return;
 
     // Use current session hashes + lifetime hashes
     const totalHashes = stats.totalHashes + persistedStats.lifetimeHashes;
@@ -129,7 +129,7 @@ export function useMiningXPIntegration(
     // Update last hash count
     lastHashCountRef.current = totalHashes;
   }, [
-    baby,
+    spark,
     stats.totalHashes,
     persistedStats.lifetimeHashes,
     hashesPerXP,

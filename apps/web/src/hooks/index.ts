@@ -71,7 +71,7 @@ export {
 
 // Game hooks - re-exported from @bitcoinbaby/core
 // Local versions deprecated, use from core
-export { useBabyState } from "./useBabyState";
+export { useSparkState } from "./useSparkState";
 
 // NFT hooks
 /**
@@ -142,7 +142,7 @@ export {
   useCosmicEnergy,
   useMoonPhase,
   useCosmicEvents,
-  useBabyCosmicStatus,
+  useSparkCosmicStatus,
   // Mining + Cosmic
   useMiningCosmic,
   useCosmicMiningMultiplier,

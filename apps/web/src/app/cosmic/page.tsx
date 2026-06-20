@@ -17,7 +17,7 @@ import {
 } from "@bitcoinbaby/core";
 import {
   CosmicStatusBar,
-  BabyEnergyIndicator,
+  SparkEnergyIndicator,
   CosmicIndicator,
   pixelShadows,
   pixelBorders,
@@ -196,7 +196,7 @@ export default function CosmicPage() {
           />
 
           {/* Baby Energy */}
-          <BabyEnergyIndicator
+          <SparkEnergyIndicator
             energy={cosmicEnergy}
             babyName={
               ownedNFTs.length > 0

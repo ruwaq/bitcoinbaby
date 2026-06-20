@@ -42,7 +42,7 @@ function toStoreWalletInfo(info: BitcoinWalletInfo): CoreWalletInfo {
     address: info.address,
     publicKey: info.publicKey,
     balance: BigInt(0), // Will be updated by useBalance
-    babyTokens: BigInt(0), // Will be updated by useTokenBalance
+    sparkTokens: BigInt(0), // Will be updated by useTokenBalance
   };
 }
 

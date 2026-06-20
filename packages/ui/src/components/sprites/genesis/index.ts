@@ -11,10 +11,10 @@
  *
  * Uso:
  * ```tsx
- * import { GenesisBabySprite, generateRandomTraits } from '@bitcoinbaby/ui/sprites/genesis';
+ * import { GenesisSparkSprite, generateRandomTraits } from '@bitcoinbaby/ui/sprites/genesis';
  *
  * const traits = generateRandomTraits();
- * <GenesisBabySprite traits={traits} size={64} state="idle" />
+ * <GenesisSparkSprite traits={traits} size={64} state="idle" />
  * ```
  */
 
@@ -58,12 +58,12 @@ export { RarityEffects, RarityFrame, RarityBadge } from "./RarityEffects";
 
 // Main Generator Component
 export {
-  GenesisBabySprite,
+  GenesisSparkSprite,
   GenesisBabyPreview,
   generateRandomTraits,
   traitsFromHash,
   type GenesisBabyTraits,
-} from "./GenesisBabySprite";
+} from "./GenesisSparkSprite";
 
 // Default export
-export { default } from "./GenesisBabySprite";
+export { default } from "./GenesisSparkSprite";

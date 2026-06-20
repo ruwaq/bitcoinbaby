@@ -80,7 +80,7 @@ export default function SettingsPage() {
   const walletAddress = useWalletStore((s) => s.wallet?.address);
 
   // Baby store
-  const baby = useSparkStore((s) => s.baby);
+  const spark = useSparkStore((s) => s.spark);
 
   // Overlay modal hooks
   const { open: openRecoveryModal } = useRecoveryPhraseModal();
@@ -265,21 +265,21 @@ export default function SettingsPage() {
           </SettingsCard>
 
           {/* My Baby Section */}
-          {baby && (
+          {spark && (
             <SettingsCard title="MY BABY">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 flex-shrink-0">
-                  <LevelSprite level={baby.level} state="idle" size={64} />
+                  <LevelSprite level={spark.level} state="idle" size={64} />
                 </div>
                 <div className="flex-1">
                   <p className="font-pixel text-sm text-pixel-primary">
-                    {baby.name}
+                    {spark.name}
                   </p>
                   <p className="font-pixel text-[10px] text-pixel-text-muted mt-1">
-                    Level {baby.level} &bull; {baby.experience} XP
+                    Level {spark.level} &bull; {spark.experience} XP
                   </p>
                   <p className="font-pixel text-[8px] text-pixel-text-muted mt-1 uppercase">
-                    State: {baby.state}
+                    State: {spark.state}
                   </p>
                 </div>
                 <Link

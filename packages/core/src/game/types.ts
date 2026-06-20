@@ -4,7 +4,7 @@
  * Type definitions for the Tamagotchi game system.
  */
 
-import type { BabyStage, SparkVisualState } from "./constants";
+import type { SparkStage, SparkVisualState } from "./constants";
 
 /**
  * Baby stats that change over time
@@ -23,7 +23,7 @@ export interface SparkProgression {
   level: number;
   xp: number;
   xpToNextLevel: number;
-  stage: BabyStage;
+  stage: SparkStage;
 }
 
 /**
@@ -67,8 +67,8 @@ export interface GameSpark {
  * Record of an evolution event
  */
 export interface EvolutionRecord {
-  fromStage: BabyStage;
-  toStage: BabyStage;
+  fromStage: SparkStage;
+  toStage: SparkStage;
   level: number;
   timestamp: number;
 }
@@ -133,7 +133,7 @@ export type AchievementRequirement =
   | { type: "hashes"; count: number }
   | { type: "shares"; count: number }
   | { type: "level"; level: number }
-  | { type: "stage"; stage: BabyStage }
+  | { type: "stage"; stage: SparkStage }
   | { type: "days_without_critical"; days: number }
   | { type: "mining_time"; hours: number }
   | { type: "all_achievements" };
@@ -151,8 +151,8 @@ export interface AchievementReward {
  * Evolution event data
  */
 export interface EvolutionEventData {
-  fromStage: BabyStage;
-  toStage: BabyStage;
+  fromStage: SparkStage;
+  toStage: SparkStage;
   newLevel: number;
   stageName: string;
   miningBonus: number;
@@ -164,8 +164,8 @@ export interface EvolutionEventData {
 export type GameEvent =
   | { type: "tick"; stats: SparkStats }
   | { type: "level_up"; level: number }
-  | { type: "evolution_ready"; nextStage: BabyStage }
-  | { type: "evolved"; stage: BabyStage; data: EvolutionEventData }
+  | { type: "evolution_ready"; nextStage: SparkStage }
+  | { type: "evolved"; stage: SparkStage; data: EvolutionEventData }
   | { type: "achievement_unlocked"; achievement: Achievement }
   | { type: "critical_stat"; stat: keyof SparkStats }
   | { type: "stat_recovered"; stat: keyof SparkStats }

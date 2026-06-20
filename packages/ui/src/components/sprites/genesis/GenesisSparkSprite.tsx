@@ -40,7 +40,7 @@ export interface GenesisBabyTraits {
   dna: string;
 }
 
-interface GenesisBabySpriteProps {
+interface GenesisSparkSpriteProps {
   traits: GenesisBabyTraits;
   size?: number;
   state?: BabyState;
@@ -173,7 +173,7 @@ export function traitsFromHash(hash: string): GenesisBabyTraits {
   };
 }
 
-export const GenesisBabySprite: FC<GenesisBabySpriteProps> = ({
+export const GenesisSparkSprite: FC<GenesisSparkSpriteProps> = ({
   traits,
   size = 64,
   state = "idle",
@@ -329,7 +329,7 @@ export const GenesisBabyPreview: FC<GenesisBabyPreviewProps> = ({
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <GenesisBabySprite
+      <GenesisSparkSprite
         traits={traits}
         size={size}
         state={state}
@@ -346,4 +346,4 @@ export const GenesisBabyPreview: FC<GenesisBabyPreviewProps> = ({
   );
 };
 
-export default GenesisBabySprite;
+export default GenesisSparkSprite;

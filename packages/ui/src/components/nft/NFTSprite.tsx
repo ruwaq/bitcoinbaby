@@ -18,7 +18,7 @@ import {
   type ColorPalette,
 } from "./trait-config";
 import {
-  GenesisBabySprite,
+  GenesisSparkSprite,
   type GenesisBabyTraits,
   type GenesisBabyState,
   type GenesisBaseType,
@@ -299,7 +299,7 @@ export const NFTSprite: FC<NFTSpriteProps> = ({
     };
 
     return (
-      <GenesisBabySprite
+      <GenesisSparkSprite
         traits={genesisTraits}
         size={size}
         state={state}

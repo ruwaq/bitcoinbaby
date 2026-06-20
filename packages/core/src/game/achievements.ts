@@ -5,7 +5,7 @@
  */
 
 import type { Achievement, GameState } from './types';
-import { STAGE_ORDER, type BabyStage } from './constants';
+import { STAGE_ORDER, type SparkStage } from './constants';
 
 /**
  * All available achievements

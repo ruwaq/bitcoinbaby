@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * CreateBabyForm - Baby creation onboarding flow
+ * CreateSparkForm - Baby creation onboarding flow
  *
  * Two-step flow:
  * 1. Tutorial/Welcome screen explaining the game
@@ -37,7 +37,7 @@ const TUTORIAL_FEATURES = [
   },
 ];
 
-interface CreateBabyFormProps {
+interface CreateSparkFormProps {
   /** Callback when baby is created */
   onCreate: (name: string, miningSharesBaseline?: number) => void;
   /** Current mining shares for baseline */
@@ -46,11 +46,11 @@ interface CreateBabyFormProps {
   onGoToMining: () => void;
 }
 
-export function CreateBabyForm({
+export function CreateSparkForm({
   onCreate,
   currentMiningShares,
   onGoToMining,
-}: CreateBabyFormProps) {
+}: CreateSparkFormProps) {
   const [name, setName] = useState("");
   const [showTutorial, setShowTutorial] = useState(true);
 
@@ -161,4 +161,4 @@ export function CreateBabyForm({
   );
 }
 
-export default CreateBabyForm;
+export default CreateSparkForm;

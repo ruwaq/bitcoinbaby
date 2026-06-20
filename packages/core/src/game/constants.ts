@@ -9,7 +9,7 @@
  * Evolution stages (21 total)
  * Grouped into 7 visual forms with 3 variants each
  */
-export type BabyStage =
+export type SparkStage =
   // Egg phase (Lvl 0)
   | 'egg'
   // Baby phase (Lvl 1-3)
@@ -30,7 +30,7 @@ export type BabyStage =
 /**
  * Visual sprite form (simplified for rendering)
  */
-export type BabySpriteForm = 'egg' | 'baby' | 'child' | 'teen' | 'young' | 'adult' | 'master' | 'legend';
+export type SparkSpriteForm = 'egg' | 'baby' | 'child' | 'teen' | 'young' | 'adult' | 'master' | 'legend';
 
 /**
  * Baby visual/behavioral states
@@ -156,7 +156,7 @@ export const MINING_REWARDS = {
 /**
  * Stage evolution levels
  */
-export const EVOLUTION_LEVELS: Record<BabyStage, number> = {
+export const EVOLUTION_LEVELS: Record<SparkStage, number> = {
   egg: 0,
   baby_1: 1,
   baby_2: 2,
@@ -183,7 +183,7 @@ export const EVOLUTION_LEVELS: Record<BabyStage, number> = {
 /**
  * All stages in order
  */
-export const STAGE_ORDER: BabyStage[] = [
+export const STAGE_ORDER: SparkStage[] = [
   'egg',
   'baby_1', 'baby_2', 'baby_3',
   'child_1', 'child_2', 'child_3',
@@ -197,7 +197,7 @@ export const STAGE_ORDER: BabyStage[] = [
 /**
  * Mining bonus multipliers (smooth scaling)
  */
-export const MINING_BONUS: Record<BabyStage, number> = {
+export const MINING_BONUS: Record<SparkStage, number> = {
   egg: 0,
   baby_1: 1.00,
   baby_2: 1.02,
@@ -223,7 +223,7 @@ export const MINING_BONUS: Record<BabyStage, number> = {
 /**
  * Stage display names (Spanish)
  */
-export const STAGE_NAMES: Record<BabyStage, string> = {
+export const STAGE_NAMES: Record<SparkStage, string> = {
   egg: 'Huevo de Código',
   baby_1: 'Bebe Nodo I',
   baby_2: 'Bebe Nodo II',
@@ -249,7 +249,7 @@ export const STAGE_NAMES: Record<BabyStage, string> = {
 /**
  * Get sprite form for a stage
  */
-export function getSpriteForm(stage: BabyStage): BabySpriteForm {
+export function getSpriteForm(stage: SparkStage): SparkSpriteForm {
   if (stage === 'egg') return 'egg';
   if (stage === 'legend') return 'legend';
   if (stage.startsWith('baby_')) return 'baby';
@@ -264,7 +264,7 @@ export function getSpriteForm(stage: BabyStage): BabySpriteForm {
 /**
  * Get sub-variant number (1, 2, or 3)
  */
-export function getStageVariant(stage: BabyStage): number {
+export function getStageVariant(stage: SparkStage): number {
   if (stage === 'egg' || stage === 'legend') return 1;
   const parts = stage.split('_');
   return parseInt(parts[1] || '1', 10);

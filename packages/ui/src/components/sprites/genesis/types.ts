@@ -324,7 +324,7 @@ export const RARITY_EFFECTS: Record<Rarity, RarityEffect> = {
 // SPRITE PROPS
 // =============================================================================
 
-export interface GenesisBabySpriteProps {
+export interface GenesisSparkSpriteProps {
   /** Base type of the baby */
   baseType: BaseType;
   /** Bloodline for accessories */

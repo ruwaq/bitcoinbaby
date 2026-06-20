@@ -15,7 +15,7 @@ import {
   STAGE_ORDER,
   LEVEL_DECAY,
   getXPForLevel,
-  type BabyStage,
+  type SparkStage,
   type GameAction,
 } from "./constants";
 import type { SparkStats, GameSpark, SparkProgression } from "./types";
@@ -174,9 +174,9 @@ export function addXP(
 /**
  * Get the stage for a given level
  */
-export function getStageForLevel(level: number): BabyStage {
+export function getStageForLevel(level: number): SparkStage {
   // Find the highest stage this level qualifies for
-  let resultStage: BabyStage = "egg";
+  let resultStage: SparkStage = "egg";
 
   for (const stage of STAGE_ORDER) {
     if (level >= EVOLUTION_LEVELS[stage]) {
@@ -192,7 +192,7 @@ export function getStageForLevel(level: number): BabyStage {
 /**
  * Check if evolution is available
  */
-export function checkEvolution(baby: GameSpark): BabyStage | null {
+export function checkEvolution(baby: GameSpark): SparkStage | null {
   const currentStage = baby.progression.stage;
   const newStage = getStageForLevel(baby.progression.level);
 
@@ -228,14 +228,14 @@ export function getCriticalStats(stats: SparkStats): (keyof SparkStats)[] {
 /**
  * Calculate mining bonus based on stage
  */
-export function calculateMiningBonus(stage: BabyStage): number {
+export function calculateMiningBonus(stage: SparkStage): number {
   return MINING_BONUS[stage];
 }
 
 /**
  * Calculate XP reward for mining shares
  */
-export function calculateMiningXP(shares: number, stage: BabyStage): number {
+export function calculateMiningXP(shares: number, stage: SparkStage): number {
   const bonus = calculateMiningBonus(stage);
   return Math.floor(shares * MINING_REWARDS.XP_PER_SHARE * bonus);
 }

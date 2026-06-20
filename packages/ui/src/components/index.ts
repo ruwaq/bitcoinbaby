@@ -138,10 +138,10 @@ export {
 export {
   CosmicStatusBar,
   CosmicIndicator,
-  BabyEnergyIndicator,
+  SparkEnergyIndicator,
   EnergyMultiplierBadge,
   type CosmicStatusBarProps,
-  type BabyEnergyIndicatorProps,
+  type SparkEnergyIndicatorProps,
   type BabyCosmicEnergy,
   type EnergyMultipliers,
   type EnergyStatus,

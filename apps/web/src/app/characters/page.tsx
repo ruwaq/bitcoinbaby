@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
-  GenesisBabySprite,
+  GenesisSparkSprite,
   generateRandomTraits,
   traitsFromHash,
   getMiningBoost,
@@ -288,7 +288,7 @@ export default function CharactersPage() {
                   <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-40" />
 
                   <div className="relative z-10">
-                    <GenesisBabySprite
+                    <GenesisSparkSprite
                       traits={traits}
                       size={spriteSize}
                       state={babyState}

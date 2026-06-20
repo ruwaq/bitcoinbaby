@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * BabyEnergyIndicator - Shows Baby's cosmic energy status
+ * SparkEnergyIndicator - Shows Baby's cosmic energy status
  *
  * Displays the current energy multiplier, status, and active effects.
  * Visual feedback changes based on thriving/normal/struggling/critical states.
@@ -18,7 +18,7 @@ export type { EnergyStatus, BabyCosmicEnergy };
 // Extract multipliers type from BabyCosmicEnergy for local use
 export type EnergyMultipliers = BabyCosmicEnergy["rawMultipliers"];
 
-export interface BabyEnergyIndicatorProps {
+export interface SparkEnergyIndicatorProps {
   /** Calculated cosmic energy data */
   energy: BabyCosmicEnergy | null;
   /** Baby's name for display */
@@ -357,9 +357,9 @@ const EnergyBar: FC<{
 };
 
 /**
- * Main BabyEnergyIndicator Component
+ * Main SparkEnergyIndicator Component
  */
-export const BabyEnergyIndicator: FC<BabyEnergyIndicatorProps> = ({
+export const SparkEnergyIndicator: FC<SparkEnergyIndicatorProps> = ({
   energy,
   babyName,
   showDetails = true,
@@ -551,4 +551,4 @@ export const EnergyMultiplierBadge: FC<{
   );
 };
 
-export default BabyEnergyIndicator;
+export default SparkEnergyIndicator;

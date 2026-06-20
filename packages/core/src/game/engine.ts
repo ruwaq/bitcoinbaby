@@ -37,7 +37,7 @@ import {
   calculateAchievementRewardXP,
 } from "./achievements";
 import { GameStorage } from "../storage";
-import type { GameAction, BabyStage } from "./constants";
+import type { GameAction, SparkStage } from "./constants";
 import { getGameLoop } from "./game-loop";
 
 /**
@@ -309,7 +309,7 @@ export class GameEngine {
   /**
    * Evolve to a new stage
    */
-  private evolve(newStage: BabyStage): void {
+  private evolve(newStage: SparkStage): void {
     if (!this.state.baby) return;
 
     const previousStage = this.state.baby.progression.stage;

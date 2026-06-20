@@ -6,11 +6,11 @@
  */
 
 export {
-  useBaby,
-  type UseBabyOptions,
-  type UseBabyReturn,
+  useSpark,
+  type UseSparkOptions,
+  type UseSparkReturn,
   type EvolutionData,
-} from "./useBaby";
+} from "./useSpark";
 
 export {
   useMining,

@@ -21,8 +21,8 @@ export {
   getXPForLevel,
   getSpriteForm,
   getStageVariant,
-  type BabyStage,
-  type BabySpriteForm,
+  type SparkStage,
+  type SparkSpriteForm,
   type SparkVisualState,
   type GameAction,
 } from "./constants";

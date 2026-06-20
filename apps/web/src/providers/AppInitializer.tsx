@@ -38,7 +38,7 @@ function toStoreWalletInfo(info: {
     address: info.address,
     publicKey: info.publicKey,
     balance: BigInt(0),
-    babyTokens: BigInt(0),
+    sparkTokens: BigInt(0),
   };
 }
 

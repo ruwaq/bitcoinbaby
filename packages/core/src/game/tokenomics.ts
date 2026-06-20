@@ -8,7 +8,7 @@
  * as the single source of truth. This file re-exports with game-specific naming.
  */
 
-import type { BabyStage } from "./constants";
+import type { SparkStage } from "./constants";
 import { MINING_BONUS } from "./constants";
 import { SPARK_CONFIG } from "@bitcoinbaby/bitcoin";
 
@@ -137,7 +137,7 @@ export interface TokenDistribution {
  */
 export function calculateDistribution(
   totalTokens: bigint,
-  stage: BabyStage,
+  stage: SparkStage,
 ): TokenDistribution {
   // Apply stage bonus using BigInt arithmetic (scaled by 1000 for precision)
   const stageBonus = MINING_BONUS[stage];

@@ -1,16 +1,16 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { Baby, SparkState } from "../types";
+import type { Spark, SparkState } from "../types";
 
 // =============================================================================
 // TYPES
 // =============================================================================
 
 /**
- * Persisted baby data uses timestamps instead of Date objects
+ * Persisted spark data uses timestamps instead of Date objects
  * for proper serialization/deserialization
  */
-export interface PersistedBaby {
+export interface PersistedSpark {
   id: string;
   name: string;
   state: SparkState;
@@ -20,9 +20,9 @@ export interface PersistedBaby {
   lastFed: number; // timestamp
 }
 
-interface BabyStore {
-  baby: PersistedBaby | null;
-  setBaby: (baby: Baby | PersistedBaby) => void;
+interface SparkStore {
+  spark: PersistedSpark | null;
+  setSpark: (spark: Spark | PersistedSpark) => void;
   updateState: (state: SparkState) => void;
   addExperience: (xp: number) => void;
   levelUp: () => void;
@@ -35,21 +35,21 @@ interface BabyStore {
 // =============================================================================
 
 /**
- * Convert Baby (with Date) to PersistedBaby (with timestamps)
+ * Convert Spark (with Date) to PersistedSpark (with timestamps)
  */
-function toBabyPersisted(baby: Baby | PersistedBaby): PersistedBaby {
+function toSparkPersisted(spark: Spark | PersistedSpark): PersistedSpark {
   return {
-    id: baby.id,
-    name: baby.name,
-    state: baby.state,
-    level: baby.level,
-    experience: baby.experience,
+    id: spark.id,
+    name: spark.name,
+    state: spark.state,
+    level: spark.level,
+    experience: spark.experience,
     createdAt:
-      typeof baby.createdAt === "number"
-        ? baby.createdAt
-        : baby.createdAt.getTime(),
+      typeof spark.createdAt === "number"
+        ? spark.createdAt
+        : spark.createdAt.getTime(),
     lastFed:
-      typeof baby.lastFed === "number" ? baby.lastFed : baby.lastFed.getTime(),
+      typeof spark.lastFed === "number" ? spark.lastFed : spark.lastFed.getTime(),
   };
 }
 
@@ -57,60 +57,60 @@ function toBabyPersisted(baby: Baby | PersistedBaby): PersistedBaby {
 // STORE
 // =============================================================================
 
-export const useSparkStore = create<BabyStore>()(
+export const useSparkStore = create<SparkStore>()(
   persist(
     (set) => ({
-      baby: null,
+      spark: null,
 
-      setBaby: (baby) => set({ baby: toBabyPersisted(baby) }),
+      setSpark: (spark) => set({ spark: toSparkPersisted(spark) }),
 
       updateState: (state) =>
-        set((s) => (s.baby ? { baby: { ...s.baby, state } } : s)),
+        set((s) => (s.spark ? { spark: { ...s.spark, state } } : s)),
 
       addExperience: (xp) =>
         set((s) => {
-          if (!s.baby) return s;
-          const newXp = s.baby.experience + xp;
-          const xpToLevel = s.baby.level * 100;
+          if (!s.spark) return s;
+          const newXp = s.spark.experience + xp;
+          const xpToLevel = s.spark.level * 100;
 
           if (newXp >= xpToLevel) {
             return {
-              baby: {
-                ...s.baby,
+              spark: {
+                ...s.spark,
                 experience: newXp - xpToLevel,
-                level: s.baby.level + 1,
+                level: s.spark.level + 1,
                 state: "evolving" as SparkState,
               },
             };
           }
 
-          return { baby: { ...s.baby, experience: newXp } };
+          return { spark: { ...s.spark, experience: newXp } };
         }),
 
       levelUp: () =>
         set((s) =>
-          s.baby
+          s.spark
             ? {
-                baby: { ...s.baby, level: s.baby.level + 1, state: "evolving" },
+                spark: { ...s.spark, level: s.spark.level + 1, state: "evolving" },
               }
             : s,
         ),
 
       feed: () =>
         set((s) =>
-          s.baby
-            ? { baby: { ...s.baby, lastFed: Date.now(), state: "happy" } }
+          s.spark
+            ? { spark: { ...s.spark, lastFed: Date.now(), state: "happy" } }
             : s,
         ),
 
-      reset: () => set({ baby: null }),
+      reset: () => set({ spark: null }),
     }),
     {
-      name: "bitcoinbaby-baby-store",
+      name: "bitcoinsparks-spark-store",
       storage: createJSONStorage(() => localStorage),
       version: 1,
       partialize: (state) => ({
-        baby: state.baby,
+        spark: state.spark,
       }),
     },
   ),

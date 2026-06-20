@@ -25,16 +25,16 @@ import { useSearchParams, useRouter } from "next/navigation";
 async function resetAllData() {
   // Clear localStorage keys
   const keysToRemove = [
-    "bitcoinbaby-spark-store",
-    "bitcoinbaby-mining-store",
-    "bitcoinbaby-spark-store",
-    "bitcoinbaby-wallet-store",
-    "bitcoinbaby-network",
-    "bitcoinbaby-settings",
-    "bitcoinbaby-leaderboard",
-    "bitcoinbaby-tutorial",
-    "bitcoinbaby-game",
-    "bitcoinbaby_game_state",
+    "bitcoinsparks-spark-store",
+    "bitcoinsparks-mining-store",
+    "bitcoinsparks-spark-store",
+    "bitcoinsparks-wallet-store",
+    "bitcoinsparks-network",
+    "bitcoinsparks-settings",
+    "bitcoinsparks-leaderboard",
+    "bitcoinsparks-tutorial",
+    "bitcoinsparks-game",
+    "bitcoinsparks_game_state",
   ];
   keysToRemove.forEach((key) => localStorage.removeItem(key));
 
@@ -43,13 +43,13 @@ async function resetAllData() {
     try {
       const databases = await indexedDB.databases();
       for (const db of databases) {
-        if (db.name?.includes("bitcoinbaby")) {
+        if (db.name?.includes("bitcoinsparks")) {
           indexedDB.deleteDatabase(db.name);
         }
       }
     } catch {
       // Fallback for browsers that don't support databases()
-      indexedDB.deleteDatabase("bitcoinbaby");
+      indexedDB.deleteDatabase("bitcoinsparks");
     }
   }
 
@@ -254,7 +254,7 @@ function AppShellInner() {
   const pendingTxCount = usePendingTxStore(
     (s) => s.transactions.filter((tx) => tx.status === "pending").length,
   );
-  const babyExists = useSparkStore((s) => s.baby !== null);
+  const sparkExists = useSparkStore((s) => s.spark !== null);
   const narrativeEventCount = useNarrativeStore((s) => {
     if (!s.activeTokenId) return 0;
     const st = s.states[s.activeTokenId];
@@ -262,7 +262,7 @@ function AppShellInner() {
   });
 
   const tabBadges: Partial<Record<TabType, number>> = {
-    dashboard: babyExists ? 0 : 1,
+    dashboard: sparkExists ? 0 : 1,
     wallet: pendingTxCount > 0 ? pendingTxCount : 0,
     nfts: narrativeEventCount > 0 ? Math.min(narrativeEventCount, 99) : 0,
   };

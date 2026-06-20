@@ -8,10 +8,11 @@ import {
   type UseGameLoopReturn,
   type UseAchievementsReturn,
 } from "@bitcoinbaby/core";
-import { useBabyState, type BabyVisualState } from "@/hooks/useBabyState";
+import useSparkState from "@/hooks/useSparkState";
+import type { SparkVisualState } from "@/hooks/useSparkState";
 
 /**
- * useBaby - Unified hook for baby care and game state
+ * useSpark - Unified hook for baby care and game state
  *
  * Combines:
  * - Game loop (baby state, actions, progression)
@@ -20,10 +21,10 @@ import { useBabyState, type BabyVisualState } from "@/hooks/useBabyState";
  * - Baby visual state derivation
  *
  * @example
- * const { baby, actions, achievements, mining, isLoading } = useBaby();
+ * const { baby, actions, achievements, mining, isLoading } = useSpark();
  */
 
-export interface UseBabyOptions {
+export interface UseSparkOptions {
   /** Auto-start game loop */
   autoStart?: boolean;
   /** Callback for evolution events */
@@ -38,10 +39,10 @@ export interface EvolutionData {
   miningBonus: number;
 }
 
-export interface UseBabyReturn {
+export interface UseSparkReturn {
   // Baby state
   baby: UseGameLoopReturn["baby"];
-  babyState: BabyVisualState | null;
+  sparkState: SparkVisualState | null;
   isLoading: boolean;
   isDead: boolean;
   daysUntilDecay: number | null;
@@ -69,7 +70,7 @@ export interface UseBabyReturn {
   clearEvolution: () => void;
 }
 
-export function useBaby(options: UseBabyOptions = {}): UseBabyReturn {
+export function useSpark(options: UseSparkOptions = {}): UseSparkReturn {
   const { autoStart = true, onEvolution } = options;
 
   // Evolution modal state
@@ -102,7 +103,7 @@ export function useBaby(options: UseBabyOptions = {}): UseBabyReturn {
   });
 
   // Baby visual state
-  const babyState = useBabyState(game.baby);
+  const sparkState = useSparkState(game.baby);
 
   // Achievements
   const achievements = useAchievements({
@@ -177,7 +178,7 @@ export function useBaby(options: UseBabyOptions = {}): UseBabyReturn {
   return {
     // Baby state
     baby: game.baby,
-    babyState,
+    sparkState,
     isLoading: game.isLoading,
     isDead: game.isDead,
     daysUntilDecay: game.daysUntilDecay,
@@ -206,4 +207,4 @@ export function useBaby(options: UseBabyOptions = {}): UseBabyReturn {
   };
 }
 
-export default useBaby;
+export default useSpark;

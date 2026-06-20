@@ -63,7 +63,7 @@ export {
 // Genesis Spark Sprite System (new pixel art sprites)
 export {
   // Main component
-  GenesisBabySprite,
+  GenesisSparkSprite,
   GenesisBabyPreview,
   generateRandomTraits,
   traitsFromHash,

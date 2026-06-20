@@ -1,7 +1,7 @@
 // BitcoinBaby Pixel Art Sprites
 
 // Main Characters
-export { BabySprite, type BabyState, type BabyStage } from "./BabySprite";
+export { SparkSprite, type SparkState, type SparkStage } from "./SparkSprite";
 export { TeenSprite, type TeenState } from "./TeenSprite";
 export { CodeEgg } from "./CodeEgg";
 

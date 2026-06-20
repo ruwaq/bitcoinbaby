@@ -1,31 +1,31 @@
 /**
- * useBabyState - Baby State Convenience Hook
+ * useSparkState - Baby State Convenience Hook
  *
- * Provides derived baby state values and visual state calculations.
+ * Provides derived spark state values and visual state calculations.
  */
 
 "use client";
 
 import { useMemo } from "react";
 import {
-  type GameBaby,
+  type GameSpark,
   STAGE_NAMES,
   MINING_BONUS,
   getSpriteForm,
   getStageVariant,
-  type BabySpriteForm,
-  type BabyVisualState,
+  type SparkSpriteForm,
+  type SparkVisualState,
 } from "@bitcoinbaby/core";
 
-interface UseBabyStateReturn {
+interface UseSparkStateReturn {
   // Identity
   name: string;
   id: string;
 
   // Visual
-  spriteForm: BabySpriteForm;
+  spriteForm: SparkSpriteForm;
   spriteVariant: 1 | 2 | 3;
-  visualState: BabyVisualState;
+  visualState: SparkVisualState;
   stageName: string;
 
   // Stats (normalized 0-100)
@@ -52,54 +52,54 @@ interface UseBabyStateReturn {
 }
 
 // Re-export the type for external use
-export type { UseBabyStateReturn as BabyVisualState };
+export type { UseSparkStateReturn as SparkVisualState };
 
-export function useBabyState(baby: GameBaby | null): UseBabyStateReturn | null {
+export function useSparkState(spark: GameSpark | null): UseSparkStateReturn | null {
   return useMemo(() => {
-    if (!baby) return null;
+    if (!spark) return null;
 
-    const spriteForm = getSpriteForm(baby.progression.stage);
-    const spriteVariant = getStageVariant(baby.progression.stage) as 1 | 2 | 3;
-    const miningBonus = MINING_BONUS[baby.progression.stage];
+    const spriteForm = getSpriteForm(spark.progression.stage);
+    const spriteVariant = getStageVariant(spark.progression.stage) as 1 | 2 | 3;
+    const miningBonus = MINING_BONUS[spark.progression.stage];
 
     // Check if any stat is critical
     const isCritical =
-      baby.stats.energy <= 20 ||
-      baby.stats.happiness <= 20 ||
-      baby.stats.hunger >= 80 ||
-      baby.stats.health <= 20;
+      spark.stats.energy <= 20 ||
+      spark.stats.happiness <= 20 ||
+      spark.stats.hunger >= 80 ||
+      spark.stats.health <= 20;
 
-    // Check if baby needs attention (warning level)
+    // Check if spark needs attention (warning level)
     const needsAttention =
-      baby.stats.energy <= 40 ||
-      baby.stats.happiness <= 40 ||
-      baby.stats.hunger >= 60 ||
-      baby.stats.health <= 40;
+      spark.stats.energy <= 40 ||
+      spark.stats.happiness <= 40 ||
+      spark.stats.hunger >= 60 ||
+      spark.stats.health <= 40;
 
     return {
       // Identity
-      name: baby.name,
-      id: baby.id,
+      name: spark.name,
+      id: spark.id,
 
       // Visual
       spriteForm,
       spriteVariant,
-      visualState: baby.visualState,
-      stageName: STAGE_NAMES[baby.progression.stage],
+      visualState: spark.visualState,
+      stageName: STAGE_NAMES[spark.progression.stage],
 
       // Stats
-      energy: baby.stats.energy,
-      happiness: baby.stats.happiness,
-      hunger: baby.stats.hunger,
-      health: baby.stats.health,
+      energy: spark.stats.energy,
+      happiness: spark.stats.happiness,
+      hunger: spark.stats.hunger,
+      health: spark.stats.health,
 
       // Progression
-      level: baby.progression.level,
-      xp: baby.progression.xp,
-      xpToNextLevel: baby.progression.xpToNextLevel,
+      level: spark.progression.level,
+      xp: spark.progression.xp,
+      xpToNextLevel: spark.progression.xpToNextLevel,
       xpPercentage:
-        baby.progression.xpToNextLevel > 0
-          ? (baby.progression.xp / baby.progression.xpToNextLevel) * 100
+        spark.progression.xpToNextLevel > 0
+          ? (spark.progression.xp / spark.progression.xpToNextLevel) * 100
           : 0,
 
       // Mining
@@ -107,12 +107,12 @@ export function useBabyState(baby: GameBaby | null): UseBabyStateReturn | null {
       miningBonusDisplay: `+${Math.round((miningBonus - 1) * 100)}%`,
 
       // Flags
-      isSleeping: baby.isSleeping,
-      isMining: baby.isMining,
+      isSleeping: spark.isSleeping,
+      isMining: spark.isMining,
       isCritical,
       needsAttention,
     };
-  }, [baby]);
+  }, [spark]);
 }
 
-export default useBabyState;
+export default useSparkState;

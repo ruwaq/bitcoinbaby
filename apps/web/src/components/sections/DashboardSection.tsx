@@ -18,11 +18,11 @@
 import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useMining } from "@/hooks/features";
-import { useBaby } from "@/hooks/features/useBaby";
+import { useSpark } from "@/hooks/features/useSpark";
 import { useGlobalMining } from "@bitcoinbaby/core";
-import type { GameBaby } from "@bitcoinbaby/core";
-import { BabyDisplay } from "@/components/features/baby/BabyDisplay";
-import { CreateBabyForm } from "@/components/features/baby/CreateBabyForm";
+import type { GameSpark } from "@bitcoinbaby/core";
+import { SparkDisplay } from "@/components/features/spark/SparkDisplay";
+import { CreateSparkForm } from "@/components/features/spark/CreateSparkForm";
 import {
   MiningVisualization,
   NotificationsPanel,
@@ -35,7 +35,7 @@ import type { GameAction } from "@bitcoinbaby/ui";
 import type { SparkNFTState } from "@bitcoinbaby/ai";
 
 /**
- * Build a SparkNFTState from a GameBaby for the NarrativeEngine.
+ * Build a SparkNFTState from a GameSpark for the NarrativeEngine.
  *
  * When the user has a free baby (no NFT minted), we generate a deterministic
  * "virtual NFT state" from the baby's id. This gives the NarrativeEngine
@@ -45,7 +45,7 @@ import type { SparkNFTState } from "@bitcoinbaby/ai";
  * The dna is derived from the baby's id via a simple hash — same baby,
  * same personality forever. Different babies get different stories.
  */
-function buildNftStateFromBaby(baby: GameBaby): SparkNFTState {
+function buildNftStateFromBaby(baby: GameSpark): SparkNFTState {
   // Deterministic "dna" from baby id — simple hash for personality seeding
   let hash = 0;
   for (let i = 0; i < baby.id.length; i++) {
@@ -76,7 +76,7 @@ function buildNftStateFromBaby(baby: GameBaby): SparkNFTState {
     tokenId: Math.abs(hash) % 100000,
     level: baby.progression.level,
     xp: baby.progression.xp,
-    totalXp: baby.progression.xp, // GameBaby doesn't track cumulative XP separately
+    totalXp: baby.progression.xp, // GameSpark doesn't track cumulative XP separately
     workCount: baby.progression.level * 10,
     lastWorkBlock: 0,
     evolutionCount: baby.evolutionHistory.length,
@@ -92,13 +92,13 @@ export function DashboardSection() {
     useMining();
   const {
     baby,
-    babyState,
+    sparkState,
     isDead,
     daysUntilDecay,
     actions,
     achievements,
     mining,
-  } = useBaby({ autoStart: true });
+  } = useSpark({ autoStart: true });
   const miningState = useGlobalMining();
   const isMining = miningState.isRunning;
 
@@ -161,7 +161,7 @@ export function DashboardSection() {
               Your AI-powered companion — FREE!
             </p>
           </div>
-          <CreateBabyForm
+          <CreateSparkForm
             onCreate={handleCreateBaby}
             currentMiningShares={mining.shares}
             onGoToMining={() => {}}
@@ -212,9 +212,9 @@ export function DashboardSection() {
           )}
 
           {/* Baby — the centerpiece */}
-          <BabyDisplay
+          <SparkDisplay
             name={baby.name || "Baby"}
-            babyState={babyState}
+            sparkState={sparkState}
             daysUntilDecay={daysUntilDecay ?? undefined}
             isMining={isMining}
             isDead={isDead}

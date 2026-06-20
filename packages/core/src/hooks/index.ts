@@ -20,7 +20,7 @@ export {
   useCosmicEnergy,
   useMoonPhase,
   useCosmicEvents,
-  useBabyCosmicStatus,
+  useSparkCosmicStatus,
   useBitcoinCosmic,
 } from "./useCosmic";
 

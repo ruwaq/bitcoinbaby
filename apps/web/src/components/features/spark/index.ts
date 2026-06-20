@@ -4,5 +4,5 @@
  * Components related to baby care, display, and onboarding.
  */
 
-export { CreateBabyForm } from "./CreateBabyForm";
-export { BabyDisplay } from "./BabyDisplay";
+export { CreateSparkForm } from "./CreateSparkForm";
+export { SparkDisplay } from "./SparkDisplay";

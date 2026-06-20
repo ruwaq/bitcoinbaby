@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * BabyDisplay - Baby sprite card with stats HUD
+ * SparkDisplay - Spark sprite card with stats HUD
  *
- * Shows the baby sprite, name, current state, and stats HUD.
- * Used as the main visual component in BabySection.
+ * Shows the spark sprite, name, current state, and stats HUD.
+ * Used as the main visual component in Section.
  */
 
 import {
@@ -14,69 +14,69 @@ import {
   type GameAction,
 } from "@bitcoinbaby/ui";
 import { pixelCard } from "@bitcoinbaby/ui";
-import type { BabyVisualState } from "@/hooks/useBabyState";
+import type { SparkVisualState } from "@/hooks/useSparkState";
 
-interface BabyDisplayProps {
-  /** Baby name */
+interface SparkDisplayProps {
+  /** Spark name */
   name: string;
-  /** Baby visual state (derived from baby stats) */
-  babyState: BabyVisualState | null;
+  /** Spark visual state (derived from spark stats) */
+  sparkState: SparkVisualState | null;
   /** Days until decay (inactivity penalty) */
   daysUntilDecay?: number;
   /** Whether mining is currently running */
   isMining: boolean;
-  /** Whether baby is dead */
+  /** Whether spark is dead */
   isDead: boolean;
   /** Action callback */
   onAction: (action: GameAction) => void;
 }
 
-export function BabyDisplay({
+export function SparkDisplay({
   name,
-  babyState,
+  sparkState,
   daysUntilDecay,
   isMining,
   isDead,
   onAction,
-}: BabyDisplayProps) {
+}: SparkDisplayProps) {
   return (
     <div className="flex flex-col items-center">
-      {/* Baby Card */}
+      {/* Spark Card */}
       <div className={`${pixelCard.primary} p-8 w-full max-w-sm`}>
         {/* Name & Stage */}
         <div className="flex justify-between items-center mb-4">
           <span className="font-pixel text-sm text-pixel-primary">{name}</span>
           <span className="font-pixel text-[10px] text-pixel-text-muted">
-            {babyState?.visualState.toUpperCase() || "IDLE"}
+            {sparkState?.visualState.toUpperCase() || "IDLE"}
           </span>
         </div>
 
-        {/* Baby Sprite */}
+        {/* Spark Sprite */}
         <div className="flex justify-center mb-6">
           <LevelSprite
-            level={babyState?.level || 1}
-            state={babyState?.visualState || "idle"}
+            level={sparkState?.level || 1}
+            state={sparkState?.visualState || "idle"}
             size={192}
           />
         </div>
 
         {/* Stats HUD */}
-        {babyState && (
+        {sparkState && (
           <GameHUD
             stats={{
-              energy: babyState.energy,
-              happiness: babyState.happiness,
-              hunger: babyState.hunger,
-              health: babyState.health,
+              energy: sparkState.energy,
+              happiness: sparkState.happiness,
+              hunger: sparkState.hunger,
+              health: sparkState.health,
             }}
             progression={{
-              level: babyState.level,
-              xp: babyState.xp,
-              xpToNextLevel: babyState.xpToNextLevel,
-              stageName: babyState.stageName,
+              level: sparkState.level,
+              xp: sparkState.xp,
+              xpToNextLevel: sparkState.xpToNextLevel,
+              stageName: sparkState.stageName,
             }}
-            isMining={babyState.isMining}
-            miningBonus={babyState.miningBonus}
+            isMining={sparkState.isMining}
+            miningBonus={sparkState.miningBonus}
             daysUntilDecay={daysUntilDecay}
           />
         )}
@@ -86,14 +86,14 @@ export function BabyDisplay({
       <div className="mt-4 w-full max-w-sm">
         <ActionButtons
           onAction={onAction}
-          isSleeping={babyState?.isSleeping}
+          isSleeping={sparkState?.isSleeping}
           isMining={isMining}
           disabled={isDead}
-          energy={babyState?.energy}
+          energy={sparkState?.energy}
         />
       </div>
     </div>
   );
 }
 
-export default BabyDisplay;
+export default SparkDisplay;

@@ -12,10 +12,10 @@ export {
 } from "./CosmicStatusBar";
 
 export {
-  BabyEnergyIndicator,
+  SparkEnergyIndicator,
   EnergyMultiplierBadge,
-  type BabyEnergyIndicatorProps,
+  type SparkEnergyIndicatorProps,
   type BabyCosmicEnergy,
   type EnergyMultipliers,
   type EnergyStatus,
-} from "./BabyEnergyIndicator";
+} from "./SparkEnergyIndicator";
