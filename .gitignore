@@ -47,6 +47,14 @@ apps/native/android/app/build/
 
 # Admin wallet (sensitive - never commit!)
 scripts/admin-wallet.md
+
+# Security — never commit credentials or secrets
+*CREDENTIALS*.md
+*credentials*.md
+*.pem
+*.key
+*.p12
+secrets/
 .env.admin
 
 # Documentation (keep only README.md in repo)

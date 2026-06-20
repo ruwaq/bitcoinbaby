@@ -1,30 +1,29 @@
-/**
- * Sitemap for SEO
- *
- * Lists all public pages for search engine indexing.
- * Next.js generates sitemap.xml at build time.
- */
-
 import type { MetadataRoute } from "next";
 
+/**
+ * sitemap.xml — Static routes for SEO
+ */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://bitcoinbaby.app";
-  const lastModified = new Date();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://bitcoinsparks.app";
 
-  // Public pages that should be indexed
-  const publicRoutes = [
-    "", // Home/Mining
-    "/leaderboard", // Leaderboard
-    "/technology", // Technology info
-    "/help", // Help/FAQ
-    "/cosmic", // Cosmic events
-    "/characters", // NFT characters showcase
+  return [
+    {
+      url: siteUrl,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 1,
+    },
+    {
+      url: `${siteUrl}/help`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
+    {
+      url: `${siteUrl}/technology`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
   ];
-
-  return publicRoutes.map((route) => ({
-    url: `${baseUrl}${route}`,
-    lastModified,
-    changeFrequency: route === "/leaderboard" ? "hourly" : "weekly",
-    priority: route === "" ? 1 : 0.8,
-  }));
 }

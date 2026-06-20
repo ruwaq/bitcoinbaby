@@ -1,8 +1,20 @@
-# BitcoinBaby
+# BitcoinSparks
 
 > Proof of Useful Work mining ecosystem on Bitcoin
 
-BitcoinBaby is a gamified mining platform where users "raise" a digital baby by performing AI tasks that contribute to training a collective model. Built on Bitcoin using BitcoinOS and Charms protocol.
+BitcoinSparks is a gamified mining platform where users raise an AI-powered pixel spark that mines Bitcoin via Proof of Useful Work. Your spark evolves through 21 stages — from egg to legend — while earning real $SPARK tokens. Built on Bitcoin using the Charms Protocol.
+
+## Status
+
+| Phase | Status |
+|-------|--------|
+| Fase 1: Limpieza + Charms v15 | ✅ Complete |
+| Fase 2: Renombre baby→spark | ✅ Complete |
+| Fase 3: AI Provider System | ✅ Complete |
+| Fase 4: UI Redesign HOME/EXPLORE/YOU | ✅ Complete |
+| Fase 5: Producción & Mainnet | ⏳ In Progress |
+
+**Network:** Testnet4 (mainnet pending contract deployment)
 
 ## Architecture
 

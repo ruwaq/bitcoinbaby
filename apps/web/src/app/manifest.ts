@@ -5,10 +5,10 @@ export const dynamic = "force-static";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "BitcoinBaby - Mine Bitcoin While Your Baby Evolves",
-    short_name: "BitcoinBaby",
+    name: "BitcoinSparks — Mine Bitcoin While Your Spark Evolves",
+    short_name: "BitcoinSparks",
     description:
-      "Raise your AI-powered pixel baby that grows with Bitcoin mining. Built on BitcoinOS with Charms Protocol.",
+      "Raise your AI-powered pixel spark while mining Bitcoin. Proof of Useful Work meets Tamagotchi. Built on Bitcoin with Charms Protocol.",
     start_url: "/",
     display: "standalone",
     background_color: "#0f0f1b",
