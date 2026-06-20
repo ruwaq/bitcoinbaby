@@ -41,6 +41,7 @@ import {
 } from "@bitcoinbaby/core";
 import { NetworkSwitcher, LevelSprite } from "@bitcoinbaby/ui";
 import { getPhaseConfig } from "@bitcoinbaby/shared";
+import { AIProviderSettings } from "@/components/settings/AIProviderSettings";
 import {
   SettingsCard,
   Toggle,
@@ -264,9 +265,9 @@ export default function SettingsPage() {
             />
           </SettingsCard>
 
-          {/* My Baby Section */}
+          {/* My Spark Section */}
           {spark && (
-            <SettingsCard title="MY BABY">
+            <SettingsCard title="MY SPARK">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 flex-shrink-0">
                   <LevelSprite level={spark.level} state="idle" size={64} />
@@ -291,6 +292,11 @@ export default function SettingsPage() {
               </div>
             </SettingsCard>
           )}
+
+          {/* AI Provider */}
+          <SettingsCard title="AI PROVIDER">
+            <AIProviderSettings />
+          </SettingsCard>
 
           {/* Security Settings */}
           <SettingsCard title="SECURITY">
