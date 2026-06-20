@@ -15,13 +15,11 @@
  */
 
 import type { AggregatedProof, ClaimData, MiningProof } from "../lib/types";
+import { MIN_DIFFICULTY } from "@bitcoinbaby/shared";
 
 // =============================================================================
 // CONSTANTS
 // =============================================================================
-
-/** Minimum difficulty to count as valid work */
-const MIN_DIFFICULTY = 16;
 
 /** Token denomination (8 decimals like Bitcoin) */
 const DENOMINATION = 100_000_000n;
@@ -106,8 +104,12 @@ export class ProofAggregator {
 
   /**
    * Aggregate multiple proofs into a single claimable proof
+   * Uses SHA-256 Merkle tree for cryptographic integrity.
    */
-  aggregateProofs(address: string, proofs: MiningProof[]): AggregatedProof {
+  async aggregateProofs(
+    address: string,
+    proofs: MiningProof[],
+  ): Promise<AggregatedProof> {
     if (proofs.length === 0) {
       throw new Error("No proofs to aggregate");
     }
@@ -129,8 +131,8 @@ export class ProofAggregator {
       throw new Error("No valid proofs (all below minimum difficulty)");
     }
 
-    // Build merkle root of proof hashes (synchronous version)
-    const merkleRoot = this.buildMerkleRootSync(proofHashes);
+    // Build merkle root using proper SHA-256 (cryptographically secure)
+    const merkleRoot = await this.buildMerkleRootAsync(proofHashes);
 
     // Calculate token amount
     const tokenAmount = (totalWork * DENOMINATION) / WORK_DIVISOR;
@@ -244,58 +246,8 @@ export class ProofAggregator {
   // ===========================================================================
 
   /**
-   * Build merkle root from proof hashes (synchronous)
-   *
-   * Uses a simplified but deterministic approach:
-   * 1. Sort hashes for deterministic order
-   * 2. Concatenate all hashes
-   * 3. Simple hash of the concatenated data
-   *
-   * Note: For production, consider async version with proper SHA256
-   */
-  private buildMerkleRootSync(hashes: string[]): string {
-    if (hashes.length === 0) {
-      return "0".repeat(64);
-    }
-
-    if (hashes.length === 1) {
-      return hashes[0];
-    }
-
-    // Sort for deterministic order
-    const sortedHashes = [...hashes].sort();
-
-    // Concatenate all hashes
-    const concatenated = sortedHashes.join("");
-
-    // Simple deterministic hash (FNV-1a variant for 256 bits)
-    // This is not cryptographically secure but is deterministic
-    let h1 = 0x811c9dc5;
-    let h2 = 0x811c9dc5;
-    let h3 = 0x811c9dc5;
-    let h4 = 0x811c9dc5;
-
-    for (let i = 0; i < concatenated.length; i++) {
-      const char = concatenated.charCodeAt(i);
-      h1 = Math.imul(h1 ^ char, 0x01000193);
-      h2 = Math.imul(h2 ^ char, 0x01000193) >>> 0;
-      h3 = Math.imul(h3 ^ (char << 8), 0x01000193);
-      h4 = Math.imul(h4 ^ (char << 16), 0x01000193) >>> 0;
-    }
-
-    // Convert to hex and pad to 64 chars
-    const hex1 = (h1 >>> 0).toString(16).padStart(8, "0");
-    const hex2 = (h2 >>> 0).toString(16).padStart(8, "0");
-    const hex3 = (h3 >>> 0).toString(16).padStart(8, "0");
-    const hex4 = (h4 >>> 0).toString(16).padStart(8, "0");
-
-    // Combine with count prefix for uniqueness
-    const countHex = hashes.length.toString(16).padStart(8, "0");
-    return countHex + hex1 + hex2 + hex3 + hex4 + countHex.slice(0, 16);
-  }
-
-  /**
-   * Build merkle root from proof hashes (async with proper SHA256)
+   * Build merkle root from proof hashes using proper SHA-256
+   * (cryptographically secure Merkle tree)
    */
   async buildMerkleRootAsync(hashes: string[]): Promise<string> {
     if (hashes.length === 0) {

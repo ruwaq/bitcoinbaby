@@ -36,7 +36,7 @@ These are set in `wrangler.toml` and should be reviewed before production:
 ```toml
 [env.production.vars]
 ENVIRONMENT = "production"           # Triggers mainnet mode
-PROVER_URL = "https://v14.charms.dev"
+PROVER_URL = "https://v15.charms.dev"
 # BABTC_APP_ID = "..."               # Set after token deployment
 ```
 

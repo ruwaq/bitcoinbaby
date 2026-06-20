@@ -270,6 +270,36 @@ async function handleScheduled(event: ScheduledEvent, env: Env): Promise<void> {
       scheduledLogger.error("Failed mint retry failed", error);
     }
   }
+
+  // Reconcile leaderboards periodically (daily at 00:00 UTC)
+  if (hour === 0) {
+    scheduledLogger.info("Running leaderboard reconciliation");
+    try {
+      const redis = getRedis(env);
+      // Fetch all miner addresses from leaderboard
+      const addresses = await redis.zrange("leaderboard:miners:all", 0, -1);
+      
+      scheduledLogger.info(`Found ${addresses.length} miners to reconcile`);
+      
+      for (const address of addresses) {
+        if (typeof address === "string") {
+          const id = env.VIRTUAL_BALANCE.idFromName(address);
+          const stub = env.VIRTUAL_BALANCE.get(id);
+          await stub.fetch(
+            new Request(`http://internal/balance/${address}/reconcile`, {
+              method: "POST",
+              headers: {
+                "X-Admin-Key": env.ADMIN_KEY || "",
+              },
+            }),
+          );
+        }
+      }
+      scheduledLogger.info("Leaderboard reconciliation complete");
+    } catch (error) {
+      scheduledLogger.error("Leaderboard reconciliation failed", error);
+    }
+  }
 }
 
 // =============================================================================

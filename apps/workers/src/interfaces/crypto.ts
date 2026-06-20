@@ -132,12 +132,12 @@ export interface ProofForAggregation {
  */
 export interface IProofAggregator {
   /**
-   * Aggregate multiple proofs into one
+   * Aggregate multiple proofs into one (async for SHA-256 Merkle tree)
    */
   aggregateProofs(
     address: string,
     proofs: ProofForAggregation[],
-  ): AggregatedProof;
+  ): Promise<AggregatedProof>;
 
   /**
    * Build merkle root from proof hashes

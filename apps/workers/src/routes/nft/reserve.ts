@@ -49,7 +49,7 @@ reserveRouter.get("/prover-health", async (c) => {
   try {
     const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
     const mintingService = getNFTMintingServiceSimple({
-      proverUrl: c.env.PROVER_URL || "https://v14.charms.dev",
+      proverUrl: c.env.PROVER_URL || "https://v15.charms.dev",
       appId: c.env.NFT_APP_ID || "placeholder",
       appVk: c.env.NFT_APP_VK || "placeholder",
       network,
@@ -372,7 +372,7 @@ reserveRouter.post("/prove", validateBody(proveNftSchema), async (c) => {
     // Get minting service (simple JSON format - like original)
     const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
     const mintingService = getNFTMintingServiceSimple({
-      proverUrl: c.env.PROVER_URL || "https://v14.charms.dev",
+      proverUrl: c.env.PROVER_URL || "https://v15.charms.dev",
       appId: nftAppId,
       appVk: nftAppVk,
       network,

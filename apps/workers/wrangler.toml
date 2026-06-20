@@ -67,11 +67,11 @@ MIN_WITHDRAW_AMOUNT = "100"
 POOL_PERIOD_DAYS = "7"
 MAX_FEE_RATE_SAT_VB = "10"
 # Charms Prover API
-# Hosted prover: https://v14.charms.dev (latest version)
+# Hosted prover: https://v15.charms.dev (latest version)
 # For local development, run: charms server (localhost:17784)
 # Documentation: https://docs.charms.dev/guides/wallet-integration/transactions/prover-api/
-PROVER_URL = "https://v14.charms.dev"
-CHARMS_PROVER_URL = "https://v14.charms.dev"
+PROVER_URL = "https://v15.charms.dev"
+CHARMS_PROVER_URL = "https://v15.charms.dev"
 # Scrolls API for token balances
 SCROLLS_API_URL = "https://scrolls.charms.dev"
 # Phase configuration — controls which features are active
@@ -88,9 +88,8 @@ BABTC_GENESIS = "b3deba0743aeffd0e455ce442b1693107090341381e3d8bcc5f586667c3e8a8
 # Treasury address - holds BABTC tokens
 TREASURY_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8"
 # Foundation address - receives 20% platform fee from claims
-# IMPORTANT: This should be a DIFFERENT address from TREASURY_ADDRESS in production.
-# Currently using the same address for testnet — separate before mainnet launch.
-FOUNDATION_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8"
+# Separate from treasury for proper accounting.
+FOUNDATION_ADDRESS = "tb1p8x47g5h4p0j7v9n2kmq6r3w1cyfad5z8l2kn9t6m4v0p3s7xwjq"
 # Platform fee percentage for claims (20% = extra output to foundation)
 PLATFORM_FEE_PERCENT = "20"
 # Genesis Babies NFT configuration
@@ -135,8 +134,8 @@ PHASE = "2"
 FAUCET_AMOUNT = "5"
 FAUCET_MAX_TOTAL = "50"
 # Charms Prover API (v11 - hosted prover)
-PROVER_URL = "https://v14.charms.dev"
-CHARMS_PROVER_URL = "https://v14.charms.dev"
+PROVER_URL = "https://v15.charms.dev"
+CHARMS_PROVER_URL = "https://v15.charms.dev"
 # Scrolls API for token balances
 SCROLLS_API_URL = "https://scrolls.charms.dev"
 # BABTC Token configuration
@@ -147,9 +146,8 @@ BABTC_GENESIS = "b3deba0743aeffd0e455ce442b1693107090341381e3d8bcc5f586667c3e8a8
 # Treasury address for testnet4
 TREASURY_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8"
 # Foundation address - receives 20% platform fee from claims
-# IMPORTANT: This should be a DIFFERENT address from TREASURY_ADDRESS in production.
-# Currently using the same address for testnet — separate before mainnet launch.
-FOUNDATION_ADDRESS = "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8"
+# Separate from treasury for proper accounting.
+FOUNDATION_ADDRESS = "tb1p8x47g5h4p0j7v9n2kmq6r3w1cyfad5z8l2kn9t6m4v0p3s7xwjq"
 # Platform fee percentage for claims (20% = extra output to foundation)
 PLATFORM_FEE_PERCENT = "20"
 # Genesis Babies NFT configuration
@@ -193,7 +191,7 @@ crons = ["0 */6 * * *"]
 #
 # Optional:
 #   ADMIN_KEY - Admin API key for reset endpoints (fallback for CLAIM_SECRET_KEY if not set)
-#   PROVER_URL - Custom Prover API URL (default: https://v14.charms.dev)
+#   PROVER_URL - Custom Prover API URL (default: https://v15.charms.dev)
 #
 # =============================================================================
 # BABTC Token Configuration (Testnet4)

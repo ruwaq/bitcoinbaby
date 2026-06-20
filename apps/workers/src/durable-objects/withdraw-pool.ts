@@ -720,8 +720,9 @@ export class WithdrawPoolDO extends DurableObject<Env> {
     // Verify admin key with constant-time comparison
     const adminKey = request.headers.get("X-Admin-Key");
     if (
-      this.env.ADMIN_KEY &&
-      (!adminKey || !constantTimeEqual(adminKey, this.env.ADMIN_KEY))
+      !this.env.ADMIN_KEY ||
+      !adminKey ||
+      !constantTimeEqual(adminKey, this.env.ADMIN_KEY)
     ) {
       return this.errorResponse("Unauthorized", 401);
     }
@@ -830,8 +831,9 @@ export class WithdrawPoolDO extends DurableObject<Env> {
     // Verify admin key with constant-time comparison
     const adminKey = request.headers.get("X-Admin-Key");
     if (
-      this.env.ADMIN_KEY &&
-      (!adminKey || !constantTimeEqual(adminKey, this.env.ADMIN_KEY))
+      !this.env.ADMIN_KEY ||
+      !adminKey ||
+      !constantTimeEqual(adminKey, this.env.ADMIN_KEY)
     ) {
       return this.errorResponse("Unauthorized", 401);
     }
@@ -1070,8 +1072,9 @@ export class WithdrawPoolDO extends DurableObject<Env> {
     // Auth check: full reset is destructive, require admin key
     const adminKey = request.headers.get("X-Admin-Key");
     if (
-      this.env.ADMIN_KEY &&
-      (!adminKey || !constantTimeEqual(adminKey, this.env.ADMIN_KEY))
+      !this.env.ADMIN_KEY ||
+      !adminKey ||
+      !constantTimeEqual(adminKey, this.env.ADMIN_KEY)
     ) {
       return this.errorResponse(
         "Unauthorized: admin key required for full reset",

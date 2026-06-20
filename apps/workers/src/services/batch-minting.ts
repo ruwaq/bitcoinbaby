@@ -90,7 +90,7 @@ export interface BatchMintingServiceConfig {
 // CONSTANTS
 // =============================================================================
 
-const DEFAULT_PROVER_URL = "https://v14.charms.dev";
+const DEFAULT_PROVER_URL = "https://v15.charms.dev";
 const DEFAULT_MAX_RECIPIENTS = 50;
 const DEFAULT_MIN_BATCH_SIZE = 1;
 

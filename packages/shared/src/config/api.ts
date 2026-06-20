@@ -34,7 +34,7 @@ export const WORKERS_API = {
  */
 export const PROVER_API = {
   development: "http://localhost:17784",
-  production: "https://v14.charms.dev",
+  production: "https://v15.charms.dev",
   test: "http://localhost:17784",
 } as const;
 

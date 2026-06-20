@@ -33,7 +33,7 @@ ADMIN_KEY="your-workers-admin-key"
 
 # OPTIONAL (defaults shown)
 WORKERS_API_URL="https://bitcoinbaby-api.workers.dev"
-CHARMS_PROVER_URL="https://v14.charms.dev"
+CHARMS_PROVER_URL="https://v15.charms.dev"
 MEMPOOL_API="https://mempool.space/testnet4/api"
 RUN_ONCE="false"
 ```

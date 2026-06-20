@@ -82,7 +82,7 @@ const nextConfig: NextConfig = {
     return config;
   },
 
-  // Security headers handled by middleware.ts for dynamic nonce CSP
+  // Security headers handled by src/proxy.ts for dynamic nonce CSP
   // Only static headers for service worker here
   ...(isNativeBuild
     ? {}

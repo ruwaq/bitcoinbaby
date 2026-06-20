@@ -66,7 +66,7 @@ interface ClaimProverRequest {
 // =============================================================================
 
 /** Charms prover URL (v11) */
-const DEFAULT_CHARMS_PROVER_URL = "https://v14.charms.dev";
+const DEFAULT_CHARMS_PROVER_URL = "https://v15.charms.dev";
 
 /** Request timeout for prover (2 minutes for proof generation) */
 const PROVER_TIMEOUT_MS = 120_000;

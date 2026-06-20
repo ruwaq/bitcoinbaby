@@ -1,10 +1,9 @@
 /**
- * Security Middleware (Proxy) - PRODUCTION
+ * Security Proxy — Next.js 16 file convention (replaces middleware.ts)
  *
- * Balanced CSP for Web3 applications:
- * - 'unsafe-inline' for Next.js hydration compatibility
- * - 'wasm-unsafe-eval' for crypto libraries (secp256k1)
- * - Allows wallet extensions to function
+ * CSP with nonce-based script-src for strong XSS protection.
+ * Dev mode adds unsafe-inline/unsafe-eval for Turbopack HMR.
+ * wasm-unsafe-eval for crypto libraries (secp256k1).
  *
  * Rate limiting:
  * - In-memory token bucket per IP for basic DoS protection
@@ -18,7 +17,7 @@ import type { NextRequest } from "next/server";
 // =============================================================================
 // RATE LIMITER (In-Memory Token Bucket)
 // =============================================================================
-// Edge Middleware runs in a lightweight runtime without access to KV or Redis.
+// Edge Runtime runs without KV/Redis at this layer.
 // This in-memory rate limiter provides basic DoS protection per Edge instance.
 // For distributed rate limiting, the Workers API handles it at the backend layer.
 
@@ -96,7 +95,7 @@ function generateNonce(): string {
 }
 
 // =============================================================================
-// MIDDLEWARE
+// PROXY HANDLER
 // =============================================================================
 
 export function proxy(request: NextRequest) {
@@ -136,15 +135,18 @@ export function proxy(request: NextRequest) {
     },
   });
 
-  // Script-src: in development React needs 'unsafe-eval' for hot reload and
-  // stack trace reconstruction (Turbopack). Never used in production.
+  // Script-src: use nonce for production (no unsafe-inline needed).
+  // Dev needs unsafe-eval for React HMR stack traces. unsafe-inline in dev for Turbopack.
   const scriptSrc = isDev
     ? `script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'`
-    : `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'`;
+    : `script-src 'self' 'nonce-${nonce}' 'wasm-unsafe-eval'`;
 
-  // connect-src: allow localhost ports for local API worker development/testing
-  const connectSrc =
-    "connect-src 'self' http://localhost:* ws://localhost:* https://mempool.space wss://mempool.space https://scrolls.charms.dev https://*.workers.dev https://charms-explorer-api.fly.dev https://v14.charms.dev https://api.cloudflare.com https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://*.xethub.hf.co https://cas-bridge.xethub.hf.co https://cdn.jsdelivr.net";
+  // connect-src: restrict localhost to dev only
+  const baseConnectSrc =
+    "connect-src 'self' https://mempool.space wss://mempool.space https://scrolls.charms.dev https://*.workers.dev https://charms-explorer-api.fly.dev https://v15.charms.dev https://api.cloudflare.com https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://*.xethub.hf.co https://cas-bridge.xethub.hf.co https://cdn.jsdelivr.net";
+  const connectSrc = isDev
+    ? `connect-src 'self' http://localhost:* ws://localhost:* https://mempool.space wss://mempool.space https://scrolls.charms.dev https://*.workers.dev https://charms-explorer-api.fly.dev https://v15.charms.dev https://api.cloudflare.com https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://*.xethub.hf.co https://cas-bridge.xethub.hf.co https://cdn.jsdelivr.net`
+    : baseConnectSrc;
 
   const cspDirectives = [
     "default-src 'self'",

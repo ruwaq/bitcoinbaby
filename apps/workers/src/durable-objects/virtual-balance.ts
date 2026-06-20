@@ -74,196 +74,186 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     this.claimRepo = new ClaimRepository(this.sql);
   }
 
-  /**
-   * Initialize SQLite schema
-   */
   private async initializeSchema(): Promise<void> {
-    // Balance table
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS balance (
-        address TEXT PRIMARY KEY,
-        virtual_balance TEXT NOT NULL DEFAULT '0',
-        total_mined TEXT NOT NULL DEFAULT '0',
-        total_withdrawn TEXT NOT NULL DEFAULT '0',
-        pending_withdraw TEXT NOT NULL DEFAULT '0',
-        streak_count INTEGER NOT NULL DEFAULT 0,
-        last_mining_at INTEGER NOT NULL DEFAULT 0,
-        faucet_last_claim_at INTEGER NOT NULL DEFAULT 0,
-        faucet_total_claimed TEXT NOT NULL DEFAULT '0',
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )
-    `);
+    const CURRENT_DB_VERSION = 4;
 
-    // Migrations
-    try {
-      this.sql.exec(
-        `ALTER TABLE balance ADD COLUMN streak_count INTEGER NOT NULL DEFAULT 0`,
-      );
-    } catch {
-      /* exists */
-    }
-    try {
-      this.sql.exec(`ALTER TABLE balance ADD COLUMN difficulty_state TEXT`);
-    } catch {
-      /* exists */
-    }
-    try {
-      this.sql.exec(
-        `ALTER TABLE balance ADD COLUMN faucet_last_claim_at INTEGER NOT NULL DEFAULT 0`,
-      );
-    } catch {
-      /* exists */
-    }
-    try {
-      this.sql.exec(
-        `ALTER TABLE balance ADD COLUMN faucet_total_claimed TEXT NOT NULL DEFAULT '0'`,
-      );
-    } catch {
-      /* exists */
+    // Get current schema version
+    const versionResult = this.sql.exec("PRAGMA user_version").toArray();
+    let userVersion = 0;
+    if (versionResult.length > 0 && versionResult[0] && typeof versionResult[0] === "object") {
+      userVersion = (versionResult[0] as Record<string, unknown>).user_version as number || 0;
     }
 
-    // Mining proofs table
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS mining_proofs (
-        id TEXT PRIMARY KEY,
-        hash TEXT NOT NULL UNIQUE,
-        nonce INTEGER NOT NULL,
-        difficulty INTEGER NOT NULL,
-        block_data TEXT NOT NULL,
-        reward TEXT NOT NULL,
-        credited INTEGER NOT NULL DEFAULT 0,
-        address TEXT,
-        created_at INTEGER NOT NULL
-      )
-    `);
+    balanceLogger.info("SQLite schema version initialization", {
+      currentVersion: userVersion,
+      targetVersion: CURRENT_DB_VERSION,
+      address: this.address || "global",
+    });
 
-    try {
-      this.sql.exec(`ALTER TABLE mining_proofs ADD COLUMN address TEXT`);
-    } catch {
-      /* exists */
+    // Version 0 -> 1: Create initial tables
+    if (userVersion < 1) {
+      // Balance table
+      this.sql.exec(`
+        CREATE TABLE IF NOT EXISTS balance (
+          address TEXT PRIMARY KEY,
+          virtual_balance TEXT NOT NULL DEFAULT '0',
+          total_mined TEXT NOT NULL DEFAULT '0',
+          total_withdrawn TEXT NOT NULL DEFAULT '0',
+          pending_withdraw TEXT NOT NULL DEFAULT '0',
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      `);
+
+      // Mining proofs table
+      this.sql.exec(`
+        CREATE TABLE IF NOT EXISTS mining_proofs (
+          id TEXT PRIMARY KEY,
+          hash TEXT NOT NULL UNIQUE,
+          nonce INTEGER NOT NULL,
+          difficulty INTEGER NOT NULL,
+          block_data TEXT NOT NULL,
+          reward TEXT NOT NULL,
+          credited INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL
+        )
+      `);
+
+      // Claims table
+      this.sql.exec(`
+        CREATE TABLE IF NOT EXISTS claims (
+          id TEXT PRIMARY KEY,
+          address TEXT NOT NULL,
+          amount TEXT NOT NULL,
+          proof_count INTEGER NOT NULL,
+          total_work TEXT NOT NULL,
+          merkle_root TEXT,
+          server_signature TEXT,
+          op_return_data TEXT,
+          claim_txid TEXT,
+          mint_txid TEXT,
+          status TEXT NOT NULL DEFAULT 'prepared',
+          error TEXT,
+          prepared_at INTEGER NOT NULL,
+          confirmed_at INTEGER,
+          minted_at INTEGER,
+          expires_at INTEGER NOT NULL
+        )
+      `);
+
+      // PoUW Tasks table
+      this.sql.exec(`
+        CREATE TABLE IF NOT EXISTS pouw_tasks (
+          id TEXT PRIMARY KEY,
+          block_hash TEXT NOT NULL,
+          prompt TEXT NOT NULL,
+          seed TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          status TEXT DEFAULT 'active'
+        )
+      `);
+
+      // PoUW Submissions table
+      this.sql.exec(`
+        CREATE TABLE IF NOT EXISTS pouw_submissions (
+          task_id TEXT NOT NULL,
+          address TEXT NOT NULL,
+          output TEXT NOT NULL,
+          compute_time REAL NOT NULL,
+          signature TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          PRIMARY KEY (task_id, address)
+        )
+      `);
+
+      // Credit history table
+      this.sql.exec(`
+        CREATE TABLE IF NOT EXISTS credit_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          address TEXT NOT NULL,
+          amount INTEGER NOT NULL,
+          type TEXT NOT NULL DEFAULT 'mining',
+          proof_id TEXT,
+          created_at INTEGER NOT NULL
+        )
+      `);
+
+      // Indexes
+      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_proofs_credited ON mining_proofs(credited)`);
+      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_proofs_address ON mining_proofs(address)`);
+      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_proofs_claimed ON mining_proofs(claimed)`);
+      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_proofs_created_at ON mining_proofs(created_at)`);
+      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_claims_address ON claims(address)`);
+      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_claims_status ON claims(status)`);
+      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_submissions_task ON pouw_submissions(task_id)`);
+      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_credit_history_address ON credit_history(address)`);
+      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_credit_history_created ON credit_history(created_at)`);
+
+      userVersion = 1;
     }
-    try {
-      this.sql.exec(
-        `ALTER TABLE mining_proofs ADD COLUMN claimed INTEGER NOT NULL DEFAULT 0`,
-      );
-    } catch {
-      /* exists */
+
+    // Version 1 -> 2: Add initial migrations for balance columns
+    if (userVersion < 2) {
+      try {
+        this.sql.exec(`ALTER TABLE balance ADD COLUMN streak_count INTEGER NOT NULL DEFAULT 0`);
+      } catch (err) {
+        /* Already exists or safe to ignore */
+      }
+      try {
+        this.sql.exec(`ALTER TABLE balance ADD COLUMN difficulty_state TEXT`);
+      } catch (err) {
+        /* Already exists or safe to ignore */
+      }
+      try {
+        this.sql.exec(`ALTER TABLE balance ADD COLUMN faucet_last_claim_at INTEGER NOT NULL DEFAULT 0`);
+      } catch (err) {
+        /* Already exists or safe to ignore */
+      }
+      try {
+        this.sql.exec(`ALTER TABLE balance ADD COLUMN faucet_total_claimed TEXT NOT NULL DEFAULT '0'`);
+      } catch (err) {
+        /* Already exists or safe to ignore */
+      }
+      userVersion = 2;
     }
-    try {
-      this.sql.exec(`ALTER TABLE mining_proofs ADD COLUMN claim_id TEXT`);
-    } catch {
-      /* exists */
+
+    // Version 2 -> 3: Add initial migrations for mining_proofs columns
+    if (userVersion < 3) {
+      try {
+        this.sql.exec(`ALTER TABLE mining_proofs ADD COLUMN address TEXT`);
+      } catch (err) {
+        /* Already exists or safe to ignore */
+      }
+      try {
+        this.sql.exec(`ALTER TABLE mining_proofs ADD COLUMN claimed INTEGER NOT NULL DEFAULT 0`);
+      } catch (err) {
+        /* Already exists or safe to ignore */
+      }
+      try {
+        this.sql.exec(`ALTER TABLE mining_proofs ADD COLUMN claim_id TEXT`);
+      } catch (err) {
+        /* Already exists or safe to ignore */
+      }
+      userVersion = 3;
     }
 
-    // Indexes
-    this.sql.exec(
-      `CREATE INDEX IF NOT EXISTS idx_proofs_credited ON mining_proofs(credited)`,
-    );
-    this.sql.exec(
-      `CREATE INDEX IF NOT EXISTS idx_proofs_address ON mining_proofs(address)`,
-    );
-    this.sql.exec(
-      `CREATE INDEX IF NOT EXISTS idx_proofs_claimed ON mining_proofs(claimed)`,
-    );
-    this.sql.exec(
-      `CREATE INDEX IF NOT EXISTS idx_proofs_created_at ON mining_proofs(created_at)`,
-    );
-
-    // Claims table
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS claims (
-        id TEXT PRIMARY KEY,
-        address TEXT NOT NULL,
-        amount TEXT NOT NULL,
-        proof_count INTEGER NOT NULL,
-        total_work TEXT NOT NULL,
-        merkle_root TEXT,
-        server_signature TEXT,
-        op_return_data TEXT,
-        claim_txid TEXT,
-        mint_txid TEXT,
-        status TEXT NOT NULL DEFAULT 'prepared',
-        error TEXT,
-        prepared_at INTEGER NOT NULL,
-        confirmed_at INTEGER,
-        minted_at INTEGER,
-        expires_at INTEGER NOT NULL
-      )
-    `);
-
-    this.sql.exec(
-      `CREATE INDEX IF NOT EXISTS idx_claims_address ON claims(address)`,
-    );
-    this.sql.exec(
-      `CREATE INDEX IF NOT EXISTS idx_claims_status ON claims(status)`,
-    );
-
-    // PoUW Tasks table
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS pouw_tasks (
-        id TEXT PRIMARY KEY,
-        block_hash TEXT NOT NULL,
-        prompt TEXT NOT NULL,
-        seed TEXT NOT NULL,
-        created_at INTEGER NOT NULL,
-        status TEXT DEFAULT 'active'
-      )
-    `);
-
-    // PoUW Submissions table
-    // Note: No foreign key constraint on task_id to avoid issues with
-    // task lifecycle (tasks can be expired independently of submissions)
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS pouw_submissions (
-        task_id TEXT NOT NULL,
-        address TEXT NOT NULL,
-        output TEXT NOT NULL,
-        compute_time REAL NOT NULL,
-        signature TEXT NOT NULL,
-        created_at INTEGER NOT NULL,
-        PRIMARY KEY (task_id, address)
-      )
-    `);
-
-    this.sql.exec(
-      `CREATE INDEX IF NOT EXISTS idx_submissions_task ON pouw_submissions(task_id)`,
-    );
-
-    // Credit history table (PoUW rewards, mining credits, faucet claims)
-    this.sql.exec(`
-      CREATE TABLE IF NOT EXISTS credit_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        address TEXT NOT NULL,
-        amount INTEGER NOT NULL,
-        type TEXT NOT NULL DEFAULT 'mining',
-        proof_id TEXT,
-        created_at INTEGER NOT NULL
-      )
-    `);
-    this.sql.exec(
-      `CREATE INDEX IF NOT EXISTS idx_credit_history_address ON credit_history(address)`,
-    );
-    this.sql.exec(
-      `CREATE INDEX IF NOT EXISTS idx_credit_history_created ON credit_history(created_at)`,
-    );
-
-    // Add reputation_score column to balance if not exists
-    try {
-      this.sql.exec(
-        `ALTER TABLE balance ADD COLUMN reputation_score INTEGER DEFAULT 100`,
-      );
-    } catch {
-      /* exists */
+    // Version 3 -> 4: Add reputation_score and lockout_until to balance
+    if (userVersion < 4) {
+      try {
+        this.sql.exec(`ALTER TABLE balance ADD COLUMN reputation_score INTEGER DEFAULT 100`);
+      } catch (err) {
+        /* Already exists or safe to ignore */
+      }
+      try {
+        this.sql.exec(`ALTER TABLE balance ADD COLUMN lockout_until INTEGER DEFAULT 0`);
+      } catch (err) {
+        /* Already exists or safe to ignore */
+      }
+      userVersion = 4;
     }
-    // Add lockout_until column to balance if not exists
-    try {
-      this.sql.exec(
-        `ALTER TABLE balance ADD COLUMN lockout_until INTEGER DEFAULT 0`,
-      );
-    } catch {
-      /* exists */
-    }
+
+    // Set schema version final
+    this.sql.exec(`PRAGMA user_version = ${CURRENT_DB_VERSION}`);
   }
 
   /**
@@ -320,6 +310,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
             return this.handleUpdateClaimStatus(request);
           if (action === "cancel-claim") return this.handleCancelClaim(request);
           if (action === "cleanup-expired") return this.handleCleanupExpired();
+          if (action === "reconcile") return this.handleReconcile();
           break;
 
         case "DELETE":
@@ -1047,6 +1038,24 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     const balance = this.balanceRepo.getOrCreate(this.address);
     const now = Date.now();
 
+    // Sybil protection: Require at least 1 successfully mined share (proof) in Phase 2+
+    const phaseNum = parseInt(this.env.PHASE || "1", 10);
+    if (phaseNum >= 2) {
+      const proofCountResult = this.sql
+        .exec(
+          "SELECT COUNT(*) as count FROM mining_proofs WHERE address = ?",
+          this.address,
+        )
+        .toArray();
+      const count = (proofCountResult[0]?.count as number) || 0;
+      if (count === 0) {
+        return this.errorResponse(
+          "Faucet access denied. You must mine at least 1 valid share (Proof of Work) before using the faucet in Phase 2+.",
+          403,
+        );
+      }
+    }
+
     // 1. Check Cooldown
     if (body.cooldownMs && body.cooldownMs > 0) {
       const timeSinceLastClaim = now - balance.faucetLastClaimAt;
@@ -1212,7 +1221,7 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       blockData: "",
     }));
 
-    const aggregatedProof = aggregator.aggregateProofs(
+    const aggregatedProof = await aggregator.aggregateProofs(
       this.address,
       miningProofs,
     );
@@ -1474,6 +1483,38 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     const claim = this.claimRepo.get(body.claimId, this.address);
     if (!claim) return this.errorResponse("Claim not found", 404);
 
+    const isDebitedStatus = (s: string) => ["broadcast", "confirmed", "minting"].includes(s);
+    const isErrorStatus = (s: string) => ["failed", "cancelled", "expired"].includes(s);
+
+    if (isErrorStatus(body.status)) {
+      // If the claim was already debited, refund the virtual balance
+      if (isDebitedStatus(claim.status)) {
+        const balance = this.balanceRepo.getOrCreate(this.address);
+        const amountToRefund = BigInt(claim.amount);
+        balance.virtualBalance += amountToRefund;
+        
+        if (balance.totalWithdrawn >= amountToRefund) {
+          balance.totalWithdrawn -= amountToRefund;
+        } else {
+          balance.totalWithdrawn = 0n;
+        }
+        
+        this.balanceRepo.update(balance);
+        balanceLogger.info("Refunded virtual balance for failed claim", {
+          claimId: body.claimId,
+          address: this.address,
+          amount: amountToRefund.toString(),
+        });
+      }
+
+      // Release the associated proofs so they can be claimed again
+      this.proofRepo.releaseFromClaim(body.claimId);
+      balanceLogger.info("Released proofs for failed claim", {
+        claimId: body.claimId,
+        address: this.address,
+      });
+    }
+
     this.claimRepo.updateStatus(body.claimId, this.address, body.status, {
       mintTxid: body.mintTxid,
       error: body.error,
@@ -1482,6 +1523,21 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     return Response.json({
       success: true,
       data: { status: body.status },
+      timestamp: Date.now(),
+    });
+  }
+
+  private handleReconcile(): Response {
+    if (!this.address) return this.errorResponse("Address required", 400);
+    const balance = this.balanceRepo.getOrCreate(this.address);
+    this.updateLeaderboardAsync(this.address, balance.totalMined);
+    return Response.json({
+      success: true,
+      data: {
+        reconciled: true,
+        address: this.address,
+        totalMined: balance.totalMined.toString(),
+      },
       timestamp: Date.now(),
     });
   }

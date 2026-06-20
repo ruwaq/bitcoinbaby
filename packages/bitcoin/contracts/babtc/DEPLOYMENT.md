@@ -26,12 +26,12 @@ t/87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681b/acf2ec0b7245e
 
 | Entorno | URL | Endpoint |
 |---------|-----|----------|
-| **Producción (Hosted)** | `https://v14.charms.dev` | `/spells/prove` |
+| **Producción (Hosted)** | `https://v15.charms.dev` | `/spells/prove` |
 | **Desarrollo (Local)** | `http://localhost:17784` | `/prove` |
 
 ### Prover Hosted de Charms
 
-El prover hosted en `v14.charms.dev` es el más actualizado (confirmado por Charms team).
+El prover hosted en `v15.charms.dev` es el más actualizado (confirmado por Charms team).
 - Mantenido por Charms Inc.
 - Funciona para mainnet y testnet4
 - **Ya configurado por defecto** en BitcoinBaby
@@ -40,7 +40,7 @@ El prover hosted en `v14.charms.dev` es el más actualizado (confirmado por Char
 
 ```bash
 # Override prover URL (opcional - por defecto usa hosted)
-NEXT_PUBLIC_PROVER_URL=https://v14.charms.dev
+NEXT_PUBLIC_PROVER_URL=https://v15.charms.dev
 # o para desarrollo local:
 NEXT_PUBLIC_PROVER_URL=http://localhost:17784
 ```

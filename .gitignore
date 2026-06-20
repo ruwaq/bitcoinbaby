@@ -50,7 +50,8 @@ scripts/admin-wallet.md
 .env.admin
 
 # Documentation (keep only README.md in repo)
-docs/
+# docs/ — intentionally tracked for design documentation
+# docs/
 
 # Scripts with sensitive data (keys, test wallets)
 packages/bitcoin/scripts/
@@ -73,5 +74,9 @@ apps/web/public/workbox-*.js.map
 .vercel
 .env*.local
 
+# AI coding tools (not our primary tools)
+.aider*
+
 # Rust build artifacts
 target/
+.superpowers/

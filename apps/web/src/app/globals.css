@@ -222,16 +222,10 @@ canvas,
 /* ========================================
    UTILITY CLASSES
    ======================================== */
-/* Font utilities - using CSS variables from next/font/local for offline-first loading */
-.font-pixel {
-  font-family: var(--font-pixel), 'Press Start 2P', monospace;
-}
-.font-pixel-body {
-  font-family: var(--font-pixel-body), 'Pixelify Sans', sans-serif;
-}
-.font-pixel-mono {
-  font-family: var(--font-vt323), 'VT323', monospace;
-}
+/* Font utilities */
+.font-pixel { font-family: 'Press Start 2P', cursive; }
+.font-pixel-body { font-family: 'Pixelify Sans', sans-serif; }
+.font-pixel-mono { font-family: 'VT323', monospace; }
 
 /* ========================================
    RESPONSIVE PIXEL FONT UTILITIES

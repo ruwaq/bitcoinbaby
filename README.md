@@ -74,11 +74,13 @@ pnpm add @bitcoinbaby/ui --filter @bitcoinbaby/web --workspace
 
 | Document | Description |
 |----------|-------------|
-| [SETUP.md](./SETUP.md) | Step-by-step monorepo setup |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | System architecture details |
-| [ROADMAP.md](./ROADMAP.md) | Development phases |
+| [DEV_SETUP.md](./DEV_SETUP.md) | Step-by-step monorepo setup |
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System architecture details |
+| [docs/ROADMAP.md](./docs/ROADMAP.md) | Development phases |
 | [docs/TECH_COMPARISON.md](./docs/TECH_COMPARISON.md) | Technology decisions |
 | [docs/TECHNICAL_DECISIONS.md](./docs/TECHNICAL_DECISIONS.md) | Technical rationale |
+| [STATUS.md](./STATUS.md) | Current project status |
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | Deployment configuration |
 
 ## Project Structure
 

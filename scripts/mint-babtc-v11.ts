@@ -25,7 +25,7 @@ const DEV_FUND_ADDRESS =
   "tb1pyzpxkhve8wrztypx62g8pnfr2axdh4n97m9a8pwveytkkn3ar02sp592z3";
 const STAKING_POOL_ADDRESS =
   "tb1pjnkc6432y0muu7r0mwrxj0sc8y9kaq7dsh477xfuk5faannhe9psxkkqmc";
-const PROVER_URL = "https://v14.charms.dev";
+const PROVER_URL = "https://v15.charms.dev";
 
 // Initialize crypto
 const bip32 = BIP32Factory(ecc);

@@ -71,7 +71,7 @@ export interface NFTMintResult {
 // CONSTANTS
 // =============================================================================
 
-const DEFAULT_PROVER_URL = "https://v14.charms.dev";
+const DEFAULT_PROVER_URL = "https://v15.charms.dev";
 const PROVER_TIMEOUT_MS = 120_000;
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 5000;

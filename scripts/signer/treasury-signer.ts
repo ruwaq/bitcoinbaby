@@ -46,7 +46,7 @@ const CONFIG = {
   walletSeed: process.env.BATCH_WALLET_SEED || "",
 
   // Charms Prover URL (v11 hosted)
-  proverUrl: process.env.CHARMS_PROVER_URL || "https://v14.charms.dev",
+  proverUrl: process.env.CHARMS_PROVER_URL || "https://v15.charms.dev",
 
   // Mempool API for broadcasting
   mempoolApi:

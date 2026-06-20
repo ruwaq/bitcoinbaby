@@ -37,7 +37,7 @@ export interface SignerConfig {
   pollInterval?: number;
   /** Mempool API URL (default: based on network) */
   mempoolUrl?: string;
-  /** Charms prover URL (default: https://v14.charms.dev) */
+  /** Charms prover URL (default: https://v15.charms.dev) */
   proverUrl?: string;
   /** BABTC token app ID */
   appId: string;
@@ -92,7 +92,7 @@ export class TreasurySigner {
       ...config,
       pollInterval: config.pollInterval ?? 60_000,
       mempoolUrl: config.mempoolUrl ?? MEMPOOL_URLS[config.network],
-      proverUrl: config.proverUrl ?? "https://v14.charms.dev",
+      proverUrl: config.proverUrl ?? "https://v15.charms.dev",
     };
 
     this.wallet = new BitcoinWallet({ network: config.network });

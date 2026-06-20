@@ -48,7 +48,7 @@
 |----------|-----|--------|
 | Workers Dev | `bitcoinbaby-api.andeanlabs-58f.workers.dev` | Healthy |
 | Workers Prod | `bitcoinbaby-api-prod.andeanlabs-58f.workers.dev` | Healthy |
-| Prover | `v14.charms.dev/ready` | OK |
+| Prover | `v15.charms.dev/ready` | OK |
 | Vercel | `bitcoinbaby-andelabs-projects.vercel.app` | ❌ Deploy colgado |
 
 ---
@@ -71,7 +71,7 @@
 
 ### ✅ Resueltos (2026-05-29 — Auditoria)
 1. ~~Fix CSP Cloudflare AI~~ → `api.cloudflare.com` agregado a `connect-src` en `proxy.ts`
-2. ~~Actualizar prover URL a `v14.charms.dev`~~ → Todos los archivos actualizados (scripts, wrangler.toml, DEPLOYMENT.md, codigo fuente)
+2. ~~Actualizar prover URL a `v15.charms.dev`~~ → Todos los archivos actualizados (scripts, wrangler.toml, DEPLOYMENT.md, codigo fuente)
 3. ~~Security headers ausentes en Workers API~~ → `securityHeaders` middleware aplicado en `index.ts`
 4. ~~Token Vercel OIDC en historial git~~ → Limpiado con `git filter-branch` + `git gc`
 5. ~~Error de lint (Mock no usado)~~ → Corregido en `phases.test.ts`
