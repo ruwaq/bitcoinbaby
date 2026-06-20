@@ -14,4 +14,6 @@ export { engagementRouter } from "./engagement";
 export { faucetRouter } from "./faucet";
 export { pouwRouter } from "./pouw";
 export { healthRouter } from "./health";
+export { aiProxy } from "./ai-proxy";
+export { aiProxyExternal } from "./ai-proxy-external";
 

@@ -35,6 +35,8 @@ import {
   faucetRouter,
   pouwRouter,
   healthRouter,
+  aiProxy,
+  aiProxyExternal,
 } from "./routes";
 
 // Re-export Durable Objects
@@ -185,6 +187,12 @@ app.route("/api/engagement", engagementRouter);
 
 // BABTC Faucet (Phase 1)
 app.route("/api/faucet", faucetRouter);
+
+// AI Proxy — Cloudflare Workers AI (server-side token)
+app.route("/api/ai", aiProxy);
+
+// AI Proxy — External providers (OpenAI, Anthropic, Google)
+app.route("/api/ai/proxy", aiProxyExternal);
 
 // =============================================================================
 // SCHEDULED TASKS (Cron)
