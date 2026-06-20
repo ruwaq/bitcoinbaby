@@ -12,6 +12,17 @@ export {
 // Cloudflare AI backend
 export type { ModelChainEntryStatus } from "./cloudflare-ai";
 
+// AI Provider System (BYO keys)
+export { AIOrchestrator } from "./orchestrator";
+export { createProvider, getAvailableProviders } from "./providers/registry";
+export {
+  type AIProvider,
+  type AIProviderId,
+  type AIProviderConfig,
+  type AIProviderStatus,
+  type AIExecutionResult,
+} from "./provider-types";
+
 // Narrative Engine (AI World Engine)
 export { NarrativeEngine } from "./narrative-engine";
 export type {
