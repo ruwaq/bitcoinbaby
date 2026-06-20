@@ -25,7 +25,7 @@ import {
   formatTokenAmount,
   getGenesisBabiesConfig,
   getDeploymentConfig,
-  type BabyNFTState,
+  type SparkNFTState,
 } from "@bitcoinbaby/bitcoin";
 import {
   useWalletStore,
@@ -51,17 +51,17 @@ export interface EvolutionResult {
 
 export interface UseEvolutionReturn {
   /** Execute evolution for an NFT */
-  evolve: (nft: BabyNFTState) => Promise<EvolutionResult>;
+  evolve: (nft: SparkNFTState) => Promise<EvolutionResult>;
   /** Is evolution in progress */
   isEvolving: boolean;
   /** Error message if evolution failed */
   error: string | null;
   /** Check if NFT can evolve */
-  canEvolve: (nft: BabyNFTState) => boolean;
+  canEvolve: (nft: SparkNFTState) => boolean;
   /** Get evolution cost in tokens */
-  getEvolutionCost: (nft: BabyNFTState) => bigint;
+  getEvolutionCost: (nft: SparkNFTState) => bigint;
   /** Get XP required for next level */
-  getXPRequired: (nft: BabyNFTState) => number;
+  getXPRequired: (nft: SparkNFTState) => number;
   /** Clear error state */
   clearError: () => void;
 }
@@ -165,7 +165,7 @@ function queueFailedConfirmation(confirmation: PendingEvolutionConfirmation): vo
  *
  * Used in Phase 1 when mining is disabled. Calls POST /api/nft/evolve which:
  * 1. Validates ownership and level
- * 2. Checks virtual BABTC balance in VirtualBalanceDO
+ * 2. Checks virtual SPARK balance in VirtualBalanceDO
  * 3. Debits the evolution cost
  * 4. Updates NFT level in Redis
  *
@@ -174,7 +174,7 @@ function queueFailedConfirmation(confirmation: PendingEvolutionConfirmation): vo
  * @param nft - The NFT to evolve
  * @param ownerAddress - The owner's Bitcoin address (for server ownership validation)
  */
-async function evolveVirtual(nft: BabyNFTState, ownerAddress: string): Promise<EvolutionResult> {
+async function evolveVirtual(nft: SparkNFTState, ownerAddress: string): Promise<EvolutionResult> {
   const apiClient = getApiClient();
 
   try {
@@ -194,7 +194,7 @@ async function evolveVirtual(nft: BabyNFTState, ownerAddress: string): Promise<E
 
     const { newLevel, evolutionCost } = result.data!;
     log.info(
-      `NFT #${nft.tokenId} evolved to level ${newLevel} (cost: ${evolutionCost} BABTC)`,
+      `NFT #${nft.tokenId} evolved to level ${newLevel} (cost: ${evolutionCost} SPARK)`,
     );
 
     return {
@@ -258,14 +258,14 @@ export function useEvolution(): UseEvolutionReturn {
   /**
    * Check if NFT can evolve
    */
-  const canEvolveNFT = useCallback((nft: BabyNFTState): boolean => {
+  const canEvolveNFT = useCallback((nft: SparkNFTState): boolean => {
     return canLevelUp(nft);
   }, []);
 
   /**
    * Get evolution cost for next level
    */
-  const getEvolutionCost = useCallback((nft: BabyNFTState): bigint => {
+  const getEvolutionCost = useCallback((nft: SparkNFTState): bigint => {
     const nextLevel = nft.level + 1;
     return EVOLUTION_COSTS[nextLevel] ?? 0n;
   }, []);
@@ -273,7 +273,7 @@ export function useEvolution(): UseEvolutionReturn {
   /**
    * Get XP required for next level
    */
-  const getXPRequired = useCallback((nft: BabyNFTState): number => {
+  const getXPRequired = useCallback((nft: SparkNFTState): number => {
     const nextLevel = nft.level + 1;
     return XP_REQUIREMENTS[nextLevel] ?? 0;
   }, []);
@@ -289,12 +289,12 @@ export function useEvolution(): UseEvolutionReturn {
    * Execute evolution
    *
    * In Phase 1 (mining disabled): uses virtual evolution via API — debits
-   * virtual BABTC server-side without requiring on-chain transactions.
+   * virtual SPARK server-side without requiring on-chain transactions.
    *
-   * In Phase 2+ (mining enabled): uses on-chain PSBT flow with real BABTC.
+   * In Phase 2+ (mining enabled): uses on-chain PSBT flow with real SPARK.
    */
   const evolve = useCallback(
-    async (nft: BabyNFTState): Promise<EvolutionResult> => {
+    async (nft: SparkNFTState): Promise<EvolutionResult> => {
       // ── Phase 1: Virtual Evolution ──
       const phaseConfig = getPhaseConfig();
       const useVirtual = phaseConfig.features.nftEvolution && !phaseConfig.features.mining;
@@ -365,7 +365,7 @@ export function useEvolution(): UseEvolutionReturn {
         // 2. Get token UTXOs
         const tokenCost = getEvolutionCost(nft);
         log.info(
-          `Evolution cost: ${formatTokenAmount(tokenCost)} BABTC`,
+          `Evolution cost: ${formatTokenAmount(tokenCost)} SPARK`,
         );
 
         const tokenCharms = charms.filter(
@@ -373,13 +373,13 @@ export function useEvolution(): UseEvolutionReturn {
         );
 
         if (tokenCharms.length === 0) {
-          throw new Error("No BABTC tokens found in your wallet");
+          throw new Error("No SPARK tokens found in your wallet");
         }
 
         const totalTokens = tokenCharms.reduce((sum, c) => sum + c.amount, 0n);
         if (totalTokens < tokenCost) {
           throw new Error(
-            `Insufficient BABTC: Have ${formatTokenAmount(totalTokens)}, need ${formatTokenAmount(tokenCost)}`,
+            `Insufficient SPARK: Have ${formatTokenAmount(totalTokens)}, need ${formatTokenAmount(tokenCost)}`,
           );
         }
 
@@ -467,7 +467,7 @@ export function useEvolution(): UseEvolutionReturn {
         addTransaction(
           txid,
           "nft_evolution",
-          `Genesis Baby #${nft.tokenId} evolved to level ${nft.level + 1}`,
+          `Genesis Spark #${nft.tokenId} evolved to level ${nft.level + 1}`,
         );
 
         // 7. Notify server of evolution (with retry and exponential backoff)

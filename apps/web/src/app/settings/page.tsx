@@ -30,7 +30,7 @@ import {
   useSettingsStore,
   useNetworkStore,
   useWalletStore,
-  useBabyStore,
+  useSparkStore,
   type MiningDifficulty,
   type MinerTypePreference,
   type AutoLockTimeout,
@@ -80,7 +80,7 @@ export default function SettingsPage() {
   const walletAddress = useWalletStore((s) => s.wallet?.address);
 
   // Baby store
-  const baby = useBabyStore((s) => s.baby);
+  const baby = useSparkStore((s) => s.baby);
 
   // Overlay modal hooks
   const { open: openRecoveryModal } = useRecoveryPhraseModal();

@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * NFTGrid - Grid Layout for Genesis Baby NFTs
+ * NFTGrid - Grid Layout for Genesis Spark NFTs
  */
 
 import { type FC, useState, useMemo } from "react";
 import { clsx } from "clsx";
 import { NFTCard, type NFTCardProps } from "./NFTCard";
-import type { BabyNFTState, RarityTier } from "./types";
+import type { SparkNFTState, RarityTier } from "./types";
 import { getMiningBoost } from "./types";
 
 export type NFTSortKey = "tokenId" | "level" | "boost" | "xp" | "workCount";
@@ -18,10 +18,10 @@ export interface NFTGridFilters {
 }
 
 export interface NFTGridProps {
-  nfts: BabyNFTState[];
+  nfts: SparkNFTState[];
   columns?: 1 | 2 | 3 | 4;
   onEvolve?: NFTCardProps["onEvolve"];
-  onSelect?: (nft: BabyNFTState) => void;
+  onSelect?: (nft: SparkNFTState) => void;
   onList?: NFTCardProps["onList"];
   selectedTokenId?: number | null;
   evolvingIds?: Set<number>;
@@ -81,7 +81,7 @@ const EmptyState: FC = () => (
       No NFTs Found
     </p>
     <p className="font-pixel-body text-sm text-pixel-text-muted mt-2">
-      Mint your first Genesis Baby to start earning mining boosts.
+      Mint your first Genesis Spark to start earning mining boosts.
     </p>
   </div>
 );

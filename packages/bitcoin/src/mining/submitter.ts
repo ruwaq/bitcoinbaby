@@ -46,10 +46,10 @@ import {
   assertValid,
 } from "../validation";
 import {
-  createBABTCMintSpellV9,
-  createBABTCMintSpellV10,
-  createBABTCMintSpellV11,
-  BABTC_CONFIG,
+  createSPARKMintSpellV9,
+  createSPARKMintSpellV10,
+  createSPARKMintSpellV11,
+  SPARK_CONFIG,
   calculateMiningReward,
   type TokenMintParamsV9,
   type TokenMintParamsV10,
@@ -57,7 +57,7 @@ import {
 } from "../charms/token";
 import { CharmsProverClient, createCharmsProverClient } from "../charms/prover";
 import type { SpellV9, SpellV11, ProverRequestV11 } from "../charms/types";
-import { BABTC_TESTNET4 as BABTC_DEPLOYED } from "../config/deployment";
+import { SPARK_TESTNET4 as SPARK_DEPLOYED } from "../config/deployment";
 
 export interface MiningSubmitterOptions {
   network?: ScrollsNetwork;
@@ -542,7 +542,7 @@ export class MiningSubmitter {
     proof: MiningProof,
     inputUtxo: { txid: string; vout: number },
     options: {
-      /** App ID for BABTC token */
+      /** App ID for SPARK token */
       appId?: string;
       /** Verification key */
       appVk?: string;
@@ -565,12 +565,12 @@ export class MiningSubmitter {
         proof.blockData || `${proof.timestamp}:${this.minerAddress}`;
 
       // Create V9 spell
-      const spell = createBABTCMintSpellV9({
-        appId: options.appId ?? BABTC_DEPLOYED.appId,
-        appVk: options.appVk ?? BABTC_DEPLOYED.appVk,
+      const spell = createSPARKMintSpellV9({
+        appId: options.appId ?? SPARK_DEPLOYED.appId,
+        appVk: options.appVk ?? SPARK_DEPLOYED.appVk,
         minerAddress: this.minerAddress,
-        devAddress: BABTC_CONFIG.addresses.devFund,
-        stakingAddress: BABTC_CONFIG.addresses.stakingPool,
+        devAddress: SPARK_CONFIG.addresses.devFund,
+        stakingAddress: SPARK_CONFIG.addresses.stakingPool,
         challenge,
         nonce: String(proof.nonce),
         difficulty: proof.difficulty,
@@ -639,7 +639,7 @@ export class MiningSubmitter {
     proof: MiningProof,
     inputUtxo: { txid: string; vout: number },
     options: {
-      /** App ID for BABTC token */
+      /** App ID for SPARK token */
       appId?: string;
       /** Verification key */
       appVk?: string;
@@ -666,12 +666,12 @@ export class MiningSubmitter {
         proof.blockData || `${proof.timestamp}:${this.minerAddress}`;
 
       // Create V11 spell with separate private_inputs
-      const { spell, proverRequest } = createBABTCMintSpellV11({
-        appId: options.appId ?? BABTC_DEPLOYED.appId,
-        appVk: options.appVk ?? BABTC_DEPLOYED.appVk,
+      const { spell, proverRequest } = createSPARKMintSpellV11({
+        appId: options.appId ?? SPARK_DEPLOYED.appId,
+        appVk: options.appVk ?? SPARK_DEPLOYED.appVk,
         minerAddress: this.minerAddress,
-        devAddress: BABTC_CONFIG.addresses.devFund,
-        stakingAddress: BABTC_CONFIG.addresses.stakingPool,
+        devAddress: SPARK_CONFIG.addresses.devFund,
+        stakingAddress: SPARK_CONFIG.addresses.stakingPool,
         challenge,
         nonce: String(proof.nonce),
         difficulty: proof.difficulty,
@@ -746,7 +746,7 @@ export class MiningSubmitter {
   async submitProofV10(
     proof: MiningProof,
     options: {
-      /** App ID for BABTC token (required for real testnet4 deployment) */
+      /** App ID for SPARK token (required for real testnet4 deployment) */
       appId?: string;
       /** Verification key (required for real testnet4 deployment) */
       appVk?: string;
@@ -813,8 +813,8 @@ export class MiningSubmitter {
       }
 
       // Step 5: Create V10 mint spell
-      const appId = options.appId ?? BABTC_DEPLOYED.appId;
-      const appVk = options.appVk ?? BABTC_DEPLOYED.appVk;
+      const appId = options.appId ?? SPARK_DEPLOYED.appId;
+      const appVk = options.appVk ?? SPARK_DEPLOYED.appVk;
 
       const reward = this.calculateReward(proof.difficulty);
 
@@ -822,8 +822,8 @@ export class MiningSubmitter {
         appId,
         appVk,
         minerAddress: this.minerAddress,
-        devAddress: BABTC_CONFIG.addresses.devFund,
-        stakingAddress: BABTC_CONFIG.addresses.stakingPool,
+        devAddress: SPARK_CONFIG.addresses.devFund,
+        stakingAddress: SPARK_CONFIG.addresses.stakingPool,
         leadingZeros: proof.difficulty, // BRO-style: difficulty determines reward
         miningTxHex,
         merkleProofHex: merkleResult.merkleProofHex!,
@@ -833,7 +833,7 @@ export class MiningSubmitter {
         },
       };
 
-      const spell = createBABTCMintSpellV10(spellParams);
+      const spell = createSPARKMintSpellV10(spellParams);
 
       // Step 6: Build mint TX PSBT
       const mintTxResult = await this.buildMintTxFromSpellV10(
@@ -1041,7 +1041,7 @@ export class MiningSubmitter {
    * Build mint TX from V10 spell
    */
   private async buildMintTxFromSpellV10(
-    spell: ReturnType<typeof createBABTCMintSpellV10>,
+    spell: ReturnType<typeof createSPARKMintSpellV10>,
     miningTxid: string,
   ): Promise<{
     success: boolean;
@@ -1209,7 +1209,7 @@ export interface SubmissionResultV10 {
 
   // Mint TX phase
   mintPsbt?: string;
-  spell?: ReturnType<typeof createBABTCMintSpellV10>;
+  spell?: ReturnType<typeof createSPARKMintSpellV10>;
   merkleProof?: MerkleProof;
   reward?: bigint;
 
@@ -1242,7 +1242,7 @@ export interface SubmissionResultV11 {
   reward?: bigint;
 }
 
-// BABTC deployment config imported from ../config/deployment.ts
+// SPARK deployment config imported from ../config/deployment.ts
 // Single source of truth for appId and appVk
 
 // Minimum sats for spell outputs (from Charms protocol)

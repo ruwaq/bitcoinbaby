@@ -20,7 +20,7 @@ import { getDeploymentConfig } from "@bitcoinbaby/bitcoin";
  * - Wallet state and actions (create/import/lock/unlock)
  * - BTC balance
  * - Virtual $BABY balance
- * - On-chain BABTC token balance
+ * - On-chain SPARK token balance
  * - NFT mining boost
  * - Modal actions (unlock/delete)
  *
@@ -103,7 +103,7 @@ export function useWalletDashboard(): UseWalletDashboardReturn {
     useNetworkStore();
 
   // Get deployment config for current network
-  const { appId: BABTC_APP_ID } = getDeploymentConfig(network);
+  const { appId: SPARK_APP_ID } = getDeploymentConfig(network);
   const NFT_APP_ID = `genesis_babies_${network}`;
 
   // Modal hooks (unlock/delete only)
@@ -150,12 +150,12 @@ export function useWalletDashboard(): UseWalletDashboardReturn {
     address: walletInfo?.address,
   });
 
-  // Charms BABTC token balance
+  // Charms SPARK token balance
   const {
     formatted: babtcFormatted,
     loading: babtcLoading,
     error: babtcError,
-  } = useCharmsTokenBalance(walletInfo?.address ?? null, BABTC_APP_ID, {
+  } = useCharmsTokenBalance(walletInfo?.address ?? null, SPARK_APP_ID, {
     autoRefresh: !isLocked,
     refreshInterval: 60000,
   });

@@ -77,11 +77,11 @@ export {
 } from "./types";
 
 // =============================================================================
-// TOKEN ($BABTC)
+// TOKEN ($SPARK)
 // =============================================================================
 
 export type {
-  BABTCMetadata,
+  SPARKMetadata,
   TokenBalance,
   MiningReward,
   TokenMintParams,
@@ -97,8 +97,8 @@ export type {
 
 export {
   // Config
-  BABTC_CONFIG,
-  BABTC_METADATA,
+  SPARK_CONFIG,
+  SPARK_METADATA,
   // Calculations
   getCurrentEpoch,
   calculateBlockReward,
@@ -111,14 +111,14 @@ export {
   createTokenMintSpell,
   createTokenTransferSpell,
   // Spell Generation (V9 - PoW Direct)
-  createBABTCMintSpellV9,
-  createBABTCMintSpellV9WithRewards,
+  createSPARKMintSpellV9,
+  createSPARKMintSpellV9WithRewards,
   // Spell Generation (V10 - Merkle Proofs)
-  createBABTCMintSpellV10,
-  createBABTCTransferSpellV10,
+  createSPARKMintSpellV10,
+  createSPARKTransferSpellV10,
   // Spell Generation (V11 - Current, CLI v11.1.0+)
-  createBABTCMintSpellV11,
-  createBABTCTransferSpellV11,
+  createSPARKMintSpellV11,
+  createSPARKTransferSpellV11,
   addressToScriptPubKeyHex,
   validateAmountForSpell,
 } from "./token";
@@ -131,8 +131,8 @@ export type {
   Bloodline,
   RarityTier,
   BaseType,
-  BabyNFTState,
-  BabyNFTInfo,
+  SparkNFTState,
+  SparkNFTInfo,
   TraitSet,
   NFTGenesisParams,
   NFTWorkProofParams,
@@ -141,7 +141,7 @@ export type {
 
 export {
   // Config
-  GENESIS_BABIES_CONFIG,
+  GENESIS_SPARKS_CONFIG,
   XP_REQUIREMENTS,
   EVOLUTION_COSTS,
   LEVEL_BOOSTS,
@@ -185,13 +185,13 @@ export {
 // BALANCE SERVICE (V10)
 // =============================================================================
 
-export type { BABTCBalance, BalanceQueryOptions } from "./balance";
+export type { SPARKBalance, BalanceQueryOptions } from "./balance";
 
 export {
-  BABTCBalanceService,
-  createBABTCBalanceService,
-  getBABTCBalance,
-  formatBABTCBalance,
+  SPARKBalanceService,
+  createSPARKBalanceService,
+  getSPARKBalance,
+  formatSPARKBalance,
   hasSufficientBalance,
 } from "./balance";
 

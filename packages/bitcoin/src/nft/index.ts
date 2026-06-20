@@ -1,7 +1,7 @@
 /**
  * NFT Module
  *
- * Complete NFT minting and management for Genesis Babies.
+ * Complete NFT minting and management for Genesis Sparks.
  *
  * NOTE: For minting, use `useNFTMinting` from `@bitcoinbaby/core` which
  * uses the correct Charms witness data format.
@@ -9,15 +9,15 @@
 
 // Re-export NFT types from charms
 export type {
-  BabyNFTState,
-  BabyNFTInfo,
+  SparkNFTState,
+  SparkNFTInfo,
   Bloodline,
   BaseType,
   RarityTier,
 } from "../charms/nft";
 
 export {
-  GENESIS_BABIES_CONFIG,
+  GENESIS_SPARKS_CONFIG,
   getMiningBoost,
   canLevelUp,
   calculateXpGain,
@@ -36,7 +36,7 @@ export {
 
 // Re-export config
 export {
-  GENESIS_BABIES_TESTNET4,
+  GENESIS_SPARKS_TESTNET4,
   isGenesisBabiesConfigured,
 } from "../config/testnet4";
 

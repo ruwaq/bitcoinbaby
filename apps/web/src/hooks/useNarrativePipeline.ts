@@ -30,7 +30,7 @@ function getEngine(): NarrativeEngine {
 }
 
 export interface UseNarrativePipelineOptions {
-  nftState: import("@bitcoinbaby/ai").BabyNFTState | null;
+  nftState: import("@bitcoinbaby/ai").SparkNFTState | null;
 }
 
 export interface UseNarrativePipelineReturn {

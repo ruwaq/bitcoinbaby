@@ -49,7 +49,7 @@ export interface Env {
   BABTC_GENESIS?: string;
   SCROLLS_API_URL?: string;
 
-  // Genesis Babies NFT configuration
+  // Genesis Sparks NFT configuration
   NFT_APP_ID?: string;
   NFT_APP_VK?: string;
 

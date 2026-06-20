@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * NFTCard - Genesis Baby NFT Display Card
+ * NFTCard - Genesis Spark NFT Display Card
  *
  * Pixel art card showing:
  * - Trait-based sprite from DNA
@@ -13,7 +13,7 @@
 
 import { type FC, useState } from "react";
 import { clsx } from "clsx";
-import type { BabyNFTState, RarityTier, Bloodline, BaseType } from "./types";
+import type { SparkNFTState, RarityTier, Bloodline, BaseType } from "./types";
 import {
   getMiningBoost,
   canLevelUp,
@@ -86,7 +86,7 @@ const BASE_TYPE_COLORS: Record<BaseType, { body: string; label: string }> = {
 // NFT AVATAR
 // =============================================================================
 
-const NFTAvatar: FC<{ nft: BabyNFTState; size?: number }> = ({
+const NFTAvatar: FC<{ nft: SparkNFTState; size?: number }> = ({
   nft,
   size = 96,
 }) => {
@@ -265,10 +265,10 @@ const MiningBoostDisplay: FC<{ boost: number }> = ({ boost }) => (
 // =============================================================================
 
 export interface NFTCardProps {
-  nft: BabyNFTState;
-  onEvolve?: (nft: BabyNFTState) => void;
-  onSelect?: (nft: BabyNFTState) => void;
-  onList?: (nft: BabyNFTState, price: number) => void;
+  nft: SparkNFTState;
+  onEvolve?: (nft: SparkNFTState) => void;
+  onSelect?: (nft: SparkNFTState) => void;
+  onList?: (nft: SparkNFTState, price: number) => void;
   isEvolving?: boolean;
   isListing?: boolean;
   isSelected?: boolean;

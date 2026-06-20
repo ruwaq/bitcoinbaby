@@ -29,7 +29,7 @@ export { Oracle } from "./Oracle";
 export { SatoBots, SatoBot } from "./SatoBots";
 export { WhaleSprite } from "./WhaleSprite";
 
-// Genesis Baby NFT Sprite System
+// Genesis Spark NFT Sprite System
 export * from "./genesis";
 
 // Pixel Art Icons (replaces emojis)

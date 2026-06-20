@@ -34,9 +34,9 @@ export function DangerZone({
 
     // 2. Clear all BitcoinBaby localStorage keys
     const keysToRemove = [
-      "bitcoinbaby-nft-store",
+      "bitcoinbaby-spark-store",
       "bitcoinbaby-mining-store",
-      "bitcoinbaby-baby-store",
+      "bitcoinbaby-spark-store",
       "bitcoinbaby-wallet-store",
       "bitcoinbaby-network",
       "bitcoinbaby-settings",

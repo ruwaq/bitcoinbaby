@@ -9,17 +9,17 @@
 
 import { useState } from "react";
 import { cn } from "../../lib/utils";
-import type { BabyNFTState, EvolutionStatus } from "./types";
+import type { SparkNFTState, EvolutionStatus } from "./types";
 
 // =============================================================================
 // TYPES
 // =============================================================================
 
 export interface NFTEvolutionPanelProps {
-  nft: BabyNFTState;
+  nft: SparkNFTState;
   evolutionStatus: EvolutionStatus;
   tokenBalance: bigint;
-  onEvolve: (nft: BabyNFTState) => Promise<void>;
+  onEvolve: (nft: SparkNFTState) => Promise<void>;
   isEvolving?: boolean;
   className?: string;
 }
@@ -101,7 +101,7 @@ export function NFTEvolutionPanel({
             Maximum Level
           </p>
           <p className="font-pixel-body text-xs text-pixel-text-muted mt-1">
-            This Genesis Baby has reached its full potential!
+            This Genesis Spark has reached its full potential!
           </p>
           <div className="mt-3 p-2 bg-pixel-bg-dark border-2 border-pixel-legendary">
             <span className="font-pixel text-[8px] text-pixel-legendary">

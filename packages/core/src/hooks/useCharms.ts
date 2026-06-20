@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   createCharmsClient,
   formatTokenAmount,
-  BABTC_CONFIG,
+  SPARK_CONFIG,
   type CharmsClientOptions,
 } from "@bitcoinbaby/bitcoin";
 import { useNFTStore } from "../stores/nft-store";
@@ -63,7 +63,7 @@ export function useTokenBalance(
     try {
       const bal = await client.getTokenBalance(address, appId);
       setBalance(bal);
-      setFormatted(formatTokenAmount(bal, BABTC_CONFIG.decimals));
+      setFormatted(formatTokenAmount(bal, SPARK_CONFIG.decimals));
     } catch (err) {
       setError(err as Error);
     } finally {

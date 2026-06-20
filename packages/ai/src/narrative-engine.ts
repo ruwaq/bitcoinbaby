@@ -14,7 +14,7 @@
  */
 
 import { createLogger } from "@bitcoinbaby/shared";
-import type { BabyNFTState } from "./narrative-types";
+import type { SparkNFTState } from "./narrative-types";
 import type {
   NarrativeEvent,
   NarrativeState,
@@ -62,7 +62,7 @@ export class NarrativeEngine {
    */
   async processAIOutput(
     aiOutput: string,
-    nft: BabyNFTState,
+    nft: SparkNFTState,
     narrativeState: NarrativeState,
     modelUsed: string,
   ): Promise<NarrativeResult> {
@@ -112,7 +112,7 @@ export class NarrativeEngine {
    * Initialize a fresh NarrativeState for a newly minted NFT.
    * Deterministic from DNA — same DNA always produces the same initial state.
    */
-  static initNarrativeState(nft: BabyNFTState): NarrativeState {
+  static initNarrativeState(nft: SparkNFTState): NarrativeState {
     const backstory = generateBackstory(
       nft.dna,
       nft.baseType,

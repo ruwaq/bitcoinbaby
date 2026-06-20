@@ -12,7 +12,7 @@ import type {
   ScrollsSignRequest,
 } from "./types";
 import { SCROLLS_URLS, MEMPOOL_URLS } from "./types";
-import type { BabyNFTState } from "./nft";
+import type { SparkNFTState } from "./nft";
 // Reuse types from blockchain module (avoid duplication)
 import type {
   UTXO,
@@ -438,14 +438,14 @@ export class CharmsClient {
   /**
    * Get owned NFTs for an address
    */
-  async getOwnedNFTs(address: string, appId: string): Promise<BabyNFTState[]> {
+  async getOwnedNFTs(address: string, appId: string): Promise<SparkNFTState[]> {
     const charms = await this.extractCharmsForWallet(address, appId);
 
     return charms
       .filter((c) => c.appId === appId && c.appType === "n" && c.state)
-      .map((c) => c.state as unknown as BabyNFTState)
+      .map((c) => c.state as unknown as SparkNFTState)
       .filter(
-        (state): state is BabyNFTState => state !== null && state !== undefined,
+        (state): state is SparkNFTState => state !== null && state !== undefined,
       );
   }
 

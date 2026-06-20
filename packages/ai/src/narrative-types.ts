@@ -5,7 +5,7 @@
 
 // Minimal canonical type mirrors (avoids @bitcoinbaby/bitcoin dependency).
 // NarrativeEngine operates on these lightweight types; the caller
-// (core/mining or web) is responsible for passing the real BabyNFTState.
+// (core/mining or web) is responsible for passing the real SparkNFTState.
 
 export type Bloodline = "royal" | "warrior" | "rogue" | "mystic";
 export type RarityTier =
@@ -17,7 +17,7 @@ export type RarityTier =
   | "mythic";
 export type BaseType = "human" | "animal" | "robot" | "mystic" | "alien";
 
-export interface BabyNFTState {
+export interface SparkNFTState {
   readonly dna: string;
   readonly bloodline: Bloodline;
   readonly baseType: BaseType;
@@ -125,7 +125,7 @@ export interface Item {
 
 /** Context passed to template renderers */
 export interface NarrativeContext {
-  nft: BabyNFTState;
+  nft: SparkNFTState;
   personality: PersonalityTraits;
   archetype: Archetype;
   mood: Mood;

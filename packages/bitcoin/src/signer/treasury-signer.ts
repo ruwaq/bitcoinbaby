@@ -39,9 +39,9 @@ export interface SignerConfig {
   mempoolUrl?: string;
   /** Charms prover URL (default: https://v15.charms.dev) */
   proverUrl?: string;
-  /** BABTC token app ID */
+  /** SPARK token app ID */
   appId: string;
-  /** BABTC token app VK */
+  /** SPARK token app VK */
   appVk: string;
 }
 

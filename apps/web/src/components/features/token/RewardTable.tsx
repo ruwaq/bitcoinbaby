@@ -92,7 +92,7 @@ export function RewardTable({ currentDifficulty }: RewardTableProps) {
                         isActive ? "text-pixel-primary" : "text-pixel-text"
                       }`}
                     >
-                      {formatTokenAmount(row.totalReward)} BABTC
+                      {formatTokenAmount(row.totalReward)} SPARK
                     </span>
                   </td>
                   <td className="py-3 pl-4 text-right">
@@ -103,7 +103,7 @@ export function RewardTable({ currentDifficulty }: RewardTableProps) {
                           : "text-pixel-success/70"
                       }`}
                     >
-                      {formatTokenAmount(row.minerReward)} BABTC
+                      {formatTokenAmount(row.minerReward)} SPARK
                     </span>
                   </td>
                 </tr>
@@ -118,7 +118,7 @@ export function RewardTable({ currentDifficulty }: RewardTableProps) {
         <p className="font-pixel-body text-pixel-xs text-pixel-text-muted">
           Higher difficulty = harder to find valid hash = more reward.
           <br />
-          Formula: 1 BABTC × D² ÷ 100 where D = leading zero bits in hash.
+          Formula: 1 SPARK × D² ÷ 100 where D = leading zero bits in hash.
         </p>
       </div>
     </div>

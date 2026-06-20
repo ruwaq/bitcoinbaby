@@ -1,7 +1,7 @@
 /**
- * Estados posibles del Baby
+ * Estados posibles del Spark
  */
-export type BabyState =
+export type SparkState =
   | "sleeping"
   | "hungry"
   | "happy"
@@ -9,12 +9,13 @@ export type BabyState =
   | "evolving";
 
 /**
- * Entidad Baby - El Tamagotchi de Bitcoin
+ * Entidad Spark - El minero de BitcoinSparks
+ * @deprecated Use Spark from spark-types.ts instead (unified type)
  */
-export interface Baby {
+export interface Spark {
   id: string;
   name: string;
-  state: BabyState;
+  state: SparkState;
   level: number;
   experience: number;
   createdAt: Date;
@@ -56,7 +57,7 @@ export interface WalletInfo {
   address: string;
   publicKey: string;
   balance: bigint;
-  babyTokens: bigint;
+  sparkTokens: bigint;
 }
 
 // =============================================================================
@@ -70,13 +71,13 @@ export {
   type Bloodline,
   type RarityTier,
   type BaseType,
-  type BabyNFTState,
-  type BabyNFTInfo,
+  type SparkNFTState,
+  type SparkNFTInfo,
   // Constants
   XP_REQUIREMENTS,
   EVOLUTION_COSTS,
   LEVEL_BOOSTS,
-  GENESIS_BABIES_CONFIG,
+  GENESIS_SPARKS_CONFIG,
   // Functions
   getMiningBoost,
   canLevelUp,

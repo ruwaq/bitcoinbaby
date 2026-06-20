@@ -11,7 +11,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import {
   getGameEngine,
   type GameState,
-  type GameBaby,
+  type GameSpark,
   type GameEvent,
   type GameAction,
   STAGE_NAMES,
@@ -29,7 +29,7 @@ export interface UseGameLoopOptions {
 
 export interface UseGameLoopReturn {
   // State
-  baby: GameBaby | null;
+  baby: GameSpark | null;
   state: GameState | null;
   isLoading: boolean;
   isDead: boolean;
@@ -59,7 +59,7 @@ export function useGameLoop(
   const { autoStart = true, onEvent } = options;
 
   const [state, setState] = useState<GameState | null>(null);
-  const [baby, setBaby] = useState<GameBaby | null>(null);
+  const [baby, setBaby] = useState<GameSpark | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDead, setIsDead] = useState(false);
 

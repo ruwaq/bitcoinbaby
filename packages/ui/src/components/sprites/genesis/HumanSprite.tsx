@@ -1,5 +1,5 @@
 /**
- * Human Baby Sprite - PRIMITIVE TRIBAL DESIGN
+ * Human Spark Sprite - PRIMITIVE TRIBAL DESIGN
  *
  * Humanos primitivos conectados a la tierra y los espíritus.
  * Estética de realismo mágico: chamanes, cazadores, ancianos sabios.

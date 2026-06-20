@@ -1,7 +1,7 @@
 /**
  * Inscription System Tests
  *
- * Tests for the Genesis Babies NFT inscription system.
+ * Tests for the Genesis Sparks NFT inscription system.
  */
 
 import { describe, it, expect } from "vitest";
@@ -10,7 +10,7 @@ import {
   getRarityFromScore,
   getBaseTypeFromIndex,
   getBloodlineFromIndex,
-  GENESIS_BABIES_LIBRARY,
+  GENESIS_SPARKS_LIBRARY,
   buildSpriteLibrary,
 } from "./sprite-library";
 import {
@@ -128,16 +128,16 @@ describe("Bloodline Mapping", () => {
 
 describe("Sprite Library", () => {
   it("should have correct structure", () => {
-    expect(GENESIS_BABIES_LIBRARY.version).toBe(1);
-    expect(GENESIS_BABIES_LIBRARY.name).toBe("Genesis Babies");
-    expect(GENESIS_BABIES_LIBRARY.totalComponents).toBe(150);
-    expect(GENESIS_BABIES_LIBRARY.categories.length).toBe(6);
-    expect(GENESIS_BABIES_LIBRARY.palettes.length).toBeGreaterThan(0);
-    expect(GENESIS_BABIES_LIBRARY.layerRules.length).toBeGreaterThan(0);
+    expect(GENESIS_SPARKS_LIBRARY.version).toBe(1);
+    expect(GENESIS_SPARKS_LIBRARY.name).toBe("Genesis Sparks");
+    expect(GENESIS_SPARKS_LIBRARY.totalComponents).toBe(150);
+    expect(GENESIS_SPARKS_LIBRARY.categories.length).toBe(6);
+    expect(GENESIS_SPARKS_LIBRARY.palettes.length).toBeGreaterThan(0);
+    expect(GENESIS_SPARKS_LIBRARY.layerRules.length).toBeGreaterThan(0);
   });
 
   it("should have all required palettes", () => {
-    const paletteIds = GENESIS_BABIES_LIBRARY.palettes.map((p) => p.id);
+    const paletteIds = GENESIS_SPARKS_LIBRARY.palettes.map((p) => p.id);
 
     expect(paletteIds).toContain("human");
     expect(paletteIds).toContain("animal");
@@ -175,7 +175,7 @@ describe("On-Chain Renderer", () => {
 
     expect(html).toContain("<!DOCTYPE html>");
     expect(html).toContain("<svg");
-    expect(html).toContain("Genesis Baby");
+    expect(html).toContain("Genesis Spark");
     expect(html).toContain("abc123i0");
     expect(html).toContain("parseDNA");
     expect(html).toContain("getRarity");
@@ -229,8 +229,8 @@ describe("NFT Metadata", () => {
 
     const parsed = JSON.parse(metadata);
 
-    expect(parsed.name).toBe("Genesis Baby #1");
-    expect(parsed.description).toContain("Genesis Baby");
+    expect(parsed.name).toBe("Genesis Spark #1");
+    expect(parsed.description).toContain("Genesis Spark");
     expect(parsed.image).toContain("renderer123i0");
     expect(parsed.image).toContain("dna=abcd1234");
     expect(parsed.properties.tokenId).toBe(1);
@@ -495,7 +495,7 @@ describe("Parent-Child Provenance and Metadata (Tags 3 & 5)", () => {
   it("should create envelope containing Tag 3 and Tag 5", () => {
     const parentId = "87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681bi1";
     const metadata = {
-      name: "Genesis Baby #42",
+      name: "Genesis Spark #42",
       attributes: [{ trait_type: "Base Type", value: "human" }]
     };
 

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * NFTInfoPanel - Information about Genesis Babies NFTs
+ * NFTInfoPanel - Information about Genesis Sparks NFTs
  *
  * Shows all NFT types, rarities, and benefits before minting.
  * Helps users understand what they could get and why it's valuable.
@@ -65,7 +65,7 @@ const BENEFITS = [
   },
   {
     title: "Evolution",
-    desc: "At max level, evolve your Baby into a stronger form",
+    desc: "At max level, evolve your Spark into a stronger form",
     icon: "🦋",
   },
   {
@@ -145,14 +145,14 @@ export function NFTInfoPanel({
           GENESIS BABIES
         </h2>
         <p className="font-pixel-body text-sm text-pixel-text-muted">
-          Mint a random NFT and discover your unique Baby!
+          Mint a random NFT and discover your unique Spark!
         </p>
       </div>
 
       {/* Benefits Overview */}
       <div className="bg-pixel-bg-medium border-4 border-pixel-success p-4">
         <h3 className="font-pixel text-[9px] text-pixel-success uppercase mb-3 text-center">
-          Why Mint a Genesis Baby?
+          Why Mint a Genesis Spark?
         </h3>
         <div className="grid grid-cols-2 gap-3">
           {BENEFITS.map((benefit) => (

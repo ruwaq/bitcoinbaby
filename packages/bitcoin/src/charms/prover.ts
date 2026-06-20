@@ -372,7 +372,7 @@ export async function validatePoWBeforeProver(
  * ```typescript
  * const client = new CharmsProverClient();
  *
- * const spell = createBABTCMintSpellV10({
+ * const spell = createSPARKMintSpellV10({
  *   appId: '87b5ecfb...',
  *   appVk: 'ab70796e...',
  *   minerAddress: 'tb1p...',

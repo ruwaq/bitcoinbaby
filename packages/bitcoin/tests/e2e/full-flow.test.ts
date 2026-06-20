@@ -26,7 +26,7 @@ import {
   createNFTGenesisSpell,
   createNFTWorkProofSpell,
   createNFTLevelUpSpell,
-  type BabyNFTState,
+  type SparkNFTState,
   type Bloodline,
   type RarityTier,
 } from "../../src/charms/nft";
@@ -41,7 +41,7 @@ const createMockMiner = () => ({
     "02abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
 });
 
-const createMockNFT = (overrides: Partial<BabyNFTState> = {}): BabyNFTState => ({
+const createMockNFT = (overrides: Partial<SparkNFTState> = {}): SparkNFTState => ({
   dna: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
   bloodline: "rogue",
   baseType: "human",
@@ -199,7 +199,7 @@ describe("E2E: NFT Minting Flow", () => {
         genesisBlock: 100000,
       });
 
-      const nftState = spell.outs[0].charms.$00 as BabyNFTState;
+      const nftState = spell.outs[0].charms.$00 as SparkNFTState;
       expect(nftState.level).toBe(1);
       expect(nftState.xp).toBe(0);
       expect(nftState.totalXp).toBe(0);
@@ -220,7 +220,7 @@ describe("E2E: NFT Minting Flow", () => {
       };
 
       const spell = createNFTGenesisSpell(params);
-      const nftState = spell.outs[0].charms.$00 as BabyNFTState;
+      const nftState = spell.outs[0].charms.$00 as SparkNFTState;
 
       expect(nftState.dna).toBe(params.dna);
       expect(nftState.bloodline).toBe(params.bloodline);
@@ -296,7 +296,7 @@ describe("E2E: Mining → XP → Evolution Cycle", () => {
         currentBlock: 100001,
       });
 
-      const newState = spell.outs[0].charms.$00 as BabyNFTState;
+      const newState = spell.outs[0].charms.$00 as SparkNFTState;
       expect(newState.xp).toBeGreaterThan(nft.xp);
       expect(newState.workCount).toBe(nft.workCount + 1);
       expect(newState.lastWorkBlock).toBe(100001);
@@ -362,7 +362,7 @@ describe("E2E: Mining → XP → Evolution Cycle", () => {
         ownerAddress: "tb1qtest",
       });
 
-      const newState = spell.outs[0].charms.$00 as BabyNFTState;
+      const newState = spell.outs[0].charms.$00 as SparkNFTState;
       expect(newState.level).toBe(2);
       expect(newState.xp).toBe(0); // Reset
       expect(newState.evolutionCount).toBe(1);
@@ -477,7 +477,7 @@ describe("E2E: Complete Lifecycle", () => {
       rarityTier: "rare",
       genesisBlock: 100000,
     });
-    let nft = nftSpell.outs[0].charms.$00 as BabyNFTState;
+    let nft = nftSpell.outs[0].charms.$00 as SparkNFTState;
 
     // Verify initial state
     expect(nft.level).toBe(1);

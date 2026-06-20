@@ -247,7 +247,7 @@ export class NFTClient extends BaseApiClient {
 
   /**
    * Request NFT evolution
-   * Requires sufficient XP and BABTC balance
+   * Requires sufficient XP and SPARK balance
    */
   async evolveNFT(
     tokenId: number,

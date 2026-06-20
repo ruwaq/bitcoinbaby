@@ -16,7 +16,7 @@
 import { useMiningStore } from "./mining-store";
 import { useWalletStore } from "./wallet-store";
 import { useNFTStore } from "./nft-store";
-import { useBabyStore } from "./baby-store";
+import { useSparkStore } from "./baby-store";
 
 // =============================================================================
 // MINING SELECTORS
@@ -87,7 +87,7 @@ export const selectIsWalletConnected = (s: WalletState) => s.wallet !== null;
 export const selectWalletBalance = (s: WalletState) => s.wallet?.balance ?? 0n;
 
 /** Select baby tokens balance */
-export const selectBabyTokens = (s: WalletState) => s.wallet?.babyTokens ?? 0n;
+export const selectBabyTokens = (s: WalletState) => s.wallet?.sparkTokens ?? 0n;
 
 /** Select sign PSBT function */
 export const selectSignPsbt = (s: WalletState) => s.signPsbt;
@@ -138,7 +138,7 @@ export const selectSelectNFT = (s: NFTState) => s.selectNFT;
 // BABY SELECTORS
 // =============================================================================
 
-type BabyStoreState = ReturnType<typeof useBabyStore.getState>;
+type BabyStoreState = ReturnType<typeof useSparkStore.getState>;
 
 /** Select baby object */
 export const selectBaby = (s: BabyStoreState) => s.baby;
@@ -153,7 +153,7 @@ export const selectBabyXP = (s: BabyStoreState) => s.baby?.experience ?? 0;
 export const selectBabyName = (s: BabyStoreState) => s.baby?.name ?? null;
 
 /** Select baby state */
-export const selectBabyState = (s: BabyStoreState) => s.baby?.state ?? null;
+export const selectSparkState = (s: BabyStoreState) => s.baby?.state ?? null;
 
 /** Select setBaby action */
 export const selectSetBaby = (s: BabyStoreState) => s.setBaby;

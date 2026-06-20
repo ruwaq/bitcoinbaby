@@ -15,7 +15,7 @@ export type { ModelChainEntryStatus } from "./cloudflare-ai";
 // Narrative Engine (AI World Engine)
 export { NarrativeEngine } from "./narrative-engine";
 export type {
-  BabyNFTState,
+  SparkNFTState,
   PersonalityTraits,
   Archetype,
   Mood,

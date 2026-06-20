@@ -11,12 +11,12 @@ import type {
   BaseType as CoreBaseType,
   RarityTier,
   Heritage,
-  BabyNFTState as CoreBabyNFTState,
+  SparkNFTState as CoreSparkNFTState,
 } from "@bitcoinbaby/core";
 
 // Re-export canonical types
 export type { RarityTier, Heritage };
-export type { CoreBabyNFTState };
+export type { CoreSparkNFTState };
 
 // =============================================================================
 // EXTENDED UI TYPES
@@ -40,7 +40,7 @@ export type BaseType = CoreBaseType | "shaman" | "elemental" | "dragon";
 /**
  * UI-extended NFT state that supports both canonical and extended types
  */
-export interface BabyNFTState {
+export interface SparkNFTState {
   readonly dna: string;
   readonly bloodline: Bloodline;
   readonly baseType: BaseType;
@@ -56,7 +56,7 @@ export interface BabyNFTState {
   tokensEarned: bigint;
 }
 
-export interface BabyNFTInfo {
+export interface SparkNFTInfo {
   tokenId: number;
   name: string;
   level: number;
@@ -123,11 +123,11 @@ export const EVOLUTION_COSTS: Record<number, bigint> = {
 // HELPERS
 // =============================================================================
 
-export function getMiningBoost(nft: BabyNFTState): number {
+export function getMiningBoost(nft: SparkNFTState): number {
   return (LEVEL_BOOSTS[nft.level] ?? 0) + (RARITY_BOOSTS[nft.rarityTier] ?? 0);
 }
 
-export function canLevelUp(nft: BabyNFTState): boolean {
+export function canLevelUp(nft: SparkNFTState): boolean {
   if (nft.level >= MAX_LEVEL) return false;
   const required = XP_REQUIREMENTS[nft.level + 1];
   return nft.xp >= required;
@@ -160,7 +160,7 @@ export interface EvolutionStatus {
   boostGain: number;
 }
 
-export function getEvolutionStatus(nft: BabyNFTState): EvolutionStatus {
+export function getEvolutionStatus(nft: SparkNFTState): EvolutionStatus {
   const nextLevel = nft.level + 1;
   const canEvolveNft = canLevelUp(nft);
   const xpRequired = XP_REQUIREMENTS[nextLevel] || 0;

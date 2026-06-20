@@ -533,10 +533,10 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       // Generate a new task
       const prompts = [
         "Write a short lore entry about Baby learning how to read the Bitcoin blockchain.",
-        "Describe the Genesis Baby's reaction to seeing the Bitcoin difficulty adjustment.",
+        "Describe the Genesis Spark's reaction to seeing the Bitcoin difficulty adjustment.",
         "Describe how a baby miner operates a tiny WebGPU mining rig in their crib.",
         "Write a story about a baby discovering Satoshi's whitepaper in their toy chest.",
-        "Describe the Genesis Baby's first encounter with a Lightning Network node.",
+        "Describe the Genesis Spark's first encounter with a Lightning Network node.",
         "Write a legend about how the Golden Pacifier was forged in a blocks mined by Satoshi.",
       ];
       const prompt = prompts[Math.floor(Math.random() * prompts.length)];

@@ -3,8 +3,8 @@
 /**
  * useFaucet Hook
  *
- * Manages the BABTC faucet claim flow for Phase 1.
- * Users can claim 5 BABTC per day (up to 50 max) to evolve NFTs
+ * Manages the SPARK faucet claim flow for Phase 1.
+ * Users can claim 5 SPARK per day (up to 50 max) to evolve NFTs
  * before mining is active.
  *
  * States: idle → claiming → cooldown/maxed/error → idle
@@ -30,7 +30,7 @@ export interface FaucetResult {
   amount: number;
   /** Timestamp (ms) when next claim is allowed */
   nextClaimAt: number;
-  /** Total BABTC claimed via faucet */
+  /** Total SPARK claimed via faucet */
   totalClaimed: number;
 }
 
@@ -50,7 +50,7 @@ export interface UseFaucetReturn {
   cooldownSeconds: number;
   /** Timestamp (ms) of when the cooldown ends */
   nextClaimAt: number | null;
-  /** Total BABTC claimed via faucet */
+  /** Total SPARK claimed via faucet */
   totalClaimed: number;
   /** Amount dispensed per claim */
   claimAmount: number;

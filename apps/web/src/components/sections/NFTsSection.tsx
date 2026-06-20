@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * NFTsSection - Genesis Babies Collection & Mint
+ * NFTsSection - Genesis Sparks Collection & Mint
  *
  * NFT management with sub-tabs: Collection | Mint New | Claim | Marketplace
  * Uses consolidated useNFTs hook for all NFT-related state management.
@@ -72,7 +72,7 @@ export function NFTsSection() {
           size="lg"
           helpTooltip={
             <HelpTooltip
-              content="Genesis Babies are NFTs that boost your mining rewards. Each NFT has unique traits and rarity levels."
+              content="Genesis Sparks are NFTs that boost your mining rewards. Each NFT has unique traits and rarity levels."
               title="NFT Collection"
               description="Higher rarity = Higher mining boost. Level up your NFTs by burning $BABY tokens."
               size="md"

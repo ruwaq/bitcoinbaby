@@ -7,7 +7,7 @@ import {
   type MintStep,
 } from "@/components/features/nft";
 import type { PendingTransaction, MintAttempt } from "@bitcoinbaby/core";
-import type { BabyNFTState } from "@bitcoinbaby/bitcoin";
+import type { SparkNFTState } from "@bitcoinbaby/bitcoin";
 
 type MintState = "info" | "confirming" | "minting" | "revealing" | "success";
 
@@ -18,7 +18,7 @@ interface MintTabContentProps {
   formattedPrice: string;
   canMint: boolean;
   error: string | null;
-  lastMinted: BabyNFTState | null;
+  lastMinted: SparkNFTState | null;
   txid: string | null;
   commitTxid?: string | null;
   pendingTransactions: PendingTransaction[];

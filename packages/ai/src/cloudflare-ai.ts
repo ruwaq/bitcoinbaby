@@ -9,7 +9,7 @@
  *   @cf/meta/llama-3.2-1b-instruct (Llama 3.2 1B, fast + free)
  *
  * The API key is NOT embedded here. Requests go through a Cloudflare Worker
- * proxy at BITCOINBABY_AI_PROXY_URL (set via env/config), which injects
+ * proxy at BITCOINSPARK_AI_PROXY_URL (set via env/config), which injects
  * the key server-side so it never reaches the browser.
  */
 
@@ -68,7 +68,7 @@ const AVAILABLE_MODELS = [
 
 /** Default proxy URL — set via VITE_CLOUDFLARE_AI_PROXY or build-time config */
 const DEFAULT_PROXY_URL =
-  (typeof process !== "undefined" && process.env?.BITCOINBABY_AI_PROXY_URL) ||
+  (typeof process !== "undefined" && process.env?.BITCOINSPARK_AI_PROXY_URL) ||
   "";
 
 // =============================================================================

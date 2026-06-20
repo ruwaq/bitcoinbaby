@@ -1,7 +1,7 @@
 /**
- * Genesis Baby Sprite System
+ * Genesis Spark Sprite System
  *
- * Sistema completo de sprites para NFTs Genesis Babies.
+ * Sistema completo de sprites para NFTs Genesis Sparks.
  *
  * Estructura de capas:
  * 1. Base Type Sprites (Human, Animal, Robot, Mystic, Alien)

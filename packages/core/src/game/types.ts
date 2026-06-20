@@ -4,12 +4,12 @@
  * Type definitions for the Tamagotchi game system.
  */
 
-import type { BabyStage, BabyVisualState } from "./constants";
+import type { BabyStage, SparkVisualState } from "./constants";
 
 /**
  * Baby stats that change over time
  */
-export interface BabyStats {
+export interface SparkStats {
   energy: number; // 0-100, depletes with activity
   happiness: number; // 0-100, depletes over time
   hunger: number; // 0-100, increases over time (100 = starving)
@@ -19,7 +19,7 @@ export interface BabyStats {
 /**
  * Baby progression data
  */
-export interface BabyProgression {
+export interface SparkProgression {
   level: number;
   xp: number;
   xpToNextLevel: number;
@@ -29,21 +29,21 @@ export interface BabyProgression {
 /**
  * Complete Baby entity for the game
  */
-export interface GameBaby {
+export interface GameSpark {
   // Identity
   id: string;
   name: string;
 
   // Current state
-  visualState: BabyVisualState;
+  visualState: SparkVisualState;
   isSleeping: boolean;
   isMining: boolean;
 
   // Stats
-  stats: BabyStats;
+  stats: SparkStats;
 
   // Progression
-  progression: BabyProgression;
+  progression: SparkProgression;
 
   // Timestamps
   createdAt: number;
@@ -92,7 +92,7 @@ export interface GameState {
   version: number;
 
   // Baby data
-  baby: GameBaby | null;
+  baby: GameSpark | null;
 
   // Mining stats (cumulative)
   miningStats: GameMiningStats;
@@ -162,13 +162,13 @@ export interface EvolutionEventData {
  * Event emitted by game engine
  */
 export type GameEvent =
-  | { type: "tick"; stats: BabyStats }
+  | { type: "tick"; stats: SparkStats }
   | { type: "level_up"; level: number }
   | { type: "evolution_ready"; nextStage: BabyStage }
   | { type: "evolved"; stage: BabyStage; data: EvolutionEventData }
   | { type: "achievement_unlocked"; achievement: Achievement }
-  | { type: "critical_stat"; stat: keyof BabyStats }
-  | { type: "stat_recovered"; stat: keyof BabyStats }
+  | { type: "critical_stat"; stat: keyof SparkStats }
+  | { type: "stat_recovered"; stat: keyof SparkStats }
   | { type: "whale_appeared" }
   | { type: "saved" };
 
@@ -180,7 +180,7 @@ export type GameEventHandler = (event: GameEvent) => void;
 /**
  * Initial state for a new baby
  */
-export const DEFAULT_BABY_STATS: BabyStats = {
+export const DEFAULT_SPARK_STATS: SparkStats = {
   energy: 100,
   happiness: 100,
   hunger: 0,

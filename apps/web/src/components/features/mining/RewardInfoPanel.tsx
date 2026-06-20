@@ -20,10 +20,10 @@ interface RewardInfoPanelProps {
 }
 
 // Token config (matches packages/bitcoin/src/charms/token.ts)
-const BABTC_CONFIG = {
-  ticker: "BABTC",
+const SPARK_CONFIG = {
+  ticker: "SPARK",
   rewards: {
-    baseReward: 100_00000000n, // 100 BABTC
+    baseReward: 100_00000000n, // 100 SPARK
     minDifficulty: 22,
     maxDifficulty: 32,
     difficultyFactor: 100n,
@@ -40,7 +40,7 @@ function calculateReward(difficulty: number): {
   minerShare: bigint;
 } {
   const { baseReward, minDifficulty, maxDifficulty, difficultyFactor } =
-    BABTC_CONFIG.rewards;
+    SPARK_CONFIG.rewards;
 
   const clampedDiff = Math.max(
     minDifficulty,
@@ -48,7 +48,7 @@ function calculateReward(difficulty: number): {
   );
   const clzSquared = BigInt(clampedDiff * clampedDiff);
   const total = (baseReward * clzSquared) / difficultyFactor;
-  const minerShare = (total * BigInt(BABTC_CONFIG.distribution.miner)) / 100n;
+  const minerShare = (total * BigInt(SPARK_CONFIG.distribution.miner)) / 100n;
 
   return { total, minerShare };
 }
@@ -71,7 +71,7 @@ export function RewardInfoPanel({
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   const currentReward = calculateReward(currentDifficulty);
-  const { minDifficulty, maxDifficulty } = BABTC_CONFIG.rewards;
+  const { minDifficulty, maxDifficulty } = SPARK_CONFIG.rewards;
 
   // Generate reward table
   const rewardTable = [];
@@ -155,13 +155,13 @@ export function RewardInfoPanel({
             <span className="text-pixel-text-muted">Distribution:</span>
             <div className="flex gap-3 mt-1 text-pixel-3xs">
               <span className="text-pixel-success">
-                {BABTC_CONFIG.distribution.miner}% Miner
+                {SPARK_CONFIG.distribution.miner}% Miner
               </span>
               <span className="text-pixel-text-muted">
-                {BABTC_CONFIG.distribution.dev}% Dev
+                {SPARK_CONFIG.distribution.dev}% Dev
               </span>
               <span className="text-pixel-text-muted">
-                {BABTC_CONFIG.distribution.staking}% Staking
+                {SPARK_CONFIG.distribution.staking}% Staking
               </span>
             </div>
           </div>

@@ -3,7 +3,7 @@
 /**
  * Cosmic Page - Web App
  *
- * Displays current cosmic conditions, how they affect your Baby,
+ * Displays current cosmic conditions, how they affect your Spark,
  * and upcoming astronomical events.
  */
 
@@ -131,7 +131,7 @@ export default function CosmicPage() {
                 COSMIC STATUS
               </h1>
               <p className="font-pixel-body text-sm text-pixel-text-muted mt-1">
-                How the universe affects your Baby
+                How the universe affects your Spark
               </p>
               {/* Baby Selector - only shows when user has multiple NFTs */}
               {ownedNFTs.length > 1 && (

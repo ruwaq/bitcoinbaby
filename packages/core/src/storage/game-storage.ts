@@ -5,7 +5,7 @@
  * Falls back to localStorage if IndexedDB is unavailable.
  */
 
-import type { GameState, GameBaby, BabyProgression } from "../game/types";
+import type { GameState, GameSpark, SparkProgression } from "../game/types";
 import { DEFAULT_GAME_STATE } from "../game/types";
 import { getXPForLevel } from "../game/constants";
 import { getStageForLevel } from "../game/mechanics";
@@ -246,9 +246,9 @@ export const GameStorage = {
  *
  * This prevents corrupted data from causing instant legend bug.
  */
-function validateBabyProgression(
-  progression: BabyProgression,
-): BabyProgression {
+function validateSparkProgression(
+  progression: SparkProgression,
+): SparkProgression {
   // Validate level (1-21, default to 1 if invalid)
   let level = progression.level;
   if (
@@ -308,9 +308,9 @@ function validateBabyProgression(
 /**
  * Validate and repair baby data
  */
-function validateBaby(baby: GameBaby): GameBaby {
+function validateBaby(baby: GameSpark): GameSpark {
   // Validate progression
-  const validatedProgression = validateBabyProgression(baby.progression);
+  const validatedProgression = validateSparkProgression(baby.progression);
 
   // Validate timestamps (ensure they exist and are valid)
   const now = Date.now();

@@ -21,24 +21,24 @@ import {
   getEvolutionStatus,
   pixelBorders,
   pixelShadows,
-  type BabyNFTState,
+  type SparkNFTState,
 } from "@bitcoinbaby/ui";
 import type { PendingTransaction } from "@bitcoinbaby/core";
 import { NFTCardSkeleton } from "@/components/shared/ShimmerSkeleton";
 import { fadeInUp, staggerContainer } from "@/utils/animations";
 
 interface NFTCollectionViewProps {
-  nfts: BabyNFTState[];
+  nfts: SparkNFTState[];
   isLoading: boolean;
   error: string | null;
-  selectedNFT: BabyNFTState | null;
-  onSelectNFT: (nft: BabyNFTState) => void;
+  selectedNFT: SparkNFTState | null;
+  onSelectNFT: (nft: SparkNFTState) => void;
   onClearSelection: () => void;
   evolvingIds: Set<number>;
   listingIds: Set<number>;
   tokenBalance: bigint;
-  onEvolve: (nft: BabyNFTState) => Promise<void>;
-  onList: (nft: BabyNFTState, price: number) => Promise<void>;
+  onEvolve: (nft: SparkNFTState) => Promise<void>;
+  onList: (nft: SparkNFTState, price: number) => Promise<void>;
   onMintClick: () => void;
   onRetry: () => void;
   formattedPrice: string;
@@ -239,7 +239,7 @@ export function NFTCollectionView({
                 No NFTs Yet
               </h3>
               <p className="font-pixel-body text-sm text-pixel-text-muted mb-4">
-                Mint your first Genesis Baby to start earning mining boosts!
+                Mint your first Genesis Spark to start earning mining boosts!
               </p>
               <Button onClick={onMintClick} variant="success">
                 Mint Your First Baby

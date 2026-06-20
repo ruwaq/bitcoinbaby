@@ -4,7 +4,7 @@
  * This module provides:
  * - Real astronomical data (moon phases, seasons, eclipses)
  * - Balance system with caps, floors, and diminishing returns
- * - Energy calculations for Genesis Babies
+ * - Energy calculations for Genesis Sparks
  */
 
 // Types (BaseType, Bloodline, Heritage are canonical from ../types)

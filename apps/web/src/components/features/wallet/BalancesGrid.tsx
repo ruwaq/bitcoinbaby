@@ -6,7 +6,7 @@
  * Shows:
  * - BTC balance
  * - $BABY virtual balance
- * - BABTC (Charms) balance
+ * - SPARK (Charms) balance
  * - Mining boost from NFTs
  */
 
@@ -24,7 +24,7 @@ interface BalancesGridProps {
   totalMined: bigint;
   virtualLoading: boolean;
 
-  // BABTC Charms
+  // SPARK Charms
   babtcFormatted: string;
   babtcLoading: boolean;
   babtcError: Error | null;
@@ -110,15 +110,15 @@ export function BalancesGrid({
         </p>
       </div>
 
-      {/* BABTC Token Balance */}
+      {/* SPARK Token Balance */}
       <div className="bg-pixel-bg-dark p-3 sm:p-4 border-2 border-pixel-border">
         <div className="flex items-center justify-between mb-1 gap-1">
           <div className="flex items-center gap-1 min-w-0">
             <label className="font-pixel text-pixel-2xs text-pixel-text-muted truncate">
-              BABTC (CHARMS)
+              SPARK (CHARMS)
             </label>
             <HelpTooltip
-              content="BABTC tokens stored on Bitcoin as Charms. These are $BABY tokens that have been claimed to the blockchain."
+              content="SPARK tokens stored on Bitcoin as Charms. These are $BABY tokens that have been claimed to the blockchain."
               title="On-Chain Tokens"
               size="sm"
             />
@@ -148,7 +148,7 @@ export function BalancesGrid({
               MINING BOOST
             </label>
             <HelpTooltip
-              content="Extra mining rewards from your Genesis Babies NFTs. Higher rarity NFTs provide bigger boosts."
+              content="Extra mining rewards from your Genesis Sparks NFTs. Higher rarity NFTs provide bigger boosts."
               title="NFT Boost"
               size="sm"
             />
@@ -175,7 +175,7 @@ export function BalancesGrid({
         </div>
         {miningBoost === 0 && !boostLoading && (
           <p className="font-pixel text-pixel-2xs text-pixel-text-muted mt-1 truncate">
-            Get Genesis Babies for boost
+            Get Genesis Sparks for boost
           </p>
         )}
       </div>

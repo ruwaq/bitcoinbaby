@@ -83,7 +83,7 @@ export function NFTExplorerView({
           </h3>
         </div>
         <p className="font-pixel-body text-sm text-pixel-text-muted">
-          Browse all Genesis Babies in the collection. View ownership, rarity,
+          Browse all Genesis Sparks in the collection. View ownership, rarity,
           and find NFTs for sale.
         </p>
       </motion.div>
@@ -222,7 +222,7 @@ export function NFTExplorerView({
               filters.rarity !== "all" ||
               filters.forSale !== "all"
                 ? "Try adjusting your filters to see more results."
-                : "No Genesis Babies have been minted yet. Be the first!"}
+                : "No Genesis Sparks have been minted yet. Be the first!"}
             </p>
             {filters.bloodline !== "all" ||
             filters.rarity !== "all" ||

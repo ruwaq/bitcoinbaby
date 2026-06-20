@@ -41,7 +41,7 @@ export {
   type UseGlobalMiningReturn,
 } from "./useGlobalMining";
 
-// Mining with NFT boost hook (global mining + Genesis Babies boost)
+// Mining with NFT boost hook (global mining + Genesis Sparks boost)
 export {
   useMiningWithNFTs,
   type UseMiningWithNFTsOptions,
@@ -76,7 +76,7 @@ export {
   type UseMiningSubmissionReturn,
 } from "./useMiningSubmission";
 
-// NFT minting hook (Genesis Babies operations)
+// NFT minting hook (Genesis Sparks operations)
 export {
   useNFTMinting,
   type UseNFTMintingOptions,

@@ -109,7 +109,7 @@ export interface SpellV9Output {
 }
 
 /**
- * PoW private inputs for BABTC mining
+ * PoW private inputs for SPARK mining
  * These are passed to the contract for validation
  */
 export interface PoWPrivateInputs {
@@ -630,7 +630,7 @@ export interface BatchRecipient {
  * Batch transfer parameters for withdrawal pool
  */
 export interface BatchTransferParams {
-  /** App ID (BABTC token) */
+  /** App ID (SPARK token) */
   appId: string;
   /** Verification key */
   appVk: string;

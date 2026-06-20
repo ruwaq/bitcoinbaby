@@ -435,7 +435,7 @@ function LeaderboardLockedView({ network }: { network: BitcoinNetwork }) {
           </p>
           <p className="font-pixel-body text-xs text-pixel-text-muted leading-relaxed">
             The global rankings and miner leaderboard will unlock in Phase 2 (Mining). 
-            Train your Baby, stack rewards, and prepare to compete with miners worldwide!
+            Train your Spark, stack rewards, and prepare to compete with miners worldwide!
           </p>
         </div>
 

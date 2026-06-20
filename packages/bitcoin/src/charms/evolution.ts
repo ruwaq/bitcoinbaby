@@ -5,7 +5,7 @@
  */
 
 import type { CharmsClient } from "./client";
-import type { BabyNFTState } from "./nft";
+import type { SparkNFTState } from "./nft";
 import {
   canLevelUp,
   calculateXpGain,
@@ -13,7 +13,7 @@ import {
   EVOLUTION_COSTS,
   XP_REQUIREMENTS,
   LEVEL_BOOSTS,
-  GENESIS_BABIES_CONFIG,
+  GENESIS_SPARKS_CONFIG,
   createNFTWorkProofSpell,
   createNFTLevelUpSpell,
 } from "./nft";
@@ -53,7 +53,7 @@ export class EvolutionService {
   async getNFTState(
     address: string,
     tokenId?: number,
-  ): Promise<BabyNFTState | null> {
+  ): Promise<SparkNFTState | null> {
     const nfts = await this.client.getOwnedNFTs(address, this.options.nftAppId);
 
     if (tokenId !== undefined) {
@@ -67,26 +67,26 @@ export class EvolutionService {
   /**
    * Get all owned NFTs
    */
-  async getOwnedNFTs(address: string): Promise<BabyNFTState[]> {
+  async getOwnedNFTs(address: string): Promise<SparkNFTState[]> {
     return this.client.getOwnedNFTs(address, this.options.nftAppId);
   }
 
   /**
    * Get evolution status for an NFT
    */
-  getEvolutionStatus(nft: BabyNFTState): EvolutionStatus {
+  getEvolutionStatus(nft: SparkNFTState): EvolutionStatus {
     const nextLevel = nft.level + 1;
     const canEvolve = canLevelUp(nft);
     const xpRequired = XP_REQUIREMENTS[nextLevel] ?? 0;
     const tokenCost = EVOLUTION_COSTS[nextLevel] ?? 0n;
     const currentBoost = getMiningBoost(nft);
     // nextBoost: use nextLevel boost if below max, otherwise stay at current level boost
-    const isMaxLevel = nft.level >= GENESIS_BABIES_CONFIG.maxLevel;
+    const isMaxLevel = nft.level >= GENESIS_SPARKS_CONFIG.maxLevel;
     const nextLevelBoost = isMaxLevel
       ? (LEVEL_BOOSTS[nft.level] ?? 0)
       : (LEVEL_BOOSTS[nextLevel] ?? LEVEL_BOOSTS[nft.level] ?? 0);
     const rarityBoost =
-      GENESIS_BABIES_CONFIG.rarityTiers[nft.rarityTier]?.boost ?? 0;
+      GENESIS_SPARKS_CONFIG.rarityTiers[nft.rarityTier]?.boost ?? 0;
     const nextBoost = nextLevelBoost + rarityBoost;
 
     return {
@@ -106,14 +106,14 @@ export class EvolutionService {
   /**
    * Calculate XP gain for work completion
    */
-  calculateXpGain(nft: BabyNFTState): number {
+  calculateXpGain(nft: SparkNFTState): number {
     return calculateXpGain(nft);
   }
 
   /**
    * Get mining boost for an NFT
    */
-  getMiningBoost(nft: BabyNFTState): number {
+  getMiningBoost(nft: SparkNFTState): number {
     return getMiningBoost(nft);
   }
 
@@ -139,7 +139,7 @@ export class EvolutionService {
    */
   async createWorkProofSpell(params: {
     nftUtxo: { txid: string; vout: number };
-    currentState: BabyNFTState;
+    currentState: SparkNFTState;
     ownerAddress: string;
     workProofHash: string;
   }): Promise<SpellV2> {
@@ -162,7 +162,7 @@ export class EvolutionService {
   async createLevelUpSpell(params: {
     nftUtxo: { txid: string; vout: number };
     tokenUtxo: { txid: string; vout: number };
-    currentState: BabyNFTState;
+    currentState: SparkNFTState;
     tokenAmount: bigint;
     ownerAddress: string;
   }): Promise<SpellV2> {
@@ -209,7 +209,7 @@ export class EvolutionService {
    */
   async executeWorkProof(params: {
     nftUtxo: { txid: string; vout: number };
-    currentState: BabyNFTState;
+    currentState: SparkNFTState;
     ownerAddress: string;
     workProofHash: string;
     signTransaction: (psbt: string) => Promise<string>;
@@ -256,7 +256,7 @@ export class EvolutionService {
   async executeLevelUp(params: {
     nftUtxo: { txid: string; vout: number };
     tokenUtxo: { txid: string; vout: number };
-    currentState: BabyNFTState;
+    currentState: SparkNFTState;
     tokenAmount: bigint;
     ownerAddress: string;
     signTransaction: (psbt: string) => Promise<string>;

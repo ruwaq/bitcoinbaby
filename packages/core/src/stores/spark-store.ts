@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { Baby, BabyState } from "../types";
+import type { Baby, SparkState } from "../types";
 
 // =============================================================================
 // TYPES
@@ -13,7 +13,7 @@ import type { Baby, BabyState } from "../types";
 export interface PersistedBaby {
   id: string;
   name: string;
-  state: BabyState;
+  state: SparkState;
   level: number;
   experience: number;
   createdAt: number; // timestamp
@@ -23,7 +23,7 @@ export interface PersistedBaby {
 interface BabyStore {
   baby: PersistedBaby | null;
   setBaby: (baby: Baby | PersistedBaby) => void;
-  updateState: (state: BabyState) => void;
+  updateState: (state: SparkState) => void;
   addExperience: (xp: number) => void;
   levelUp: () => void;
   feed: () => void;
@@ -57,7 +57,7 @@ function toBabyPersisted(baby: Baby | PersistedBaby): PersistedBaby {
 // STORE
 // =============================================================================
 
-export const useBabyStore = create<BabyStore>()(
+export const useSparkStore = create<BabyStore>()(
   persist(
     (set) => ({
       baby: null,
@@ -79,7 +79,7 @@ export const useBabyStore = create<BabyStore>()(
                 ...s.baby,
                 experience: newXp - xpToLevel,
                 level: s.baby.level + 1,
-                state: "evolving" as BabyState,
+                state: "evolving" as SparkState,
               },
             };
           }

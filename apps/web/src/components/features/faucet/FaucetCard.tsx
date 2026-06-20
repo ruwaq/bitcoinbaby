@@ -1,16 +1,16 @@
 "use client";
 
 /**
- * FaucetCard - BABTC Faucet UI Component
+ * FaucetCard - SPARK Faucet UI Component
  *
  * Shows the faucet claim button with cooldown countdown, maxed state,
  * and error handling. Only rendered when phaseConfig.features.babtcFaucet is true.
  *
  * States:
- * - idle: "CLAIM 5 BABTC" button
+ * - idle: "CLAIM 5 SPARK" button
  * - claiming: Loading spinner
  * - cooldown: Countdown timer
- * - maxed: "Max claims reached (50 BABTC)"
+ * - maxed: "Max claims reached (50 SPARK)"
  * - error: Error message with retry button
  */
 
@@ -54,14 +54,14 @@ export const FaucetCard: FC<FaucetCardProps> = ({ address }) => {
       <div className="bg-pixel-bg-dark p-4 border-2 border-pixel-border">
         <div className="flex items-center justify-between mb-2">
           <label className="font-pixel text-pixel-2xs text-pixel-text-muted">
-            BABTC FAUCET
+            SPARK FAUCET
           </label>
           <span className="font-pixel text-pixel-2xs text-pixel-accent">
             MAXED
           </span>
         </div>
         <p className="font-pixel text-pixel-xs text-pixel-text-muted text-center py-2">
-          Max claims reached ({faucet.totalClaimed} BABTC)
+          Max claims reached ({faucet.totalClaimed} SPARK)
         </p>
       </div>
     );
@@ -73,7 +73,7 @@ export const FaucetCard: FC<FaucetCardProps> = ({ address }) => {
       <div className="bg-pixel-bg-dark p-4 border-2 border-pixel-error">
         <div className="flex items-center justify-between mb-2">
           <label className="font-pixel text-pixel-2xs text-pixel-text-muted">
-            BABTC FAUCET
+            SPARK FAUCET
           </label>
           <button
             onClick={faucet.reset}
@@ -95,7 +95,7 @@ export const FaucetCard: FC<FaucetCardProps> = ({ address }) => {
     return (
       <div className="bg-pixel-bg-dark p-4 border-2 border-pixel-border">
         <label className="font-pixel text-pixel-2xs text-pixel-text-muted block mb-2">
-          BABTC FAUCET
+          SPARK FAUCET
         </label>
         <div className="flex items-center justify-center py-2">
           <div className="animate-spin h-5 w-5 border-2 border-pixel-primary border-t-transparent" />
@@ -113,10 +113,10 @@ export const FaucetCard: FC<FaucetCardProps> = ({ address }) => {
       <div className="bg-pixel-bg-dark p-4 border-2 border-pixel-border">
         <div className="flex items-center justify-between mb-2">
           <label className="font-pixel text-pixel-2xs text-pixel-text-muted">
-            BABTC FAUCET
+            SPARK FAUCET
           </label>
           <span className="font-pixel text-pixel-2xs text-pixel-text-muted">
-            {faucet.totalClaimed}/{50} BABTC
+            {faucet.totalClaimed}/{50} SPARK
           </span>
         </div>
         <div className="text-center py-2">
@@ -136,10 +136,10 @@ export const FaucetCard: FC<FaucetCardProps> = ({ address }) => {
     <div className="bg-pixel-bg-dark p-4 border-2 border-pixel-border">
       <div className="flex items-center justify-between mb-2">
         <label className="font-pixel text-pixel-2xs text-pixel-text-muted">
-          BABTC FAUCET
+          SPARK FAUCET
         </label>
         <span className="font-pixel text-pixel-2xs text-pixel-text-muted">
-          {faucet.totalClaimed}/{50} BABTC
+          {faucet.totalClaimed}/{50} SPARK
         </span>
       </div>
       <button
@@ -148,10 +148,10 @@ export const FaucetCard: FC<FaucetCardProps> = ({ address }) => {
         type="button"
         disabled={faucet.isLoading}
       >
-        CLAIM 5 BABTC
+        CLAIM 5 SPARK
       </button>
       <p className="font-pixel text-pixel-2xs text-pixel-text-muted text-center mt-2">
-        5 BABTC per day &middot; Use to evolve NFTs
+        5 SPARK per day &middot; Use to evolve NFTs
       </p>
     </div>
   );

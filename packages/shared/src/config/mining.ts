@@ -13,7 +13,7 @@
 // =============================================================================
 
 /**
- * Minimum mining difficulty (D16 to match BABTC contract)
+ * Minimum mining difficulty (D16 to match SPARK contract)
  *
  * D16 means the hash must have 16 leading zero bits.
  * Expected hashes to find share: 2^16 = 65,536

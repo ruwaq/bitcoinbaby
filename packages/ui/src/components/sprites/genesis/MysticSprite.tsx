@@ -1,5 +1,5 @@
 /**
- * Mystic Baby Sprite - DUAL NATURE: Traditional + Ethereal
+ * Mystic Spark Sprite - DUAL NATURE: Traditional + Ethereal
  *
  * Seres mágicos que canalizan energía ancestral.
  * +30% XP, -20% hashrate. Fuertes en eclipses.

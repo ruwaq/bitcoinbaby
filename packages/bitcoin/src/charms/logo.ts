@@ -6,11 +6,11 @@
  */
 
 // =============================================================================
-// BABTC TOKEN LOGO
+// SPARK TOKEN LOGO
 // =============================================================================
 
 /**
- * $BABTC Token Logo - 32x32 pixel art
+ * $SPARK Token Logo - 32x32 pixel art
  *
  * Design: Baby face with Bitcoin orange theme
  * - Orange background gradient
@@ -19,7 +19,7 @@
  *
  * Generated as base64 PNG for Charms metadata.
  */
-export const BABTC_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+export const SPARK_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
   <!-- Background - Bitcoin Orange Circle -->
   <circle cx="16" cy="16" r="15" fill="#f7931a"/>
   <circle cx="16" cy="16" r="13" fill="#ffb84d"/>
@@ -48,9 +48,9 @@ export const BABTC_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="
 </svg>`;
 
 /**
- * Genesis Babies Collection Logo
+ * Genesis Sparks Collection Logo
  */
-export const GENESIS_BABIES_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+export const GENESIS_SPARKS_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
   <!-- Background - Dark space -->
   <rect width="32" height="32" fill="#0f0f1b"/>
 
@@ -91,17 +91,17 @@ export function svgToBase64DataUri(svg: string): string {
 }
 
 /**
- * Get BABTC token logo as base64 data URI
+ * Get SPARK token logo as base64 data URI
  */
-export function getBABTCLogoDataUri(): string {
-  return svgToBase64DataUri(BABTC_LOGO_SVG);
+export function getSPARKLogoDataUri(): string {
+  return svgToBase64DataUri(SPARK_LOGO_SVG);
 }
 
 /**
- * Get Genesis Babies collection logo as base64 data URI
+ * Get Genesis Sparks collection logo as base64 data URI
  */
 export function getGenesisBabiesLogoDataUri(): string {
-  return svgToBase64DataUri(GENESIS_BABIES_LOGO_SVG);
+  return svgToBase64DataUri(GENESIS_SPARKS_LOGO_SVG);
 }
 
 // =============================================================================
@@ -109,13 +109,13 @@ export function getGenesisBabiesLogoDataUri(): string {
 // =============================================================================
 
 /**
- * Pre-computed base64 of BABTC logo SVG
+ * Pre-computed base64 of SPARK logo SVG
  * Use this for server-side/build-time embedding
  */
-export const BABTC_LOGO_BASE64 =
+export const SPARK_LOGO_BASE64 =
   "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiIgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIj48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxNSIgZmlsbD0iI2Y3OTMxYSIvPjxjaXJjbGUgY3g9IjE2IiBjeT0iMTYiIHI9IjEzIiBmaWxsPSIjZmZiODRkIi8+PGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMTAiIGZpbGw9IiNmZmU0YzQiLz48Y2lyY2xlIGN4PSIxMiIgY3k9IjE0IiByPSIyIiBmaWxsPSIjMWExYTJlIi8+PGNpcmNsZSBjeD0iMjAiIGN5PSIxNCIgcj0iMiIgZmlsbD0iIzFhMWEyZSIvPjxjaXJjbGUgY3g9IjExLjUiIGN5PSIxMy41IiByPSIwLjYiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSIxOS41IiBjeT0iMTMuNSIgcj0iMC42IiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTEyIDE5IFExNiAyMiAyMCAxOSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOGI1YTJiIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjkiIGN5PSIxNyIgcj0iMS41IiBmaWxsPSIjZmZiNmMxIiBvcGFjaXR5PSIwLjUiLz48Y2lyY2xlIGN4PSIyMyIgY3k9IjE3IiByPSIxLjUiIGZpbGw9IiNmZmI2YzEiIG9wYWNpdHk9IjAuNSIvPjx0ZXh0IHg9IjE2IiB5PSIyOCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjYiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjZjc5MzFhIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5CPC90ZXh0PjxjaXJjbGUgY3g9IjE2IiBjeT0iMTYiIHI9IjE1IiBmaWxsPSJub25lIiBzdHJva2U9IiNjNjczMDciIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPg==";
 
 /**
- * Full data URI for BABTC logo (ready to use in metadata)
+ * Full data URI for SPARK logo (ready to use in metadata)
  */
-export const BABTC_LOGO_DATA_URI = `data:image/svg+xml;base64,${BABTC_LOGO_BASE64}`;
+export const SPARK_LOGO_DATA_URI = `data:image/svg+xml;base64,${SPARK_LOGO_BASE64}`;

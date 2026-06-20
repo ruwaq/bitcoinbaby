@@ -25,9 +25,9 @@ import { useSearchParams, useRouter } from "next/navigation";
 async function resetAllData() {
   // Clear localStorage keys
   const keysToRemove = [
-    "bitcoinbaby-nft-store",
+    "bitcoinbaby-spark-store",
     "bitcoinbaby-mining-store",
-    "bitcoinbaby-baby-store",
+    "bitcoinbaby-spark-store",
     "bitcoinbaby-wallet-store",
     "bitcoinbaby-network",
     "bitcoinbaby-settings",
@@ -60,7 +60,7 @@ import { getPhaseConfig, type TabType } from "@bitcoinbaby/shared";
 import {
   usePendingTxStore,
   useNarrativeStore,
-  useBabyStore,
+  useSparkStore,
 } from "@bitcoinbaby/core";
 import {
   OnboardingTour,
@@ -254,7 +254,7 @@ function AppShellInner() {
   const pendingTxCount = usePendingTxStore(
     (s) => s.transactions.filter((tx) => tx.status === "pending").length,
   );
-  const babyExists = useBabyStore((s) => s.baby !== null);
+  const babyExists = useSparkStore((s) => s.baby !== null);
   const narrativeEventCount = useNarrativeStore((s) => {
     if (!s.activeTokenId) return 0;
     const st = s.states[s.activeTokenId];

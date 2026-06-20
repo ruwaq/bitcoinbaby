@@ -1,7 +1,7 @@
 /**
- * BABTC Balance Utilities
+ * SPARK Balance Utilities
  *
- * High-level utilities for querying BABTC token balances.
+ * High-level utilities for querying SPARK token balances.
  * Combines Scrolls API data with pending mining rewards.
  *
  * Updated for Charms Protocol v10 (January 2026)
@@ -10,16 +10,16 @@
 import { ScrollsClient } from "../scrolls/client";
 import { MempoolClient } from "../blockchain/mempool";
 import type { ScrollsNetwork } from "../scrolls/types";
-import { BABTC_CONFIG, formatTokenAmount } from "./token";
+import { SPARK_CONFIG, formatTokenAmount } from "./token";
 
 // =============================================================================
 // TYPES
 // =============================================================================
 
 /**
- * Complete BABTC balance for an address
+ * Complete SPARK balance for an address
  */
-export interface BABTCBalance {
+export interface SPARKBalance {
   /** Raw balance in base units (8 decimals) */
   confirmed: bigint;
   /** Pending rewards from unconfirmed mining transactions */
@@ -30,7 +30,7 @@ export interface BABTCBalance {
   formattedConfirmed: string;
   /** Formatted total balance */
   formattedTotal: string;
-  /** Number of UTXOs holding BABTC */
+  /** Number of UTXOs holding SPARK */
   utxoCount: number;
   /** Block height at query time */
   blockHeight: number;
@@ -57,11 +57,11 @@ export interface BalanceQueryOptions {
 // =============================================================================
 
 /**
- * BABTC Balance Service
+ * SPARK Balance Service
  *
- * Provides methods for querying BABTC token balances across networks.
+ * Provides methods for querying SPARK token balances across networks.
  */
-export class BABTCBalanceService {
+export class SPARKBalanceService {
   private scrollsClient: ScrollsClient;
   private mempoolClient: MempoolClient;
   private network: ScrollsNetwork;
@@ -84,23 +84,23 @@ export class BABTCBalanceService {
   }
 
   /**
-   * Get BABTC balance for an address
+   * Get SPARK balance for an address
    */
   async getBalance(
     address: string,
     options: BalanceQueryOptions = {},
-  ): Promise<BABTCBalance> {
+  ): Promise<SPARKBalance> {
     const { includePending = true } = options;
 
     // Query confirmed balance from Scrolls
     const tokenBalances = await this.scrollsClient.getTokenBalances(
       address,
-      BABTC_CONFIG.ticker,
+      SPARK_CONFIG.ticker,
     );
 
-    // Find BABTC balance
+    // Find SPARK balance
     const babtcBalance = tokenBalances.balances.find(
-      (b) => b.ticker === BABTC_CONFIG.ticker,
+      (b) => b.ticker === SPARK_CONFIG.ticker,
     );
 
     const confirmed = babtcBalance?.amount ?? 0n;
@@ -158,8 +158,8 @@ export class BABTCBalanceService {
   async getBalances(
     addresses: string[],
     options: BalanceQueryOptions = {},
-  ): Promise<Map<string, BABTCBalance>> {
-    const results = new Map<string, BABTCBalance>();
+  ): Promise<Map<string, SPARKBalance>> {
+    const results = new Map<string, SPARKBalance>();
 
     // Query in parallel with concurrency limit
     const batchSize = 5;
@@ -178,7 +178,7 @@ export class BABTCBalanceService {
   }
 
   /**
-   * Check if an address has any BABTC
+   * Check if an address has any SPARK
    */
   async hasBalance(address: string): Promise<boolean> {
     const balance = await this.getBalance(address, { includePending: false });
@@ -198,30 +198,30 @@ export class BABTCBalanceService {
 // =============================================================================
 
 /**
- * Create a BABTC balance service
+ * Create a SPARK balance service
  */
-export function createBABTCBalanceService(
+export function createSPARKBalanceService(
   network: ScrollsNetwork = "testnet4",
   options: BalanceQueryOptions = {},
-): BABTCBalanceService {
-  return new BABTCBalanceService(network, options);
+): SPARKBalanceService {
+  return new SPARKBalanceService(network, options);
 }
 
 /**
  * Quick balance check for a single address
  */
-export async function getBABTCBalance(
+export async function getSPARKBalance(
   address: string,
   network: ScrollsNetwork = "testnet4",
-): Promise<BABTCBalance> {
-  const service = createBABTCBalanceService(network);
+): Promise<SPARKBalance> {
+  const service = createSPARKBalanceService(network);
   return service.getBalance(address);
 }
 
 /**
  * Format balance for display
  */
-export function formatBABTCBalance(balance: BABTCBalance): string {
+export function formatSPARKBalance(balance: SPARKBalance): string {
   if (balance.pending > 0n) {
     return `${balance.formattedConfirmed} (+${formatTokenAmount(balance.pending)} pending)`;
   }
@@ -232,7 +232,7 @@ export function formatBABTCBalance(balance: BABTCBalance): string {
  * Check if balance is sufficient for a transfer
  */
 export function hasSufficientBalance(
-  balance: BABTCBalance,
+  balance: SPARKBalance,
   amount: bigint,
   options: { includePending?: boolean } = {},
 ): boolean {

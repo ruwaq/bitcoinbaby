@@ -1,13 +1,13 @@
 /**
  * Testnet4 Configuration
  *
- * Configuration for BABTC deployment on Bitcoin testnet4.
- * Update these values after deploying the BABTC contract.
+ * Configuration for SPARK deployment on Bitcoin testnet4.
+ * Update these values after deploying the SPARK contract.
  *
  * Deployment Steps:
  * 1. Build the Rust contract: packages/bitcoin/contracts/babtc/BUILD.md
  * 2. Deploy to testnet4 using Charms CLI
- * 3. Update BABTC_APP_ID and BABTC_APP_VK below
+ * 3. Update SPARK_APP_ID and SPARK_APP_VK below
  * 4. Run E2E tests to verify
  */
 
@@ -42,23 +42,23 @@ export const TESTNET4_ENDPOINTS = {
 } as const;
 
 // =============================================================================
-// BABTC DEPLOYMENT CONFIG
+// SPARK DEPLOYMENT CONFIG
 // =============================================================================
 
 /**
- * BABTC App Configuration
+ * SPARK App Configuration
  *
  * STATUS: DEPLOYED on testnet4 (2026-02-18)
  * Genesis UTXO: b3deba0743aeffd0e455ce442b1693107090341381e3d8bcc5f586667c3e8a81:0
  */
-export const BABTC_TESTNET4 = {
+export const SPARK_TESTNET4 = {
   /**
    * App ID - SHA256 hash of the genesis UTXO
    * Deployed and verified on testnet4
    */
   appId:
-    process.env.NEXT_PUBLIC_BABTC_APP_ID ||
-    process.env.BABTC_APP_ID ||
+    process.env.NEXT_PUBLIC_SPARK_APP_ID ||
+    process.env.SPARK_APP_ID ||
     "87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681b",
 
   /**
@@ -67,12 +67,12 @@ export const BABTC_TESTNET4 = {
    * Updated: 2026-03-05 (synced with deployment.ts)
    */
   appVk:
-    process.env.NEXT_PUBLIC_BABTC_APP_VK ||
-    process.env.BABTC_APP_VK ||
+    process.env.NEXT_PUBLIC_SPARK_APP_VK ||
+    process.env.SPARK_APP_VK ||
     "acf2ec0b7245eb9c3371ef4e67eb1ca3f85d712b1aeca438a6a6d1898392179d",
 
   /** Token ticker */
-  ticker: "BABTC",
+  ticker: "SPARK",
 
   /** Token name */
   name: "BitcoinBaby",
@@ -89,34 +89,34 @@ export const BABTC_TESTNET4 = {
 } as const;
 
 /**
- * Check if BABTC is properly configured for deployment
+ * Check if SPARK is properly configured for deployment
  */
-export function isBABTCConfigured(): boolean {
+export function isSPARKConfigured(): boolean {
   return (
-    !BABTC_TESTNET4.appId.startsWith("PLACEHOLDER") &&
-    !BABTC_TESTNET4.appVk.startsWith("PLACEHOLDER")
+    !SPARK_TESTNET4.appId.startsWith("PLACEHOLDER") &&
+    !SPARK_TESTNET4.appVk.startsWith("PLACEHOLDER")
   );
 }
 
 /**
- * Validate BABTC configuration
+ * Validate SPARK configuration
  * Throws error if not properly configured
  */
-export function requireBABTCConfigured(): void {
-  if (!isBABTCConfigured()) {
+export function requireSPARKConfigured(): void {
+  if (!isSPARKConfigured()) {
     throw new Error(
-      "BABTC not configured for testnet4. " +
-        "Please deploy the contract and set BABTC_APP_ID and BABTC_APP_VK environment variables. " +
+      "SPARK not configured for testnet4. " +
+        "Please deploy the contract and set SPARK_APP_ID and SPARK_APP_VK environment variables. " +
         "See packages/bitcoin/contracts/babtc/BUILD.md for instructions.",
     );
   }
 
   // Validate format
-  if (BABTC_TESTNET4.appId.length !== 64) {
-    throw new Error(`Invalid BABTC_APP_ID length: expected 64 hex chars`);
+  if (SPARK_TESTNET4.appId.length !== 64) {
+    throw new Error(`Invalid SPARK_APP_ID length: expected 64 hex chars`);
   }
-  if (BABTC_TESTNET4.appVk.length !== 64) {
-    throw new Error(`Invalid BABTC_APP_VK length: expected 64 hex chars`);
+  if (SPARK_TESTNET4.appVk.length !== 64) {
+    throw new Error(`Invalid SPARK_APP_VK length: expected 64 hex chars`);
   }
 }
 
@@ -125,12 +125,12 @@ export function requireBABTCConfigured(): void {
 // =============================================================================
 
 /**
- * Genesis Babies NFT App Configuration
+ * Genesis Sparks NFT App Configuration
  *
  * NFT collection for BitcoinBaby with mining boosts.
- * Separate from BABTC token - uses 'n' app type instead of 't'.
+ * Separate from SPARK token - uses 'n' app type instead of 't'.
  */
-export const GENESIS_BABIES_TESTNET4 = {
+export const GENESIS_SPARKS_TESTNET4 = {
   /**
    * App ID - SHA256 hash of "genesis-babies-testnet4-v1"
    * Deterministic ID for NFT collection on testnet4
@@ -152,7 +152,7 @@ export const GENESIS_BABIES_TESTNET4 = {
     "2e455d2692d118528f5aefd4a32b37ab32de8fb90a8a385f198f0a1da7a43754",
 
   /** Collection name */
-  name: "Genesis Babies",
+  name: "Genesis Sparks",
 
   /** Collection symbol */
   symbol: "GBABY",
@@ -169,16 +169,16 @@ export const GENESIS_BABIES_TESTNET4 = {
 } as const;
 
 /**
- * Mainnet Genesis Babies NFT App Configuration
+ * Mainnet Genesis Sparks NFT App Configuration
  *
  * STATUS: NOT DEPLOYED
  * WARNING: Deploy to mainnet only after thorough testnet4 testing
  */
-export const GENESIS_BABIES_MAINNET = {
+export const GENESIS_SPARKS_MAINNET = {
   network: "mainnet" as const,
   appId: "not_deployed",
   appVk: "not_deployed",
-  name: "Genesis Babies",
+  name: "Genesis Sparks",
   symbol: "GBABY",
   maxSupply: 10_000,
   priceSats: 50_000n,
@@ -187,15 +187,15 @@ export const GENESIS_BABIES_MAINNET = {
 } as const;
 
 /**
- * Regtest Genesis Babies NFT App Configuration
+ * Regtest Genesis Sparks NFT App Configuration
  *
  * STATUS: DEPLOYED locally for development.
  */
-export const GENESIS_BABIES_REGTEST = {
+export const GENESIS_SPARKS_REGTEST = {
   network: "regtest" as const,
   appId: "6ce41e63fa9a1029e934fd0113e322c292c9de31a4cb10f03f07e0bfc0c6c2cf",
   appVk: "2e455d2692d118528f5aefd4a32b37ab32de8fb90a8a385f198f0a1da7a43754",
-  name: "Genesis Babies",
+  name: "Genesis Sparks",
   symbol: "GBABY",
   maxSupply: 10_000,
   priceSats: 50_000n,
@@ -204,23 +204,23 @@ export const GENESIS_BABIES_REGTEST = {
 } as const;
 
 /**
- * Get Genesis Babies config for a network
+ * Get Genesis Sparks config for a network
  */
 export function getGenesisBabiesConfig(
   network: SupportedNetwork = "testnet4",
 ) {
-  if (network === "mainnet") return GENESIS_BABIES_MAINNET;
-  if (network === "regtest") return GENESIS_BABIES_REGTEST;
-  return GENESIS_BABIES_TESTNET4;
+  if (network === "mainnet") return GENESIS_SPARKS_MAINNET;
+  if (network === "regtest") return GENESIS_SPARKS_REGTEST;
+  return GENESIS_SPARKS_TESTNET4;
 }
 
 /**
- * Check if Genesis Babies NFT is configured
+ * Check if Genesis Sparks NFT is configured
  */
 export function isGenesisBabiesConfigured(): boolean {
   return (
-    GENESIS_BABIES_TESTNET4.appId.length === 64 &&
-    GENESIS_BABIES_TESTNET4.appVk.length === 64
+    GENESIS_SPARKS_TESTNET4.appId.length === 64 &&
+    GENESIS_SPARKS_TESTNET4.appVk.length === 64
   );
 }
 
@@ -276,19 +276,19 @@ export function getDeploymentStatus(): {
   appVk: string;
   message: string;
 } {
-  const configured = isBABTCConfigured();
+  const configured = isSPARKConfigured();
 
   return {
     configured,
     network: "testnet4",
     appId: configured
-      ? BABTC_TESTNET4.appId.substring(0, 16) + "..."
+      ? SPARK_TESTNET4.appId.substring(0, 16) + "..."
       : "Not configured",
     appVk: configured
-      ? BABTC_TESTNET4.appVk.substring(0, 16) + "..."
+      ? SPARK_TESTNET4.appVk.substring(0, 16) + "..."
       : "Not configured",
     message: configured
-      ? "BABTC contract deployed and ready"
-      : "Deploy BABTC contract to testnet4 to enable mining. See BUILD.md for instructions.",
+      ? "SPARK contract deployed and ready"
+      : "Deploy SPARK contract to testnet4 to enable mining. See BUILD.md for instructions.",
   };
 }

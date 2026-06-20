@@ -44,7 +44,7 @@ export function WalletActions({
           variant="success"
           className="w-full"
           onClick={() => onViewChange?.("claim")}
-          aria-label="Claim BABTC tokens"
+          aria-label="Claim SPARK tokens"
         >
           CLAIM
         </Button>

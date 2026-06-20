@@ -1,5 +1,5 @@
 /**
- * Genesis Baby Sprite - Generador de NFTs combinados
+ * Genesis Spark Sprite - Generador de NFTs combinados
  *
  * Componente principal que combina:
  * - Base Type (Human, Robot, Mystic, Alien, Rune)

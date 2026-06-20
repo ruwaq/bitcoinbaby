@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * TokenSection - Seccion principal del token $BABTC
+ * TokenSection - Seccion principal del token $SPARK
  *
  * Muestra toda la informacion sobre el token:
  * - Header con logo, nombre, badges

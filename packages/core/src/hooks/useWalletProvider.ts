@@ -180,7 +180,7 @@ export function useWalletProvider(): UseWalletProviderReturn {
           address: connectedAccount.address,
           publicKey: connectedAccount.publicKey,
           balance: 0n, // Will be updated by balance hook
-          babyTokens: 0n, // Will be updated by token balance hook
+          sparkTokens: 0n, // Will be updated by token balance hook
         });
 
         // Set up signing functions in store for components like useMintNFT

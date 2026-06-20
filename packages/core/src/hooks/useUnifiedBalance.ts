@@ -21,7 +21,7 @@ import { useBalance } from "./use-api";
 export interface UnifiedBalanceOptions {
   /** User's Bitcoin address */
   address: string | null;
-  /** Token app ID for Charms (default: BABY_TOKEN_APP_ID) */
+  /** Token app ID for Charms (default: SPARK_TOKEN_APP_ID) */
   tokenAppId?: string;
   /** Auto-refresh interval in ms (0 to disable) */
   refreshInterval?: number;
@@ -90,7 +90,7 @@ export interface UseUnifiedBalanceReturn {
 // CONSTANTS
 // =============================================================================
 
-const BABY_TOKEN_APP_ID = "baby"; // Default token app ID
+const SPARK_TOKEN_APP_ID = "baby"; // Default token app ID
 const SATS_PER_BTC = 100_000_000;
 const TOKEN_DECIMALS = 8;
 
@@ -134,7 +134,7 @@ function formatTokens(amount: bigint): string {
 export function useUnifiedBalance(
   options: UnifiedBalanceOptions,
 ): UseUnifiedBalanceReturn {
-  const { address, tokenAppId = BABY_TOKEN_APP_ID } = options;
+  const { address, tokenAppId = SPARK_TOKEN_APP_ID } = options;
 
   // Fetch individual balances
   const btcBalance = useBTCBalance(address);

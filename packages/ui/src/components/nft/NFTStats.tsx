@@ -4,11 +4,11 @@
 
 import { type FC, useMemo } from "react";
 import { clsx } from "clsx";
-import type { BabyNFTState, RarityTier } from "./types";
+import type { SparkNFTState, RarityTier } from "./types";
 import { getMiningBoost, MAX_LEVEL } from "./types";
 
 export interface NFTStatsProps {
-  nfts: BabyNFTState[];
+  nfts: SparkNFTState[];
   showRarityBreakdown?: boolean;
   isLoading?: boolean;
   className?: string;
@@ -25,7 +25,7 @@ interface CollectionStats {
   rarityDist: Record<RarityTier, number>;
 }
 
-function computeStats(nfts: BabyNFTState[]): CollectionStats {
+function computeStats(nfts: SparkNFTState[]): CollectionStats {
   const empty: CollectionStats = {
     total: 0,
     bestBoost: 0,

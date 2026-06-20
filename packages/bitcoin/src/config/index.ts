@@ -7,13 +7,13 @@
 export {
   // Endpoints
   TESTNET4_ENDPOINTS,
-  // BABTC Config
-  BABTC_TESTNET4,
-  isBABTCConfigured,
-  requireBABTCConfigured,
-  // Genesis Babies NFT Config
-  GENESIS_BABIES_TESTNET4,
-  GENESIS_BABIES_MAINNET,
+  // SPARK Config
+  SPARK_TESTNET4,
+  isSPARKConfigured,
+  requireSPARKConfigured,
+  // Genesis Sparks NFT Config
+  GENESIS_SPARKS_TESTNET4,
+  GENESIS_SPARKS_MAINNET,
   getGenesisBabiesConfig,
   isGenesisBabiesConfigured,
   // Mining Config
@@ -28,8 +28,8 @@ export {
 export {
   // Deployment Config
   type DeploymentConfig,
-  BABTC_TESTNET4 as BABTC_DEPLOY_CONFIG,
-  BABTC_MAINNET as BABTC_DEPLOY_MAINNET,
+  SPARK_TESTNET4 as SPARK_DEPLOY_CONFIG,
+  SPARK_MAINNET as SPARK_DEPLOY_MAINNET,
   getDeploymentConfig,
   isDeploymentReady,
   validateDeployment,

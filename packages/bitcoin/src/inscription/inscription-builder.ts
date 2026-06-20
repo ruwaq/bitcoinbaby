@@ -1,5 +1,5 @@
 /**
- * Bitcoin Inscription Builder for Genesis Babies
+ * Bitcoin Inscription Builder for Genesis Sparks
  *
  * Creates ordinal inscriptions for:
  * 1. Sprite Library (one-time, ~$15-50)
@@ -18,7 +18,7 @@ import {
 } from "./onchain-renderer";
 import {
   generateLibraryInscription,
-  GENESIS_BABIES_LIBRARY,
+  GENESIS_SPARKS_LIBRARY,
 } from "./sprite-library";
 
 // =============================================================================
@@ -280,7 +280,7 @@ export function compressBrotli(content: Uint8Array): Uint8Array {
 }
 
 /**
- * Generate complete inscription plan for Genesis Babies
+ * Generate complete inscription plan for Genesis Sparks
  */
 export function generateInscriptionPlan(options: {
   feeRate: number;
@@ -293,7 +293,7 @@ export function generateInscriptionPlan(options: {
   let totalFee = 0;
 
   // 1. Sprite Library
-  const libraryData = generateLibraryInscription(GENESIS_BABIES_LIBRARY);
+  const libraryData = generateLibraryInscription(GENESIS_SPARKS_LIBRARY);
   const libraryBytes = new TextEncoder().encode(libraryData.content);
   
   // Try Brotli compression
@@ -303,7 +303,7 @@ export function generateInscriptionPlan(options: {
   const libraryFee = estimateInscriptionFee(finalLibraryBytes.length, feeRate);
 
   inscriptions.push({
-    name: "Genesis Babies Sprite Library",
+    name: "Genesis Sparks Sprite Library",
     type: "library",
     data: {
       contentType: libraryData.contentType,
@@ -329,7 +329,7 @@ export function generateInscriptionPlan(options: {
   const rendererFee = estimateInscriptionFee(finalRendererBytes.length, feeRate);
 
   inscriptions.push({
-    name: "Genesis Babies Renderer",
+    name: "Genesis Sparks Renderer",
     type: "renderer",
     data: {
       contentType: rendererData.contentType,
@@ -483,7 +483,7 @@ export function buildRevealTransaction(
 // =============================================================================
 
 /**
- * Inscription order for Genesis Babies deployment
+ * Inscription order for Genesis Sparks deployment
  */
 export const INSCRIPTION_ORDER = [
   { step: 1, type: "library", description: "Inscribe sprite library (~15KB)" },

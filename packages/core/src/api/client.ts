@@ -883,7 +883,7 @@ export class BitcoinBabyClient {
   }
 
   /**
-   * Request virtual NFT evolution (Phase 1 — debits virtual BABTC)
+   * Request virtual NFT evolution (Phase 1 — debits virtual SPARK)
    *
    * Server-side evolution that deducts virtual BALANCE without requiring
    * an on-chain transaction. Returns updated NFT state.

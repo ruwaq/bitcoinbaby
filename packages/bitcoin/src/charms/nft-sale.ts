@@ -1,12 +1,12 @@
 /**
  * NFT Sale System
  *
- * Simple NFT sales for Genesis Babies.
+ * Simple NFT sales for Genesis Sparks.
  * Price: FIXED in Bitcoin (50,000 sats)
  * All funds go to single treasury wallet.
  */
 
-import { GENESIS_BABIES_CONFIG, type RarityTier } from "./nft";
+import { GENESIS_SPARKS_CONFIG, type RarityTier } from "./nft";
 import { NFT_TREASURY_TESTNET4 } from "../config/treasury";
 
 // =============================================================================
@@ -27,7 +27,7 @@ export const NFT_SALE_CONFIG = {
   dustLimit: 546n,
 
   /** Max supply */
-  maxSupply: GENESIS_BABIES_CONFIG.maxSupply,
+  maxSupply: GENESIS_SPARKS_CONFIG.maxSupply,
 } as const;
 
 // Treasury address (can be overridden at runtime)
@@ -228,4 +228,4 @@ export function calculateSalesStats(sales: NFTSaleRecord[]): SalesStats {
   };
 }
 
-export { GENESIS_BABIES_CONFIG };
+export { GENESIS_SPARKS_CONFIG };

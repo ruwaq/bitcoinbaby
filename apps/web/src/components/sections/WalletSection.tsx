@@ -198,7 +198,7 @@ export function WalletSection() {
                     boostLoading={balances.nftBoost.loading}
                   />
 
-                  {/* Faucet (Phase 1 — BABTC for NFT evolution) */}
+                  {/* Faucet (Phase 1 — SPARK for NFT evolution) */}
                   {getPhaseConfig().features.babtcFaucet && (
                     <FaucetCard address={wallet.address} />
                   )}
@@ -236,7 +236,7 @@ export function WalletSection() {
                       CLAIM TOKENS
                     </h2>
                     <p className="font-pixel-body text-xs text-pixel-text-muted mt-1">
-                      Convert mining work to $BABTC
+                      Convert mining work to $SPARK
                     </p>
                   </div>
                   <button
@@ -277,7 +277,7 @@ export function WalletSection() {
                     <li className="flex items-start gap-2">
                       <span className="text-pixel-success">4.</span>
                       <span>
-                        After confirmation, your $BABTC tokens are minted on
+                        After confirmation, your $SPARK tokens are minted on
                         Bitcoin
                       </span>
                     </li>

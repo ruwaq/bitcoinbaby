@@ -60,7 +60,7 @@ export function NFTMarketplaceView({
           NFT Marketplace
         </h3>
         <p className="font-pixel-body text-sm text-pixel-text-muted">
-          Buy and sell Genesis Babies with other players. All transactions are
+          Buy and sell Genesis Sparks with other players. All transactions are
           recorded on-chain.
         </p>
       </motion.div>
@@ -163,7 +163,7 @@ export function NFTMarketplaceView({
               No Listings Yet
             </h3>
             <p className="font-pixel-body text-sm text-pixel-text-muted mb-4">
-              Be the first to list your Genesis Baby for sale!
+              Be the first to list your Genesis Spark for sale!
             </p>
             <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
               <Button onClick={onGoToCollection} variant="warning">

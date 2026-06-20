@@ -54,8 +54,8 @@ export interface WalletInfoWithBalance extends WalletInfo {
   /** On-chain balance in satoshis */
   balance: bigint;
 
-  /** BABTC token balance */
-  babyTokens: bigint;
+  /** SPARK token balance */
+  sparkTokens: bigint;
 }
 
 // =============================================================================

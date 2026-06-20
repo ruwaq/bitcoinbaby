@@ -57,15 +57,15 @@ const STEPS: Step[] = [
     title: "3. Start Mining ⛏️",
     icon: "⛏️",
     description:
-      "Mining earns you $BABY tokens AND trains AI models. Your computer runs a local Gemma 4 model — every inference helps the Genesis Baby learn. Mining also gives your baby XP to level up!",
+      "Mining earns you $BABY tokens AND trains AI models. Your computer runs a local Gemma 4 model — every inference helps the Genesis Spark learn. Mining also gives your baby XP to level up!",
     action: { label: "Go to Mining", tab: "mining" },
   },
   {
     id: "nfts",
-    title: "4. Mint Genesis Babies NFTs 🎨",
+    title: "4. Mint Genesis Sparks NFTs 🎨",
     icon: "🎨",
     description:
-      "With $BABY tokens earned from mining, mint Genesis Babies NFTs! These boost your mining rewards. Higher rarity = bigger boost. Trade them on the marketplace!",
+      "With $BABY tokens earned from mining, mint Genesis Sparks NFTs! These boost your mining rewards. Higher rarity = bigger boost. Trade them on the marketplace!",
     action: { label: "Go to NFTs", tab: "nfts" },
   },
   {

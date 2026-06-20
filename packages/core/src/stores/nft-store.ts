@@ -1,14 +1,14 @@
 /**
  * NFT Store
  *
- * Zustand store for Genesis Babies NFT state management.
+ * Zustand store for Genesis Sparks NFT state management.
  */
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type {
-  BabyNFTState,
-  BabyNFTInfo,
+  SparkNFTState,
+  SparkNFTInfo,
   EvolutionStatus,
 } from "@bitcoinbaby/bitcoin";
 import {
@@ -26,8 +26,8 @@ import { createBigIntStorage } from "./utils/bigint-storage";
 
 interface NFTStore {
   // State
-  ownedNFTs: BabyNFTState[];
-  selectedNFT: BabyNFTState | null;
+  ownedNFTs: SparkNFTState[];
+  selectedNFT: SparkNFTState | null;
   isLoading: boolean;
   error: string | null;
   lastUpdated: number | null;
@@ -38,19 +38,19 @@ interface NFTStore {
   totalNFTs: number;
 
   // Actions
-  setOwnedNFTs: (nfts: BabyNFTState[]) => void;
+  setOwnedNFTs: (nfts: SparkNFTState[]) => void;
   selectNFT: (tokenId: number | null) => void;
-  updateNFT: (tokenId: number, updates: Partial<BabyNFTState>) => void;
-  addNFT: (nft: BabyNFTState) => void;
+  updateNFT: (tokenId: number, updates: Partial<SparkNFTState>) => void;
+  addNFT: (nft: SparkNFTState) => void;
   removeNFT: (tokenId: number) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   reset: () => void;
 
   // Getters
-  getNFT: (tokenId: number) => BabyNFTState | undefined;
+  getNFT: (tokenId: number) => SparkNFTState | undefined;
   getEvolutionStatus: (tokenId: number) => EvolutionStatus | null;
-  getNFTInfo: (tokenId: number) => BabyNFTInfo | null;
+  getNFTInfo: (tokenId: number) => SparkNFTInfo | null;
 }
 
 // =============================================================================
@@ -89,7 +89,7 @@ const STACKING_MULTIPLIERS = [1.0, 0.5, 0.25, 0.125, 0.05];
  * Calculate combined boost from all NFTs with diminishing returns
  * NFTs are sorted by individual boost (highest first)
  */
-function calculateStackedBoost(nfts: BabyNFTState[]): number {
+function calculateStackedBoost(nfts: SparkNFTState[]): number {
   if (nfts.length === 0) return 0;
 
   // Sort NFTs by boost (highest first)
@@ -270,7 +270,7 @@ export const useNFTStore = create<NFTStore>()(
 
         return {
           tokenId: nft.tokenId,
-          name: `Genesis Baby #${nft.tokenId}`,
+          name: `Genesis Spark #${nft.tokenId}`,
           level: nft.level,
           xp: nft.xp,
           rarityTier: nft.rarityTier,

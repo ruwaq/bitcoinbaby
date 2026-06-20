@@ -9,7 +9,7 @@ import {
   getMiningBoost,
   GENESIS_BABIES_CONFIG,
   LEVEL_BOOSTS,
-  type BabyNFTState,
+  type SparkNFTState,
   type Bloodline,
   type BaseType,
   type RarityTier,
@@ -24,7 +24,7 @@ function generateDNA(): string {
   return "0".repeat(64);
 }
 
-function createMockNFT(overrides: Partial<BabyNFTState> = {}): BabyNFTState {
+function createMockNFT(overrides: Partial<SparkNFTState> = {}): SparkNFTState {
   return {
     dna: generateDNA(),
     bloodline: "warrior",
@@ -284,7 +284,7 @@ describe("Mining Store NFT Boost Integration", () => {
 // =============================================================================
 
 describe("NFT Collection Best Boost", () => {
-  function getBestBoost(nfts: BabyNFTState[]): number {
+  function getBestBoost(nfts: SparkNFTState[]): number {
     if (nfts.length === 0) return 0;
     return Math.max(...nfts.map((n) => getMiningBoost(n)));
   }

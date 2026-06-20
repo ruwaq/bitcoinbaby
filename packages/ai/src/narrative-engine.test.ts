@@ -13,14 +13,14 @@ import {
 import type {
   NarrativeState,
   NarrativeContext,
-  BabyNFTState,
+  SparkNFTState,
 } from "./narrative-types";
 
 // =============================================================================
 // FIXTURES
 // =============================================================================
 
-function makeNFT(overrides: Partial<BabyNFTState> = {}): BabyNFTState {
+function makeNFT(overrides: Partial<SparkNFTState> = {}): SparkNFTState {
   return {
     dna: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0",
     bloodline: "rogue",
@@ -265,7 +265,7 @@ describe("NarrativeEngine.processAIOutput", () => {
 
 describe("buildNarrativeSlots", () => {
   it("returns valid slots for all base types", () => {
-    const types: Array<BabyNFTState["baseType"]> = [
+    const types: Array<SparkNFTState["baseType"]> = [
       "human",
       "animal",
       "robot",

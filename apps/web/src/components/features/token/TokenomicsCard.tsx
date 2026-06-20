@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * TokenomicsCard - Tokenomics del $BABTC
+ * TokenomicsCard - Tokenomics del $SPARK
  *
  * Muestra:
  * - Distribucion: 90% Miners, 5% Dev, 5% Staking
@@ -9,11 +9,11 @@
  * - Rango de dificultad
  */
 
-import { BABTC_CONFIG } from "@bitcoinbaby/bitcoin";
+import { SPARK_CONFIG } from "@bitcoinbaby/bitcoin";
 import { pixelBorders } from "@bitcoinbaby/ui";
 
 export function TokenomicsCard() {
-  const { distribution, rewards } = BABTC_CONFIG;
+  const { distribution, rewards } = SPARK_CONFIG;
 
   return (
     <div

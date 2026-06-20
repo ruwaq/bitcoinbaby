@@ -150,7 +150,7 @@ function ClaimSummary({
         <p className="text-3xl font-pixel text-pixel-primary">
           {formatTokens(netTokens)}
         </p>
-        <p className="text-xs text-gray-500">BABTC tokens</p>
+        <p className="text-xs text-gray-500">SPARK tokens</p>
       </div>
 
       {/* Fee breakdown */}
@@ -160,7 +160,7 @@ function ClaimSummary({
             Platform fee ({platformFeePercent}%)
           </span>
           <span className="text-gray-300">
-            -{formatTokens(platformFee)} BABTC
+            -{formatTokens(platformFee)} SPARK
           </span>
         </div>
         <div className="flex justify-between text-xs">
@@ -347,7 +347,7 @@ export function ClaimSection() {
             ? "Broadcasting..."
             : needsDeposit
               ? "Deposit Required"
-              : `Claim ${formatTokens(balance.netTokens)} BABTC`}
+              : `Claim ${formatTokens(balance.netTokens)} SPARK`}
       </PixelButton>
 
       {/* Refresh button */}

@@ -1,5 +1,5 @@
 /**
- * Dragon Baby Sprite - MYTHICAL CREATURES
+ * Dragon Spark Sprite - MYTHICAL CREATURES
  *
  * Bebés dragón con poderes elementales.
  * +30% poder en combate, colección de tesoros.

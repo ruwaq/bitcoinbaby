@@ -12,10 +12,10 @@
 import { GAME_CONFIG, STAGE_NAMES, MINING_BONUS } from "./constants";
 import type {
   GameState,
-  GameBaby,
+  GameSpark,
   GameEvent,
   GameEventHandler,
-  BabyStats,
+  SparkStats,
   EvolutionEventData,
 } from "./types";
 import { DEFAULT_GAME_STATE } from "./types";
@@ -198,7 +198,7 @@ export class GameEngine {
    * @param miningSharesBaseline - Current mining shares to use as baseline
    *   (prevents XP from pre-existing mining progress)
    */
-  createBaby(name: string, miningSharesBaseline = 0): GameBaby {
+  createBaby(name: string, miningSharesBaseline = 0): GameSpark {
     const baby = createNewBaby(name, miningSharesBaseline);
     this.state.baby = baby;
     this.save();
@@ -343,7 +343,7 @@ export class GameEngine {
   /**
    * Check critical stat changes
    */
-  private checkCriticalStats(previous: BabyStats, current: BabyStats): void {
+  private checkCriticalStats(previous: SparkStats, current: SparkStats): void {
     const previousCritical = getCriticalStats(previous);
     const currentCritical = getCriticalStats(current);
 
@@ -409,7 +409,7 @@ export class GameEngine {
   /**
    * Get baby (convenience getter)
    */
-  getBaby(): Readonly<GameBaby> | null {
+  getBaby(): Readonly<GameSpark> | null {
     return this.state.baby;
   }
 

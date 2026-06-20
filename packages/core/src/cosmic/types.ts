@@ -1,6 +1,6 @@
 /**
  * Cosmic System Types
- * Types for astronomical events and their effects on Genesis Babies
+ * Types for astronomical events and their effects on Genesis Sparks
  */
 
 // Import canonical types from core

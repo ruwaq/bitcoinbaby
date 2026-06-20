@@ -129,7 +129,7 @@ describe("NFTBonusProvider - No NFTs", () => {
     const result = provider.calculate(context);
 
     expect(result.metadata?.label).toBe("No NFTs");
-    expect(result.metadata?.description).toContain("Mint Genesis Babies");
+    expect(result.metadata?.description).toContain("Mint Genesis Sparks");
   });
 
   it("should handle undefined nfts in context", () => {

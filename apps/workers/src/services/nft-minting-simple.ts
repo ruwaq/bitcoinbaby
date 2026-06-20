@@ -17,7 +17,7 @@ import { MEMPOOL_API_URLS, type BitcoinNetwork } from "../config/bitcoin";
 // TYPES
 // =============================================================================
 
-export interface BabyNFTState {
+export interface SparkNFTState {
   dna: string;
   bloodline: string;
   base_type: string;
@@ -179,7 +179,7 @@ export class NFTMintingServiceSimple {
     const fundingUtxoStr = `${request.fundingUtxo.txid}:${request.fundingUtxo.vout}`;
 
     // Convert to snake_case for contract
-    const nftState: BabyNFTState = {
+    const nftState: SparkNFTState = {
       dna: request.nftState.dna,
       bloodline: request.nftState.bloodline,
       base_type: request.nftState.baseType,

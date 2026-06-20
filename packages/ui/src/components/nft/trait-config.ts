@@ -1,7 +1,7 @@
 /**
  * NFT Trait Configuration
  *
- * Data-driven visual configuration for Genesis Babies traits.
+ * Data-driven visual configuration for Genesis Sparks traits.
  * Follows the same pattern as sprite-config.ts for levels.
  */
 
@@ -64,7 +64,7 @@ export interface TraitVisualConfig {
 
 export const BASE_TYPE_CONFIGS: Record<BaseType, TraitVisualConfig> = {
   human: {
-    name: "Human Baby",
+    name: "Human Spark",
     palette: {
       primary: "#ffcc99",
       secondary: "#ffb380",
@@ -127,7 +127,7 @@ export const BASE_TYPE_CONFIGS: Record<BaseType, TraitVisualConfig> = {
   },
 
   animal: {
-    name: "Animal Baby",
+    name: "Animal Spark",
     palette: {
       primary: "#d4a574",
       secondary: "#c4956a",
@@ -230,7 +230,7 @@ export const BASE_TYPE_CONFIGS: Record<BaseType, TraitVisualConfig> = {
   },
 
   robot: {
-    name: "Robot Baby",
+    name: "Robot Spark",
     palette: {
       primary: "#7a8a9a",
       secondary: "#5a6a7a",
@@ -305,7 +305,7 @@ export const BASE_TYPE_CONFIGS: Record<BaseType, TraitVisualConfig> = {
   },
 
   mystic: {
-    name: "Mystic Baby",
+    name: "Mystic Spark",
     palette: {
       primary: "#9966ff",
       secondary: "#7744dd",
@@ -393,7 +393,7 @@ export const BASE_TYPE_CONFIGS: Record<BaseType, TraitVisualConfig> = {
   },
 
   alien: {
-    name: "Alien Baby",
+    name: "Alien Spark",
     palette: {
       primary: "#88ff88",
       secondary: "#55cc55",
@@ -501,7 +501,7 @@ export const BASE_TYPE_CONFIGS: Record<BaseType, TraitVisualConfig> = {
   },
   // Elemental - uses mystic as base with fire colors
   elemental: {
-    name: "Elemental Baby",
+    name: "Elemental Spark",
     palette: {
       primary: "#ff6b35",
       secondary: "#f7c59f",
@@ -546,7 +546,7 @@ export const BASE_TYPE_CONFIGS: Record<BaseType, TraitVisualConfig> = {
   },
   // Shaman - spiritual nature connection
   shaman: {
-    name: "Shaman Baby",
+    name: "Shaman Spark",
     palette: {
       primary: "#059669",
       secondary: "#34d399",
@@ -602,7 +602,7 @@ export const BASE_TYPE_CONFIGS: Record<BaseType, TraitVisualConfig> = {
 
   // Dragon - powerful mythical creature
   dragon: {
-    name: "Dragon Baby",
+    name: "Dragon Spark",
     palette: {
       primary: "#dc2626",
       secondary: "#ef4444",

@@ -31,7 +31,7 @@ import {
   type Bloodline,
   type BaseType,
   type RarityTier,
-  type BabyNFTState,
+  type SparkNFTState,
 } from "@bitcoinbaby/bitcoin";
 import { createLogger } from "@bitcoinbaby/shared";
 
@@ -166,7 +166,7 @@ async function processConfirmationQueue(): Promise<void> {
 
 export interface MintResult {
   success: boolean;
-  nft?: BabyNFTState;
+  nft?: SparkNFTState;
   txid?: string;
   spellTxid?: string;
   commitTxid?: string;
@@ -191,7 +191,7 @@ export interface UseMintNFTReturn {
   isLoading: boolean;
   error: string | null;
   suggestedAction: string | null;
-  lastMinted: BabyNFTState | null;
+  lastMinted: SparkNFTState | null;
   /** Spell transaction ID (NFT location) - also aliased as txid */
   spellTxid: string | null;
   /** @deprecated Use spellTxid instead */
@@ -350,7 +350,7 @@ export function useMintNFT(): UseMintNFTReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestedAction, setSuggestedAction] = useState<string | null>(null);
-  const [lastMinted, setLastMinted] = useState<BabyNFTState | null>(null);
+  const [lastMinted, setLastMinted] = useState<SparkNFTState | null>(null);
   const [spellTxid, setSpellTxid] = useState<string | null>(null);
   const [commitTxid, setCommitTxid] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState<MintStep>("idle");
@@ -481,7 +481,7 @@ export function useMintNFT(): UseMintNFTReturn {
       // Get current block height for genesisBlock
       const blockHeight = await mempoolClient.getBlockHeight();
 
-      const nftState: BabyNFTState = {
+      const nftState: SparkNFTState = {
         dna,
         bloodline,
         baseType,
@@ -782,13 +782,13 @@ export function useMintNFT(): UseMintNFTReturn {
         addTransaction(
           broadcastCommitTxid,
           "nft_mint",
-          `Genesis Baby #${reservedTokenId} commit`,
+          `Genesis Spark #${reservedTokenId} commit`,
         );
       }
       addTransaction(
         broadcastSpellTxid,
         "nft_mint",
-        `Genesis Baby #${reservedTokenId} spell`,
+        `Genesis Spark #${reservedTokenId} spell`,
       );
 
       // Step 8: Confirm the mint with server

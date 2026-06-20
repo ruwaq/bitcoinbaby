@@ -65,7 +65,7 @@ const TECH_STACK: TechCard[] = [
     subtitle: "NFTs Visuales",
     icon: "🖼️",
     description:
-      "Los Ordinals permiten inscribir datos permanentemente en Bitcoin. BitcoinBaby usa Ordinals para la capa visual de los Genesis Babies NFTs.",
+      "Los Ordinals permiten inscribir datos permanentemente en Bitcoin. BitcoinBaby usa Ordinals para la capa visual de los Genesis Sparks NFTs.",
     features: [
       "Imagenes generadas on-chain desde DNA",
       "Sprite library inscrita una sola vez",
@@ -86,7 +86,7 @@ const TECH_STACK: TechCard[] = [
       "100% deterministic results with Greedy Decoding",
       "On-chain verification of AI processing",
       "Frictionless onboarding (no local app installation)",
-      "Fair rewards in $BABY tokens and Genesis Baby XP",
+      "Fair rewards in $BABY tokens and Genesis Spark XP",
     ],
     link: { label: "AI Roadmap", url: "#ai-roadmap" },
     highlight: true,
@@ -137,7 +137,7 @@ const ARCHITECTURE_LAYERS = [
   {
     layer: "Token Layer",
     tech: "Charms",
-    description: "$BABTC fungible tokens",
+    description: "$SPARK fungible tokens",
     color: "bg-yellow-500",
   },
   {
@@ -251,7 +251,7 @@ export default function TechnologyPage() {
               <span className="text-purple-400 font-semibold">
                 your GPU/CPU to execute Gemma 4 E2B locally
               </span>
-              . Every token processed helps your Genesis Baby learn and generates cryptographic proof for on-chain rewards.
+              . Every token processed helps your Genesis Spark learn and generates cryptographic proof for on-chain rewards.
             </p>
             <div className="flex justify-center gap-4 mb-4">
               <div className="px-4 py-2 bg-purple-500/20 border-2 border-purple-500 rounded">
@@ -399,7 +399,7 @@ export default function TechnologyPage() {
                   <span className="text-2xl">👶</span>
                   <div>
                     <p className="font-pixel text-[10px] text-pixel-primary">
-                      Genesis Baby
+                      Genesis Spark
                     </p>
                     <p className="font-pixel-body text-xs text-pixel-text">
                       NFT completo con visual + estado
@@ -435,7 +435,7 @@ export default function TechnologyPage() {
                     text: "Validacion criptografica del trabajo",
                     icon: "✅",
                   },
-                  { step: 6, text: "Mint de $BABTC y XP para tu Genesis Baby", icon: "🪙" },
+                  { step: 6, text: "Mint de $SPARK y XP para tu Genesis Spark", icon: "🪙" },
                 ].map((item) => (
                   <div
                     key={item.step}

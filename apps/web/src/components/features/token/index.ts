@@ -1,7 +1,7 @@
 /**
  * Token Components
  *
- * Components for the $BABTC token section
+ * Components for the $SPARK token section
  */
 
 export { TokenHeader } from "./TokenHeader";

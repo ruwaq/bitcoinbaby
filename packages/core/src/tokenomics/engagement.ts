@@ -86,8 +86,8 @@ export function createInitialEngagementState(): EngagementState {
  *
  * This encourages players to care for their baby, not just mine.
  */
-/** Baby stats for engagement calculation (mirrors GameBaby stats) */
-export interface EngagementBabyStats {
+/** Baby stats for engagement calculation (mirrors GameSpark stats) */
+export interface EngagementSparkStats {
   energy: number;
   happiness: number;
   hunger: number;
@@ -95,7 +95,7 @@ export interface EngagementBabyStats {
 }
 
 export function calculateBabyCareBonus(
-  stats: EngagementBabyStats | null,
+  stats: EngagementSparkStats | null,
   config: EngagementConfig = DEFAULT_ENGAGEMENT_CONFIG,
 ): number {
   if (!stats) return 0;
@@ -218,7 +218,7 @@ export interface EngagementMultiplierResult {
  */
 export function calculateEngagementMultiplier(
   state: EngagementState,
-  babyStats: EngagementBabyStats | null,
+  babyStats: EngagementSparkStats | null,
   config: EngagementConfig = DEFAULT_ENGAGEMENT_CONFIG,
 ): EngagementMultiplierResult {
   const babyCare = calculateBabyCareBonus(babyStats, config);
@@ -275,7 +275,7 @@ import { calculateShareReward, BASE_REWARD_PER_SHARE } from "./constants";
 export function calculateRewardWithEngagement(
   difficulty: number,
   engagementState: EngagementState,
-  babyStats: EngagementBabyStats | null,
+  babyStats: EngagementSparkStats | null,
   config: EngagementConfig = DEFAULT_ENGAGEMENT_CONFIG,
 ): {
   baseReward: bigint;

@@ -7,7 +7,7 @@
  */
 
 import Link from "next/link";
-import { BABTC_TESTNET4 } from "@bitcoinbaby/bitcoin";
+import { SPARK_TESTNET4 } from "@bitcoinbaby/bitcoin";
 import { pixelBorders } from "@bitcoinbaby/ui";
 
 interface TokenLink {
@@ -49,7 +49,7 @@ const LINKS: TokenLink[] = [
 const linkStyles = `flex flex-col items-center justify-center p-4 bg-pixel-bg-dark ${pixelBorders.thin} hover:border-pixel-primary hover:bg-pixel-primary/10 transition-all group`;
 
 export function TokenLinks() {
-  const appId = BABTC_TESTNET4.appId;
+  const appId = SPARK_TESTNET4.appId;
 
   return (
     <div className={`bg-pixel-bg-medium ${pixelBorders.medium} p-4 sm:p-6`}>

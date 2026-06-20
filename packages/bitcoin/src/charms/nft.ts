@@ -1,7 +1,7 @@
 /**
- * Genesis Babies NFT Types
+ * Genesis Sparks NFT Types
  *
- * NFT configuration and types for the Genesis Babies collection.
+ * NFT configuration and types for the Genesis Sparks collection.
  * Separate from token, provides mining boosts and evolution.
  */
 
@@ -12,10 +12,10 @@ import type { SpellV2, AppType } from "./types";
 // =============================================================================
 
 /**
- * Genesis Babies NFT Configuration
+ * Genesis Sparks NFT Configuration
  */
-export const GENESIS_BABIES_CONFIG = {
-  name: "Genesis Babies",
+export const GENESIS_SPARKS_CONFIG = {
+  name: "Genesis Sparks",
   symbol: "GBABY",
   maxSupply: 10_000,
   appType: "n" as AppType,
@@ -33,11 +33,11 @@ export const GENESIS_BABIES_CONFIG = {
 
   // Base types
   baseTypes: {
-    human: { weight: 70, name: "Human Baby" },
-    animal: { weight: 15, name: "Animal Baby" },
-    robot: { weight: 5, name: "Robot Baby" },
-    mystic: { weight: 9, name: "Mystic Baby" },
-    alien: { weight: 1, name: "Alien Baby" },
+    human: { weight: 70, name: "Human Spark" },
+    animal: { weight: 15, name: "Animal Spark" },
+    robot: { weight: 5, name: "Robot Spark" },
+    mystic: { weight: 9, name: "Mystic Spark" },
+    alien: { weight: 1, name: "Alien Spark" },
   },
 
   // Max level
@@ -72,7 +72,7 @@ export type BaseType = "human" | "animal" | "robot" | "mystic" | "alien";
 /**
  * Complete NFT state stored in Charm UTXO
  */
-export interface BabyNFTState {
+export interface SparkNFTState {
   // Immutable (set at genesis, never changes)
   readonly dna: string; // Deterministic hash for visuals
   readonly bloodline: Bloodline;
@@ -88,13 +88,13 @@ export interface BabyNFTState {
   workCount: number; // Total PoUW tasks completed
   lastWorkBlock: number; // Block of last work submission
   evolutionCount: number; // Times evolved
-  tokensEarned: bigint; // Lifetime BABTC earned
+  tokensEarned: bigint; // Lifetime SPARK earned
 }
 
 /**
  * Simplified NFT info for display
  */
-export interface BabyNFTInfo {
+export interface SparkNFTInfo {
   tokenId: number;
   name: string;
   level: number;
@@ -125,10 +125,10 @@ export const XP_REQUIREMENTS: Record<number, number> = {
 };
 
 /**
- * BABTC burn cost for evolution (in base units with 8 decimals)
+ * SPARK burn cost for evolution (in base units with 8 decimals)
  */
 export const EVOLUTION_COSTS: Record<number, bigint> = {
-  2: 100n * 100_000_000n, // 100 BABTC
+  2: 100n * 100_000_000n, // 100 SPARK
   3: 250n * 100_000_000n,
   4: 500n * 100_000_000n,
   5: 1000n * 100_000_000n,
@@ -161,10 +161,10 @@ export const LEVEL_BOOSTS: Record<number, number> = {
  * Get total mining boost for an NFT
  * Combines level boost + rarity boost
  */
-export function getMiningBoost(nft: BabyNFTState): number {
+export function getMiningBoost(nft: SparkNFTState): number {
   const levelBoost = LEVEL_BOOSTS[nft.level] ?? 0;
   const rarityBoost =
-    GENESIS_BABIES_CONFIG.rarityTiers[nft.rarityTier]?.boost ?? 0;
+    GENESIS_SPARKS_CONFIG.rarityTiers[nft.rarityTier]?.boost ?? 0;
 
   // Boosts are additive
   return levelBoost + rarityBoost;
@@ -173,8 +173,8 @@ export function getMiningBoost(nft: BabyNFTState): number {
 /**
  * Check if NFT can level up
  */
-export function canLevelUp(nft: BabyNFTState): boolean {
-  if (nft.level >= GENESIS_BABIES_CONFIG.maxLevel) {
+export function canLevelUp(nft: SparkNFTState): boolean {
+  if (nft.level >= GENESIS_SPARKS_CONFIG.maxLevel) {
     return false;
   }
 
@@ -186,7 +186,7 @@ export function canLevelUp(nft: BabyNFTState): boolean {
  * Calculate XP gained from work
  * Base: 100 XP, modified by bloodline
  */
-export function calculateXpGain(nft: BabyNFTState): number {
+export function calculateXpGain(nft: SparkNFTState): number {
   const baseXp = 100;
 
   const bloodlineMultipliers: Record<Bloodline, number> = {
@@ -303,7 +303,7 @@ export interface NFTGenesisParams {
 export function createNFTGenesisSpell(params: NFTGenesisParams): SpellV2 {
   const appRef = `n/${params.appId}/${params.appVk}`;
 
-  const initialState: BabyNFTState = {
+  const initialState: SparkNFTState = {
     dna: params.dna,
     bloodline: params.bloodline,
     baseType: params.baseType,
@@ -344,7 +344,7 @@ export interface NFTWorkProofParams {
   appId: string;
   appVk: string;
   nftUtxo: { txid: string; vout: number };
-  currentState: BabyNFTState;
+  currentState: SparkNFTState;
   ownerAddress: string;
   workProofHash: string;
   currentBlock: number;
@@ -366,7 +366,7 @@ export function createNFTWorkProofSpell(params: NFTWorkProofParams): SpellV2 {
       ? Math.min(rawNewXp, nextLevelReq)
       : rawNewXp;
 
-  const newState: BabyNFTState = {
+  const newState: SparkNFTState = {
     ...params.currentState,
     xp: cappedNewXp,
     totalXp: params.currentState.totalXp + xpGain,
@@ -413,7 +413,7 @@ export interface NFTLevelUpParams {
   tokenAppVk: string;
   nftUtxo: { txid: string; vout: number };
   tokenUtxo: { txid: string; vout: number };
-  currentState: BabyNFTState;
+  currentState: SparkNFTState;
   tokenAmount: bigint;
   ownerAddress: string;
 }
@@ -422,9 +422,9 @@ export interface NFTLevelUpParams {
  * Generate level up spell (burns tokens, increases level)
  */
 export function createNFTLevelUpSpell(params: NFTLevelUpParams): SpellV2 {
-  if (params.currentState.level >= GENESIS_BABIES_CONFIG.maxLevel) {
+  if (params.currentState.level >= GENESIS_SPARKS_CONFIG.maxLevel) {
     throw new Error(
-      `NFT is already at max level (${GENESIS_BABIES_CONFIG.maxLevel}). Cannot level up further.`,
+      `NFT is already at max level (${GENESIS_SPARKS_CONFIG.maxLevel}). Cannot level up further.`,
     );
   }
 
@@ -435,7 +435,7 @@ export function createNFTLevelUpSpell(params: NFTLevelUpParams): SpellV2 {
   const burnCost = EVOLUTION_COSTS[nextLevel];
   const remainingTokens = params.tokenAmount - burnCost;
 
-  const newState: BabyNFTState = {
+  const newState: SparkNFTState = {
     ...params.currentState,
     level: nextLevel,
     xp: 0, // Reset XP

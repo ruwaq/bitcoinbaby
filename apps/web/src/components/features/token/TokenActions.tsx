@@ -100,7 +100,7 @@ export function TokenActions({
       {virtualBalance > 0n && (
         <div className="mt-4 pt-4 border-t border-pixel-text-muted/20">
           <p className="font-pixel-body text-pixel-xs text-pixel-text-muted">
-            Claim converts your virtual $BABY to on-chain BABTC tokens on
+            Claim converts your virtual $BABY to on-chain SPARK tokens on
             Bitcoin. You pay a small network fee (~1000 sats). Minimum:{" "}
             {minClaim.toLocaleString()} $BABY.
           </p>

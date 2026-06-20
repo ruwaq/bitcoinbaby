@@ -1,5 +1,5 @@
 /**
- * Elemental Baby Sprite - NATURE'S FORCES
+ * Elemental Spark Sprite - NATURE'S FORCES
  *
  * Bebés elementales que encarnan las fuerzas de la naturaleza.
  * +20% poder en clima relacionado, resistencia elemental.

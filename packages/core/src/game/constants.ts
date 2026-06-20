@@ -35,7 +35,7 @@ export type BabySpriteForm = 'egg' | 'baby' | 'child' | 'teen' | 'young' | 'adul
 /**
  * Baby visual/behavioral states
  */
-export type BabyVisualState =
+export type SparkVisualState =
   | 'idle'
   | 'happy'
   | 'sleeping'

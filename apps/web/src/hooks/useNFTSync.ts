@@ -27,7 +27,7 @@ import {
   RETRY_DELAYS,
   type NFTRecord,
 } from "@bitcoinbaby/core";
-import { type BabyNFTState } from "@bitcoinbaby/bitcoin";
+import { type SparkNFTState } from "@bitcoinbaby/bitcoin";
 
 // =============================================================================
 // TYPES
@@ -35,7 +35,7 @@ import { type BabyNFTState } from "@bitcoinbaby/bitcoin";
 
 export interface UseNFTSyncReturn {
   /** NFTs from server index */
-  nfts: BabyNFTState[];
+  nfts: SparkNFTState[];
   /** Is fetching from server */
   isLoading: boolean;
   /** Is refetching in background */
@@ -124,10 +124,10 @@ function isValidRarityTier(value: unknown): value is RarityTier {
 // =============================================================================
 
 /**
- * Convert server NFTRecord to BabyNFTState for local use
+ * Convert server NFTRecord to SparkNFTState for local use
  * Validates all enum fields before casting
  */
-function convertToNFTState(record: NFTRecord): BabyNFTState | null {
+function convertToNFTState(record: NFTRecord): SparkNFTState | null {
   // Validate enum fields
   if (!isValidBloodline(record.bloodline)) {
     console.warn(
@@ -178,7 +178,7 @@ function convertToNFTState(record: NFTRecord): BabyNFTState | null {
  * Fetch owned NFTs from server index
  * Much faster than blockchain parsing - direct database query
  */
-async function fetchOwnedNFTs(address: string): Promise<BabyNFTState[]> {
+async function fetchOwnedNFTs(address: string): Promise<SparkNFTState[]> {
   const apiClient = getApiClient();
   const response = await apiClient.getOwnedNFTs(address);
 
@@ -186,10 +186,10 @@ async function fetchOwnedNFTs(address: string): Promise<BabyNFTState[]> {
     throw new Error(response.error || "Failed to fetch NFTs");
   }
 
-  // Convert server records to BabyNFTState, filtering out invalid records
+  // Convert server records to SparkNFTState, filtering out invalid records
   return response.data.nfts
     .map(convertToNFTState)
-    .filter((nft): nft is BabyNFTState => nft !== null);
+    .filter((nft): nft is SparkNFTState => nft !== null);
 }
 
 // =============================================================================

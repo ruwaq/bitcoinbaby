@@ -1,5 +1,5 @@
 /**
- * NFTBonusProvider - Genesis Babies NFT mining boost
+ * NFTBonusProvider - Genesis Sparks NFT mining boost
  *
  * NFTs provide mining boosts based on level and rarity.
  * Multiple NFTs stack with diminishing returns.
@@ -100,7 +100,7 @@ export class NFTBonusProvider implements IBonusProvider {
         status: this.getStatus(),
         metadata: {
           label: "No NFTs",
-          description: "Mint Genesis Babies to boost mining!",
+          description: "Mint Genesis Sparks to boost mining!",
           details: {
             totalNFTs: 0,
             bestBoost: 0,

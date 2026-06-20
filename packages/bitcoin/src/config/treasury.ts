@@ -6,52 +6,52 @@
  *
  * Treasury Types:
  * - NFT Treasury: Receives NFT sale payments (BTC)
- * - BABTC Treasury: Holds BABTC tokens for batch withdrawals
+ * - SPARK Treasury: Holds SPARK tokens for batch withdrawals
  */
 
 // =============================================================================
-// BABTC TOKEN TREASURY (Testnet4)
+// SPARK TOKEN TREASURY (Testnet4)
 // =============================================================================
 
 /**
- * BABTC Token Treasury Address
+ * SPARK Token Treasury Address
  *
- * Holds BABTC tokens that are distributed to users on withdraw.
+ * Holds SPARK tokens that are distributed to users on withdraw.
  * Must be pre-funded with tokens via initial mint.
  *
  * Network: Testnet4
  * Type: Taproot (P2TR)
  *
  * IMPORTANT: This wallet's private key must be available to the signer service.
- * Store mnemonic securely (env var: BABTC_TREASURY_MNEMONIC)
+ * Store mnemonic securely (env var: SPARK_TREASURY_MNEMONIC)
  */
-export const BABTC_TREASURY_TESTNET4 =
-  process.env.NEXT_PUBLIC_BABTC_TREASURY_ADDRESS ||
-  process.env.BABTC_TREASURY_ADDRESS ||
+export const SPARK_TREASURY_TESTNET4 =
+  process.env.NEXT_PUBLIC_SPARK_TREASURY_ADDRESS ||
+  process.env.SPARK_TREASURY_ADDRESS ||
   "tb1prrj7vwsxxfk0nvp279h9l83fplq9e2yf4v7727rxnt7d3zvgdccqcjywq8";
 
-// Mainnet — set via BABTC_TREASURY_MAINNET_ADDRESS env var before production
-export const BABTC_TREASURY_MAINNET =
-  process.env.BABTC_TREASURY_MAINNET_ADDRESS || "";
+// Mainnet — set via SPARK_TREASURY_MAINNET_ADDRESS env var before production
+export const SPARK_TREASURY_MAINNET =
+  process.env.SPARK_TREASURY_MAINNET_ADDRESS || "";
 
 /**
- * Get BABTC treasury address for current network
+ * Get SPARK treasury address for current network
  */
-export function getBABTCTreasuryAddress(
+export function getSPARKTreasuryAddress(
   network: "testnet4" | "mainnet" = "testnet4",
 ): string {
   if (network === "mainnet") {
-    if (!BABTC_TREASURY_MAINNET) {
-      throw new Error("Mainnet BABTC treasury not configured");
+    if (!SPARK_TREASURY_MAINNET) {
+      throw new Error("Mainnet SPARK treasury not configured");
     }
-    return BABTC_TREASURY_MAINNET;
+    return SPARK_TREASURY_MAINNET;
   }
-  if (!BABTC_TREASURY_TESTNET4) {
+  if (!SPARK_TREASURY_TESTNET4) {
     throw new Error(
-      "Testnet4 BABTC treasury not configured. Set BABTC_TREASURY_ADDRESS env var.",
+      "Testnet4 SPARK treasury not configured. Set SPARK_TREASURY_ADDRESS env var.",
     );
   }
-  return BABTC_TREASURY_TESTNET4;
+  return SPARK_TREASURY_TESTNET4;
 }
 
 // =============================================================================

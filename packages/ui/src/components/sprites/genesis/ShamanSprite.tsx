@@ -1,5 +1,5 @@
 /**
- * Shaman Baby Sprite - TRIBAL MAGIC CASTERS
+ * Shaman Spark Sprite - TRIBAL MAGIC CASTERS
  *
  * Chamanes y curanderos tribales conectados con la naturaleza.
  * +25% XP en misiones de exploración, +15% drops de hierbas.

@@ -3,7 +3,7 @@ import { test, expect } from "./fixtures";
 /**
  * NFT Minting E2E Tests
  *
- * Tests the Genesis Babies NFT minting flow.
+ * Tests the Genesis Sparks NFT minting flow.
  * The app uses tab-based navigation on the main page.
  */
 

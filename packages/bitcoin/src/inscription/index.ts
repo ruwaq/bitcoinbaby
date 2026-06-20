@@ -1,5 +1,5 @@
 /**
- * Bitcoin Inscription Module for Genesis Babies NFTs
+ * Bitcoin Inscription Module for Genesis Sparks NFTs
  *
  * Complete toolkit for inscribing NFTs on Bitcoin:
  * - PNG Exporter: Convert SVG sprites to optimized PNGs
@@ -35,7 +35,7 @@ export {
 
 // Sprite Library
 export {
-  GENESIS_BABIES_LIBRARY,
+  GENESIS_SPARKS_LIBRARY,
   parseDNA,
   getRarityFromScore,
   getBaseTypeFromIndex,

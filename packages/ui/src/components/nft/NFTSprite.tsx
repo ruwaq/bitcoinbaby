@@ -1,7 +1,7 @@
 /**
  * NFTSprite Component
  *
- * Renders a Genesis Baby NFT sprite based on its traits.
+ * Renders a Genesis Spark NFT sprite based on its traits.
  * Combines base type, bloodline accessories, and rarity effects.
  *
  * UPDATED: Now supports both legacy mode and new Genesis Sprite system.

@@ -23,7 +23,7 @@ import {
   ENGAGEMENT_TIERS,
   type EngagementState,
   type EngagementMultiplierResult,
-  type EngagementBabyStats,
+  type EngagementSparkStats,
 } from "../tokenomics/engagement";
 
 // =============================================================================
@@ -43,7 +43,7 @@ const AUTO_SAVE_TASK = "engagement-auto-save";
 
 export interface UseEngagementOptions {
   /** Baby stats from game state */
-  babyStats?: EngagementBabyStats | null;
+  babyStats?: EngagementSparkStats | null;
   /** Auto-save interval in ms (default: 30s) */
   autoSaveInterval?: number;
 }

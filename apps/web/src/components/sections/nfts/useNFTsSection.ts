@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
-import { type BabyNFTState } from "@bitcoinbaby/ui";
-import { type BabyNFTState as CoreBabyNFTState } from "@bitcoinbaby/bitcoin";
+import { type SparkNFTState } from "@bitcoinbaby/ui";
+import { type SparkNFTState as CoreSparkNFTState } from "@bitcoinbaby/bitcoin";
 import { useNFTs } from "@/hooks/features";
 import { useNFTExplorer } from "@/hooks/useNFTExplorer";
 import type { SubTab } from "./NFTTabNav";
@@ -22,7 +22,7 @@ export function useNFTsSection() {
   const [evolvingIds, setEvolvingIds] = useState<Set<number>>(new Set());
   const [listingIds, setListingIds] = useState<Set<number>>(new Set());
   const [claimTxid, setClaimTxid] = useState("");
-  const [selectedNFT, setSelectedNFT] = useState<BabyNFTState | null>(null);
+  const [selectedNFT, setSelectedNFT] = useState<SparkNFTState | null>(null);
   const [listFeedback, setListFeedback] = useState<ListFeedback | null>(null);
 
   // Data hooks
@@ -74,21 +74,21 @@ export function useNFTsSection() {
   }, [claimTxid, nfts.claiming]);
 
   const handleSelectNFT = useCallback(
-    (nft: BabyNFTState) => {
+    (nft: SparkNFTState) => {
       setSelectedNFT(selectedNFT?.tokenId === nft.tokenId ? null : nft);
     },
     [selectedNFT],
   );
 
   const handleEvolve = useCallback(
-    async (nft: BabyNFTState) => {
+    async (nft: SparkNFTState) => {
       // Mark as evolving
       setEvolvingIds((prev) => new Set(prev).add(nft.tokenId));
 
       try {
         // Cast to core type for blockchain operations
         // UI type is a superset of core type, so this is safe for canonical bloodlines
-        const coreNFT = nft as unknown as CoreBabyNFTState;
+        const coreNFT = nft as unknown as CoreSparkNFTState;
 
         // Execute real blockchain evolution
         const result = await nfts.evolution.evolve(coreNFT);
@@ -123,7 +123,7 @@ export function useNFTsSection() {
   );
 
   const handleListNFT = useCallback(
-    async (nft: BabyNFTState, price: number) => {
+    async (nft: SparkNFTState, price: number) => {
       setListingIds((prev) => new Set(prev).add(nft.tokenId));
       setListFeedback(null);
 

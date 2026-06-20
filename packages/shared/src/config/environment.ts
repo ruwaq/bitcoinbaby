@@ -80,10 +80,10 @@ const DEFAULTS = {
   PROVER_PROD: "https://v15.charms.dev",
 
   // Testnet4 app IDs (default for development)
-  BABTC_APP_ID: "genesis_babies_nft",
-  GBABY_APP_ID: "genesis_babies_nft",
-  BABTC_APP_VK: "",
-  GBABY_APP_VK: "",
+  SPARK_APP_ID: "genesis_babies_nft",
+  GSPARK_APP_ID: "genesis_babies_nft",
+  SPARK_APP_VK: "",
+  GSPARK_APP_VK: "",
 } as const;
 
 // =============================================================================
@@ -135,10 +135,10 @@ export function getEnvironmentConfig(): EnvironmentConfig {
     ),
 
     // Smart Contract IDs
-    babtcAppId: getEnv("BABTC_APP_ID", DEFAULTS.BABTC_APP_ID),
-    gbabyAppId: getEnv("GBABY_APP_ID", DEFAULTS.GBABY_APP_ID),
-    babtcAppVk: getEnv("BABTC_APP_VK", DEFAULTS.BABTC_APP_VK),
-    gbabyAppVk: getEnv("GBABY_APP_VK", DEFAULTS.GBABY_APP_VK),
+    babtcAppId: getEnv("SPARK_APP_ID", DEFAULTS.SPARK_APP_ID),
+    gbabyAppId: getEnv("GSPARK_APP_ID", DEFAULTS.GSPARK_APP_ID),
+    babtcAppVk: getEnv("SPARK_APP_VK", DEFAULTS.SPARK_APP_VK),
+    gbabyAppVk: getEnv("GSPARK_APP_VK", DEFAULTS.GSPARK_APP_VK),
 
     // Feature flags
     isProduction: isProd,

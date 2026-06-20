@@ -12,7 +12,7 @@
 import { useState, useCallback } from "react";
 import { NarrativeEngine } from "@bitcoinbaby/ai";
 import { useNarrativeStore } from "@bitcoinbaby/core";
-import type { BabyNFTState } from "@bitcoinbaby/ai";
+import type { SparkNFTState } from "@bitcoinbaby/ai";
 import type { BaseType, Bloodline } from "@bitcoinbaby/bitcoin";
 
 // =============================================================================
@@ -47,7 +47,7 @@ function randomDNA(): string {
   ).join("");
 }
 
-function makeRandomNFT(): BabyNFTState {
+function makeRandomNFT(): SparkNFTState {
   return {
     dna: randomDNA(),
     bloodline: BLOODLINES[Math.floor(Math.random() * BLOODLINES.length)],
@@ -72,7 +72,7 @@ function makeRandomNFT(): BabyNFTState {
 // =============================================================================
 
 export function NarrativeDebugPanel() {
-  const [nft, setNft] = useState<BabyNFTState>(makeRandomNFT);
+  const [nft, setNft] = useState<SparkNFTState>(makeRandomNFT);
   const [selectedOutput, setSelectedOutput] = useState(
     Object.keys(SAMPLE_OUTPUTS)[0],
   );

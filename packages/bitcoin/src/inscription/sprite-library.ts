@@ -98,11 +98,11 @@ export interface AnimationDef {
 // =============================================================================
 
 /**
- * Complete Genesis Babies sprite library configuration
+ * Complete Genesis Sparks sprite library configuration
  */
-export const GENESIS_BABIES_LIBRARY: SpriteLibrary = {
+export const GENESIS_SPARKS_LIBRARY: SpriteLibrary = {
   version: 1,
-  name: "Genesis Babies",
+  name: "Genesis Sparks",
   description: "10,000 unique babies on Bitcoin",
   totalComponents: 150,
   categories: [
@@ -310,7 +310,7 @@ export const GENESIS_BABIES_LIBRARY: SpriteLibrary = {
 // =============================================================================
 
 /**
- * DNA structure for Genesis Babies (64 hex chars = 256 bits)
+ * DNA structure for Genesis Sparks (64 hex chars = 256 bits)
  *
  * Bits 0-3:   Base type (0-7 = human, animal, robot, mystic, alien, shaman, elemental, dragon)
  * Bits 4-5:   Bloodline (0-3 = royal, warrior, rogue, mystic)
@@ -625,7 +625,7 @@ export async function buildSpriteLibrary(): Promise<BuildResult> {
 
   // Build library JSON
   const library = {
-    ...GENESIS_BABIES_LIBRARY,
+    ...GENESIS_SPARKS_LIBRARY,
     components: componentDefs.map((c) => ({
       id: c.id,
       category: c.category,
@@ -648,7 +648,7 @@ export async function buildSpriteLibrary(): Promise<BuildResult> {
     estimatedCost,
     stats: {
       totalComponents: componentDefs.length,
-      totalPalettes: GENESIS_BABIES_LIBRARY.palettes.length,
+      totalPalettes: GENESIS_SPARKS_LIBRARY.palettes.length,
       largestComponent: largest,
       smallestComponent: smallest,
       averageComponentSize: totalSize / componentDefs.length,

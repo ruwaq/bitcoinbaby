@@ -64,10 +64,10 @@ test.describe("NFT Mint Tab", () => {
     await expect(mintButton).toBeVisible({ timeout: 10000 });
   });
 
-  test("should show Genesis Babies branding", async ({ page }) => {
+  test("should show Genesis Sparks branding", async ({ page }) => {
     await page.goto("/?tab=nfts");
 
-    // Should show Genesis Babies name
+    // Should show Genesis Sparks name
     const genesisText = page.getByText(/genesis.*bab|bab.*genesis/i).first();
     const hasGenesis = await genesisText.isVisible().catch(() => false);
     expect(typeof hasGenesis).toBe("boolean");

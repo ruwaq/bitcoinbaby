@@ -100,14 +100,14 @@ export {
   createAppReference,
   createMiningMintSpellV10,
   createTokenTransferSpellV10,
-  // Token ($BABTC)
-  type BABTCMetadata,
+  // Token ($SPARK)
+  type SPARKMetadata,
   type TokenBalance as CharmsTokenBalance,
   type MiningReward,
   type TokenMintParamsV10,
   type TokenMintParamsV11,
-  BABTC_CONFIG,
-  BABTC_METADATA,
+  SPARK_CONFIG,
+  SPARK_METADATA,
   getCurrentEpoch,
   calculateBlockReward,
   calculateMiningReward,
@@ -117,10 +117,10 @@ export {
   parseTokenAmount,
   createTokenMintSpell,
   createTokenTransferSpell,
-  createBABTCMintSpellV10,
-  createBABTCTransferSpellV10,
-  createBABTCMintSpellV11,
-  createBABTCTransferSpellV11,
+  createSPARKMintSpellV10,
+  createSPARKTransferSpellV10,
+  createSPARKMintSpellV11,
+  createSPARKTransferSpellV11,
   addressToScriptPubKeyHex,
   validateAmountForSpell,
   // Batch Transfer (Withdrawal Pool)
@@ -128,20 +128,20 @@ export {
   type BatchTransferParams,
   createBatchTransferSpellV10,
   // Balance Service
-  type BABTCBalance,
+  type SPARKBalance,
   type BalanceQueryOptions,
-  BABTCBalanceService,
-  createBABTCBalanceService,
-  getBABTCBalance,
-  formatBABTCBalance,
+  SPARKBalanceService,
+  createSPARKBalanceService,
+  getSPARKBalance,
+  formatSPARKBalance,
   hasSufficientBalance,
-  // NFT (Genesis Babies)
+  // NFT (Genesis Sparks)
   type Bloodline,
   type RarityTier,
   type BaseType,
-  type BabyNFTState,
-  type BabyNFTInfo,
-  GENESIS_BABIES_CONFIG,
+  type SparkNFTState,
+  type SparkNFTInfo,
+  GENESIS_SPARKS_CONFIG,
   XP_REQUIREMENTS,
   EVOLUTION_COSTS,
   LEVEL_BOOSTS,
@@ -290,9 +290,9 @@ export {
 // Configuration (Testnet4)
 export {
   TESTNET4_ENDPOINTS,
-  BABTC_TESTNET4,
-  isBABTCConfigured,
-  requireBABTCConfigured,
+  SPARK_TESTNET4,
+  isSPARKConfigured,
+  requireSPARKConfigured,
   MINING_CONFIG_TESTNET4,
   toScrollsNetwork,
   toBitcoinNetwork,
@@ -309,8 +309,8 @@ export { Psbt } from "bitcoinjs-lib";
 
 // NFT Config
 export {
-  GENESIS_BABIES_TESTNET4,
-  GENESIS_BABIES_MAINNET,
+  GENESIS_SPARKS_TESTNET4,
+  GENESIS_SPARKS_MAINNET,
   getGenesisBabiesConfig,
   isGenesisBabiesConfigured,
 } from "./config/testnet4";
@@ -425,7 +425,7 @@ export {
   type SigningResult,
 } from "./signer";
 
-// Inscription System (Genesis Babies NFTs on Bitcoin)
+// Inscription System (Genesis Sparks NFTs on Bitcoin)
 export {
   // PNG Exporter
   exportSVGtoPNG,
@@ -437,7 +437,7 @@ export {
   type SpriteComponent,
   type SpriteManifest,
   // Sprite Library
-  GENESIS_BABIES_LIBRARY,
+  GENESIS_SPARKS_LIBRARY,
   parseDNA as parseInscriptionDNA,
   getRarityFromScore,
   getBaseTypeFromIndex,

@@ -1,4 +1,4 @@
-export { useBabyStore } from "./baby-store";
+export { useSparkStore } from "./baby-store";
 export { useMiningStore } from "./mining-store";
 export {
   useWalletStore,
@@ -144,7 +144,7 @@ export {
   selectBabyLevel,
   selectBabyXP,
   selectBabyName,
-  selectBabyState,
+  selectSparkState,
   selectSetBaby,
   selectAddExperience,
   selectFeed,

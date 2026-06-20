@@ -14,7 +14,7 @@ import { useNarrativeStore } from "@bitcoinbaby/core";
 import type {
   NarrativeEvent,
   NarrativeEventType,
-  BabyNFTState,
+  SparkNFTState,
 } from "@bitcoinbaby/ai";
 import { NarrativeEngine } from "@bitcoinbaby/ai";
 import { clsx } from "clsx";
@@ -139,7 +139,7 @@ export interface NarrativeChronicleProps {
   /** Token ID of the active baby NFT */
   tokenId: number | null;
   /** NFT state for initializing the narrative store */
-  nftState: BabyNFTState | null;
+  nftState: SparkNFTState | null;
   /** Optional className */
   className?: string;
 }
@@ -199,7 +199,7 @@ export function NarrativeChronicle({
           No baby selected
         </div>
         <div className="font-pixel text-[7px] text-pixel-text-muted mt-1">
-          Mint a Genesis Baby NFT to begin your story.
+          Mint a Genesis Spark NFT to begin your story.
         </div>
       </div>
     );

@@ -8,7 +8,7 @@
  * NFT Collection App IDs
  */
 export const NFT_APP_IDS = {
-  /** Genesis Babies collection */
+  /** Genesis Sparks collection */
   genesisBabies: "genesis-babies",
 } as const;
 

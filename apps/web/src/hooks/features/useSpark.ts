@@ -118,16 +118,16 @@ export function useBaby(options: UseBabyOptions = {}): UseBabyReturn {
   // Track mining progress for XP
   const lastProcessedSharesRef = useRef<number>(mining.shares);
   const lastProcessedHashesRef = useRef<number>(mining.totalHashes);
-  const babyIdRef = useRef<string | null>(null);
+  const sparkIdRef = useRef<string | null>(null);
 
   // Reset refs when baby changes
   useEffect(() => {
     const currentBabyId = game.baby?.id ?? null;
-    if (currentBabyId !== babyIdRef.current) {
+    if (currentBabyId !== sparkIdRef.current) {
       const baseline = game.baby?.miningSharesBaseline ?? 0;
       lastProcessedSharesRef.current = Math.max(baseline, mining.shares);
       lastProcessedHashesRef.current = mining.totalHashes;
-      babyIdRef.current = currentBabyId;
+      sparkIdRef.current = currentBabyId;
     }
   }, [
     game.baby?.id,

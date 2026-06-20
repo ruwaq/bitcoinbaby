@@ -1,5 +1,5 @@
 /**
- * Genesis Baby NFT Sprite Types
+ * Genesis Spark NFT Sprite Types
  *
  * Type definitions for the NFT sprite generation system.
  *

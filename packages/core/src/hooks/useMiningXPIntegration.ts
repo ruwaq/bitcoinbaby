@@ -13,7 +13,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useBabyStore } from "../stores/baby-store";
+import { useSparkStore } from "../stores/baby-store";
 import { useMiningStore } from "../stores/mining-store";
 
 // =============================================================================
@@ -62,8 +62,8 @@ export function useMiningXPIntegration(
   } = options;
 
   // Stores
-  const baby = useBabyStore((s) => s.baby);
-  const addExperience = useBabyStore((s) => s.addExperience);
+  const baby = useSparkStore((s) => s.baby);
+  const addExperience = useSparkStore((s) => s.addExperience);
   const stats = useMiningStore((s) => s.stats);
   const persistedStats = useMiningStore((s) => s.persistedStats);
   const cosmicMultiplier = useMiningStore((s) => s.cosmicMultiplier);

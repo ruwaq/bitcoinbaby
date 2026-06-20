@@ -1,7 +1,7 @@
 /**
  * Minting Manager
  *
- * Orchestrates the complete flow of minting BABTC tokens on-chain.
+ * Orchestrates the complete flow of minting SPARK tokens on-chain.
  * Connects mining proofs to the Charms protocol via the Prover API.
  *
  * TWO FLOWS SUPPORTED:
@@ -28,9 +28,9 @@ import { CharmsProverClient, createCharmsProverClient } from "./prover";
 import type { ProverResponse } from "./prover";
 import type { SpellV9, SpellV10 } from "./types";
 import {
-  createBABTCMintSpellV9,
-  createBABTCMintSpellV10,
-  BABTC_CONFIG,
+  createSPARKMintSpellV9,
+  createSPARKMintSpellV10,
+  SPARK_CONFIG,
   calculateMiningReward,
 } from "./token";
 import type {
@@ -47,7 +47,7 @@ import {
 } from "../blockchain";
 import { TransactionBuilder, createTransactionBuilder } from "../transactions";
 import type { BitcoinNetwork } from "../types";
-import { BABTC_TESTNET4 } from "../config/deployment";
+import { SPARK_TESTNET4 } from "../config/deployment";
 import { createLogger } from "@bitcoinbaby/shared";
 
 const mintingLog = createLogger("MintingManager");
@@ -399,11 +399,11 @@ export class MintingManager {
 
     // Create V10 spell with BRO-style reward based on difficulty
     const spellParams: TokenMintParamsV10 = {
-      appId: BABTC_TESTNET4.appId,
-      appVk: BABTC_TESTNET4.appVk,
+      appId: SPARK_TESTNET4.appId,
+      appVk: SPARK_TESTNET4.appVk,
       minerAddress,
-      devAddress: BABTC_CONFIG.addresses.devFund,
-      stakingAddress: BABTC_CONFIG.addresses.stakingPool,
+      devAddress: SPARK_CONFIG.addresses.devFund,
+      stakingAddress: SPARK_CONFIG.addresses.stakingPool,
       leadingZeros,
       miningTxHex,
       merkleProofHex,
@@ -413,7 +413,7 @@ export class MintingManager {
       },
     };
 
-    const spell = createBABTCMintSpellV10(spellParams);
+    const spell = createSPARKMintSpellV10(spellParams);
     this.log("Spell created", {
       apps: spell.apps,
       outsCount: spell.outs.length,
@@ -610,7 +610,7 @@ export class MintingManager {
    * @returns Reward breakdown for the given difficulty
    */
   estimateReward(
-    leadingZeros: number = BABTC_CONFIG.rewards.minDifficulty,
+    leadingZeros: number = SPARK_CONFIG.rewards.minDifficulty,
   ): MiningReward {
     return calculateMiningReward(leadingZeros);
   }
@@ -638,7 +638,7 @@ export class MintingManager {
   /**
    * Generate V9 spell and submit to prover (simplified flow)
    *
-   * This is the recommended flow for BABTC mining:
+   * This is the recommended flow for SPARK mining:
    * 1. Miner finds valid PoW
    * 2. This method creates spell and submits to prover
    * 3. Returns commit/spell TXs ready for signing
@@ -659,12 +659,12 @@ export class MintingManager {
     onProgress?.("building_spell", { message: "Building V9 mint spell..." });
 
     // Create V9 spell with PoW private_inputs
-    const spell = createBABTCMintSpellV9({
-      appId: BABTC_TESTNET4.appId,
-      appVk: BABTC_TESTNET4.appVk,
+    const spell = createSPARKMintSpellV9({
+      appId: SPARK_TESTNET4.appId,
+      appVk: SPARK_TESTNET4.appVk,
       minerAddress,
-      devAddress: BABTC_CONFIG.addresses.devFund,
-      stakingAddress: BABTC_CONFIG.addresses.stakingPool,
+      devAddress: SPARK_CONFIG.addresses.devFund,
+      stakingAddress: SPARK_CONFIG.addresses.stakingPool,
       challenge: miningData.challenge,
       nonce: miningData.nonce,
       difficulty: miningData.difficulty,

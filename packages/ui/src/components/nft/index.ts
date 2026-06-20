@@ -1,13 +1,13 @@
 /**
  * NFT UI Components
  *
- * Pixel art display components for Genesis Baby NFTs.
+ * Pixel art display components for Genesis Spark NFTs.
  */
 
 // NFT types (local mirror of @bitcoinbaby/bitcoin/charms/nft types)
 export type {
-  BabyNFTState,
-  BabyNFTInfo,
+  SparkNFTState,
+  SparkNFTInfo,
   Bloodline,
   RarityTier,
   BaseType,
@@ -60,7 +60,7 @@ export {
   type EffectsConfig,
 } from "./trait-config";
 
-// Genesis Baby Sprite System (new pixel art sprites)
+// Genesis Spark Sprite System (new pixel art sprites)
 export {
   // Main component
   GenesisBabySprite,

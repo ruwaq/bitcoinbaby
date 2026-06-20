@@ -71,7 +71,7 @@ vi.mock("@bitcoinbaby/core", () => ({
   }),
   usePendingTxStore: () => 0,
   useNarrativeStore: () => 0,
-  useBabyStore: () => ({ baby: null }),
+  useSparkStore: () => ({ baby: null }),
   useWalletStore: () => ({ wallet: null }),
   useNFTStore: () => ({ bestBoost: 0, stackedBoost: 0, totalNFTs: 0 }),
   useNetworkStore: () => ({ config: { scrolls: "testnet4" } }),

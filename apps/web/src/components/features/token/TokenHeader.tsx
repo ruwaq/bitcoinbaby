@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * TokenHeader - Header del token $BABTC
+ * TokenHeader - Header del token $SPARK
  *
  * Muestra:
  * - Logo y nombre del token
@@ -11,9 +11,9 @@
 
 import Image from "next/image";
 import {
-  BABTC_CONFIG,
-  BABTC_METADATA,
-  BABTC_TESTNET4,
+  SPARK_CONFIG,
+  SPARK_METADATA,
+  SPARK_TESTNET4,
 } from "@bitcoinbaby/bitcoin";
 import { pixelBorders } from "@bitcoinbaby/ui";
 
@@ -24,8 +24,8 @@ const EXPLORER_LINKS = {
 };
 
 export function TokenHeader() {
-  const appId = BABTC_TESTNET4.appId;
-  const appVk = BABTC_TESTNET4.appVk;
+  const appId = SPARK_TESTNET4.appId;
+  const appVk = SPARK_TESTNET4.appVk;
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -39,10 +39,10 @@ export function TokenHeader() {
         {/* Logo and Name */}
         <div className="flex items-center gap-4">
           <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-4 border-pixel-primary bg-pixel-bg-dark flex items-center justify-center">
-            {BABTC_METADATA.image ? (
+            {SPARK_METADATA.image ? (
               <Image
-                src={BABTC_METADATA.image}
-                alt="BABTC Logo"
+                src={SPARK_METADATA.image}
+                alt="SPARK Logo"
                 fill
                 className="object-cover pixelated"
                 unoptimized
@@ -55,10 +55,10 @@ export function TokenHeader() {
           </div>
           <div>
             <h1 className="font-pixel text-pixel-lg sm:text-pixel-xl text-pixel-primary">
-              ${BABTC_CONFIG.ticker}
+              ${SPARK_CONFIG.ticker}
             </h1>
             <p className="font-pixel-body text-pixel-sm text-pixel-text-muted">
-              {BABTC_METADATA.name} Token
+              {SPARK_METADATA.name} Token
             </p>
             <div className="flex gap-2 mt-2">
               <span className="font-pixel text-pixel-2xs px-2 py-1 bg-pixel-warning/20 text-pixel-warning border border-pixel-warning">

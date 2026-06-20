@@ -1,5 +1,5 @@
 /**
- * Alien Baby Sprite - SCI-FI EXTRATERRESTRIALS
+ * Alien Spark Sprite - SCI-FI EXTRATERRESTRIALS
  *
  * Seres de otros mundos con tecnología avanzada.
  * +15% a todo en eventos raros, impredecibles.

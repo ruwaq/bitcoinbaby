@@ -1,5 +1,5 @@
 /**
- * $BABTC Token Configuration
+ * $SPARK Token Configuration
  *
  * Token configuration and types for the BitcoinBaby fungible token.
  * Distributed via Proof-of-Useful-Work mining.
@@ -77,11 +77,11 @@ export function addressToScriptPubKeyHex(
 // =============================================================================
 
 /**
- * $BABTC Token Configuration
+ * $SPARK Token Configuration
  * These values are IMMUTABLE once deployed
  */
-export const BABTC_CONFIG = {
-  ticker: "BABTC",
+export const SPARK_CONFIG = {
+  ticker: "SPARK",
   name: "BitcoinBaby",
   decimals: 8,
   maxSupply: 21_000_000_000n * 100_000_000n, // 21B with 8 decimals
@@ -97,7 +97,7 @@ export const BABTC_CONFIG = {
   // BRO-style reward configuration (no halving)
   // Must match contracts/babtc/src/lib.rs constants
   rewards: {
-    /** Base reward (1 BABTC in base units) */
+    /** Base reward (1 SPARK in base units) */
     baseReward: 1n * 100_000_000n,
     /** Minimum leading zeros required (D16) */
     minDifficulty: 16,
@@ -136,10 +136,10 @@ if (
   process.env.BITCOIN_NETWORK !== "testnet4" &&
   process.env.BITCOIN_NETWORK !== "testnet"
 ) {
-  const { devFund, stakingPool } = BABTC_CONFIG.addresses;
+  const { devFund, stakingPool } = SPARK_CONFIG.addresses;
   if (devFund.startsWith("tb1") || stakingPool.startsWith("tb1")) {
     console.warn(
-      "[BABTC] WARNING: Testnet addresses detected in production/mainnet environment. " +
+      "[SPARK] WARNING: Testnet addresses detected in production/mainnet environment. " +
         "Replace NEXT_PUBLIC_DEV_FUND_ADDRESS and NEXT_PUBLIC_STAKING_POOL_ADDRESS " +
         "with mainnet addresses before deploying to production.",
     );
@@ -153,7 +153,7 @@ if (
 /**
  * Token metadata for Charms Explorer
  */
-export interface BABTCMetadata {
+export interface SPARKMetadata {
   decimals: number;
   description: string;
   image: string;
@@ -163,19 +163,19 @@ export interface BABTCMetadata {
   url: string;
 }
 
-import { BABTC_LOGO_DATA_URI } from "./logo";
+import { SPARK_LOGO_DATA_URI } from "./logo";
 
 /**
- * Default metadata for $BABTC
+ * Default metadata for $SPARK
  */
-export const BABTC_METADATA: BABTCMetadata = {
+export const SPARK_METADATA: SPARKMetadata = {
   decimals: 8,
   description:
-    "Proof-of-Useful-Work token. Mine by training AI, raise your BitcoinBaby, earn $BABTC.",
-  image: BABTC_LOGO_DATA_URI,
+    "Proof-of-Useful-Work token. Mine by training AI, raise your BitcoinBaby, earn $SPARK.",
+  image: SPARK_LOGO_DATA_URI,
   name: "BitcoinBaby",
   supply_limit: 21_000_000_000,
-  ticker: "BABTC",
+  ticker: "SPARK",
   url: "https://bitcoinbaby.dev",
 };
 
@@ -214,15 +214,15 @@ export interface MiningReward {
  * Calculate mining reward based on difficulty (BRO formula)
  *
  * Formula: BASE_REWARD * D² / DIFFICULTY_FACTOR
- * Where: BASE_REWARD = 1 BABTC, FACTOR = 100
+ * Where: BASE_REWARD = 1 SPARK, FACTOR = 100
  *
  * Examples:
- * - D16 (min): 1 * 256 / 100 = 2.56 BABTC
- * - D20:       1 * 400 / 100 = 4.00 BABTC
- * - D22:       1 * 484 / 100 = 4.84 BABTC
- * - D24:       1 * 576 / 100 = 5.76 BABTC
- * - D28:       1 * 784 / 100 = 7.84 BABTC
- * - D32 (max): 1 * 1024 / 100 = 10.24 BABTC
+ * - D16 (min): 1 * 256 / 100 = 2.56 SPARK
+ * - D20:       1 * 400 / 100 = 4.00 SPARK
+ * - D22:       1 * 484 / 100 = 4.84 SPARK
+ * - D24:       1 * 576 / 100 = 5.76 SPARK
+ * - D28:       1 * 784 / 100 = 7.84 SPARK
+ * - D32 (max): 1 * 1024 / 100 = 10.24 SPARK
  *
  * Harder work = exponentially more reward (D²)
  *
@@ -231,8 +231,8 @@ export interface MiningReward {
  */
 export function calculateMiningReward(leadingZeros: number): MiningReward {
   const { baseReward, minDifficulty, maxDifficulty, difficultyFactor } =
-    BABTC_CONFIG.rewards;
-  const { miner, dev, staking } = BABTC_CONFIG.distribution;
+    SPARK_CONFIG.rewards;
+  const { miner, dev, staking } = SPARK_CONFIG.distribution;
 
   // Clamp difficulty to valid range
   const clampedDifficulty = Math.max(
@@ -271,7 +271,7 @@ export function getRewardTable(): Array<{
   totalReward: bigint;
   minerReward: bigint;
 }> {
-  const { minDifficulty, maxDifficulty } = BABTC_CONFIG.rewards;
+  const { minDifficulty, maxDifficulty } = SPARK_CONFIG.rewards;
   const table: Array<{
     difficulty: number;
     totalReward: bigint;
@@ -310,7 +310,7 @@ export function getCurrentEpoch(_blockHeight: number): number {
 export function calculateBlockReward(_blockHeight: number): bigint {
   // Return base reward for compatibility
   // New code should use calculateMiningReward(difficulty) instead
-  return BABTC_CONFIG.rewards.baseReward;
+  return SPARK_CONFIG.rewards.baseReward;
 }
 
 // =============================================================================
@@ -322,7 +322,7 @@ export function calculateBlockReward(_blockHeight: number): bigint {
  */
 export function formatTokenAmount(
   amount: bigint,
-  decimals: number = BABTC_CONFIG.decimals,
+  decimals: number = SPARK_CONFIG.decimals,
 ): string {
   const divisor = 10n ** BigInt(decimals);
   const whole = amount / divisor;
@@ -340,7 +340,7 @@ export function formatTokenAmount(
  */
 export function parseTokenAmount(
   amount: string,
-  decimals: number = BABTC_CONFIG.decimals,
+  decimals: number = SPARK_CONFIG.decimals,
 ): bigint {
   const [whole, fraction = ""] = amount.split(".");
   const paddedFraction = fraction.padEnd(decimals, "0").slice(0, decimals);
@@ -412,7 +412,7 @@ export interface TokenMintParams {
 
 /**
  * Generate a token mint spell
- * @deprecated Use createBABTCMintSpellV10 for new implementations
+ * @deprecated Use createSPARKMintSpellV10 for new implementations
  */
 export function createTokenMintSpell(params: TokenMintParams): SpellV2 {
   const reward = calculateMiningReward(params.leadingZeros);
@@ -518,7 +518,7 @@ export function createTokenTransferSpell(params: TokenTransferParams): SpellV2 {
  * 4. Create mint spell with private_inputs
  */
 export interface TokenMintParamsV10 {
-  /** BABTC app ID (SHA256 of genesis UTXO) */
+  /** SPARK app ID (SHA256 of genesis UTXO) */
   appId: string;
   /** Verification key (SHA256 of WASM binary) */
   appVk: string;
@@ -547,7 +547,7 @@ export interface TokenMintParamsV10 {
  * This is the main entry point for creating mint spells after mining.
  * Uses BRO-style reward calculation based on difficulty.
  */
-export function createBABTCMintSpellV10(params: TokenMintParamsV10): SpellV10 {
+export function createSPARKMintSpellV10(params: TokenMintParamsV10): SpellV10 {
   const reward = calculateMiningReward(params.leadingZeros);
 
   // Use the shared V10 spell creator for miner's share
@@ -590,7 +590,7 @@ export function createBABTCMintSpellV10(params: TokenMintParamsV10): SpellV10 {
 /**
  * Generate a token transfer spell (V10 format)
  */
-export function createBABTCTransferSpellV10(
+export function createSPARKTransferSpellV10(
   params: TokenTransferParams,
 ): SpellV10 {
   return createTokenTransferSpellV10({
@@ -630,13 +630,13 @@ export function validateAmountForSpell(amount: bigint): void {
 /**
  * PoW mint spell parameters for V9 (direct PoW validation)
  *
- * This is the primary method for BABTC mining:
+ * This is the primary method for SPARK mining:
  * 1. Miner finds valid PoW (challenge:nonce -> hash with D bits)
  * 2. Creates spell with challenge, nonce, difficulty
  * 3. Contract validates the PoW and mints tokens
  */
 export interface TokenMintParamsV9 {
-  /** BABTC app ID (SHA256 of genesis UTXO) */
+  /** SPARK app ID (SHA256 of genesis UTXO) */
   appId: string;
   /** Verification key (SHA256 of WASM binary) */
   appVk: string;
@@ -667,7 +667,7 @@ export interface TokenMintParamsV9 {
  *
  * @example
  * ```typescript
- * const spell = createBABTCMintSpellV9({
+ * const spell = createSPARKMintSpellV9({
  *   appId: '87b5ecfb...',
  *   appVk: 'acf2ec0b...',
  *   minerAddress: 'tb1p...',
@@ -680,7 +680,7 @@ export interface TokenMintParamsV9 {
  * });
  * ```
  */
-export function createBABTCMintSpellV9(params: TokenMintParamsV9): SpellV9 {
+export function createSPARKMintSpellV9(params: TokenMintParamsV9): SpellV9 {
   // Calculate reward based on difficulty
   const reward = calculateMiningReward(params.difficulty);
 
@@ -712,7 +712,7 @@ export function createBABTCMintSpellV9(params: TokenMintParamsV9): SpellV9 {
  * Use this when you need to specify exact reward amounts
  * (e.g., for testing or special cases).
  */
-export function createBABTCMintSpellV9WithRewards(
+export function createSPARKMintSpellV9WithRewards(
   params: TokenMintParamsV9 & {
     minerReward: bigint;
     devReward: bigint;
@@ -757,7 +757,7 @@ const MIN_OUTPUT_SATS = 546;
  * - private_inputs passed separately via API
  */
 export interface TokenMintParamsV11 {
-  /** BABTC app ID (SHA256 of genesis UTXO) */
+  /** SPARK app ID (SHA256 of genesis UTXO) */
   appId: string;
   /** Verification key (SHA256 of WASM binary) */
   appVk: string;
@@ -803,7 +803,7 @@ export interface TokenMintParamsV11 {
  *
  * @example
  * ```typescript
- * const { spell, privateInputs } = createBABTCMintSpellV11({
+ * const { spell, privateInputs } = createSPARKMintSpellV11({
  *   appId: '87b5ecfb...',
  *   appVk: 'acf2ec0b...',
  *   minerAddress: 'tb1p...',
@@ -816,7 +816,7 @@ export interface TokenMintParamsV11 {
  * });
  * ```
  */
-export function createBABTCMintSpellV11(params: TokenMintParamsV11): {
+export function createSPARKMintSpellV11(params: TokenMintParamsV11): {
   spell: SpellV11;
   privateInputs: PoWPrivateInputsV11;
   proverRequest: ProverRequestV11;
@@ -906,7 +906,7 @@ export interface TokenTransferParamsV11 {
   changeAddress?: string;
 }
 
-export function createBABTCTransferSpellV11(
+export function createSPARKTransferSpellV11(
   params: TokenTransferParamsV11,
 ): SpellV11 {
   if (params.fromAmount < params.toAmount) {

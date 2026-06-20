@@ -1,5 +1,5 @@
 /**
- * On-Chain HTML Renderer for Genesis Babies NFTs
+ * On-Chain HTML Renderer for Genesis Sparks NFTs
  *
  * Self-contained HTML/JS that renders NFTs from DNA.
  * Inscribed once, referenced by all NFT metadata.
@@ -30,7 +30,7 @@ export function generateOnChainRenderer(options: {
   title?: string;
   version?: number;
 }): string {
-  const { libraryInscriptionId, title = "Genesis Baby", version = 1 } = options;
+  const { libraryInscriptionId, title = "Genesis Spark", version = 1 } = options;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -574,8 +574,8 @@ export function generateNFTMetadata(params: {
     tokenId,
     dna,
     rendererInscriptionId,
-    name = `Genesis Baby #${tokenId}`,
-    description = "A unique Genesis Baby on Bitcoin",
+    name = `Genesis Spark #${tokenId}`,
+    description = "A unique Genesis Spark on Bitcoin",
     attributes = [],
   } = params;
 
@@ -587,7 +587,7 @@ export function generateNFTMetadata(params: {
     properties: {
       dna,
       tokenId,
-      collection: "Genesis Babies",
+      collection: "Genesis Sparks",
       standard: "ordinals",
     },
   };

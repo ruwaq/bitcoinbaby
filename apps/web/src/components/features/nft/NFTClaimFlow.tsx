@@ -122,7 +122,7 @@ export function NFTClaimFlow({
               NFT Claimed Successfully!
             </p>
             <p className="font-pixel text-[8px] text-pixel-text-muted">
-              Genesis Baby #{lastClaimed.tokenId} is now in your collection
+              Genesis Spark #{lastClaimed.tokenId} is now in your collection
             </p>
           </div>
 

@@ -21,7 +21,7 @@ import {
   getMiningBoost,
   createNFTWorkProofSpell,
   createNFTLevelUpSpell,
-  type BabyNFTState,
+  type SparkNFTState,
   type Bloodline,
 } from "../../src/charms/nft";
 
@@ -30,8 +30,8 @@ import {
 // =============================================================================
 
 const createMockNFT = (
-  overrides: Partial<BabyNFTState> = {},
-): BabyNFTState => ({
+  overrides: Partial<SparkNFTState> = {},
+): SparkNFTState => ({
   dna: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
   bloodline: "rogue",
   baseType: "human",
@@ -257,7 +257,7 @@ describe("getMiningBoost", () => {
     for (const [tier, config] of Object.entries(rarityBoosts)) {
       const nft = createMockNFT({
         level: 1,
-        rarityTier: tier as BabyNFTState["rarityTier"],
+        rarityTier: tier as SparkNFTState["rarityTier"],
       });
       const boost = getMiningBoost(nft);
       // Level 1 boost is 0, so total = rarity boost
@@ -323,7 +323,7 @@ describe("createNFTWorkProofSpell", () => {
     const nextLevelReq = XP_REQUIREMENTS[defaultParams.currentState.level + 1]; // 100
     const rawNewXp = defaultParams.currentState.xp + xpGain; // 50 + 100 = 150
     const expectedXp = Math.min(rawNewXp, nextLevelReq); // min(150, 100) = 100
-    const newState = spell.outs[0].charms.$00 as BabyNFTState;
+    const newState = spell.outs[0].charms.$00 as SparkNFTState;
 
     // XP is capped at the next level's requirement to prevent overflow
     expect(newState.xp).toBe(expectedXp); // 100 (capped)
@@ -342,7 +342,7 @@ describe("createNFTWorkProofSpell", () => {
     const spell = createNFTWorkProofSpell(params);
     const xpGain = calculateXpGain(highCapState); // 100
     const nextLevelReq = XP_REQUIREMENTS[10]; // 32000
-    const newState = spell.outs[0].charms.$00 as BabyNFTState;
+    const newState = spell.outs[0].charms.$00 as SparkNFTState;
 
     // 0 + 100 = 100 < 32000, so no cap applied
     expect(newState.xp).toBe(xpGain); // 100, no cap
@@ -351,21 +351,21 @@ describe("createNFTWorkProofSpell", () => {
 
   it("should increment work count", () => {
     const spell = createNFTWorkProofSpell(defaultParams);
-    const newState = spell.outs[0].charms.$00 as BabyNFTState;
+    const newState = spell.outs[0].charms.$00 as SparkNFTState;
 
     expect(newState.workCount).toBe(defaultParams.currentState.workCount + 1);
   });
 
   it("should update lastWorkBlock", () => {
     const spell = createNFTWorkProofSpell(defaultParams);
-    const newState = spell.outs[0].charms.$00 as BabyNFTState;
+    const newState = spell.outs[0].charms.$00 as SparkNFTState;
 
     expect(newState.lastWorkBlock).toBe(defaultParams.currentBlock);
   });
 
   it("should preserve immutable fields", () => {
     const spell = createNFTWorkProofSpell(defaultParams);
-    const newState = spell.outs[0].charms.$00 as BabyNFTState;
+    const newState = spell.outs[0].charms.$00 as SparkNFTState;
 
     expect(newState.dna).toBe(defaultParams.currentState.dna);
     expect(newState.bloodline).toBe(defaultParams.currentState.bloodline);
@@ -419,21 +419,21 @@ describe("createNFTLevelUpSpell", () => {
 
   it("should increment level", () => {
     const spell = createNFTLevelUpSpell(defaultParams);
-    const newState = spell.outs[0].charms.$00 as BabyNFTState;
+    const newState = spell.outs[0].charms.$00 as SparkNFTState;
 
     expect(newState.level).toBe(currentState.level + 1);
   });
 
   it("should reset XP to 0", () => {
     const spell = createNFTLevelUpSpell(defaultParams);
-    const newState = spell.outs[0].charms.$00 as BabyNFTState;
+    const newState = spell.outs[0].charms.$00 as SparkNFTState;
 
     expect(newState.xp).toBe(0);
   });
 
   it("should increment evolutionCount", () => {
     const spell = createNFTLevelUpSpell(defaultParams);
-    const newState = spell.outs[0].charms.$00 as BabyNFTState;
+    const newState = spell.outs[0].charms.$00 as SparkNFTState;
 
     expect(newState.evolutionCount).toBe(currentState.evolutionCount + 1);
   });
@@ -460,7 +460,7 @@ describe("createNFTLevelUpSpell", () => {
 
   it("should preserve immutable fields", () => {
     const spell = createNFTLevelUpSpell(defaultParams);
-    const newState = spell.outs[0].charms.$00 as BabyNFTState;
+    const newState = spell.outs[0].charms.$00 as SparkNFTState;
 
     expect(newState.dna).toBe(currentState.dna);
     expect(newState.bloodline).toBe(currentState.bloodline);

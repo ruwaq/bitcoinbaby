@@ -1,5 +1,5 @@
 /**
- * Animal Baby Sprite - CUTE CREATURE DESIGN (Pixel Art Edition)
+ * Animal Spark Sprite - CUTE CREATURE DESIGN (Pixel Art Edition)
  *
  * Adorable animal babies with big eyes and soft features.
  * Aesthetic: 32x32 strict pixel art grid, cohesive and highly valuable visual asset.

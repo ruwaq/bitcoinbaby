@@ -1,7 +1,7 @@
 /**
  * Spark Types — Unified entity for BitcoinSparks
  *
- * Replaces: Baby (types.ts), GameBaby (game/types.ts), BabyNFTState (bitcoin/src/charms/nft.ts)
+ * Replaces: Baby (types.ts), GameSpark (game/types.ts), SparkNFTState (bitcoin/src/charms/nft.ts)
  * Principle: 1 Spark = 1 NFT. The NFT IS the spark.
  */
 
@@ -10,7 +10,7 @@ import type {
   Bloodline as _Bloodline,
   RarityTier as _RarityTier,
   BaseType as _BaseType,
-  BabyNFTState,
+  SparkNFTState,
 } from "@bitcoinbaby/bitcoin";
 
 // =============================================================================
@@ -65,7 +65,7 @@ export interface Spark {
 
   // === Game State (off-chain volatile + on-chain mutable) ===
   state: SparkState;
-  visualState: string; // from BabyVisualState
+  visualState: string; // from SparkVisualState
   level: number; // 1-21 (MAX_LEVEL from shared)
   xp: number;
   totalXp: number;
@@ -111,9 +111,9 @@ export interface SparkEvolutionRecord {
 // =============================================================================
 
 /**
- * Convert BabyNFTState (on-chain) to Spark
+ * Convert SparkNFTState (on-chain) to Spark
  */
-export function fromNFTState(nft: BabyNFTState, owner: string): Partial<Spark> {
+export function fromNFTState(nft: SparkNFTState, owner: string): Partial<Spark> {
   return {
     tokenId: nft.tokenId,
     dna: nft.dna,

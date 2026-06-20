@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * TokenStats - Stats cards del token $BABTC
+ * TokenStats - Stats cards del token $SPARK
  *
  * Muestra:
  * - Max Supply
@@ -10,7 +10,7 @@
  * - On-chain balance
  */
 
-import { BABTC_CONFIG } from "@bitcoinbaby/bitcoin";
+import { SPARK_CONFIG } from "@bitcoinbaby/bitcoin";
 import {
   AnimatedTokenCounter,
   HelpTooltip,
@@ -28,7 +28,7 @@ export function TokenStats({
   onChainBalance,
   isLoading = false,
 }: TokenStatsProps) {
-  const maxSupply = BABTC_CONFIG.maxSupply;
+  const maxSupply = SPARK_CONFIG.maxSupply;
   const totalBalance = virtualBalance + onChainBalance;
 
   // Format large numbers with suffix (B, M, K)
@@ -49,7 +49,7 @@ export function TokenStats({
             Max Supply
           </span>
           <HelpTooltip
-            content="The maximum number of $BABTC tokens that will ever exist. Similar to Bitcoin's 21M cap."
+            content="The maximum number of $SPARK tokens that will ever exist. Similar to Bitcoin's 21M cap."
             title="Maximum Supply"
             size="sm"
           />
@@ -71,7 +71,7 @@ export function TokenStats({
             Your Balance
           </span>
           <HelpTooltip
-            content="Your total $BABTC tokens: virtual balance (earned from mining) + on-chain balance (withdrawn to wallet)."
+            content="Your total $SPARK tokens: virtual balance (earned from mining) + on-chain balance (withdrawn to wallet)."
             title="Total Balance"
             size="sm"
           />

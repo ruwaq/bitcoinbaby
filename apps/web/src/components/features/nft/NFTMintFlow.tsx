@@ -19,7 +19,7 @@ import {
   Button,
   pixelShadows,
   pixelBorders,
-  type BabyNFTState,
+  type SparkNFTState,
 } from "@bitcoinbaby/ui";
 import type { MintStep } from "@/hooks/useMintNFT";
 
@@ -105,7 +105,7 @@ interface NFTMintFlowProps {
   formattedPrice: string;
   canMint: boolean;
   isWalletConnected: boolean;
-  lastMinted: BabyNFTState | null;
+  lastMinted: SparkNFTState | null;
   txid: string | null;
   commitTxid?: string | null;
   error?: string | null;
@@ -167,7 +167,7 @@ export function NFTMintFlow({
               size="lg"
               disabled={!canMint || !isWalletConnected}
             >
-              {isWalletConnected ? "Mint Genesis Baby" : "Connect wallet first"}
+              {isWalletConnected ? "Mint Genesis Spark" : "Connect wallet first"}
             </Button>
           </motion.div>
           {!isWalletConnected && (
@@ -402,7 +402,7 @@ export function NFTMintFlow({
               Congratulations!
             </p>
             <p className="font-pixel text-[8px] text-pixel-text-muted">
-              You got a new Genesis Baby!
+              You got a new Genesis Spark!
             </p>
           </div>
 

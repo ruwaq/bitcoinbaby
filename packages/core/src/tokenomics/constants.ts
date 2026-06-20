@@ -59,11 +59,11 @@ export const BASE_REWARD_PER_SHARE = BigInt(10);
 
 /**
  * Minimum mining difficulty
- * Set to D16 to match the BABTC contract
+ * Set to D16 to match the SPARK contract
  *
  * Reward formula: BASE_REWARD × D² ÷ DIFFICULTY_FACTOR
- * D16 = 2.56 BABTC reward per valid share
- * D22 = 4.84 BABTC reward per valid share
+ * D16 = 2.56 SPARK reward per valid share
+ * D22 = 4.84 SPARK reward per valid share
  */
 export const MIN_DIFFICULTY = 16;
 
@@ -266,18 +266,18 @@ export function calculateWithdrawBurn(amount: bigint): {
 // DISTRIBUTION (Re-exported from @bitcoinbaby/bitcoin - single source of truth)
 // =============================================================================
 
-import { BABTC_CONFIG } from "@bitcoinbaby/bitcoin";
+import { SPARK_CONFIG } from "@bitcoinbaby/bitcoin";
 
 /**
  * Mining reward distribution for ON-CHAIN minting
  *
- * SOURCE OF TRUTH: @bitcoinbaby/bitcoin (BABTC_CONFIG.distribution)
+ * SOURCE OF TRUTH: @bitcoinbaby/bitcoin (SPARK_CONFIG.distribution)
  *
  * NOTE: This only applies when minting real tokens via Charms.
  * Virtual balance (what users see) shows 100% of their mined rewards.
  * The dev/staking distribution happens silently in the background.
  */
-export const DISTRIBUTION = BABTC_CONFIG.distribution;
+export const DISTRIBUTION = SPARK_CONFIG.distribution;
 
 // =============================================================================
 // NFT & EVOLUTION COSTS

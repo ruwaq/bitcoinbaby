@@ -23,15 +23,15 @@ export {
   getStageVariant,
   type BabyStage,
   type BabySpriteForm,
-  type BabyVisualState,
+  type SparkVisualState,
   type GameAction,
 } from "./constants";
 
 // Types
 export type {
-  BabyStats,
-  BabyProgression,
-  GameBaby,
+  SparkStats,
+  SparkProgression,
+  GameSpark,
   EvolutionRecord,
   EvolutionEventData,
   GameMiningStats,
@@ -43,7 +43,7 @@ export type {
   GameEvent,
   GameEventHandler,
 } from "./types";
-export { DEFAULT_BABY_STATS, DEFAULT_GAME_STATE } from "./types";
+export { DEFAULT_SPARK_STATS, DEFAULT_GAME_STATE } from "./types";
 
 // Mechanics
 export {

@@ -238,7 +238,7 @@ export const useWalletStore = create<WalletStore>((set, get) => {
       }),
 
     // Update BABY token balance (with race condition protection)
-    updateBabyTokens: (babyTokens) =>
+    updateBabyTokens: (sparkTokens) =>
       set((s) => {
         if (!s.wallet || !s.isConnected) {
           console.warn(
@@ -246,7 +246,7 @@ export const useWalletStore = create<WalletStore>((set, get) => {
           );
           return s;
         }
-        return { wallet: { ...s.wallet, babyTokens } };
+        return { wallet: { ...s.wallet, sparkTokens } };
       }),
 
     // Set signing functions (called by wallet provider after connection)

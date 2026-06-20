@@ -174,7 +174,7 @@ export function getCatchUpBonus(
 // MAIN ENERGY CALCULATOR
 // =============================================================================
 
-interface BabyStats {
+interface SparkStats {
   baseType: BaseType;
   bloodline: Bloodline;
   heritage: Heritage;
@@ -185,7 +185,7 @@ interface BabyStats {
 }
 
 interface CalculateEnergyOptions {
-  baby: BabyStats;
+  baby: SparkStats;
   cosmicState: CosmicState;
   serverAverageLevel?: number;
   context?: "xp" | "mining" | "drops";

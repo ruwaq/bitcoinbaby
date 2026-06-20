@@ -18,7 +18,7 @@ import {
   type BabyStage,
   type GameAction,
 } from "./constants";
-import type { BabyStats, GameBaby, BabyProgression } from "./types";
+import type { SparkStats, GameSpark, SparkProgression } from "./types";
 
 /**
  * Clamp a value between min and max
@@ -30,7 +30,7 @@ function clamp(value: number, min: number, max: number): number {
 /**
  * Clamp stats to valid range
  */
-function clampStats(stats: BabyStats): BabyStats {
+function clampStats(stats: SparkStats): SparkStats {
   return {
     energy: clamp(stats.energy, GAME_CONFIG.STAT_MIN, GAME_CONFIG.STAT_MAX),
     happiness: clamp(
@@ -47,11 +47,11 @@ function clampStats(stats: BabyStats): BabyStats {
  * Calculate stat decay based on elapsed time
  */
 export function calculateDecay(
-  stats: BabyStats,
+  stats: SparkStats,
   deltaMs: number,
   isSleeping: boolean,
   isMining: boolean,
-): BabyStats {
+): SparkStats {
   const minutes = deltaMs / 60_000;
   const rates = isSleeping ? SLEEP_RATES : DECAY_RATES;
 
@@ -87,7 +87,7 @@ export function calculateDecay(
 /**
  * Apply an action to stats
  */
-export function applyAction(stats: BabyStats, action: GameAction): BabyStats {
+export function applyAction(stats: SparkStats, action: GameAction): SparkStats {
   const effects = ACTION_EFFECTS[action];
 
   return clampStats({
@@ -104,9 +104,9 @@ export function applyAction(stats: BabyStats, action: GameAction): BabyStats {
  * SECURITY: Validates all values to prevent runaway level-ups from corrupted data.
  */
 export function addXP(
-  progression: BabyProgression,
+  progression: SparkProgression,
   xpToAdd: number,
-): BabyProgression {
+): SparkProgression {
   // Validate inputs to prevent corruption
   let level = progression.level;
   if (typeof level !== "number" || level < 1 || level > GAME_CONFIG.MAX_LEVEL) {
@@ -192,7 +192,7 @@ export function getStageForLevel(level: number): BabyStage {
 /**
  * Check if evolution is available
  */
-export function checkEvolution(baby: GameBaby): BabyStage | null {
+export function checkEvolution(baby: GameSpark): BabyStage | null {
   const currentStage = baby.progression.stage;
   const newStage = getStageForLevel(baby.progression.level);
 
@@ -206,8 +206,8 @@ export function checkEvolution(baby: GameBaby): BabyStage | null {
 /**
  * Get stats that are in critical state
  */
-export function getCriticalStats(stats: BabyStats): (keyof BabyStats)[] {
-  const critical: (keyof BabyStats)[] = [];
+export function getCriticalStats(stats: SparkStats): (keyof SparkStats)[] {
+  const critical: (keyof SparkStats)[] = [];
 
   if (stats.energy <= GAME_CONFIG.CRITICAL_THRESHOLD) {
     critical.push("energy");
@@ -243,7 +243,7 @@ export function calculateMiningXP(shares: number, stage: BabyStage): number {
 /**
  * Determine the visual state based on baby status
  */
-export function determineVisualState(baby: GameBaby): GameBaby["visualState"] {
+export function determineVisualState(baby: GameSpark): GameSpark["visualState"] {
   // Dead state takes absolute priority
   if (isBabyDead(baby)) {
     return "dead";
@@ -276,7 +276,7 @@ export function determineVisualState(baby: GameBaby): GameBaby["visualState"] {
 export function createNewBaby(
   name: string,
   miningSharesBaseline = 0,
-): GameBaby {
+): GameSpark {
   const now = Date.now();
 
   return {
@@ -312,10 +312,10 @@ export function createNewBaby(
  * Calculate offline decay (simplified for returning players)
  */
 export function calculateOfflineDecay(
-  stats: BabyStats,
+  stats: SparkStats,
   offlineMs: number,
   wasSleeping: boolean,
-): BabyStats {
+): SparkStats {
   // Cap offline time to 24 hours
   const maxOfflineMs = 24 * 60 * 60 * 1000;
   const cappedOfflineMs = Math.min(offlineMs, maxOfflineMs);
@@ -338,10 +338,10 @@ export function calculateOfflineDecay(
  * Mined $BABY tokens are PERMANENT and NEVER reduced.
  */
 export function calculateLevelDecay(
-  progression: BabyProgression,
+  progression: SparkProgression,
   lastMinedAt: number,
   now: number = Date.now(),
-): { progression: BabyProgression; isDead: boolean } {
+): { progression: SparkProgression; isDead: boolean } {
   const inactiveMs = now - lastMinedAt;
 
   // No decay during grace period
@@ -382,9 +382,9 @@ export function calculateLevelDecay(
  * required to reach level N (i.e., getXPForLevel(N)), not getXPForLevel(N-1).
  */
 export function removeXP(
-  progression: BabyProgression,
+  progression: SparkProgression,
   xpToRemove: number,
-): BabyProgression {
+): SparkProgression {
   let xp = progression.xp - xpToRemove;
   let level = progression.level;
 
@@ -418,7 +418,7 @@ export function removeXP(
 /**
  * Check if baby is dead (level 0)
  */
-export function isBabyDead(baby: GameBaby): boolean {
+export function isBabyDead(baby: GameSpark): boolean {
   return baby.progression.level <= 0;
 }
 
@@ -426,7 +426,7 @@ export function isBabyDead(baby: GameBaby): boolean {
  * Revive a dead baby
  * Costs mining shares to revive.
  */
-export function reviveBaby(baby: GameBaby): GameBaby {
+export function reviveBaby(baby: GameSpark): GameSpark {
   if (!isBabyDead(baby)) {
     return baby;
   }

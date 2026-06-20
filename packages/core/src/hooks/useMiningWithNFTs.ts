@@ -3,7 +3,7 @@
  *
  * Uses the global MiningManager singleton so mining persists
  * across page navigations. Automatically applies NFT boost
- * from user's Genesis Babies to mining hashrate.
+ * from user's Genesis Sparks to mining hashrate.
  *
  * When mining finds a valid share, equipped NFTs gain XP automatically
  * through the work proof system.
@@ -26,7 +26,7 @@ export interface UseMiningWithNFTsOptions extends Omit<
   UseGlobalMiningOptions,
   "nftBoost" | "onXPGained"
 > {
-  /** NFT app ID for Genesis Babies */
+  /** NFT app ID for Genesis Sparks */
   nftAppId?: string;
   /** Disable automatic XP submission for equipped NFTs */
   disableAutoXP?: boolean;
@@ -60,7 +60,7 @@ export function useMiningWithNFTs(
   // Get equipped NFT token ID from NFTStore (selectedNFT is the "equipped" NFT)
   const equippedTokenId = useNFTStore((s) => s.selectedNFT?.tokenId ?? null);
 
-  // Get NFT boost from owned Genesis Babies
+  // Get NFT boost from owned Genesis Sparks
   const {
     boost,
     nftCount,

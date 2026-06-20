@@ -10,11 +10,11 @@
 
 import type { BabyStage } from "./constants";
 import { MINING_BONUS } from "./constants";
-import { BABTC_CONFIG } from "@bitcoinbaby/bitcoin";
+import { SPARK_CONFIG } from "@bitcoinbaby/bitcoin";
 
 /**
  * Token distribution percentages
- * SOURCE OF TRUTH: @bitcoinbaby/bitcoin (BABTC_CONFIG.distribution)
+ * SOURCE OF TRUTH: @bitcoinbaby/bitcoin (SPARK_CONFIG.distribution)
  *
  * These are re-exported with game-specific naming for backwards compatibility.
  * miner → PLAYER_SHARE
@@ -22,14 +22,14 @@ import { BABTC_CONFIG } from "@bitcoinbaby/bitcoin";
  * staking → COMMUNITY_SHARE (staking pool funds community events)
  */
 export const TOKEN_DISTRIBUTION = {
-  // Percentage to player (miner) - from BABTC_CONFIG
-  PLAYER_SHARE: BABTC_CONFIG.distribution.miner,
+  // Percentage to player (miner) - from SPARK_CONFIG
+  PLAYER_SHARE: SPARK_CONFIG.distribution.miner,
 
-  // Percentage to dev fund (for game improvements) - from BABTC_CONFIG
-  DEV_FUND_SHARE: BABTC_CONFIG.distribution.dev,
+  // Percentage to dev fund (for game improvements) - from SPARK_CONFIG
+  DEV_FUND_SHARE: SPARK_CONFIG.distribution.dev,
 
-  // Percentage to community treasury (events, prizes) - from BABTC_CONFIG
-  COMMUNITY_SHARE: BABTC_CONFIG.distribution.staking,
+  // Percentage to community treasury (events, prizes) - from SPARK_CONFIG
+  COMMUNITY_SHARE: SPARK_CONFIG.distribution.staking,
 } as const;
 
 /**

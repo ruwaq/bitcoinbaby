@@ -5,7 +5,7 @@
  * Generates text procedurally using seed-based templates — always available,
  * starts instantly, and produces deterministic, verifiable outputs for PoUW.
  *
- * The "Baby Brain" is thematically the Genesis Baby's own thinking engine:
+ * The "Baby Brain" is thematically the Genesis Spark's own thinking engine:
  * as the baby grows, its thoughts become more sophisticated.
  */
 
@@ -56,7 +56,7 @@ function seedToValues(seed: string, count: number): number[] {
   return Array.from({ length: count }, () => rng());
 }
 
-const BABY_NAMES = [
+const SPARK_NAMES = [
   "Satoshi",
   "Nakamoto",
   "Blocky",
@@ -368,7 +368,7 @@ export class BabyBrainEngine {
     let template = selectedSet.templates[tplIdx % selectedSet.templates.length];
 
     // Fill template slots
-    const name = BABY_NAMES[Math.floor(values[2] * BABY_NAMES.length)];
+    const name = SPARK_NAMES[Math.floor(values[2] * SPARK_NAMES.length)];
     const pronoun =
       name === "Satoshi" || name === "Nakamoto"
         ? "they"

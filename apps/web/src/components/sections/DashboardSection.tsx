@@ -32,10 +32,10 @@ import { NarrativePanel } from "@/components/features/mining/NarrativePanel";
 import { useNarrativePipeline } from "@/hooks/useNarrativePipeline";
 import { InfoBanner } from "@bitcoinbaby/ui";
 import type { GameAction } from "@bitcoinbaby/ui";
-import type { BabyNFTState } from "@bitcoinbaby/ai";
+import type { SparkNFTState } from "@bitcoinbaby/ai";
 
 /**
- * Build a BabyNFTState from a GameBaby for the NarrativeEngine.
+ * Build a SparkNFTState from a GameBaby for the NarrativeEngine.
  *
  * When the user has a free baby (no NFT minted), we generate a deterministic
  * "virtual NFT state" from the baby's id. This gives the NarrativeEngine
@@ -45,7 +45,7 @@ import type { BabyNFTState } from "@bitcoinbaby/ai";
  * The dna is derived from the baby's id via a simple hash — same baby,
  * same personality forever. Different babies get different stories.
  */
-function buildNftStateFromBaby(baby: GameBaby): BabyNFTState {
+function buildNftStateFromBaby(baby: GameBaby): SparkNFTState {
   // Deterministic "dna" from baby id — simple hash for personality seeding
   let hash = 0;
   for (let i = 0; i < baby.id.length; i++) {
@@ -53,13 +53,13 @@ function buildNftStateFromBaby(baby: GameBaby): BabyNFTState {
   }
 
   // Map hash to bloodline and baseType deterministically
-  const bloodlines: BabyNFTState["bloodline"][] = [
+  const bloodlines: SparkNFTState["bloodline"][] = [
     "royal",
     "warrior",
     "rogue",
     "mystic",
   ];
-  const baseTypes: BabyNFTState["baseType"][] = [
+  const baseTypes: SparkNFTState["baseType"][] = [
     "human",
     "animal",
     "robot",
@@ -104,7 +104,7 @@ export function DashboardSection() {
 
   // Build NFT state from the real baby so NarrativeEngine has context
   // (personality, bloodline, archetype) to generate personalized stories
-  const nftState = useMemo<BabyNFTState | null>(() => {
+  const nftState = useMemo<SparkNFTState | null>(() => {
     if (!baby) return null;
     return buildNftStateFromBaby(baby);
   }, [baby]);

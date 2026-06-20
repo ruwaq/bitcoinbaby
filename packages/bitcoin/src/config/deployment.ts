@@ -1,5 +1,5 @@
 /**
- * BABTC Deployment Configuration
+ * SPARK Deployment Configuration
  *
  * This file contains deployment-specific configuration.
  * Update these values after deploying the contract to testnet4.
@@ -12,7 +12,7 @@
  *
  * Reward Formula (BRO-style):
  * reward = BASE_REWARD × D² ÷ DIFFICULTY_FACTOR
- * Where D = difficulty (leading zero bits), BASE_REWARD = 1 BABTC, FACTOR = 100
+ * Where D = difficulty (leading zero bits), BASE_REWARD = 1 SPARK, FACTOR = 100
  *
  * Distribution: 90% miner, 5% dev, 5% staking
  */
@@ -46,7 +46,7 @@ export interface DeploymentConfig {
  * Contract: packages/bitcoin/contracts/babtc
  * VK generated with: charms app vk ./target/wasm32-wasip1/release/babtc-contract.wasm
  */
-export const BABTC_TESTNET4: DeploymentConfig = {
+export const SPARK_TESTNET4: DeploymentConfig = {
   network: "testnet4",
   appId: "87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681b",
   appVk: "acf2ec0b7245eb9c3371ef4e67eb1ca3f85d712b1aeca438a6a6d1898392179d",
@@ -61,7 +61,7 @@ export const BABTC_TESTNET4: DeploymentConfig = {
  *
  * STATUS: DEPLOYED locally for development.
  */
-export const BABTC_REGTEST: DeploymentConfig = {
+export const SPARK_REGTEST: DeploymentConfig = {
   network: "regtest",
   appId: "87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681b",
   appVk: "acf2ec0b7245eb9c3371ef4e67eb1ca3f85d712b1aeca438a6a6d1898392179d",
@@ -77,7 +77,7 @@ export const BABTC_REGTEST: DeploymentConfig = {
  * STATUS: NOT DEPLOYED
  * WARNING: Deploy to mainnet only after thorough testnet4 testing
  */
-export const BABTC_MAINNET: DeploymentConfig = {
+export const SPARK_MAINNET: DeploymentConfig = {
   network: "mainnet",
   appId: "not_deployed",
   appVk: "not_deployed",
@@ -90,9 +90,9 @@ export const BABTC_MAINNET: DeploymentConfig = {
 export function getDeploymentConfig(
   network: SupportedNetwork = "testnet4",
 ): DeploymentConfig {
-  if (network === "mainnet") return BABTC_MAINNET;
-  if (network === "regtest") return BABTC_REGTEST;
-  return BABTC_TESTNET4;
+  if (network === "mainnet") return SPARK_MAINNET;
+  if (network === "regtest") return SPARK_REGTEST;
+  return SPARK_TESTNET4;
 }
 
 /**
@@ -114,7 +114,7 @@ export function validateDeployment(
   const config = getDeploymentConfig(network);
   if (config.isPlaceholder) {
     throw new Error(
-      `BABTC contract not deployed to ${network}. ` +
+      `SPARK contract not deployed to ${network}. ` +
         `See packages/bitcoin/contracts/babtc/BUILD.md for deployment instructions.`,
     );
   }

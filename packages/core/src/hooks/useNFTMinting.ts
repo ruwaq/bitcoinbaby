@@ -1,7 +1,7 @@
 /**
  * useNFTMinting Hook
  *
- * Manages Genesis Babies NFT operations on Bitcoin via Charms protocol.
+ * Manages Genesis Sparks NFT operations on Bitcoin via Charms protocol.
  * Handles genesis minting, work proofs (XP), and level ups.
  */
 
@@ -12,14 +12,14 @@ import {
   createMempoolClient,
   Psbt,
   type CharmsClientOptions,
-  type BabyNFTState,
+  type SparkNFTState,
   type Bloodline,
   type BaseType,
   type RarityTier,
   createNFTGenesisSpell,
   createNFTWorkProofSpell,
   createNFTLevelUpSpell,
-  GENESIS_BABIES_CONFIG,
+  GENESIS_SPARKS_CONFIG,
   getMiningBoost,
   canLevelUp,
   XP_REQUIREMENTS,
@@ -49,12 +49,12 @@ export interface UseNFTMintingOptions extends CharmsClientOptions {
 export interface NFTMintResult {
   success: boolean;
   psbt?: string;
-  nftState?: BabyNFTState;
+  nftState?: SparkNFTState;
   error?: string;
 }
 
 export interface UseNFTMintingReturn {
-  /** Mint a new Genesis Baby NFT */
+  /** Mint a new Genesis Spark NFT */
   mintGenesis: (params: {
     tokenId: number;
     dna: string;
@@ -65,14 +65,14 @@ export interface UseNFTMintingReturn {
 
   /** Submit work proof for XP gain */
   submitWorkProof: (
-    nft: BabyNFTState,
+    nft: SparkNFTState,
     nftUtxo: { txid: string; vout: number },
     workProofHash: string,
   ) => Promise<NFTMintResult>;
 
   /** Level up an NFT (burns tokens) */
   levelUp: (
-    nft: BabyNFTState,
+    nft: SparkNFTState,
     nftUtxo: { txid: string; vout: number },
     tokenUtxo: { txid: string; vout: number },
     tokenAmount: bigint,
@@ -85,7 +85,7 @@ export interface UseNFTMintingReturn {
   ) => Promise<{ success: boolean; txid?: string; error?: string }>;
 
   /** Check if NFT can level up */
-  checkCanLevelUp: (nft: BabyNFTState) => {
+  checkCanLevelUp: (nft: SparkNFTState) => {
     canLevel: boolean;
     xpRequired: number;
     currentXp: number;
@@ -93,7 +93,7 @@ export interface UseNFTMintingReturn {
   };
 
   /** Get mining boost for an NFT */
-  getBoost: (nft: BabyNFTState) => number;
+  getBoost: (nft: SparkNFTState) => number;
 
   /** Generate random DNA for new NFT */
   generateDNA: () => Promise<string>;
@@ -127,7 +127,7 @@ async function generateRandomDNA(): Promise<string> {
  * Roll for rarity tier based on weights
  */
 function rollRarityTier(): RarityTier {
-  const tiers = GENESIS_BABIES_CONFIG.rarityTiers;
+  const tiers = GENESIS_SPARKS_CONFIG.rarityTiers;
   const totalWeight = Object.values(tiers).reduce(
     (sum, t) => sum + t.weight,
     0,
@@ -257,7 +257,7 @@ export function useNFTMinting(
         const psbt = txBuilderRef.current.buildPSBT(tx, tx.spellWitness);
 
         // Create NFT state for return
-        const nftState: BabyNFTState = {
+        const nftState: SparkNFTState = {
           dna: params.dna,
           bloodline: params.bloodline,
           baseType: params.baseType,
@@ -292,7 +292,7 @@ export function useNFTMinting(
   // Submit work proof
   const submitWorkProof = useCallback(
     async (
-      nft: BabyNFTState,
+      nft: SparkNFTState,
       nftUtxo: { txid: string; vout: number },
       workProofHash: string,
     ): Promise<NFTMintResult> => {
@@ -370,7 +370,7 @@ export function useNFTMinting(
   // Level up
   const levelUp = useCallback(
     async (
-      nft: BabyNFTState,
+      nft: SparkNFTState,
       nftUtxo: { txid: string; vout: number },
       tokenUtxo: { txid: string; vout: number },
       tokenAmount: bigint,
@@ -500,7 +500,7 @@ export function useNFTMinting(
   );
 
   // Check can level up
-  const checkCanLevelUp = useCallback((nft: BabyNFTState) => {
+  const checkCanLevelUp = useCallback((nft: SparkNFTState) => {
     const nextLevel = nft.level + 1;
     const xpRequired = XP_REQUIREMENTS[nextLevel] || Infinity;
     const tokenCost = EVOLUTION_COSTS[nextLevel] || 0n;
@@ -514,7 +514,7 @@ export function useNFTMinting(
   }, []);
 
   // Get boost
-  const getBoost = useCallback((nft: BabyNFTState) => {
+  const getBoost = useCallback((nft: SparkNFTState) => {
     return getMiningBoost(nft);
   }, []);
 

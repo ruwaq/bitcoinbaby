@@ -216,7 +216,7 @@ export async function processAICredit(
   if (!hasNFT && !hasPriorBalance) {
     return {
       success: false,
-      error: "Sybil Protection: Debes poseer al menos un Genesis Baby NFT o balance previo para minar.",
+      error: "Sybil Protection: Debes poseer al menos un Genesis Spark NFT o balance previo para minar.",
       errorCode: 403,
     };
   }

@@ -391,7 +391,7 @@ export class AIEngine {
 export function generateSentimentTask(): AITask {
   const prompts = [
     "Write a short lore entry about Baby learning how to read the Bitcoin blockchain.",
-    "Describe the Genesis Baby's reaction to seeing the Bitcoin difficulty adjustment.",
+    "Describe the Genesis Spark's reaction to seeing the Bitcoin difficulty adjustment.",
     "Describe how a baby miner operates a tiny WebGPU mining rig in their crib.",
     "Write a story about a baby discovering Satoshi's whitepaper in their toy chest.",
   ];

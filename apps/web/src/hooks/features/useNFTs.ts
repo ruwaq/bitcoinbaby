@@ -16,7 +16,7 @@ import { useVirtualBalance } from "@/hooks/useVirtualBalance";
 import { useMarketplace } from "@/hooks/useMarketplace";
 import { useEvolution } from "@/hooks/useEvolution";
 import { useMintAttempts } from "@/hooks/useMintAttempts";
-import type { BabyNFTState } from "@bitcoinbaby/bitcoin";
+import type { SparkNFTState } from "@bitcoinbaby/bitcoin";
 import type { TransactionDetails } from "@bitcoinbaby/ui";
 
 /**
@@ -37,13 +37,13 @@ import type { TransactionDetails } from "@bitcoinbaby/ui";
 export interface UseNFTsReturn {
   // Collection state
   collection: {
-    nfts: BabyNFTState[];
+    nfts: SparkNFTState[];
     isLoading: boolean;
     isFetching: boolean;
     refresh: () => void;
     lastSynced: number | null;
     error: string | null;
-    setNFTs: (nfts: BabyNFTState[]) => void;
+    setNFTs: (nfts: SparkNFTState[]) => void;
     invalidate: () => void;
   };
 
@@ -51,14 +51,14 @@ export interface UseNFTsReturn {
   minting: {
     mint: () => Promise<{
       success: boolean;
-      nft?: BabyNFTState;
+      nft?: SparkNFTState;
       txid?: string;
       error?: string;
     }>;
     isLoading: boolean;
     error: string | null;
     suggestedAction: string | null;
-    lastMinted: BabyNFTState | null;
+    lastMinted: SparkNFTState | null;
     txid: string | null;
     commitTxid: string | null;
     currentStep: MintStep;
@@ -99,7 +99,7 @@ export interface UseNFTsReturn {
 
   // Evolution
   evolution: {
-    evolve: (nft: BabyNFTState) => Promise<{
+    evolve: (nft: SparkNFTState) => Promise<{
       success: boolean;
       txid?: string;
       newLevel?: number;
@@ -107,9 +107,9 @@ export interface UseNFTsReturn {
     }>;
     isEvolving: boolean;
     error: string | null;
-    canEvolve: (nft: BabyNFTState) => boolean;
-    getEvolutionCost: (nft: BabyNFTState) => bigint;
-    getXPRequired: (nft: BabyNFTState) => number;
+    canEvolve: (nft: SparkNFTState) => boolean;
+    getEvolutionCost: (nft: SparkNFTState) => bigint;
+    getXPRequired: (nft: SparkNFTState) => number;
     clearError: () => void;
   };
 
@@ -234,9 +234,9 @@ export function useNFTs(): UseNFTsReturn {
   const transactionDetails: TransactionDetails = useMemo(
     () => ({
       type: "mint" as const,
-      title: "Mint Genesis Baby",
+      title: "Mint Genesis Spark",
       description:
-        "You are about to mint a new Genesis Baby NFT. The traits will be randomly generated - it's a surprise!",
+        "You are about to mint a new Genesis Spark NFT. The traits will be randomly generated - it's a surprise!",
       costs: [
         {
           label: "NFT Price",
