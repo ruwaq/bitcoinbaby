@@ -28,6 +28,7 @@ function makeNFT(overrides: Partial<SparkNFTState> = {}): SparkNFTState {
     genesisBlock: 123456,
     rarityTier: "rare",
     tokenId: 42,
+    heritage: 0,
     level: 3,
     xp: 350,
     totalXp: 1500,

@@ -84,7 +84,7 @@ export class AIWorkIntegration {
   // ===========================================================================
 
   async initialize(): Promise<void> {
-    if (this.babyBrain || this.orchestrator) return;
+    if (this.orchestrator) return;
     if (this.initPromise) return this.initPromise;
 
     this.isInitializing = true;

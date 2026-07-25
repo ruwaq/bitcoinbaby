@@ -5,7 +5,7 @@
  * All tests run 100% locally without server or network access.
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { AIWorkIntegration } from "./ai-integration";
 import type { AITask, AIProof } from "./types";
 
