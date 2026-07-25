@@ -10,15 +10,14 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
-  BABTC_CONFIG,
+  SPARK_CONFIG,
   calculateMiningReward,
   formatTokenAmount,
   createTokenMintSpell,
 } from "../../src/charms/token";
 import {
-  GENESIS_BABIES_CONFIG,
+  GENESIS_SPARKS_CONFIG,
   XP_REQUIREMENTS,
-  EVOLUTION_COSTS,
   LEVEL_BOOSTS,
   calculateXpGain,
   canLevelUp,
@@ -41,7 +40,9 @@ const createMockMiner = () => ({
     "02abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
 });
 
-const createMockNFT = (overrides: Partial<SparkNFTState> = {}): SparkNFTState => ({
+const createMockNFT = (
+  overrides: Partial<SparkNFTState> = {},
+): SparkNFTState => ({
   dna: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
   bloodline: "rogue",
   baseType: "human",
@@ -85,11 +86,11 @@ describe("E2E: Token Minting Flow", () => {
     it("should distribute rewards 90/5/5", () => {
       const reward = calculateMiningReward(16);
 
-      const minerPercent =
-        Number((reward.minerShare * 100n) / reward.total);
+      const minerPercent = Number((reward.minerShare * 100n) / reward.total);
       const devPercent = Number((reward.devShare * 100n) / reward.total);
-      const stakingPercent =
-        Number((reward.stakingShare * 100n) / reward.total);
+      const stakingPercent = Number(
+        (reward.stakingShare * 100n) / reward.total,
+      );
 
       expect(minerPercent).toBe(90);
       expect(devPercent).toBe(5);
@@ -111,8 +112,8 @@ describe("E2E: Token Minting Flow", () => {
         appId: mockAppConfig.tokenAppId,
         appVk: mockAppConfig.tokenAppVk,
         minerAddress: miner.address,
-        devAddress: BABTC_CONFIG.addresses.devFund,
-        stakingAddress: BABTC_CONFIG.addresses.stakingPool,
+        devAddress: SPARK_CONFIG.addresses.devFund,
+        stakingAddress: SPARK_CONFIG.addresses.stakingPool,
         leadingZeros: 16,
         workProofHash: "abcdef123456",
       });
@@ -128,8 +129,8 @@ describe("E2E: Token Minting Flow", () => {
         appId: mockAppConfig.tokenAppId,
         appVk: mockAppConfig.tokenAppVk,
         minerAddress: miner.address,
-        devAddress: BABTC_CONFIG.addresses.devFund,
-        stakingAddress: BABTC_CONFIG.addresses.stakingPool,
+        devAddress: SPARK_CONFIG.addresses.devFund,
+        stakingAddress: SPARK_CONFIG.addresses.stakingPool,
         leadingZeros: 16,
         workProofHash: "abcdef123456",
       });
@@ -232,18 +233,25 @@ describe("E2E: NFT Minting Flow", () => {
   });
 
   describe("Rarity Distribution", () => {
+    // Post-refactor note: rarityTiers.weight is still consumed at mint time
+    // to pick a rarity deterministically. rarityTiers.boost is still defined
+    // as a structural invariant but is NOT applied to mining rewards anymore
+    // (see getMiningBoost — level-only). These tests verify the config
+    // structure; the behavioural effect of boost is tested in the
+    // "Mining Boost Application" section below.
+
     it("should have correct rarity weights", () => {
-      const { rarityTiers } = GENESIS_BABIES_CONFIG;
+      const { rarityTiers } = GENESIS_SPARKS_CONFIG;
       const totalWeight = Object.values(rarityTiers).reduce(
         (sum, tier) => sum + tier.weight,
-        0
+        0,
       );
 
       expect(totalWeight).toBe(100);
     });
 
-    it("should have increasing boosts for rarer tiers", () => {
-      const { rarityTiers } = GENESIS_BABIES_CONFIG;
+    it("should have increasing boosts for rarer tiers (structural invariant)", () => {
+      const { rarityTiers } = GENESIS_SPARKS_CONFIG;
       const tiers: RarityTier[] = [
         "common",
         "uncommon",
@@ -336,13 +344,16 @@ describe("E2E: Mining → XP → Evolution Cycle", () => {
     it("should have increasing XP requirements per level", () => {
       for (let level = 2; level < 10; level++) {
         expect(XP_REQUIREMENTS[level + 1]).toBeGreaterThan(
-          XP_REQUIREMENTS[level]
+          XP_REQUIREMENTS[level],
         );
       }
     });
 
     it("should not allow evolution at max level", () => {
-      const nft = createMockNFT({ level: 10, xp: 100000 });
+      const nft = createMockNFT({
+        level: GENESIS_SPARKS_CONFIG.maxLevel,
+        xp: 100000,
+      });
       expect(canLevelUp(nft)).toBe(false);
     });
   });
@@ -356,9 +367,7 @@ describe("E2E: Mining → XP → Evolution Cycle", () => {
         tokenAppId: mockAppConfig.tokenAppId,
         tokenAppVk: mockAppConfig.tokenAppVk,
         nftUtxo: { txid: "nft", vout: 0 },
-        tokenUtxo: { txid: "token", vout: 0 },
         currentState: nft,
-        tokenAmount: EVOLUTION_COSTS[2],
         ownerAddress: "tb1qtest",
       });
 
@@ -368,34 +377,11 @@ describe("E2E: Mining → XP → Evolution Cycle", () => {
       expect(newState.evolutionCount).toBe(1);
     });
 
-    it("should burn correct token amount for each level", () => {
-      for (let level = 1; level < 10; level++) {
-        const cost = EVOLUTION_COSTS[level + 1];
-        expect(cost).toBeGreaterThan(0n);
-      }
-    });
-
-    it("should return excess tokens as change", () => {
-      const nft = createMockNFT({ level: 1, xp: 100 });
-      const extraTokens = 1000n;
-      const tokenAmount = EVOLUTION_COSTS[2] + extraTokens;
-
-      const spell = createNFTLevelUpSpell({
-        nftAppId: mockAppConfig.nftAppId,
-        nftAppVk: mockAppConfig.nftAppVk,
-        tokenAppId: mockAppConfig.tokenAppId,
-        tokenAppVk: mockAppConfig.tokenAppVk,
-        nftUtxo: { txid: "nft", vout: 0 },
-        tokenUtxo: { txid: "token", vout: 0 },
-        currentState: nft,
-        tokenAmount,
-        ownerAddress: "tb1qtest",
-      });
-
-      // Should have NFT output + token change output
-      expect(spell.outs).toHaveLength(2);
-      expect(spell.outs[1].charms.$01).toBe(extraTokens);
-    });
+    // Post-refactor: 'should burn correct token amount for each level' and
+    // 'should return excess tokens as change' were removed. Level-up is now
+    // XP-only — there is no token burn and therefore no "excess as change"
+    // path. The new state-transition coverage lives in the test above and in
+    // packages/bitcoin/tests/charms/{nft,evolution}.test.ts.
   });
 });
 
@@ -407,7 +393,7 @@ describe("E2E: Mining Boost Application", () => {
   describe("Level-based Boosts", () => {
     it("should increase boost with level", () => {
       let prevBoost = 0;
-      for (let level = 1; level <= 10; level++) {
+      for (let level = 1; level <= GENESIS_SPARKS_CONFIG.maxLevel; level++) {
         const nft = createMockNFT({ level, rarityTier: "common" });
         const boost = getMiningBoost(nft);
         expect(boost).toBeGreaterThanOrEqual(prevBoost);
@@ -415,37 +401,32 @@ describe("E2E: Mining Boost Application", () => {
       }
     });
 
-    it("should cap level boost at 4% for level 10", () => {
-      expect(LEVEL_BOOSTS[10]).toBe(4);
+    it("should be 2% at level 10 (post-rebalance)", () => {
+      // Pre-refactor this was 'cap at 4% for level 10' — the level table
+      // was rebalanced to scale 0% -> 10% over 21 levels instead of
+      // 0% -> 4% over 10 levels. The cap (10%) is now reached only at
+      // maxLevel (21).
+      expect(LEVEL_BOOSTS[10]).toBe(2);
+    });
+
+    it("should cap at 10% at max level (21)", () => {
+      expect(LEVEL_BOOSTS[GENESIS_SPARKS_CONFIG.maxLevel]).toBe(10);
     });
   });
 
-  describe("Rarity-based Boosts", () => {
-    it("should add rarity boost to level boost", () => {
-      const nft = createMockNFT({ level: 5, rarityTier: "epic" });
-      const boost = getMiningBoost(nft);
-
-      // Level 5: 1% + Epic: 3% = 4%
-      expect(boost).toBe(LEVEL_BOOSTS[5] + GENESIS_BABIES_CONFIG.rarityTiers.epic.boost);
-    });
-
-    it("should give maximum boost for level 10 mythic", () => {
-      const nft = createMockNFT({ level: 10, rarityTier: "mythic" });
-      const boost = getMiningBoost(nft);
-
-      // Level 10: 4% + Mythic: 8% = 12%
-      expect(boost).toBe(12);
-    });
-  });
+  // Post-refactor: the entire 'Rarity-based Boosts' subsection was removed.
+  // getMiningBoost is now level-only — rarity no longer contributes to
+  // mining rewards. Coverage of "rarity does not affect boost" lives in
+  // packages/bitcoin/tests/charms/{nft,evolution}.test.ts.
 
   describe("Boost Impact on Mining", () => {
     it("should increase effective mining reward with boost", () => {
       const baseReward = calculateMiningReward(16);
-      const boost = 12; // Level 10 mythic
+      const boost = LEVEL_BOOSTS[GENESIS_SPARKS_CONFIG.maxLevel]; // 10
       const boostMultiplier = 1 + boost / 100;
 
       const effectiveReward = BigInt(
-        Math.floor(Number(baseReward.minerShare) * boostMultiplier)
+        Math.floor(Number(baseReward.minerShare) * boostMultiplier),
       );
 
       expect(effectiveReward).toBeGreaterThan(baseReward.minerShare);
@@ -479,9 +460,9 @@ describe("E2E: Complete Lifecycle", () => {
     });
     let nft = nftSpell.outs[0].charms.$00 as SparkNFTState;
 
-    // Verify initial state
+    // Verify initial state — level 1 boost is LEVEL_BOOSTS[1] = 0
     expect(nft.level).toBe(1);
-    expect(getMiningBoost(nft)).toBe(GENESIS_BABIES_CONFIG.rarityTiers.rare.boost);
+    expect(getMiningBoost(nft)).toBe(LEVEL_BOOSTS[1]);
 
     // Step 3: Submit work proofs to gain XP
     const xpPerWork = calculateXpGain(nft); // 150 for Royal
@@ -498,10 +479,7 @@ describe("E2E: Complete Lifecycle", () => {
 
     expect(canLevelUp(nft)).toBe(true);
 
-    // Step 4: Level up (burns tokens)
-    const levelUpCost = EVOLUTION_COSTS[2];
-    expect(initialReward.minerShare).toBeLessThan(levelUpCost);
-    // Note: Would need more mining to afford level up
+    // Step 4: Level up is XP-only post-refactor (no token burn).
 
     // After level up (simulated)
     const upgradedNft = {
@@ -532,32 +510,24 @@ describe("E2E: Complete Lifecycle", () => {
 // =============================================================================
 
 describe("E2E: Tokenomics Validation", () => {
-  it("should validate max supply is 21B BABTC", () => {
-    const maxSupply = BABTC_CONFIG.maxSupply;
+  it("should validate max supply is 21B SPARK", () => {
+    const maxSupply = SPARK_CONFIG.maxSupply;
     const expectedMaxSupply = 21_000_000_000n * 100_000_000n;
 
     expect(maxSupply).toBe(expectedMaxSupply);
   });
 
   it("should validate NFT max supply is 10,000", () => {
-    expect(GENESIS_BABIES_CONFIG.maxSupply).toBe(10_000);
+    expect(GENESIS_SPARKS_CONFIG.maxSupply).toBe(10_000);
   });
 
-  it("should validate evolution creates token sink", () => {
-    // Calculate total tokens needed to max all 10,000 NFTs
-    let totalBurn = 0n;
-    for (let level = 2; level <= 10; level++) {
-      totalBurn += EVOLUTION_COSTS[level];
-    }
+  // Post-refactor: 'should validate evolution creates token sink' was
+  // removed. Token-burn evolution was dropped, so leveling up no longer
+  // removes SPARK from circulation. There is currently no other built-in
+  // SPARK sink in the model; if one is reintroduced (e.g. fee-burn,
+  // cosmetic upgrades), this test should be revived against that path.
 
-    const perNFTBurn = totalBurn;
-    const totalSink = perNFTBurn * BigInt(GENESIS_BABIES_CONFIG.maxSupply);
-
-    // Should be significant portion of supply
-    expect(totalSink).toBeGreaterThan(0n);
-  });
-
-  it("should validate max level is 10", () => {
-    expect(GENESIS_BABIES_CONFIG.maxLevel).toBe(10);
+  it("should validate max level is 21 (post-refactor: extended from 10)", () => {
+    expect(GENESIS_SPARKS_CONFIG.maxLevel).toBe(21);
   });
 });

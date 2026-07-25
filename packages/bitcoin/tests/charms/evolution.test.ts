@@ -13,9 +13,8 @@ import {
 } from "../../src/charms/evolution";
 import {
   XP_REQUIREMENTS,
-  EVOLUTION_COSTS,
   LEVEL_BOOSTS,
-  GENESIS_BABIES_CONFIG,
+  GENESIS_SPARKS_CONFIG,
   calculateXpGain,
   canLevelUp,
   getMiningBoost,
@@ -90,38 +89,18 @@ describe("XP_REQUIREMENTS", () => {
 
 // =============================================================================
 // EVOLUTION COSTS TESTS
+// (removed: token-burn evolution was dropped in the post-refactor model;
+//  level-up is now gated purely by XP — see EVOLUTION_COSTS removal in
+//  packages/bitcoin/src/charms/{nft,evolution}.ts)
 // =============================================================================
-
-describe("EVOLUTION_COSTS", () => {
-  it("should have costs for levels 2-10", () => {
-    for (let level = 2; level <= 10; level++) {
-      expect(EVOLUTION_COSTS[level]).toBeDefined();
-      expect(EVOLUTION_COSTS[level]).toBeGreaterThan(0n);
-    }
-  });
-
-  it("should have increasing costs", () => {
-    let prevCost = 0n;
-    for (let level = 2; level <= 10; level++) {
-      expect(EVOLUTION_COSTS[level]).toBeGreaterThan(prevCost);
-      prevCost = EVOLUTION_COSTS[level];
-    }
-  });
-
-  it("should have correct specific values (in base units)", () => {
-    expect(EVOLUTION_COSTS[2]).toBe(100n * 100_000_000n); // 100 BABTC
-    expect(EVOLUTION_COSTS[5]).toBe(1000n * 100_000_000n); // 1000 BABTC
-    expect(EVOLUTION_COSTS[10]).toBe(50000n * 100_000_000n); // 50000 BABTC
-  });
-});
 
 // =============================================================================
 // LEVEL BOOSTS TESTS
 // =============================================================================
 
 describe("LEVEL_BOOSTS", () => {
-  it("should have boosts for levels 1-10", () => {
-    for (let level = 1; level <= 10; level++) {
+  it("should have boosts for levels 1..maxLevel", () => {
+    for (let level = 1; level <= GENESIS_SPARKS_CONFIG.maxLevel; level++) {
       expect(LEVEL_BOOSTS[level]).toBeDefined();
     }
   });
@@ -130,13 +109,17 @@ describe("LEVEL_BOOSTS", () => {
     expect(LEVEL_BOOSTS[1]).toBe(0);
   });
 
-  it("should cap at 4% for level 10", () => {
-    expect(LEVEL_BOOSTS[10]).toBe(4);
+  it("should cap at 10% at max level (21)", () => {
+    expect(LEVEL_BOOSTS[GENESIS_SPARKS_CONFIG.maxLevel]).toBe(10);
   });
 
-  it("should increase with level", () => {
+  it("should be 2% at level 10 (post-rebalance)", () => {
+    expect(LEVEL_BOOSTS[10]).toBe(2);
+  });
+
+  it("should increase (weakly) with level", () => {
     let prevBoost = -1;
-    for (let level = 1; level <= 10; level++) {
+    for (let level = 1; level <= GENESIS_SPARKS_CONFIG.maxLevel; level++) {
       expect(LEVEL_BOOSTS[level]).toBeGreaterThanOrEqual(prevBoost);
       prevBoost = LEVEL_BOOSTS[level];
     }
@@ -208,13 +191,23 @@ describe("canLevelUp", () => {
   });
 
   it("should return false at max level", () => {
-    const nft = createMockNFT({ level: 10, xp: 100000 });
+    const nft = createMockNFT({
+      level: GENESIS_SPARKS_CONFIG.maxLevel,
+      xp: 100000,
+    });
     expect(canLevelUp(nft)).toBe(false);
   });
 
   it("should check correct threshold for each level", () => {
-    for (let level = 1; level < 10; level++) {
+    // XP_REQUIREMENTS is defined for levels 2..maxLevel (i.e. the XP needed
+    // to *reach* level N from N-1). So the last meaningful entry is
+    // XP_REQUIREMENTS[maxLevel]; there is no XP_REQUIREMENTS[maxLevel+1]
+    // because the NFT cannot level past maxLevel.
+    for (let level = 1; level < GENESIS_SPARKS_CONFIG.maxLevel; level++) {
       const requiredXp = XP_REQUIREMENTS[level + 1];
+      // Level 20 -> XP_REQUIREMENTS[21] is intentionally undefined
+      // (no path beyond max); skip it.
+      if (requiredXp === undefined) continue;
 
       const cannotLevelUp = createMockNFT({ level, xp: requiredXp - 1 });
       expect(canLevelUp(cannotLevelUp)).toBe(false);
@@ -230,39 +223,34 @@ describe("canLevelUp", () => {
 // =============================================================================
 
 describe("getMiningBoost", () => {
-  it("should return 0% for level 1 common NFT", () => {
+  // Post-refactor: getMiningBoost is level-only. Rarity tiers still exist on
+  // GENESIS_SPARKS_CONFIG for mint-time weighting, but their `boost` field no
+  // longer affects mining rewards.
+
+  it("should return 0% for level 1 NFT (any rarity)", () => {
     const nft = createMockNFT({ level: 1, rarityTier: "common" });
     const boost = getMiningBoost(nft);
-    // Level 1: 0% + Common: 0.5% = 0.5%
-    expect(boost).toBe(0.5);
+    expect(boost).toBe(LEVEL_BOOSTS[1]); // 0
   });
 
-  it("should combine level and rarity boosts", () => {
+  it("should return level boost only for mid-level NFT", () => {
     const nft = createMockNFT({ level: 5, rarityTier: "rare" });
     const boost = getMiningBoost(nft);
-    // Level 5: 1% + Rare: 2% = 3%
-    expect(boost).toBe(1 + 2);
+    expect(boost).toBe(LEVEL_BOOSTS[5]); // 0.5
   });
 
-  it("should return max boost for level 10 mythic", () => {
+  it("should return level boost for level 10 regardless of rarity", () => {
     const nft = createMockNFT({ level: 10, rarityTier: "mythic" });
     const boost = getMiningBoost(nft);
-    // Level 10: 4% + Mythic: 8% = 12%
-    expect(boost).toBe(4 + 8);
+    expect(boost).toBe(LEVEL_BOOSTS[10]); // 2 (level-only now)
   });
 
-  it("should return correct boost for all rarity tiers", () => {
-    const rarityBoosts = GENESIS_BABIES_CONFIG.rarityTiers;
-
-    for (const [tier, config] of Object.entries(rarityBoosts)) {
-      const nft = createMockNFT({
-        level: 1,
-        rarityTier: tier as SparkNFTState["rarityTier"],
-      });
-      const boost = getMiningBoost(nft);
-      // Level 1 boost is 0, so total = rarity boost
-      expect(boost).toBe(config.boost);
-    }
+  it("should ignore rarity tier entirely (post-refactor)", () => {
+    // Same level, different rarities → same boost
+    const common = createMockNFT({ level: 7, rarityTier: "common" });
+    const mythic = createMockNFT({ level: 7, rarityTier: "mythic" });
+    expect(getMiningBoost(common)).toBe(getMiningBoost(mythic));
+    expect(getMiningBoost(common)).toBe(LEVEL_BOOSTS[7]);
   });
 });
 
@@ -391,9 +379,7 @@ describe("createNFTLevelUpSpell", () => {
     tokenAppId: "test_token_app_id",
     tokenAppVk: "test_token_vk",
     nftUtxo: { txid: "nft123", vout: 0 },
-    tokenUtxo: { txid: "token456", vout: 1 },
     currentState,
-    tokenAmount: EVOLUTION_COSTS[2] + 1000n, // Cost + extra
     ownerAddress: "tb1qowner",
   };
 
@@ -402,19 +388,22 @@ describe("createNFTLevelUpSpell", () => {
     expect(spell.version).toBe(2);
   });
 
-  it("should include both NFT and token app references", () => {
+  it("should include NFT app reference only (post-refactor: no token app)", () => {
     const spell = createNFTLevelUpSpell(defaultParams);
     expect(spell.apps.$00).toBe(
       `n/${defaultParams.nftAppId}/${defaultParams.nftAppVk}`,
     );
-    expect(spell.apps.$01).toBe(
-      `t/${defaultParams.tokenAppId}/${defaultParams.tokenAppVk}`,
-    );
+    // Post-refactor: level-up no longer burns tokens, so there is no
+    // t/<tokenApp> reference in the spell apps.
+    expect(spell.apps.$01).toBeUndefined();
   });
 
-  it("should have two inputs (NFT and tokens)", () => {
+  it("should have a single NFT input (post-refactor: no token input)", () => {
     const spell = createNFTLevelUpSpell(defaultParams);
-    expect(spell.ins).toHaveLength(2);
+    expect(spell.ins).toHaveLength(1);
+    expect(spell.ins[0].utxo_id).toBe(
+      `${defaultParams.nftUtxo.txid}:${defaultParams.nftUtxo.vout}`,
+    );
   });
 
   it("should increment level", () => {
@@ -438,24 +427,12 @@ describe("createNFTLevelUpSpell", () => {
     expect(newState.evolutionCount).toBe(currentState.evolutionCount + 1);
   });
 
-  it("should return remaining tokens if overpaid", () => {
+  it("should have a single NFT output (no token change output)", () => {
+    // Post-refactor: level-up is XP-only, no token transfer → exactly 1 output.
     const spell = createNFTLevelUpSpell(defaultParams);
-    const remaining = defaultParams.tokenAmount - EVOLUTION_COSTS[2];
-
-    // Should have 2 outputs: NFT and remaining tokens
-    expect(spell.outs).toHaveLength(2);
-    expect(spell.outs[1].charms.$01).toBe(remaining);
-  });
-
-  it("should not return tokens if exact amount", () => {
-    const exactParams = {
-      ...defaultParams,
-      tokenAmount: EVOLUTION_COSTS[2],
-    };
-    const spell = createNFTLevelUpSpell(exactParams);
-
-    // Should only have NFT output
     expect(spell.outs).toHaveLength(1);
+    expect(spell.outs[0].charms.$00).toBeDefined();
+    expect(spell.outs[0].charms.$01).toBeUndefined();
   });
 
   it("should preserve immutable fields", () => {
@@ -505,7 +482,8 @@ describe("EvolutionService", () => {
 
       expect(status.canEvolve).toBe(true);
       expect(status.nextLevel).toBe(2);
-      expect(status.tokenCost).toBe(EVOLUTION_COSTS[2]);
+      // Post-refactor: no tokenCost field (XP-only gating)
+      expect((status as any).tokenCost).toBeUndefined();
     });
 
     it("should calculate xpProgress correctly", () => {
@@ -516,16 +494,16 @@ describe("EvolutionService", () => {
       expect(status.xpProgress).toBe(50);
     });
 
-    it("should show boost gain correctly", () => {
+    it("should show boost gain correctly (level-only, post-refactor)", () => {
       const nft = createMockNFT({ level: 1, xp: 100, rarityTier: "common" });
       const status = service.getEvolutionStatus(nft);
 
-      // currentBoost = getMiningBoost(nft) = level boost + rarity boost
-      expect(status.currentBoost).toBe(0.5); // Level 1: 0% + Common: 0.5%
-      // nextBoost = LEVEL_BOOSTS[nextLevel] + rarity boost
-      expect(status.nextBoost).toBe(LEVEL_BOOSTS[2] + 0.5); // 0.25 + 0.5 = 0.75
-      // boostGain = nextBoost - currentBoost = level boost increase only
-      expect(status.boostGain).toBe(LEVEL_BOOSTS[2]); // 0.25
+      // currentBoost = getMiningBoost(nft) = LEVEL_BOOSTS[1] = 0
+      expect(status.currentBoost).toBe(LEVEL_BOOSTS[1]); // 0
+      // nextBoost = LEVEL_BOOSTS[2] (rarity no longer contributes)
+      expect(status.nextBoost).toBe(LEVEL_BOOSTS[2]);
+      // boostGain = nextBoost - currentBoost
+      expect(status.boostGain).toBe(LEVEL_BOOSTS[2] - LEVEL_BOOSTS[1]);
     });
   });
 
@@ -551,41 +529,27 @@ describe("EvolutionService", () => {
       await expect(
         service.createLevelUpSpell({
           nftUtxo: { txid: "nft", vout: 0 },
-          tokenUtxo: { txid: "token", vout: 0 },
           currentState: nft,
-          tokenAmount: EVOLUTION_COSTS[2],
           ownerAddress: "tb1qtest",
         }),
       ).rejects.toThrow(EvolutionError);
     });
 
-    it("should throw EvolutionError if insufficient tokens", async () => {
-      const nft = createMockNFT({ level: 1, xp: 100 });
-
-      await expect(
-        service.createLevelUpSpell({
-          nftUtxo: { txid: "nft", vout: 0 },
-          tokenUtxo: { txid: "token", vout: 0 },
-          currentState: nft,
-          tokenAmount: 100n, // Way too little
-          ownerAddress: "tb1qtest",
-        }),
-      ).rejects.toThrow(EvolutionError);
-    });
+    // Post-refactor: 'insufficient tokens' test removed — level-up is XP-only,
+    // there is no token-burn path to be insufficient.
 
     it("should generate valid level up spell when conditions met", async () => {
       const nft = createMockNFT({ level: 1, xp: 100 });
       const spell = await service.createLevelUpSpell({
         nftUtxo: { txid: "nft", vout: 0 },
-        tokenUtxo: { txid: "token", vout: 0 },
         currentState: nft,
-        tokenAmount: EVOLUTION_COSTS[2],
         ownerAddress: "tb1qtest",
       });
 
       expect(spell.version).toBe(2);
       expect(spell.apps.$00).toContain(defaultOptions.nftAppId);
-      expect(spell.apps.$01).toContain(defaultOptions.tokenAppId);
+      // Post-refactor: spell only references the NFT app.
+      expect(spell.apps.$01).toBeUndefined();
     });
   });
 });

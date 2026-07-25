@@ -7,8 +7,8 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  BABTC_CONFIG,
-  BABTC_METADATA,
+  SPARK_CONFIG,
+  SPARK_METADATA,
   calculateBlockReward,
   calculateMiningReward,
   formatTokenAmount,
@@ -22,55 +22,55 @@ import {
 // Configuration Tests
 // ============================================
 
-describe("BABTC_CONFIG", () => {
+describe("SPARK_CONFIG", () => {
   it("should have correct ticker", () => {
-    expect(BABTC_CONFIG.ticker).toBe("BABTC");
+    expect(SPARK_CONFIG.ticker).toBe("SPARK");
   });
 
   it("should have 8 decimals", () => {
-    expect(BABTC_CONFIG.decimals).toBe(8);
+    expect(SPARK_CONFIG.decimals).toBe(8);
   });
 
   it("should have max supply of 21 billion tokens", () => {
     const expectedMaxSupply = 21_000_000_000n * 100_000_000n;
-    expect(BABTC_CONFIG.maxSupply).toBe(expectedMaxSupply);
+    expect(SPARK_CONFIG.maxSupply).toBe(expectedMaxSupply);
   });
 
   it("should have app type as token (t)", () => {
-    expect(BABTC_CONFIG.appType).toBe("t");
+    expect(SPARK_CONFIG.appType).toBe("t");
   });
 
   it("should have distribution percentages that sum to 100", () => {
-    const { miner, dev, staking } = BABTC_CONFIG.distribution;
+    const { miner, dev, staking } = SPARK_CONFIG.distribution;
     expect(miner + dev + staking).toBe(100);
   });
 
   it("should have distribution of 90/5/5", () => {
-    expect(BABTC_CONFIG.distribution.miner).toBe(90);
-    expect(BABTC_CONFIG.distribution.dev).toBe(5);
-    expect(BABTC_CONFIG.distribution.staking).toBe(5);
+    expect(SPARK_CONFIG.distribution.miner).toBe(90);
+    expect(SPARK_CONFIG.distribution.dev).toBe(5);
+    expect(SPARK_CONFIG.distribution.staking).toBe(5);
   });
 
   it("should have BRO-style reward configuration", () => {
-    expect(BABTC_CONFIG.rewards).toBeDefined();
-    expect(BABTC_CONFIG.rewards.baseReward).toBe(100_000_000n); // 1 BABTC
-    expect(BABTC_CONFIG.rewards.minDifficulty).toBe(16);
-    expect(BABTC_CONFIG.rewards.maxDifficulty).toBe(32);
-    expect(BABTC_CONFIG.rewards.difficultyFactor).toBe(100n);
+    expect(SPARK_CONFIG.rewards).toBeDefined();
+    expect(SPARK_CONFIG.rewards.baseReward).toBe(100_000_000n); // 1 BABTC
+    expect(SPARK_CONFIG.rewards.minDifficulty).toBe(16);
+    expect(SPARK_CONFIG.rewards.maxDifficulty).toBe(32);
+    expect(SPARK_CONFIG.rewards.difficultyFactor).toBe(100n);
   });
 });
 
-describe("BABTC_METADATA", () => {
+describe("SPARK_METADATA", () => {
   it("should match config decimals", () => {
-    expect(BABTC_METADATA.decimals).toBe(BABTC_CONFIG.decimals);
+    expect(SPARK_METADATA.decimals).toBe(SPARK_CONFIG.decimals);
   });
 
   it("should match config ticker", () => {
-    expect(BABTC_METADATA.ticker).toBe(BABTC_CONFIG.ticker);
+    expect(SPARK_METADATA.ticker).toBe(SPARK_CONFIG.ticker);
   });
 
   it("should have supply limit of 21 billion", () => {
-    expect(BABTC_METADATA.supply_limit).toBe(21_000_000_000);
+    expect(SPARK_METADATA.supply_limit).toBe(21_000_000_000);
   });
 });
 
@@ -150,7 +150,7 @@ describe("calculateMiningReward (BRO-style)", () => {
   it("should distribute 90% to miner", () => {
     const reward = calculateMiningReward(16);
     const expectedMinerShare =
-      (reward.total * BigInt(BABTC_CONFIG.distribution.miner)) / 100n;
+      (reward.total * BigInt(SPARK_CONFIG.distribution.miner)) / 100n;
 
     expect(reward.minerShare).toBe(expectedMinerShare);
   });
@@ -158,7 +158,7 @@ describe("calculateMiningReward (BRO-style)", () => {
   it("should distribute 5% to dev fund", () => {
     const reward = calculateMiningReward(16);
     const expectedDevShare =
-      (reward.total * BigInt(BABTC_CONFIG.distribution.dev)) / 100n;
+      (reward.total * BigInt(SPARK_CONFIG.distribution.dev)) / 100n;
 
     expect(reward.devShare).toBe(expectedDevShare);
   });
@@ -166,7 +166,7 @@ describe("calculateMiningReward (BRO-style)", () => {
   it("should distribute 5% to staking pool", () => {
     const reward = calculateMiningReward(16);
     const expectedStakingShare =
-      (reward.total * BigInt(BABTC_CONFIG.distribution.staking)) / 100n;
+      (reward.total * BigInt(SPARK_CONFIG.distribution.staking)) / 100n;
 
     expect(reward.stakingShare).toBe(expectedStakingShare);
   });
