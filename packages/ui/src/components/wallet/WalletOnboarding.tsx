@@ -134,6 +134,7 @@ export function WalletOnboarding({
   const [error, setError] = useState<string | null>(null);
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [hasWrittenDown, setHasWrittenDown] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Parse mnemonic words
   const mnemonicWords = useMemo(
@@ -198,6 +199,16 @@ export function WalletOnboarding({
     }
     setError(null);
     setStep("verify-mnemonic");
+  };
+
+  const handleCopyAll = async () => {
+    try {
+      await navigator.clipboard.writeText(mnemonic);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard API may not be available
+    }
   };
 
   // Handle verification
@@ -431,6 +442,17 @@ export function WalletOnboarding({
                 </div>
               )}
             </div>
+
+            {/* Copy all words button */}
+            {showMnemonic && (
+              <button
+                onClick={handleCopyAll}
+                className="w-full py-2 font-pixel text-[10px] bg-pixel-bg-light text-pixel-text border-2 border-pixel-border hover:bg-pixel-bg-medium transition-colors"
+                type="button"
+              >
+                {copied ? "COPIED!" : "COPY ALL WORDS"}
+              </button>
+            )}
 
             {/* Checkbox confirmation */}
             <label className="flex items-center gap-3 p-3 bg-pixel-bg-light border-2 border-pixel-border cursor-pointer">

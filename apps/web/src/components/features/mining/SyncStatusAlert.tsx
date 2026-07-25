@@ -11,7 +11,7 @@
  * This replaces the hidden debug panel approach with visible user feedback.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { InfoBanner } from "@bitcoinbaby/ui";
 
 interface SyncState {
@@ -39,10 +39,12 @@ export function SyncStatusAlert({
   const [countdown, setCountdown] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Update sync state periodically
+  const getSyncStateRef = useRef(getSyncState);
+  getSyncStateRef.current = getSyncState;
+
   useEffect(() => {
     const update = () => {
-      const state = getSyncState();
+      const state = getSyncStateRef.current();
       setSyncState(state);
       if (state.circuitBreakerActive) {
         setCountdown(
@@ -53,7 +55,7 @@ export function SyncStatusAlert({
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [getSyncState]);
+  }, []);
 
   const handleForceSync = () => {
     setIsSyncing(true);

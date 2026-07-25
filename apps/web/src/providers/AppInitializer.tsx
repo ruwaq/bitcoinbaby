@@ -65,10 +65,10 @@ export function AppInitializer() {
   // This hook fetches NFTs from the server and updates the store
   const { isLoading, refresh } = useNFTSync();
 
-  // Auto-enable Dev Fund in development so wallets always have test funds
+  // Auto-enable Dev Fund only in development for testing
   useEffect(() => {
-    if (!isDevFundEnabled()) {
-      console.log("[AppInitializer] Auto-enabling Dev Fund for testing...");
+    if (process.env.NODE_ENV === "development" && !isDevFundEnabled()) {
+      console.log("[AppInitializer] Auto-enabling Dev Fund for development...");
       enableDevFund();
     }
   }, []);

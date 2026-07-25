@@ -17,6 +17,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -47,6 +48,7 @@ interface MiningProviderProps {
 
 export function MiningProvider({ children }: MiningProviderProps) {
   const [isInitialized, setIsInitialized] = useState(false);
+  const initializedRef = useRef(false);
   const [state, setState] = useState<MiningManagerState>({
     isRunning: false,
     isPaused: false,
@@ -61,7 +63,7 @@ export function MiningProvider({ children }: MiningProviderProps) {
     sessionStartTime: null,
     aiStatus: null,
     // Feature states
-    isLeader: true,
+    isLeader: false,
     isWaitingForLeadership: false,
     wakeLockActive: false,
     canResume: false,
@@ -82,8 +84,10 @@ export function MiningProvider({ children }: MiningProviderProps) {
     // Subscribe to state changes
     const unsubscribe = manager.subscribe((newState) => {
       setState(newState);
-      // Mark as initialized in the callback (not synchronously)
-      setIsInitialized(true);
+      if (!initializedRef.current) {
+        initializedRef.current = true;
+        setIsInitialized(true);
+      }
     });
 
     return () => {

@@ -10,6 +10,7 @@ import { useNetworkStore } from "@bitcoinbaby/core";
 import {
   TransactionBuilder,
   createMempoolClient,
+  DUST_LIMIT,
   type TxUTXO,
 } from "@bitcoinbaby/bitcoin";
 
@@ -217,10 +218,7 @@ export function SendView({ onBack }: SendViewProps) {
           signedTx.hex,
         );
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("BROADCAST_TIMEOUT")),
-            30000,
-          ),
+          setTimeout(() => reject(new Error("BROADCAST_TIMEOUT")), 30000),
         );
 
         const txid = await Promise.race([broadcastPromise, timeoutPromise]);
@@ -256,8 +254,7 @@ export function SendView({ onBack }: SendViewProps) {
           const shortfall = totalNeeded - availableBalance;
           errorMessage = `Insufficient funds. Need ${(totalNeeded / 100_000_000).toFixed(8)} BTC (amount + fee), have ${(availableBalance / 100_000_000).toFixed(8)} BTC. Short by ${(shortfall / 100_000_000).toFixed(8)} BTC.`;
         } else if (error.message.includes("dust")) {
-          errorMessage =
-            "Amount too small. Minimum is 546 satoshis (0.00000546 BTC).";
+          errorMessage = `Amount too small. Minimum is ${DUST_LIMIT} satoshis (${(DUST_LIMIT / 100_000_000).toFixed(8)} BTC).`;
         } else {
           errorMessage = error.message;
         }
@@ -451,16 +448,20 @@ export function SendView({ onBack }: SendViewProps) {
         </h3>
         <ul className="space-y-1.5 font-pixel-body text-xs text-pixel-text-muted">
           <li>
-            <span className="text-pixel-success">*</span> Transactions are signed locally
+            <span className="text-pixel-success">*</span> Transactions are
+            signed locally
           </li>
           <li>
-            <span className="text-pixel-success">*</span> Private keys never leave your device
+            <span className="text-pixel-success">*</span> Private keys never
+            leave your device
           </li>
           <li>
-            <span className="text-pixel-primary">*</span> Bitcoin transactions are irreversible
+            <span className="text-pixel-primary">*</span> Bitcoin transactions
+            are irreversible
           </li>
           <li>
-            <span className="text-pixel-primary">*</span> Always verify the recipient address
+            <span className="text-pixel-primary">*</span> Always verify the
+            recipient address
           </li>
         </ul>
       </div>

@@ -48,10 +48,13 @@ reserveRouter.get("/counter", async (c) => {
 reserveRouter.get("/prover-health", async (c) => {
   try {
     const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
+    if (!c.env.NFT_APP_ID || !c.env.NFT_APP_VK) {
+      return errorResponse(c, "NFT app not configured", 503);
+    }
     const mintingService = getNFTMintingServiceSimple({
       proverUrl: c.env.PROVER_URL || "https://v15.charms.dev",
-      appId: c.env.NFT_APP_ID || "placeholder",
-      appVk: c.env.NFT_APP_VK || "placeholder",
+      appId: c.env.NFT_APP_ID,
+      appVk: c.env.NFT_APP_VK,
       network,
     });
 

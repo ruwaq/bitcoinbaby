@@ -54,11 +54,15 @@ check_file() {
   fi
 
   # --- Pattern 3: Private keys (hex 64 chars) ---
+  # Excludes obvious test vectors: all-zeros/ones/ff key, and the two
+  # canonical bitcoin test txids (...0001 / ...0002) used as fixtures.
   local hex_matches
   hex_matches=$(echo "$added_lines" \
     | grep -v '0000000000000000000000000000000000000000000000000000000000000000' \
     | grep -v '1111111111111111111111111111111111111111111111111111111111111111' \
     | grep -v 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff' \
+    | grep -v '0000000000000000000000000000000000000000000000000000000000000001' \
+    | grep -v '0000000000000000000000000000000000000000000000000000000000000002' \
     | grep -oE '\b[a-fA-F0-9]{64}\b' || true)
 
   if [ -n "$hex_matches" ]; then
