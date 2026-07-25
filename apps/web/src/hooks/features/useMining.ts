@@ -11,6 +11,7 @@ import {
   useBonusEngine,
   type WalletInfo,
   type AIStatus,
+  type AIProof,
 } from "@bitcoinbaby/core";
 
 /**
@@ -33,6 +34,8 @@ export interface UseMiningOptions {
   autoStart?: boolean;
   /** Throttle interval for display values (ms) */
   throttleMs?: number;
+  /** Narrative pipeline callback */
+  onAIProof?: (proof: AIProof) => void;
 }
 
 export interface UseMiningReturn {
@@ -135,7 +138,7 @@ export interface UseMiningReturn {
 }
 
 export function useMining(options: UseMiningOptions = {}): UseMiningReturn {
-  const { autoStart = false, throttleMs = 500 } = options;
+  const { autoStart = false, throttleMs = 500, onAIProof } = options;
 
   // Wallet
   const wallet = useWalletStore((s) => s.wallet);
@@ -173,6 +176,7 @@ export function useMining(options: UseMiningOptions = {}): UseMiningReturn {
   // Unified share submission
   const shareSubmission = useMiningShareSubmission({
     strategy: "virtual-first",
+    onAIProof,
   });
 
   // Engagement tracking

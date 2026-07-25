@@ -14,7 +14,7 @@
  */
 
 import { createLogger } from "@bitcoinbaby/shared";
-import type { AITask, AIResult, AIProof } from "./engine";
+import type { AITask, AIResult, AIProof } from "./types";
 
 const log = createLogger("CloudflareAI");
 
@@ -68,7 +68,8 @@ const AVAILABLE_MODELS = [
 
 /** Default proxy URL — set via VITE_CLOUDFLARE_AI_PROXY or build-time config */
 const DEFAULT_PROXY_URL =
-  (typeof process !== "undefined" && process.env?.BITCOINSPARK_AI_PROXY_URL) ||
+  (typeof globalThis !== "undefined" &&
+    (globalThis as any).process?.env?.BITCOINSPARK_AI_PROXY_URL) ||
   "";
 
 // =============================================================================

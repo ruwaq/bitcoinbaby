@@ -54,6 +54,7 @@ function makeRandomNFT(): SparkNFTState {
     baseType: BASE_TYPES[Math.floor(Math.random() * BASE_TYPES.length)],
     genesisBlock: 2_500_000 + Math.floor(Math.random() * 50_000),
     rarityTier: "rare",
+    heritage: 2,
     tokenId: Math.floor(Math.random() * 100) + 1,
     level: Math.floor(Math.random() * 8) + 1,
     xp: Math.floor(Math.random() * 500),
@@ -72,6 +73,10 @@ function makeRandomNFT(): SparkNFTState {
 // =============================================================================
 
 export function NarrativeDebugPanel() {
+  if (process.env.NODE_ENV !== "development") {
+    return null;
+  }
+
   const [nft, setNft] = useState<SparkNFTState>(makeRandomNFT);
   const [selectedOutput, setSelectedOutput] = useState(
     Object.keys(SAMPLE_OUTPUTS)[0],

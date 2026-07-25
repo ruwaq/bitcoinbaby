@@ -10,7 +10,7 @@
  */
 
 import { createLogger } from "@bitcoinbaby/shared";
-import type { AITask, AIResult, AIProof } from "./engine";
+import type { AITask, AIResult, AIProof, AIProgressData } from "./types";
 
 const log = createLogger("BabyBrain");
 
@@ -21,16 +21,6 @@ const log = createLogger("BabyBrain");
 export interface BabyBrainConfig {
   /** Brain complexity level (1-10), affects output sophistication */
   level?: number;
-}
-
-export interface AIProgressData {
-  progress: number;
-  loaded: number;
-  total: number;
-  status: string;
-  file: string;
-  filesCount: number;
-  doneCount: number;
 }
 
 // =============================================================================

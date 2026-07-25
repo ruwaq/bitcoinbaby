@@ -139,7 +139,7 @@ class MiningManager {
     if (this.orchestrator) {
       // Already initialized, just update config
       this.config = { ...this.config, ...config };
-      
+
       // Update orchestrator config in real-time (especially minerAddress)
       this.orchestrator.updateConfig({
         minerAddress: config.minerAddress,
@@ -187,10 +187,29 @@ class MiningManager {
         lastShare: result,
       });
 
-      // Process share through client VarDiff for timing-based adjustment
       this.processShareForClientVarDiff();
 
       this.config.onWorkFound?.(result);
+
+      // Forward AI proof to narrative pipeline
+      if (result.aiProof && this.config.onAILocalTaskResolved) {
+        try {
+          const proofData = JSON.parse(result.aiProof) as AIProof;
+          if (proofData.taskId) {
+            this.config.onAILocalTaskResolved(proofData, {
+              id: proofData.taskId,
+              type: "pouw",
+              input: proofData.inputPrompt || "",
+              seed: proofData.seed || "",
+            });
+          }
+        } catch (err) {
+          log.warn("AI proof JSON parse failed, skipping narrative", {
+            error: err instanceof Error ? err.message : String(err),
+            proofPreview: result.aiProof?.substring(0, 100),
+          });
+        }
+      }
     });
 
     // XP gained event (for NFT work proof system)

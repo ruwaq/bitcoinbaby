@@ -11,6 +11,7 @@
 
 import { useState } from "react";
 import { HelpTooltip, pixelBorders } from "@bitcoinbaby/ui";
+import { SPARK_CONFIG } from "@bitcoinbaby/bitcoin";
 
 interface RewardInfoPanelProps {
   /** Current mining difficulty (AI PoUW task complexity) */
@@ -18,22 +19,6 @@ interface RewardInfoPanelProps {
   /** Whether panel is expanded by default */
   defaultExpanded?: boolean;
 }
-
-// Token config (matches packages/bitcoin/src/charms/token.ts)
-const SPARK_CONFIG = {
-  ticker: "SPARK",
-  rewards: {
-    baseReward: 100_00000000n, // 100 SPARK
-    minDifficulty: 22,
-    maxDifficulty: 32,
-    difficultyFactor: 100n,
-  },
-  distribution: {
-    miner: 90,
-    dev: 5,
-    staking: 5,
-  },
-};
 
 function calculateReward(difficulty: number): {
   total: bigint;
@@ -65,7 +50,7 @@ function formatReward(amount: bigint): string {
 }
 
 export function RewardInfoPanel({
-  currentDifficulty = 22,
+  currentDifficulty = SPARK_CONFIG.rewards.minDifficulty,
   defaultExpanded = false,
 }: RewardInfoPanelProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -101,7 +86,7 @@ export function RewardInfoPanel({
             </span>
           </button>
           <HelpTooltip
-            content="Rewards are based on AI PoUW complexity (measured by Gemma processing iterations). Harder AI tasks = more rewards. No halving schedule."
+            content="Rewards are based on AI PoUW complexity. Harder AI tasks = more rewards. No halving schedule."
             title="PoUW Rewards"
             size="sm"
           />
@@ -111,7 +96,7 @@ export function RewardInfoPanel({
       {/* Summary row - always visible */}
       <div className="flex items-center justify-between mt-2 text-pixel-xs">
         <span className="text-pixel-text-muted">
-          Gemma Task D{currentDifficulty} Reward:
+          AI Task D{currentDifficulty} Reward:
         </span>
         <span className="font-pixel text-pixel-success">
           {formatReward(currentReward.minerShare)} $BABY
@@ -168,7 +153,8 @@ export function RewardInfoPanel({
 
           {/* Info text */}
           <div className="text-pixel-3xs text-pixel-text-muted italic">
-            Higher AI task complexity (measured by LLM difficulty) = exponentially more reward
+            Higher AI task complexity (measured by LLM difficulty) =
+            exponentially more reward
           </div>
         </div>
       )}

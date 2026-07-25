@@ -4,8 +4,9 @@
  * AIProviderSettings — UI for configuring BYO AI provider
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { AIProviderId } from "@bitcoinbaby/ai";
+import { useAIProviderStore } from "@bitcoinbaby/core";
 
 const PROVIDERS: Array<{
   id: AIProviderId;
@@ -41,9 +42,11 @@ const PROVIDERS: Array<{
 ];
 
 export function AIProviderSettings() {
-  const [selectedProvider, setSelectedProvider] = useState<
-    AIProviderId | ""
-  >("");
+  const aiStore = useAIProviderStore();
+
+  const [selectedProvider, setSelectedProvider] = useState<AIProviderId | "">(
+    "",
+  );
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
   const [endpoint, setEndpoint] = useState("http://localhost:11434");
@@ -52,28 +55,32 @@ export function AIProviderSettings() {
   >("idle");
   const [statusMsg, setStatusMsg] = useState("");
 
-  const selectedProviderData = PROVIDERS.find(
-    (p) => p.id === selectedProvider
-  );
+  // Load saved config from store on mount
+  useEffect(() => {
+    if (aiStore.providerId) {
+      setSelectedProvider(aiStore.providerId);
+      if (aiStore.apiKey) setApiKey(aiStore.apiKey);
+      if (aiStore.model) setModel(aiStore.model);
+      if (aiStore.endpoint) setEndpoint(aiStore.endpoint);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectedProviderData = PROVIDERS.find((p) => p.id === selectedProvider);
 
   const handleSave = () => {
-    if (!selectedProvider || !apiKey) return;
-    // TODO: encrypt and save via spark-store or dedicated hook
-    localStorage.setItem(
-      "bitcoinsparks-ai-provider",
-      JSON.stringify({
-        provider: selectedProvider,
-        apiKey, // will be encrypted in production
-        model: model || selectedProviderData?.models[0],
-        endpoint,
-      })
-    );
+    if (!selectedProvider) return;
+    aiStore.configure({
+      providerId: selectedProvider,
+      apiKey: apiKey || undefined,
+      model: model || selectedProviderData?.models[0],
+      endpoint: endpoint || undefined,
+    });
     setStatus("success");
-    setStatusMsg("Provider saved! (API key stored in localStorage — will be encrypted)");
+    setStatusMsg("Provider saved!");
   };
 
   const handleDisconnect = () => {
-    localStorage.removeItem("bitcoinsparks-ai-provider");
+    aiStore.disconnect();
     setSelectedProvider("");
     setApiKey("");
     setModel("");

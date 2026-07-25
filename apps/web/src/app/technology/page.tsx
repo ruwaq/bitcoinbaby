@@ -80,9 +80,9 @@ const TECH_STACK: TechCard[] = [
     subtitle: "Your Device Runs Local AI",
     icon: "🧠",
     description:
-      "Mining energy is NOT wasted on meaningless hash algorithms. In BitcoinBaby, you execute the Gemma 4 E2B model locally via WebGPU/ONNX. Every processed token contributes to training collective intelligence with cryptographic proofs.",
+      "Mining energy is NOT wasted on meaningless hash algorithms. In BitcoinBaby, you execute AI inference via external providers (Gemini, OpenAI, Claude, or Ollama). Every inference generates cryptographic proof and earns $SPARK.",
     features: [
-      "Local inference running Gemma 4 E2B via WebGPU",
+      "AI inference via external providers (BYO API key)",
       "100% deterministic results with Greedy Decoding",
       "On-chain verification of AI processing",
       "Frictionless onboarding (no local app installation)",
@@ -249,15 +249,18 @@ export default function TechnologyPage() {
               BitcoinBaby does not waste energy on meaningless SHA-256 hashes.
               Our Proof of Useful Work system uses{" "}
               <span className="text-purple-400 font-semibold">
-                your GPU/CPU to execute Gemma 4 E2B locally
+                your GPU/CPU for AI inference
               </span>
-              . Every token processed helps your Genesis Spark learn and generates cryptographic proof for on-chain rewards.
+              . Every token processed helps your Genesis Spark learn and
+              generates cryptographic proof for on-chain rewards.
             </p>
             <div className="flex justify-center gap-4 mb-4">
               <div className="px-4 py-2 bg-purple-500/20 border-2 border-purple-500 rounded">
-                <p className="font-pixel text-[8px] text-purple-400">AI ENGINE</p>
+                <p className="font-pixel text-[8px] text-purple-400">
+                  AI ENGINE
+                </p>
                 <p className="font-pixel-body text-xs text-pixel-text">
-                  Gemma 4 E2B via WebGPU
+                  AI Provider API
                 </p>
               </div>
             </div>
@@ -418,8 +421,16 @@ export default function TechnologyPage() {
               </h3>
               <div className="space-y-3">
                 {[
-                  { step: 1, text: "Obtencion de tarea JIT desde el pool", icon: "📥" },
-                  { step: 2, text: "Inferencia local de Gemma 4 E2B (WebGPU)", icon: "🧠" },
+                  {
+                    step: 1,
+                    text: "Obtencion de tarea JIT desde el pool",
+                    icon: "📥",
+                  },
+                  {
+                    step: 2,
+                    text: "Inferencia via IA externa (Gemini, OpenAI, Claude)",
+                    icon: "🧠",
+                  },
                   {
                     step: 3,
                     text: "Generacion de prueba de inferencia determinista",
@@ -435,7 +446,11 @@ export default function TechnologyPage() {
                     text: "Validacion criptografica del trabajo",
                     icon: "✅",
                   },
-                  { step: 6, text: "Mint de $SPARK y XP para tu Genesis Spark", icon: "🪙" },
+                  {
+                    step: 6,
+                    text: "Mint de $SPARK y XP para tu Genesis Spark",
+                    icon: "🪙",
+                  },
                 ].map((item) => (
                   <div
                     key={item.step}
