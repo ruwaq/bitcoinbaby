@@ -19,7 +19,6 @@ import {
   createCharmsClient,
   createMempoolClient,
   Psbt,
-  EVOLUTION_COSTS,
   XP_REQUIREMENTS,
   canLevelUp,
   formatTokenAmount,
@@ -130,14 +129,22 @@ async function confirmEvolutionWithRetry(
   log.warn(
     `Server confirmation exhausted all ${MAX_CONFIRM_RETRIES} retries. Queuing for later.`,
   );
-  queueFailedConfirmation({ tokenId, txid, newLevel, address, timestamp: Date.now() });
+  queueFailedConfirmation({
+    tokenId,
+    txid,
+    newLevel,
+    address,
+    timestamp: Date.now(),
+  });
   return false;
 }
 
 /**
  * Queue a failed confirmation in localStorage for retry on next app load.
  */
-function queueFailedConfirmation(confirmation: PendingEvolutionConfirmation): void {
+function queueFailedConfirmation(
+  confirmation: PendingEvolutionConfirmation,
+): void {
   try {
     const stored = localStorage.getItem(EVOLUTION_CONFIRM_STORAGE_KEY);
     const queue: PendingEvolutionConfirmation[] = stored
@@ -174,11 +181,16 @@ function queueFailedConfirmation(confirmation: PendingEvolutionConfirmation): vo
  * @param nft - The NFT to evolve
  * @param ownerAddress - The owner's Bitcoin address (for server ownership validation)
  */
-async function evolveVirtual(nft: SparkNFTState, ownerAddress: string): Promise<EvolutionResult> {
+async function evolveVirtual(
+  nft: SparkNFTState,
+  ownerAddress: string,
+): Promise<EvolutionResult> {
   const apiClient = getApiClient();
 
   try {
-    log.info(`Virtual evolution for NFT #${nft.tokenId} (level ${nft.level} → ${nft.level + 1})`);
+    log.info(
+      `Virtual evolution for NFT #${nft.tokenId} (level ${nft.level} → ${nft.level + 1})`,
+    );
 
     const result = await apiClient.evolveNFT(
       nft.tokenId,
@@ -192,10 +204,8 @@ async function evolveVirtual(nft: SparkNFTState, ownerAddress: string): Promise<
       return { success: false, error: errorMsg };
     }
 
-    const { newLevel, evolutionCost } = result.data!;
-    log.info(
-      `NFT #${nft.tokenId} evolved to level ${newLevel} (cost: ${evolutionCost} SPARK)`,
-    );
+    const { newLevel } = result.data!;
+    log.info(`NFT #${nft.tokenId} evolved to level ${newLevel}`);
 
     return {
       success: true,
@@ -203,7 +213,8 @@ async function evolveVirtual(nft: SparkNFTState, ownerAddress: string): Promise<
       txid: undefined, // No blockchain txid for virtual evolution
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Virtual evolution failed";
+    const message =
+      err instanceof Error ? err.message : "Virtual evolution failed";
     log.error("Virtual evolution error:", { message });
     return { success: false, error: message };
   }
@@ -265,9 +276,8 @@ export function useEvolution(): UseEvolutionReturn {
   /**
    * Get evolution cost for next level
    */
-  const getEvolutionCost = useCallback((nft: SparkNFTState): bigint => {
-    const nextLevel = nft.level + 1;
-    return EVOLUTION_COSTS[nextLevel] ?? 0n;
+  const getEvolutionCost = useCallback((_nft: SparkNFTState): bigint => {
+    return 0n;
   }, []);
 
   /**
@@ -297,7 +307,8 @@ export function useEvolution(): UseEvolutionReturn {
     async (nft: SparkNFTState): Promise<EvolutionResult> => {
       // ── Phase 1: Virtual Evolution ──
       const phaseConfig = getPhaseConfig();
-      const useVirtual = phaseConfig.features.nftEvolution && !phaseConfig.features.mining;
+      const useVirtual =
+        phaseConfig.features.nftEvolution && !phaseConfig.features.mining;
 
       if (useVirtual) {
         // Virtual evolution doesn't need a full wallet but we need an owner address
@@ -305,7 +316,8 @@ export function useEvolution(): UseEvolutionReturn {
         if (!ownerAddr) {
           return {
             success: false,
-            error: "Please connect your wallet first (address needed for ownership validation)",
+            error:
+              "Please connect your wallet first (address needed for ownership validation)",
           };
         }
         return evolveVirtual(nft, ownerAddr);
@@ -358,15 +370,11 @@ export function useEvolution(): UseEvolutionReturn {
           txid: nftCharm.txid,
           vout: nftCharm.vout,
         };
-        log.info(
-          `Found NFT UTXO: ${nftUtxo.txid}:${nftUtxo.vout}`,
-        );
+        log.info(`Found NFT UTXO: ${nftUtxo.txid}:${nftUtxo.vout}`);
 
         // 2. Get token UTXOs
         const tokenCost = getEvolutionCost(nft);
-        log.info(
-          `Evolution cost: ${formatTokenAmount(tokenCost)} SPARK`,
-        );
+        log.info(`Evolution cost: ${formatTokenAmount(tokenCost)} SPARK`);
 
         const tokenCharms = charms.filter(
           (c) => c.appId === babtcConfig.appId && c.appType === "t",
@@ -386,8 +394,8 @@ export function useEvolution(): UseEvolutionReturn {
         // Coin selection: sort UTXOs by amount descending, then pick the
         // smallest UTXO that meets or exceeds the cost. If no single UTXO
         // is large enough, use the largest one as best-effort fallback.
-        const sortedTokenCharms = [...tokenCharms].sort(
-          (a, b) => (b.amount > a.amount ? 1 : b.amount < a.amount ? -1 : 0),
+        const sortedTokenCharms = [...tokenCharms].sort((a, b) =>
+          b.amount > a.amount ? 1 : b.amount < a.amount ? -1 : 0,
         );
 
         // Find smallest UTXO that meets or exceeds the cost (iterate reversed)
@@ -438,8 +446,7 @@ export function useEvolution(): UseEvolutionReturn {
 
         // Detect PSBT format: hex vs base64 (uses PSBT magic bytes)
         // Hex: "70736274ff" | Base64: "cHNidP8"
-        const isHexPsbt =
-          signedPsbtHex.toLowerCase().startsWith("70736274ff");
+        const isHexPsbt = signedPsbtHex.toLowerCase().startsWith("70736274ff");
         const isBase64Psbt = signedPsbtHex.startsWith("cHNidP8");
         const isPsbtFormat = isHexPsbt || isBase64Psbt;
 

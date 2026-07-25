@@ -18,7 +18,6 @@ import {
   getMiningBoost,
   canLevelUp,
   getXpForNextLevel,
-  getEvolutionCostDisplay,
   MAX_LEVEL,
 } from "./types";
 import { NFTSprite } from "./NFTSprite";
@@ -292,7 +291,6 @@ export const NFTCard: FC<NFTCardProps> = ({
 
   const boost = getMiningBoost(nft);
   const levelUpReady = canLevelUp(nft);
-  const evolutionCost = getEvolutionCostDisplay(nft.level);
   const rarity = RARITY_COLORS[nft.rarityTier];
   const bloodline = BLOODLINE_COLORS[nft.bloodline];
   const baseType = BASE_TYPE_COLORS[nft.baseType];
@@ -419,12 +417,7 @@ export const NFTCard: FC<NFTCardProps> = ({
             {isEvolving ? (
               <span className="animate-pulse">Evolving...</span>
             ) : (
-              <>
-                Evolve to LV{nft.level + 1}
-                <span className="block font-pixel-mono text-[11px] text-[#fce7f3] mt-0.5">
-                  {evolutionCost}
-                </span>
-              </>
+              <>Evolve to LV{nft.level + 1}</>
             )}
           </button>
         </div>

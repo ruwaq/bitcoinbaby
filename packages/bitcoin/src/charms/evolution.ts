@@ -10,7 +10,6 @@ import {
   canLevelUp,
   calculateXpGain,
   getMiningBoost,
-  EVOLUTION_COSTS,
   XP_REQUIREMENTS,
   LEVEL_BOOSTS,
   GENESIS_SPARKS_CONFIG,
@@ -78,16 +77,11 @@ export class EvolutionService {
     const nextLevel = nft.level + 1;
     const canEvolve = canLevelUp(nft);
     const xpRequired = XP_REQUIREMENTS[nextLevel] ?? 0;
-    const tokenCost = EVOLUTION_COSTS[nextLevel] ?? 0n;
     const currentBoost = getMiningBoost(nft);
-    // nextBoost: use nextLevel boost if below max, otherwise stay at current level boost
     const isMaxLevel = nft.level >= GENESIS_SPARKS_CONFIG.maxLevel;
     const nextLevelBoost = isMaxLevel
       ? (LEVEL_BOOSTS[nft.level] ?? 0)
       : (LEVEL_BOOSTS[nextLevel] ?? LEVEL_BOOSTS[nft.level] ?? 0);
-    const rarityBoost =
-      GENESIS_SPARKS_CONFIG.rarityTiers[nft.rarityTier]?.boost ?? 0;
-    const nextBoost = nextLevelBoost + rarityBoost;
 
     return {
       currentLevel: nft.level,
@@ -96,10 +90,9 @@ export class EvolutionService {
       xpRequired,
       xpProgress: xpRequired > 0 ? (nft.xp / xpRequired) * 100 : 100,
       canEvolve,
-      tokenCost,
       currentBoost,
-      nextBoost,
-      boostGain: nextBoost - currentBoost,
+      nextBoost: nextLevelBoost,
+      boostGain: nextLevelBoost - currentBoost,
     };
   }
 
@@ -161,23 +154,12 @@ export class EvolutionService {
    */
   async createLevelUpSpell(params: {
     nftUtxo: { txid: string; vout: number };
-    tokenUtxo: { txid: string; vout: number };
     currentState: SparkNFTState;
-    tokenAmount: bigint;
     ownerAddress: string;
   }): Promise<SpellV2> {
-    // Validate can level up
     if (!canLevelUp(params.currentState)) {
       throw new EvolutionError(
         `Cannot level up: insufficient XP (${params.currentState.xp}/${XP_REQUIREMENTS[params.currentState.level + 1]})`,
-      );
-    }
-
-    // Validate token amount
-    const cost = EVOLUTION_COSTS[params.currentState.level + 1];
-    if (params.tokenAmount < cost) {
-      throw new EvolutionError(
-        `Insufficient tokens: ${params.tokenAmount} < ${cost}`,
       );
     }
 
@@ -187,9 +169,7 @@ export class EvolutionService {
       tokenAppId: this.options.tokenAppId,
       tokenAppVk: this.options.tokenAppVk,
       nftUtxo: params.nftUtxo,
-      tokenUtxo: params.tokenUtxo,
       currentState: params.currentState,
-      tokenAmount: params.tokenAmount,
       ownerAddress: params.ownerAddress,
     });
   }
@@ -230,9 +210,7 @@ export class EvolutionService {
     const nextLevelReq = XP_REQUIREMENTS[params.currentState.level + 1];
     const rawNewXp = params.currentState.xp + xpGain;
     const cappedNewXp =
-      nextLevelReq !== undefined
-        ? Math.min(rawNewXp, nextLevelReq)
-        : rawNewXp;
+      nextLevelReq !== undefined ? Math.min(rawNewXp, nextLevelReq) : rawNewXp;
     // NOTE: Work-proof does NOT auto-level-up — that requires a separate levelUp tx.
     // We report whether the player CAN now level up (canLevelUpNow flag).
     const canLevelUpNow =
@@ -243,9 +221,8 @@ export class EvolutionService {
       type: "work_proof",
       xpGained: xpGain,
       newXp: cappedNewXp,
-      newLevel: params.currentState.level, // Level unchanged — levelUp is a separate tx
-      tokensBurned: 0n,
-      estimatedFee: feeEstimates.halfHourFee * 200, // ~200 vbytes
+      newLevel: params.currentState.level,
+      estimatedFee: feeEstimates.halfHourFee * 200,
       canLevelUpNow,
     };
   }
@@ -255,24 +232,17 @@ export class EvolutionService {
    */
   async executeLevelUp(params: {
     nftUtxo: { txid: string; vout: number };
-    tokenUtxo: { txid: string; vout: number };
     currentState: SparkNFTState;
-    tokenAmount: bigint;
     ownerAddress: string;
     signTransaction: (psbt: string) => Promise<string>;
   }): Promise<EvolutionResult> {
-    // 1. Create spell
     const spell = await this.createLevelUpSpell({
       nftUtxo: params.nftUtxo,
-      tokenUtxo: params.tokenUtxo,
       currentState: params.currentState,
-      tokenAmount: params.tokenAmount,
       ownerAddress: params.ownerAddress,
     });
 
-    // 2. Get fee info
     const feeEstimates = await this.client.getFeeEstimates();
-    const cost = EVOLUTION_COSTS[params.currentState.level + 1];
 
     return {
       spell,
@@ -280,8 +250,7 @@ export class EvolutionService {
       xpGained: 0,
       newXp: 0,
       newLevel: params.currentState.level + 1,
-      tokensBurned: cost,
-      estimatedFee: feeEstimates.halfHourFee * 300, // ~300 vbytes
+      estimatedFee: feeEstimates.halfHourFee * 200,
     };
   }
 }
@@ -297,7 +266,6 @@ export interface EvolutionStatus {
   xpRequired: number;
   xpProgress: number; // 0-100
   canEvolve: boolean;
-  tokenCost: bigint;
   currentBoost: number;
   nextBoost: number;
   boostGain: number;
@@ -309,7 +277,6 @@ export interface EvolutionResult {
   xpGained: number;
   newXp: number;
   newLevel: number;
-  tokensBurned: bigint;
   estimatedFee: number;
   /** Only present for work_proof: true if the player can now submit a levelUp tx */
   canLevelUpNow?: boolean;

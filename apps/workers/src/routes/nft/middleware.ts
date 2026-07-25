@@ -192,7 +192,7 @@ export const explorerQuerySchema = z.object({
 
 export const MAX_SUPPLY = 10_000;
 
-// XP requirements per level
+// XP requirements per level (1-21)
 export const XP_REQUIREMENTS: Record<number, number> = {
   2: 100,
   3: 250,
@@ -203,19 +203,16 @@ export const XP_REQUIREMENTS: Record<number, number> = {
   8: 8000,
   9: 16000,
   10: 32000,
-};
-
-// Evolution costs in BABTC
-export const EVOLUTION_COSTS: Record<number, bigint> = {
-  2: 100n * 100_000_000n,
-  3: 250n * 100_000_000n,
-  4: 500n * 100_000_000n,
-  5: 1000n * 100_000_000n,
-  6: 2500n * 100_000_000n,
-  7: 5000n * 100_000_000n,
-  8: 10000n * 100_000_000n,
-  9: 25000n * 100_000_000n,
-  10: 50000n * 100_000_000n,
+  11: 48000,
+  12: 64000,
+  13: 96000,
+  14: 128000,
+  15: 192000,
+  16: 256000,
+  17: 384000,
+  18: 512000,
+  19: 768000,
+  20: 1024000,
 };
 
 // Base XP per valid share

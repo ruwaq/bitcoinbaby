@@ -95,41 +95,31 @@ export const PLAY_TIME_CONFIG = {
 // =============================================================================
 
 /**
- * NFT level boost percentages
+ * NFT level boost percentages (fair 0→10% across 21 levels)
  */
 export const NFT_LEVEL_BOOSTS: Record<number, number> = {
   1: 0,
-  2: 2,
-  3: 5,
-  4: 8,
-  5: 12,
-  6: 16,
-  7: 20,
-  8: 25,
-  9: 30,
-  10: 35,
+  2: 0.1,
+  3: 0.2,
+  4: 0.3,
+  5: 0.5,
+  6: 1,
+  7: 1.25,
+  8: 1.5,
+  9: 1.75,
+  10: 2,
+  11: 2.5,
+  12: 3,
+  13: 3.5,
+  14: 4,
+  15: 4.5,
+  16: 5,
+  17: 5.5,
+  18: 6,
+  19: 7,
+  20: 8,
+  21: 10,
 };
-
-/**
- * NFT rarity boost percentages
- */
-export const NFT_RARITY_BOOSTS: Record<string, number> = {
-  common: 0,
-  uncommon: 2,
-  rare: 5,
-  epic: 10,
-  legendary: 15,
-  mythic: 25,
-};
-
-/**
- * NFT stacking multipliers for diminishing returns
- * 1st NFT: 100% of boost
- * 2nd NFT: 50% of boost
- * 3rd NFT: 25% of boost
- * etc.
- */
-export const NFT_STACKING_MULTIPLIERS = [1.0, 0.5, 0.25, 0.125, 0.05] as const;
 
 // =============================================================================
 // COMBINED BOOST LIMITS

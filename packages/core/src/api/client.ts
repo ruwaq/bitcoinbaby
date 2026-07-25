@@ -895,7 +895,6 @@ export class BitcoinBabyClient {
   ): Promise<
     ApiResponse<{
       nft: NFTRecord;
-      evolutionCost: string;
       previousLevel: number;
       newLevel: number;
     }>

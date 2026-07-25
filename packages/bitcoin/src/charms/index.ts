@@ -143,7 +143,6 @@ export {
   // Config
   GENESIS_SPARKS_CONFIG,
   XP_REQUIREMENTS,
-  EVOLUTION_COSTS,
   LEVEL_BOOSTS,
   // Calculations
   getMiningBoost,

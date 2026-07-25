@@ -55,17 +55,15 @@ export function NFTEvolutionPanel({
     xpRequired,
     xpProgress,
     canEvolve,
-    tokenCost,
     currentBoost,
     nextBoost,
     boostGain,
   } = evolutionStatus;
 
-  const hasEnoughTokens = tokenBalance >= tokenCost;
-  const isMaxLevel = currentLevel >= 10;
+  const isMaxLevel = currentLevel >= 21;
 
   const handleEvolveClick = () => {
-    if (canEvolve && hasEnoughTokens) {
+    if (canEvolve) {
       setShowConfirm(true);
     }
   };
@@ -142,25 +140,22 @@ export function NFTEvolutionPanel({
           {/* Evolution Requirements */}
           <div className="mb-4 p-3 bg-pixel-bg-dark border-2 border-pixel-border">
             <p className="font-pixel text-[7px] text-pixel-text-muted uppercase mb-2">
-              Level Up Cost
+              Requirements
             </p>
             <div className="flex items-center justify-between">
               <span className="font-pixel text-[10px] text-pixel-warning">
-                {formatTokenAmount(tokenCost)} $BABY
+                {xpRequired} XP needed
               </span>
-              {hasEnoughTokens ? (
+              {canEvolve ? (
                 <span className="font-pixel text-[7px] text-pixel-success">
-                  OK
+                  READY
                 </span>
               ) : (
-                <span className="font-pixel text-[7px] text-pixel-error">
-                  Need more
+                <span className="font-pixel text-[7px] text-pixel-text-muted">
+                  Keep mining
                 </span>
               )}
             </div>
-            <p className="font-pixel text-[6px] text-pixel-text-muted mt-1">
-              Your balance: {formatTokenAmount(tokenBalance)} $BABY
-            </p>
           </div>
 
           {/* Boost Preview */}
@@ -188,10 +183,10 @@ export function NFTEvolutionPanel({
           {!showConfirm ? (
             <button
               onClick={handleEvolveClick}
-              disabled={!canEvolve || !hasEnoughTokens || isEvolving}
+              disabled={!canEvolve || isEvolving}
               className={cn(
                 "w-full font-pixel text-[9px] uppercase px-4 py-3 border-4 transition-all",
-                canEvolve && hasEnoughTokens && !isEvolving
+                canEvolve && !isEvolving
                   ? "bg-pixel-success text-pixel-text-dark border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000]"
                   : "bg-pixel-bg-dark text-pixel-text-muted border-pixel-border cursor-not-allowed opacity-50",
               )}
@@ -200,8 +195,6 @@ export function NFTEvolutionPanel({
                 <span className="animate-pulse">Evolving...</span>
               ) : !canEvolve ? (
                 "Need More XP"
-              ) : !hasEnoughTokens ? (
-                "Need More $BABY"
               ) : (
                 "Evolve to Level " + nextLevel
               )}
@@ -210,7 +203,7 @@ export function NFTEvolutionPanel({
             /* Confirmation */
             <div className="space-y-2">
               <p className="font-pixel text-[8px] text-pixel-warning text-center">
-                Burn {formatTokenAmount(tokenCost)} $BABY to evolve?
+                Evolve to Level {nextLevel}?
               </p>
               <div className="flex gap-2">
                 <button

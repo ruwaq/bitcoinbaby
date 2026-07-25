@@ -11,7 +11,7 @@ export type {
   Bloodline,
   RarityTier,
   BaseType,
-  Heritage,
+  HeritageSeed,
   EvolutionStatus,
 } from "./types";
 
@@ -19,13 +19,10 @@ export {
   getMiningBoost,
   canLevelUp,
   getXpForNextLevel,
-  getEvolutionCostDisplay,
   getEvolutionStatus,
   MAX_LEVEL,
   XP_REQUIREMENTS,
   LEVEL_BOOSTS,
-  RARITY_BOOSTS,
-  EVOLUTION_COSTS,
 } from "./types";
 
 // Components
