@@ -243,7 +243,11 @@ claimRouter.get(
  * User just needs to sign.
  */
 claimRouter.post("/execute", validateBody(executeClaimSchema), async (c) => {
-  const { address } = await c.req.json();
+  // Use the Zod-validated body set by validateBody middleware.
+  // Re-reading c.req.json() here would discard the validated/transformed
+  // payload (defaults, coercions) and is the anti-pattern flagged in
+  // the Hono middleware docs. See middleware.ts validateBody JSDoc.
+  const { address } = c.get("validatedBody");
 
   try {
     claimLogger.info("Execute request", { address });
@@ -343,7 +347,7 @@ claimRouter.post("/execute", validateBody(executeClaimSchema), async (c) => {
  * Server broadcasts and queues mint.
  */
 claimRouter.post("/complete", validateBody(completeClaimSchema), async (c) => {
-  const { claimId, signedPsbtBase64, address } = await c.req.json();
+  const { claimId, signedPsbtBase64, address } = c.get("validatedBody");
 
   try {
     claimLogger.info("Complete request", { claimId, address });
@@ -482,7 +486,7 @@ claimRouter.post(
     }),
   ),
   async (c) => {
-    const { claimId, address } = await c.req.json();
+    const { claimId, address } = c.get("validatedBody");
     try {
       // 1. Get claim status/details from DO
       const stub = getVirtualBalanceStub(c.env, address);
@@ -531,9 +535,12 @@ claimRouter.post(
 
       // 2. Initialize minting service
       const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
+      if (!c.env.BABTC_APP_ID) {
+        return errorResponse(c, "Token app not configured", 503);
+      }
       const mintingService = getClaimMintingService({
         proverUrl: c.env.PROVER_URL || "https://v15.charms.dev",
-        appId: c.env.BABTC_APP_ID || "placeholder",
+        appId: c.env.BABTC_APP_ID,
         network,
       });
 
@@ -635,9 +642,12 @@ claimRouter.post("/retry-failed", async (c) => {
 
     let retriedCount = 0;
     const network = getNetworkForEnvironment(c.env.ENVIRONMENT);
+    if (!c.env.BABTC_APP_ID) {
+      return errorResponse(c, "Token app not configured", 503);
+    }
     const mintingService = getClaimMintingService({
       proverUrl: c.env.PROVER_URL || "https://v15.charms.dev",
-      appId: c.env.BABTC_APP_ID || "placeholder",
+      appId: c.env.BABTC_APP_ID,
       network,
     });
 
