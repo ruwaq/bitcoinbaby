@@ -7,7 +7,7 @@
 import type {
   Bloodline as CanonicalBloodline,
   BaseType as CanonicalBaseType,
-  Heritage as CanonicalHeritage,
+  HeritageSeed as CanonicalHeritage,
 } from "../types";
 
 // Re-export canonical types for use within cosmic module

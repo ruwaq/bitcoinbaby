@@ -12,13 +12,13 @@
  */
 
 import { type FC } from "react";
-import { type Heritage, HERITAGE_STYLES } from "./types";
+import { type HeritageSeed, HERITAGE_STYLES } from "./types";
 
 interface HeritageOverlayProps {
-  heritage: Heritage;
+  heritage: HeritageSeed;
   size?: number;
   animated?: boolean;
-  variant?: number; // 0-4 for different sub-styles within each heritage
+  variant?: number;
 }
 
 // Color palettes for each heritage
@@ -1008,15 +1008,15 @@ export const HeritageOverlay: FC<HeritageOverlayProps> = ({
   // Select renderer based on heritage
   const renderHeritage = () => {
     switch (heritage) {
-      case "americas":
+      case 0:
         return renderAmericas();
-      case "africa":
+      case 1:
         return renderAfrica();
-      case "asia":
+      case 2:
         return renderAsia();
-      case "europa":
+      case 3:
         return renderEuropa();
-      case "oceania":
+      case 4:
         return renderOceania();
       default:
         return null;
@@ -1044,32 +1044,32 @@ export const HeritageOverlay: FC<HeritageOverlayProps> = ({
  * para no distraer del personaje principal.
  */
 interface HeritageBackgroundProps {
-  heritage: Heritage;
+  heritage: number;
   size?: number;
   intensity?: "subtle" | "medium" | "visible";
 }
 
 // Background color palettes - very muted
-const BG_COLORS = {
-  americas: {
-    pattern: "#78350f", // terracotta
-    accent: "#fbbf24", // gold
+const BG_COLORS: Record<number, { pattern: string; accent: string }> = {
+  0: {
+    pattern: "#78350f",
+    accent: "#fbbf24",
   },
-  africa: {
-    pattern: "#78350f", // earth brown
-    accent: "#fbbf24", // kente gold
+  1: {
+    pattern: "#15803d",
+    accent: "#86efac",
   },
-  asia: {
-    pattern: "#1e40af", // deep blue
-    accent: "#fda4af", // cherry pink
+  2: {
+    pattern: "#1e40af",
+    accent: "#fda4af",
   },
-  europa: {
-    pattern: "#15803d", // celtic green
-    accent: "#fbbf24", // gold
+  3: {
+    pattern: "#78350f",
+    accent: "#a78bfa",
   },
-  oceania: {
-    pattern: "#0891b2", // ocean
-    accent: "#14b8a6", // turquoise
+  4: {
+    pattern: "#0891b2",
+    accent: "#14b8a6",
   },
 };
 
@@ -1517,15 +1517,15 @@ export const HeritageBackground: FC<HeritageBackgroundProps> = ({
   // Select renderer based on heritage
   const renderPattern = () => {
     switch (heritage) {
-      case "americas":
+      case 0:
         return renderAmericas();
-      case "africa":
+      case 1:
         return renderAfrica();
-      case "asia":
+      case 2:
         return renderAsia();
-      case "europa":
+      case 3:
         return renderEuropa();
-      case "oceania":
+      case 4:
         return renderOceania();
       default:
         return null;
@@ -1550,7 +1550,7 @@ export const HeritageBackground: FC<HeritageBackgroundProps> = ({
  * Partículas temáticas flotantes para cada herencia
  */
 interface HeritageParticlesProps {
-  heritage: Heritage;
+  heritage: number;
   size?: number;
 }
 
@@ -1558,12 +1558,12 @@ export const HeritageParticles: FC<HeritageParticlesProps> = ({
   heritage,
   size = 64,
 }) => {
-  const particleColors: Record<Heritage, string[]> = {
-    americas: ["#fbbf24", "#22c55e", "#dc2626"],
-    africa: ["#fbbf24", "#dc2626", "#15803d"],
-    asia: ["#fda4af", "#dc2626", "#fbbf24"],
-    europa: ["#1e40af", "#fbbf24", "#15803d"],
-    oceania: ["#0891b2", "#f472b6", "#14b8a6"],
+  const particleColors: Record<number, string[]> = {
+    0: ["#fbbf24", "#22c55e", "#dc2626"],
+    1: ["#fbbf24", "#dc2626", "#15803d"],
+    2: ["#fda4af", "#dc2626", "#fbbf24"],
+    3: ["#1e40af", "#fbbf24", "#15803d"],
+    4: ["#0891b2", "#f472b6", "#14b8a6"],
   };
 
   const colors = particleColors[heritage];

@@ -8,7 +8,7 @@
 import { useEffect, useMemo } from "react";
 import { useMiningStore } from "../stores/mining-store";
 import { useCosmicEnergy, useCosmicState } from "./useCosmic";
-import type { BaseType, Bloodline, Heritage } from "../types";
+import type { BaseType, Bloodline, HeritageSeed } from "../types";
 import type { Rarity, BabyCosmicEnergy, CosmicState } from "../cosmic";
 
 // =============================================================================
@@ -18,7 +18,7 @@ import type { Rarity, BabyCosmicEnergy, CosmicState } from "../cosmic";
 interface BabyForMining {
   baseType: BaseType;
   bloodline: Bloodline;
-  heritage: Heritage;
+  heritage: HeritageSeed;
   level: number;
   rarity: Rarity;
   energy: number;

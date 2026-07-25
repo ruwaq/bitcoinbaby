@@ -237,44 +237,44 @@ export const BLOODLINE_CONFIGS: Record<Bloodline, BloodlineConfig> = {
 // =============================================================================
 
 // BALANCED: Heritage bonuses (flavor, +1% each)
-export const HERITAGE_CONFIGS: Record<Heritage, HeritageConfig> = {
-  americas: {
-    name: "Americas",
-    spirits: ["Pachamama", "Quetzalcoatl", "Thunderbird"],
-    flavor: "Conectado a la tierra",
-    bonus: 0.01, // +1% resistance
+export const HERITAGE_CONFIGS: Record<number, HeritageConfig> = {
+  0: {
+    name: "Ashlands",
+    spirits: ["The Hollow Flame", "Dust Walker", "Sun Serpent"],
+    flavor: "Born of fire and sand",
+    bonus: 0.01,
     bonusType: "resistance",
     favoriteEvent: "solstice",
   },
-  africa: {
-    name: "Africa",
-    spirits: ["Shango", "Oshun", "Anansi"],
-    flavor: "Portador del Ache",
-    bonus: 0.01, // +1% group XP
+  1: {
+    name: "Verdant Reach",
+    spirits: ["The Deep Root", "Canopy Whisper", "Bloom Keeper"],
+    flavor: "Woven into the living web",
+    bonus: 0.01,
     bonusType: "group_xp",
     favoriteEvent: "lunar_phase",
   },
-  asia: {
-    name: "Asia",
-    spirits: ["Ryu", "Kitsune", "Ganesha"],
-    flavor: "En armonia",
-    bonus: 0.01, // +1% focus
+  2: {
+    name: "Iron Peaks",
+    spirits: ["The Stone Watcher", "Forge Heart", "Echo Carver"],
+    flavor: "Carved from ancient mountain",
+    bonus: 0.01,
     bonusType: "focus",
     favoriteEvent: "equinox",
   },
-  europa: {
-    name: "Europa",
-    spirits: ["Dryad", "Norns", "Salamandra"],
-    flavor: "Guardian elemental",
-    bonus: 0.01, // +1% protection
+  3: {
+    name: "Timberveil",
+    spirits: ["The Clockwork Owl", "Veil Dancer", "Gear Spirit"],
+    flavor: "Where innovation meets tradition",
+    bonus: 0.01,
     bonusType: "protection",
     favoriteEvent: "eclipse_lunar",
   },
-  oceania: {
-    name: "Oceania",
-    spirits: ["Maui", "Rainbow Serpent", "Tangaroa"],
-    flavor: "Hijo del oceano",
-    bonus: 0.01, // +1% adaptability
+  4: {
+    name: "Saltspray Isles",
+    spirits: ["The Tide Weaver", "Storm Caller", "Reef Dreamer"],
+    flavor: "Child of the endless ocean",
+    bonus: 0.01,
     bonusType: "adaptability",
     favoriteEvent: "meteor_shower",
   },

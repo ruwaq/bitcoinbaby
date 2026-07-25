@@ -14,7 +14,7 @@ import { type FC, useMemo } from "react";
 import {
   type BaseType,
   type Bloodline,
-  type Heritage,
+  type HeritageSeed,
   type Rarity,
   type BabyState,
   type ColorPalette,
@@ -35,7 +35,7 @@ import { RarityEffects, RarityFrame, RarityBadge } from "./RarityEffects";
 export interface GenesisBabyTraits {
   baseType: BaseType;
   bloodline: Bloodline;
-  heritage: Heritage;
+  heritage: HeritageSeed;
   rarity: Rarity;
   dna: string;
 }
@@ -73,13 +73,7 @@ export function generateRandomTraits(): GenesisBabyTraits {
     "dragon",
   ];
   const bloodlines: Bloodline[] = ["royal", "warrior", "rogue", "mystic"];
-  const heritages: Heritage[] = [
-    "americas",
-    "africa",
-    "asia",
-    "europa",
-    "oceania",
-  ];
+  const heritages: number[] = [0, 1, 2, 3, 4];
   const rarities: Rarity[] = [
     "common",
     "uncommon",
@@ -110,7 +104,9 @@ export function generateRandomTraits(): GenesisBabyTraits {
   return {
     baseType: baseTypes[Math.floor(Math.random() * baseTypes.length)],
     bloodline: bloodlines[Math.floor(Math.random() * bloodlines.length)],
-    heritage: heritages[Math.floor(Math.random() * heritages.length)],
+    heritage: heritages[
+      Math.floor(Math.random() * heritages.length)
+    ] as HeritageSeed,
     rarity: rarities[rarityIndex],
     dna,
   };
@@ -131,13 +127,7 @@ export function traitsFromHash(hash: string): GenesisBabyTraits {
     "dragon",
   ];
   const bloodlines: Bloodline[] = ["royal", "warrior", "rogue", "mystic"];
-  const heritages: Heritage[] = [
-    "americas",
-    "africa",
-    "asia",
-    "europa",
-    "oceania",
-  ];
+  const heritages: number[] = [0, 1, 2, 3, 4];
   const rarities: Rarity[] = [
     "common",
     "uncommon",
@@ -167,7 +157,7 @@ export function traitsFromHash(hash: string): GenesisBabyTraits {
   return {
     baseType: baseTypes[baseTypeIndex],
     bloodline: bloodlines[bloodlineIndex],
-    heritage: heritages[heritageIndex],
+    heritage: heritages[heritageIndex] as HeritageSeed,
     rarity: rarities[rarityIndex],
     dna: normalizedHash.slice(5, 21),
   };
@@ -305,7 +295,7 @@ export const GenesisSparkSprite: FC<GenesisSparkSpriteProps> = ({
 interface GenesisBabyPreviewProps {
   baseType?: BaseType;
   bloodline?: Bloodline;
-  heritage?: Heritage;
+  heritage?: number;
   rarity?: Rarity;
   size?: number;
   state?: BabyState;
@@ -322,7 +312,7 @@ export const GenesisBabyPreview: FC<GenesisBabyPreviewProps> = ({
   const traits: GenesisBabyTraits = {
     baseType,
     bloodline,
-    heritage,
+    heritage: heritage as HeritageSeed,
     rarity,
     dna: "0123456789abcdef",
   };
