@@ -12,11 +12,19 @@
  * Run in a secure environment with proper access controls.
  */
 
+import * as bitcoin from "bitcoinjs-lib";
+import * as ecc from "tiny-secp256k1";
 import { BitcoinWallet } from "../wallet";
 import type { BitcoinNetwork } from "../types";
 import { CharmsProverClient, type ProverResponse } from "../charms/prover";
 import type { SpellV10 } from "../charms/types";
+import type { BlockchainAPI } from "../blockchain/types";
+import { MempoolClient } from "../blockchain/mempool";
+import { rawTxToPsbt, type FundingUtxo } from "../transactions/psbt-utils";
 import { createLogger } from "@bitcoinbaby/shared";
+
+// Initialize ECC for bitcoinjs-lib (PSBT signing requires it)
+bitcoin.initEccLib(ecc);
 
 const log = createLogger("TreasurySigner");
 
@@ -64,6 +72,22 @@ export interface SigningResult {
   error?: string;
 }
 
+/**
+ * Optional dependency injection for TreasurySigner.
+ *
+ * Production callers omit this — the signer instantiates CharmsProverClient
+ * and MempoolClient internally using the config URLs.
+ *
+ * Tests inject mocks to avoid touching the network (see
+ * tests/signer/treasury-signer.test.ts).
+ */
+export interface SignerDeps {
+  /** Override the prover client (tests). */
+  prover?: Pick<CharmsProverClient, "prove">;
+  /** Override the mempool/blockchain client (tests). */
+  blockchain?: BlockchainAPI;
+}
+
 // =============================================================================
 // MEMPOOL URLS
 // =============================================================================
@@ -82,12 +106,13 @@ const MEMPOOL_URLS: Record<BitcoinNetwork, string> = {
 export class TreasurySigner {
   private config: Required<SignerConfig>;
   private wallet: BitcoinWallet;
-  private prover: CharmsProverClient;
+  private prover: Pick<CharmsProverClient, "prove">;
+  private blockchain: BlockchainAPI;
   private isRunning = false;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private treasuryAddress: string | null = null;
 
-  constructor(config: SignerConfig) {
+  constructor(config: SignerConfig, deps?: SignerDeps) {
     this.config = {
       ...config,
       pollInterval: config.pollInterval ?? 60_000,
@@ -96,10 +121,20 @@ export class TreasurySigner {
     };
 
     this.wallet = new BitcoinWallet({ network: config.network });
-    this.prover = new CharmsProverClient({
-      proverUrl: this.config.proverUrl,
-      debug: true,
-    });
+
+    // Dependency injection (tests pass mocks; production uses real clients)
+    this.prover =
+      deps?.prover ??
+      new CharmsProverClient({
+        proverUrl: this.config.proverUrl,
+        debug: true,
+      });
+    this.blockchain =
+      deps?.blockchain ??
+      new MempoolClient({
+        network: config.network,
+        baseUrl: this.config.mempoolUrl,
+      });
   }
 
   /**
@@ -253,7 +288,12 @@ export class TreasurySigner {
 
       const prepareData = (await prepareResponse.json()) as {
         success: boolean;
-        data: { spell: Record<string, unknown>; fundingUtxo: string };
+        data: {
+          spell: Record<string, unknown>;
+          // fundingUtxo may arrive as a JSON string or as an object depending
+          // on the prepare endpoint's serialization. We normalize both.
+          fundingUtxo: string | FundingUtxo;
+        };
       };
 
       if (!prepareData.success) {
@@ -261,8 +301,17 @@ export class TreasurySigner {
         return result;
       }
 
-      // 2. Sign the transactions via prover
-      const signedTxs = await this.signSpell(prepareData.data.spell);
+      // Normalize fundingUtxo into the FundingUtxo shape
+      const fundingUtxo: FundingUtxo =
+        typeof prepareData.data.fundingUtxo === "string"
+          ? (JSON.parse(prepareData.data.fundingUtxo) as FundingUtxo)
+          : prepareData.data.fundingUtxo;
+
+      // 2. Sign the transactions via prover (real Schnorr PSBT signing)
+      const signedTxs = await this.signSpell(
+        prepareData.data.spell,
+        fundingUtxo,
+      );
 
       if (!signedTxs) {
         result.error = "Signing failed";
@@ -327,17 +376,27 @@ export class TreasurySigner {
    * Sign a Charms spell transaction
    *
    * Flow:
-   * 1. Submit spell to Charms prover
-   * 2. Prover returns commit_tx and spell_tx
-   * 3. Sign with wallet (if needed)
-   * 4. Return transactions ready for broadcast
+   *   1. Submit spell to Charms prover
+   *   2. Prover returns UNSIGNED commit_tx and spell_tx (raw hex)
+   *   3. Convert each TX to a PSBT via rawTxToPsbt (which fetches the prevTx
+   *      via the blockchain client to populate witnessUtxo)
+   *   4. Sign the treasury input with the wallet's tweaked Schnorr signer
+   *      (BIP-340/341 key-path spend)
+   *   5. Return fully signed transactions ready for broadcast
    *
-   * NOTE: Charms prover may return already-signed transactions
-   * depending on the spell type. For transfer spells, the treasury
-   * inputs need to be signed by our wallet.
+   * The Charms prover (v11/v15) intentionally returns UNSIGNED raw
+   * transactions for security — see psbt-utils.ts header comment. The
+   * treasury (this signer) holds the private key and must sign its own
+   * input. Without this step, broadcasting the prover's hex directly would
+   * fail mempool policy (invalid witness).
+   *
+   * @param spell - Charms spell object (validated by prover before submit)
+   * @param fundingUtxo - Treasury UTXO that anchors the commit TX
+   * @returns Signed { commitTxHex, spellTxHex } or null on failure
    */
-  private async signSpell(
+  async signSpell(
     spell: Record<string, unknown>,
+    fundingUtxo: FundingUtxo,
   ): Promise<{ commitTxHex: string; spellTxHex: string } | null> {
     try {
       log.info("Submitting spell to prover...");
@@ -348,7 +407,7 @@ export class TreasurySigner {
         return null;
       }
 
-      // Submit to prover
+      // 1. Submit to prover (returns UNSIGNED raw hex)
       const proverResponse: ProverResponse = await this.prover.prove(
         spell as unknown as SpellV10,
       );
@@ -357,24 +416,98 @@ export class TreasurySigner {
       log.info(`  Commit TX: ${proverResponse.commitTx.slice(0, 40)}...`);
       log.info(`  Spell TX: ${proverResponse.spellTx.slice(0, 40)}...`);
 
-      // For transfer spells, the prover returns transactions that need
-      // the treasury inputs signed. The signing flow depends on whether
-      // the prover returns PSBTs or raw unsigned transactions.
-      //
-      // Current Charms prover (v11) returns fully constructed transactions
-      // that may already be signed or need PSBT signing.
-      //
-      // TODO: Implement PSBT signing if prover returns unsigned transactions
-      // For now, assume prover handles signing or returns ready transactions
+      if (!this.treasuryAddress) {
+        log.error("Signer not initialized — call initialize() first");
+        return null;
+      }
 
+      // 2. Sign the commit TX (its input spends the funding UTXO)
+      const signedCommitHex = await this.signProverTx(
+        proverResponse.commitTx,
+        fundingUtxo,
+      );
+
+      // 3. Sign the spell TX. Its prevout is the commit TX's output, which
+      //    is also a Taproot output owned by the treasury (the prover wires
+      //    it that way). We need the commit TX's txid + the vout it produced.
+      //
+      // IMPORTANT: the commit txid is computed from the UNSIGNED commit TX
+      // (SegWit commitment means signing does not change the txid). Computing
+      // it from the signed hex is also valid but adds unnecessary work and
+      // risks confusion; we use the unsigned version for clarity.
+      const unsignedCommitTx = bitcoin.Transaction.fromHex(
+        proverResponse.commitTx,
+      );
+      const commitTxid = unsignedCommitTx.getId();
+      // The commit TX output 0 pays to the treasury (Taproot); the spell
+      // TX spends it. We derive the value from the commit TX's first output.
+      const spellFundingUtxo: FundingUtxo = {
+        txid: commitTxid,
+        vout: 0,
+        value: unsignedCommitTx.outs[0]?.value ?? 0,
+      };
+
+      const signedSpellHex = await this.signProverTx(
+        proverResponse.spellTx,
+        spellFundingUtxo,
+      );
+
+      log.info("Successfully signed commit + spell transactions");
       return {
-        commitTxHex: proverResponse.commitTx,
-        spellTxHex: proverResponse.spellTx,
+        commitTxHex: signedCommitHex,
+        spellTxHex: signedSpellHex,
       };
     } catch (error) {
-      log.error("Spell signing failed:", { error });
+      log.error("Spell signing failed:", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return null;
     }
+  }
+
+  /**
+   * Sign a single prover-returned transaction.
+   *
+   * Converts the raw hex to a PSBT, signs the treasury input with the
+   * wallet's BIP-340/341 tweaked Schnorr signer, and returns the fully
+   * signed hex.
+   */
+  private async signProverTx(
+    txHex: string,
+    fundingUtxo: FundingUtxo,
+  ): Promise<string> {
+    if (!this.treasuryAddress) {
+      throw new Error("Signer not initialized");
+    }
+
+    // Convert raw unsigned TX to PSBT, populating witnessUtxo from prevTx
+    const psbtHex = await rawTxToPsbt(
+      txHex,
+      fundingUtxo,
+      this.treasuryAddress,
+      this.blockchain,
+      this.config.network,
+    );
+
+    const psbt = bitcoin.Psbt.fromHex(psbtHex, {
+      network: this.networkConfig(),
+    });
+
+    // Sign + finalize using the wallet's tweaked Schnorr signer (BIP-340/341).
+    // wallet.signAndFinalizePSBT handles key negation and TapTweak internally.
+    const { hex } = this.wallet.signAndFinalizePSBT(psbt);
+    return hex;
+  }
+
+  /**
+   * Get the bitcoinjs-lib Network object for the configured network.
+   */
+  private networkConfig(): bitcoin.Network {
+    if (this.config.network === "mainnet") return bitcoin.networks.bitcoin;
+    if (this.config.network === "regtest") return bitcoin.networks.regtest;
+    // testnet + testnet4 share the same bech32 hrp ('tb')
+    return bitcoin.networks.testnet;
   }
 
   /**
