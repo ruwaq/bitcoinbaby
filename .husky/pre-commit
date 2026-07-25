@@ -1,10 +1,12 @@
 # BitcoinBaby Pre-commit Hook
-# Runs lint-staged (formatting + linting) and secret scanning on staged files
+# Runs secret scanning + prettier formatting on staged files.
+# ESLint is intentionally NOT run here — it's enforced in CI via `turbo lint`.
+# See the README "Linting strategy" section for the rationale.
 
 echo "🔍 BitcoinBaby pre-commit checks..."
 
 # Phase 1: Secret scanning (always runs first — blocks commit if secrets found)
 ./scripts/scan-secrets.sh || exit 1
 
-# Phase 2: Lint-staged (format + lint only staged files)
+# Phase 2: prettier --write on staged files (configured via root lint-staged)
 npx lint-staged
