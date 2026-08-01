@@ -19,7 +19,6 @@ const log = createLogger("TxBuilder");
 type Spell = SpellConfig | SpellV2 | SpellV10;
 import type {
   TxUTXO,
-  TxInput,
   TxOutput,
   UnsignedTx,
   SignedTx,
@@ -749,6 +748,7 @@ export class TransactionBuilder {
     } catch (error) {
       throw new Error(
         `PSBT finalization failed: ${error instanceof Error ? error.message : "unknown error"}`,
+        { cause: error },
       );
     }
 

@@ -18,7 +18,7 @@ import * as bitcoin from "bitcoinjs-lib";
 
 export class MockMempoolClient implements BlockchainAPI {
   readonly network: BitcoinNetwork;
-  
+
   // In-memory database for address UTXOs
   private utxosDb: Map<string, UTXO[]> = new Map();
   // In-memory database for transaction details
@@ -27,11 +27,11 @@ export class MockMempoolClient implements BlockchainAPI {
   private txHexDb: Map<string, string> = new Map();
   // In-memory database for address transaction history
   private addressTxsDb: Map<string, TransactionInfo[]> = new Map();
-  
+
   constructor(network: BitcoinNetwork = "testnet4") {
     this.network = network;
   }
-  
+
   /**
    * Helper to ensure an address has some mock UTXOs (automatic faucet)
    */
@@ -62,7 +62,7 @@ export class MockMempoolClient implements BlockchainAPI {
       this.utxosDb.set(address, mockUtxos);
     }
   }
-  
+
   async getBalance(address: string): Promise<AddressBalance> {
     this.ensureFunds(address);
     const utxos = this.utxosDb.get(address) || [];
@@ -75,12 +75,12 @@ export class MockMempoolClient implements BlockchainAPI {
       utxoCount: utxos.length,
     };
   }
-  
+
   async getUTXOs(address: string): Promise<UTXO[]> {
     this.ensureFunds(address);
     return this.utxosDb.get(address) || [];
   }
-  
+
   async getTransaction(txid: string): Promise<TransactionInfo> {
     const tx = this.txsDb.get(txid);
     if (!tx) {
@@ -88,29 +88,29 @@ export class MockMempoolClient implements BlockchainAPI {
     }
     return tx;
   }
-  
+
   async broadcastTransaction(txHex: string): Promise<string> {
     try {
       const tx = bitcoin.Transaction.fromHex(txHex);
       const txid = tx.getId();
-      
+
       const bitcoinJsNetwork =
         this.network === "mainnet"
           ? bitcoin.networks.bitcoin
           : this.network === "regtest"
-          ? bitcoin.networks.regtest
-          : bitcoin.networks.testnet;
-      
+            ? bitcoin.networks.regtest
+            : bitcoin.networks.testnet;
+
       const involvedAddresses = new Set<string>();
 
       // 1. Remove consumed UTXOs (inputs)
       for (const input of tx.ins) {
         const inputTxid = Buffer.from(input.hash).reverse().toString("hex");
         const inputVout = input.index;
-        
+
         for (const [address, utxos] of this.utxosDb.entries()) {
           const index = utxos.findIndex(
-            (u) => u.txid === inputTxid && u.vout === inputVout
+            (u) => u.txid === inputTxid && u.vout === inputVout,
           );
           if (index !== -1) {
             utxos.splice(index, 1);
@@ -120,16 +120,16 @@ export class MockMempoolClient implements BlockchainAPI {
           }
         }
       }
-      
+
       // 2. Add newly created UTXOs (outputs)
       for (let i = 0; i < tx.outs.length; i++) {
         const out = tx.outs[i];
         try {
           const destAddress = bitcoin.address.fromOutputScript(
             out.script,
-            bitcoinJsNetwork
+            bitcoinJsNetwork,
           );
-          
+
           const newUtxo: UTXO = {
             txid,
             vout: i,
@@ -140,16 +140,16 @@ export class MockMempoolClient implements BlockchainAPI {
               block_time: Math.floor(Date.now() / 1000),
             },
           };
-          
+
           const currentUtxos = this.utxosDb.get(destAddress) || [];
           currentUtxos.push(newUtxo);
           this.utxosDb.set(destAddress, currentUtxos);
           involvedAddresses.add(destAddress);
-        } catch (e) {
+        } catch {
           // Ignore outputs that do not map to an address (e.g., OP_RETURN)
         }
       }
-      
+
       // 3. Register transaction in details map
       const txInfo: TransactionInfo = {
         txid,
@@ -164,7 +164,7 @@ export class MockMempoolClient implements BlockchainAPI {
           block_time: Math.floor(Date.now() / 1000),
         },
       };
-      
+
       this.txsDb.set(txid, txInfo);
       this.txHexDb.set(txid, txHex);
 
@@ -174,15 +174,16 @@ export class MockMempoolClient implements BlockchainAPI {
         txs.unshift(txInfo); // Add newest first
         this.addressTxsDb.set(address, txs);
       }
-      
+
       return txid;
     } catch (e) {
       throw new Error(
-        `Failed to decode/broadcast mock transaction: ${(e as Error).message}`
+        `Failed to decode/broadcast mock transaction: ${(e as Error).message}`,
+        { cause: e },
       );
     }
   }
-  
+
   async getFeeEstimates(): Promise<FeeEstimates> {
     return {
       fastestFee: 2,
@@ -206,8 +207,10 @@ export class MockMempoolClient implements BlockchainAPI {
       tx_count: this.txsDb.size || 1,
       size: 1000,
       weight: 4000,
-      merkle_root: "0000000000000000000000000000000000000000000000000000000000000000",
-      previousblockhash: "0000000000000000000000000000000000000000000000000000000000000000",
+      merkle_root:
+        "0000000000000000000000000000000000000000000000000000000000000000",
+      previousblockhash:
+        "0000000000000000000000000000000000000000000000000000000000000000",
       mediantime: Math.floor(Date.now() / 1000) - 600,
       nonce: 12345,
       bits: 0x1d00ffff,
@@ -218,7 +221,9 @@ export class MockMempoolClient implements BlockchainAPI {
   async getBlockTxids(_blockHash: string): Promise<string[]> {
     // Return all txs currently registered in our database to allow Merkle proof builds to succeed
     const txids = Array.from(this.txsDb.keys());
-    return txids.length > 0 ? txids : ["0000000000000000000000000000000000000000000000000000000000000001"];
+    return txids.length > 0
+      ? txids
+      : ["0000000000000000000000000000000000000000000000000000000000000001"];
   }
 
   async getTransactionHex(txid: string): Promise<string> {
@@ -237,7 +242,7 @@ export class MockMempoolClient implements BlockchainAPI {
 
   async getAddressTransactions(
     address: string,
-    _afterTxid?: string
+    _afterTxid?: string,
   ): Promise<TransactionInfo[]> {
     this.ensureFunds(address);
     return this.addressTxsDb.get(address) || [];

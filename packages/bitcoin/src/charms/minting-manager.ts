@@ -25,7 +25,6 @@
  */
 
 import { CharmsProverClient, createCharmsProverClient } from "./prover";
-import type { ProverResponse } from "./prover";
 import type { SpellV9, SpellV10 } from "./types";
 import {
   createSPARKMintSpellV9,
@@ -33,17 +32,12 @@ import {
   SPARK_CONFIG,
   calculateMiningReward,
 } from "./token";
-import type {
-  TokenMintParamsV9,
-  TokenMintParamsV10,
-  MiningReward,
-} from "./token";
+import type { TokenMintParamsV10, MiningReward } from "./token";
 import {
   BlockchainAPI,
   createMempoolClient,
   getEncodedMerkleProof,
   type MerkleProof,
-  type UTXO,
 } from "../blockchain";
 import { TransactionBuilder, createTransactionBuilder } from "../transactions";
 import type { BitcoinNetwork } from "../types";

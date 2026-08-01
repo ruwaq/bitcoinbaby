@@ -329,7 +329,7 @@ describe("createNFTWorkProofSpell", () => {
     const params = { ...defaultParams, currentState: highCapState };
     const spell = createNFTWorkProofSpell(params);
     const xpGain = calculateXpGain(highCapState); // 100
-    const nextLevelReq = XP_REQUIREMENTS[10]; // 32000
+    // nextLevelReq would be XP_REQUIREMENTS[10] = 32000; unused but documents the cap threshold
     const newState = spell.outs[0].charms.$00 as SparkNFTState;
 
     // 0 + 100 = 100 < 32000, so no cap applied

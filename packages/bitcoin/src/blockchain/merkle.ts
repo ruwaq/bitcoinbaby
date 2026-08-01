@@ -317,7 +317,6 @@ function buildPartialMerkleTree(
     // Calculate if this node is on the path to target
     const levelWidth = 1 << (height - level);
     const startIdx = pos * levelWidth;
-    const endIdx = Math.min(startIdx + levelWidth, n);
 
     const isOnPath =
       targetIndex >= startIdx && targetIndex < startIdx + levelWidth;

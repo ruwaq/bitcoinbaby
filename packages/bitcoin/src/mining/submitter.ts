@@ -31,7 +31,6 @@ import {
 import { TransactionBuilder, createTransactionBuilder } from "../transactions";
 import type { ScrollsNetwork } from "../scrolls/types";
 import type { BitcoinNetwork } from "../types";
-import type { UTXO } from "../blockchain/types";
 import type {
   MiningSubmission,
   MiningProof,
@@ -51,9 +50,7 @@ import {
   createSPARKMintSpellV11,
   SPARK_CONFIG,
   calculateMiningReward,
-  type TokenMintParamsV9,
   type TokenMintParamsV10,
-  type TokenMintParamsV11,
 } from "../charms/token";
 import { CharmsProverClient, createCharmsProverClient } from "../charms/prover";
 import type { SpellV9, SpellV11, ProverRequestV11 } from "../charms/types";
@@ -1042,7 +1039,7 @@ export class MiningSubmitter {
    */
   private async buildMintTxFromSpellV10(
     spell: ReturnType<typeof createSPARKMintSpellV10>,
-    miningTxid: string,
+    _miningTxid: string,
   ): Promise<{
     success: boolean;
     psbt?: string;
@@ -1145,7 +1142,7 @@ export class MiningSubmitter {
         );
 
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-      } catch (error) {
+      } catch {
         // Transaction might not be visible yet, keep polling
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
       }

@@ -3,7 +3,6 @@
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import type { UTXO } from "../../blockchain/types";
 import {
   validateAddress,
   validateDNA,

@@ -6,12 +6,7 @@
  */
 
 import { ScrollsClient, type ScrollsClientOptions } from "./client";
-import type {
-  ScrollsNetwork,
-  CharmToken,
-  CharmUTXO,
-  SpellConfig,
-} from "./types";
+import type { ScrollsNetwork, CharmUTXO, SpellConfig } from "./types";
 import {
   validateAddress,
   validateHash,

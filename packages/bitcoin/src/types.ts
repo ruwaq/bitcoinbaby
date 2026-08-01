@@ -8,7 +8,6 @@
 import {
   type WalletInfo as SharedWalletInfo,
   type WalletOptions as SharedWalletOptions,
-  type InternalWallet as SharedInternalWallet,
   type AddressType,
 } from "@bitcoinbaby/shared";
 

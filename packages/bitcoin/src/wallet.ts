@@ -21,11 +21,7 @@ import type {
   WalletOptions,
   WalletBalance,
 } from "./types";
-import {
-  InvalidMnemonicError,
-  WalletNotFoundError,
-  InvalidAddressError,
-} from "./errors";
+import { InvalidMnemonicError, WalletNotFoundError } from "./errors";
 import { secureErase, bytesToHex } from "./crypto";
 
 // Initialize BIP32 with secp256k1
@@ -442,8 +438,9 @@ export class BitcoinWallet {
       if (this.wallet.mnemonic) {
         // Overwrite mnemonic chars in an array to help GC (strings immutable in JS)
         const buf = Array.from(this.wallet.mnemonic);
-        buf.fill('x');
-        (this.wallet as unknown as { mnemonic: string }).mnemonic = buf.join('');
+        buf.fill("x");
+        (this.wallet as unknown as { mnemonic: string }).mnemonic =
+          buf.join("");
         this.wallet.mnemonic = undefined as unknown as string;
       }
       this.wallet = null;

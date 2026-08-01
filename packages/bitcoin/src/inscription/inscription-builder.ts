@@ -295,11 +295,13 @@ export function generateInscriptionPlan(options: {
   // 1. Sprite Library
   const libraryData = generateLibraryInscription(GENESIS_SPARKS_LIBRARY);
   const libraryBytes = new TextEncoder().encode(libraryData.content);
-  
+
   // Try Brotli compression
   const compressedLibrary = compressBrotli(libraryBytes);
   const useCompressedLibrary = compressedLibrary.length < libraryBytes.length;
-  const finalLibraryBytes = useCompressedLibrary ? compressedLibrary : libraryBytes;
+  const finalLibraryBytes = useCompressedLibrary
+    ? compressedLibrary
+    : libraryBytes;
   const libraryFee = estimateInscriptionFee(finalLibraryBytes.length, feeRate);
 
   inscriptions.push({
@@ -321,12 +323,18 @@ export function generateInscriptionPlan(options: {
     minify: true,
   });
   const rendererBytes = new TextEncoder().encode(rendererData.content);
-  
+
   // Try Brotli compression
   const compressedRenderer = compressBrotli(rendererBytes);
-  const useCompressedRenderer = compressedRenderer.length < rendererBytes.length;
-  const finalRendererBytes = useCompressedRenderer ? compressedRenderer : rendererBytes;
-  const rendererFee = estimateInscriptionFee(finalRendererBytes.length, feeRate);
+  const useCompressedRenderer =
+    compressedRenderer.length < rendererBytes.length;
+  const finalRendererBytes = useCompressedRenderer
+    ? compressedRenderer
+    : rendererBytes;
+  const rendererFee = estimateInscriptionFee(
+    finalRendererBytes.length,
+    feeRate,
+  );
 
   inscriptions.push({
     name: "Genesis Sparks Renderer",
@@ -376,19 +384,16 @@ export function generateNFTInscriptionData(params: {
 export function buildCommitTransaction(
   config: InscriptionConfig,
   inscriptionData: InscriptionData,
-  internalPubkey: Buffer,
+  _internalPubkey: Buffer,
 ): bitcoin.Psbt {
   const { network, fundingUtxo, destinationAddress, feeRate } = config;
 
-  // Create inscription script
-  const inscriptionScript = createInscriptionEnvelope(inscriptionData);
-
-  // Create taproot script tree
-  const leafScript = bitcoin.script.compile([
-    internalPubkey,
-    bitcoin.opcodes.OP_CHECKSIG,
-    ...inscriptionScript,
-  ]);
+  // TODO(inscription): full ordinal-inscription conformance requires building a
+  // taproot script-path output from (internalPubkey + OP_CHECKSIG + inscription
+  // envelope via createInscriptionEnvelope). The PSBT below is a simplified
+  // placeholder that sends the commit value to destinationAddress directly.
+  // `_internalPubkey` and the envelope are kept in the signature so the proper
+  // implementation can land without breaking callers.
 
   // Calculate output amounts
   const inscriptionFee = estimateInscriptionFee(
@@ -440,7 +445,7 @@ export function buildRevealTransaction(
   commitVout: number,
   commitValue: number,
   inscriptionData: InscriptionData,
-  internalPubkey: Buffer,
+  _internalPubkey: Buffer,
 ): bitcoin.Psbt {
   const { network, destinationAddress, feeRate } = config;
 

@@ -111,9 +111,6 @@ const CHARMS_HOSTED_PROVER_BASE = PROVER_API.production;
 /** Local prover URL (for development) */
 const LOCAL_PROVER_URL = PROVER_API.development;
 
-/** Default Charms Prover API URL - use hosted prover by default */
-const DEFAULT_PROVER_URL = CHARMS_HOSTED_PROVER_BASE;
-
 /** Prover URL (configured via environment, falls back to hosted) */
 const CONFIGURED_PROVER_URL = getConfiguredProverUrl();
 
@@ -1101,9 +1098,10 @@ export function createCharmsProverClient(
  * Get default prover URL for network
  */
 export function getProverUrl(
-  network: "main" | "testnet4" = "testnet4",
+  _network: "main" | "testnet4" = "testnet4",
 ): string {
-  // Charms hosted prover works for both mainnet and testnet4
+  // Charms hosted prover works for both mainnet and testnet4.
+  // The network param is kept for API stability / future per-network routing.
   return CONFIGURED_PROVER_URL;
 }
 

@@ -19,11 +19,9 @@
 import { describe, it, expect } from "vitest";
 import * as bitcoin from "bitcoinjs-lib";
 import * as ecc from "tiny-secp256k1";
-import {
-  createTransactionBuilder,
-} from "../src/transactions/builder";
+import { createTransactionBuilder } from "../src/transactions/builder";
 import { BitcoinWallet } from "../src/wallet";
-import { hexToBytes, bytesToHex } from "../src/crypto";
+import { bytesToHex } from "../src/crypto";
 import type { TxUTXO } from "../src/transactions/types";
 
 bitcoin.initEccLib(ecc);
@@ -40,10 +38,10 @@ function buildAndSignP2TRSpend(
   network: bitcoin.Network,
 ): {
   txHex: string;
-    txid: string;
-    witnessCount: number;
-    witnessItems: string[];
-  } {
+  txid: string;
+  witnessCount: number;
+  witnessItems: string[];
+} {
   // Derive the tweaked P2TR address from the private key (BIP-86 style)
   const compressedPubkey = ecc.pointFromScalar(privateKey);
   if (!compressedPubkey) throw new Error("Failed to derive pubkey");
@@ -135,7 +133,9 @@ function findPrivateKeyWithParity(targetParity: 0x02 | 0x03): {
       return { sk: skBytes, skScalar };
     }
   }
-  throw new Error(`Could not find a key with parity 0x${targetParity.toString(16)}`);
+  throw new Error(
+    `Could not find a key with parity 0x${targetParity.toString(16)}`,
+  );
 }
 
 describe("BIP-341 Taproot key-path spend", () => {
