@@ -3,6 +3,7 @@ import {
   useGameLoop,
   useAchievements,
   useGlobalMining,
+  useWalletStore,
   MIN_DIFFICULTY,
   type GameEvent,
   type UseGameLoopReturn,
@@ -73,6 +74,9 @@ export interface UseSparkReturn {
 export function useSpark(options: UseSparkOptions = {}): UseSparkReturn {
   const { autoStart = true, onEvolution } = options;
 
+  const wallet = useWalletStore((s) => s.wallet);
+  const minerAddress = wallet?.address ?? undefined;
+
   // Evolution modal state
   const [evolutionData, setEvolutionData] = useState<EvolutionData | null>(
     null,
@@ -113,7 +117,7 @@ export function useSpark(options: UseSparkOptions = {}): UseSparkReturn {
   // Mining (for XP tracking)
   const mining = useGlobalMining({
     difficulty: MIN_DIFFICULTY,
-    minerAddress: "baby-miner-001",
+    minerAddress,
   });
 
   // Track mining progress for XP

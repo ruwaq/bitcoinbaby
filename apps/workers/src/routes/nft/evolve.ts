@@ -6,7 +6,7 @@
  */
 
 import { Hono } from "hono";
-import type { Env, ApiResponse } from "../../lib/types";
+import type { Env } from "../../lib/types";
 import { getRedis } from "../../lib/redis";
 import {
   errorResponse,
@@ -14,10 +14,7 @@ import {
   fetchWithTimeout,
   EXTERNAL_API,
 } from "../../lib/helpers";
-import {
-  validateBody,
-  validateParams,
-} from "../../lib/middleware";
+import { validateBody, validateParams } from "../../lib/middleware";
 import { nftLogger } from "../../lib/logger";
 import {
   tokenIdParamSchema,
@@ -25,7 +22,6 @@ import {
   confirmEvolutionSchema,
   workProofSchema,
   XP_REQUIREMENTS,
-  EVOLUTION_COSTS,
   BASE_XP_PER_SHARE,
   BLOODLINE_XP_MULTIPLIERS,
   MIN_DIFFICULTY_FOR_XP,
@@ -43,7 +39,11 @@ export const evolveRouter = new Hono<{ Bindings: Env }>();
  * POST /evolve - Evolve an NFT to the next level
  */
 evolveRouter.post("/evolve", validateBody(evolveNftSchema), async (c) => {
-  const { tokenId, address, currentLevel: clientClaimedLevel } = c.get("validatedBody");
+  const {
+    tokenId,
+    address,
+    currentLevel: clientClaimedLevel,
+  } = c.get("validatedBody");
 
   try {
     const redis = getRedis(c.env);
@@ -94,43 +94,7 @@ evolveRouter.post("/evolve", validateBody(evolveNftSchema), async (c) => {
       );
     }
 
-    const evolutionCost = EVOLUTION_COSTS[nextLevel];
-    if (!evolutionCost) {
-      return errorResponse(c, "Invalid evolution level", 400);
-    }
-
-    // Deduct balance from VirtualBalanceDO
-    const balanceId = c.env.VIRTUAL_BALANCE.idFromName(address);
-    const balanceStub = c.env.VIRTUAL_BALANCE.get(balanceId);
-
-    const deductResponse = await balanceStub.fetch(
-      new Request(`http://internal/balance/${address}/deduct`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: evolutionCost.toString(),
-          reason: `NFT Evolution: Token #${tokenId} to Level ${nextLevel}`,
-        }),
-      }),
-    );
-
-    if (!deductResponse.ok) {
-      const errorData = (await deductResponse.json()) as ApiResponse;
-      const status =
-        deductResponse.status === 400 || deductResponse.status === 403
-          ? deductResponse.status
-          : 400;
-      return c.json<ApiResponse>(
-        {
-          success: false,
-          error: errorData.error || "Failed to deduct evolution cost",
-          timestamp: Date.now(),
-        },
-        status,
-      );
-    }
-
-    // Update NFT
+    // Update NFT — XP-based level up (no token cost)
     const updatedNft = {
       ...nftData,
       level: nextLevel.toString(),
@@ -150,7 +114,6 @@ evolveRouter.post("/evolve", validateBody(evolveNftSchema), async (c) => {
 
     return successResponse(c, {
       nft: responseNft,
-      evolutionCost: evolutionCost.toString(),
       previousLevel: currentLevel,
       newLevel: nextLevel,
     });

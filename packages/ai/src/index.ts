@@ -1,13 +1,5 @@
-// Primary exports - AIEngine is the recommended way to use AI features
-export {
-  AIEngine,
-  generateSentimentTask,
-  generateTaskBatch,
-  type AITask,
-  type AIResult,
-  type AIProof,
-  type AIProgressData,
-} from "./engine";
+// Shared AI types
+export type { AIProgressData, AITask, AIResult, AIProof } from "./types";
 
 // Cloudflare AI backend
 export type { ModelChainEntryStatus } from "./cloudflare-ai";
@@ -37,3 +29,7 @@ export type {
   Item,
 } from "./narrative-types";
 export { generatePersonality, generateArchetype } from "./narrative-templates";
+
+// Baby Brain (procedural text generator, no downloads)
+export { BabyBrainEngine } from "./baby-brain";
+export type { BabyBrainConfig } from "./baby-brain";

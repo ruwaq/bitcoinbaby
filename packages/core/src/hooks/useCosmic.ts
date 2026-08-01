@@ -14,7 +14,7 @@ import {
   type Rarity,
   type BitcoinCosmicData,
 } from "../cosmic";
-import type { BaseType, Bloodline, Heritage } from "../types";
+import type { BaseType, Bloodline, HeritageSeed } from "../types";
 
 // =============================================================================
 // TYPES
@@ -23,7 +23,7 @@ import type { BaseType, Bloodline, Heritage } from "../types";
 interface BabyForCosmic {
   baseType: BaseType;
   bloodline: Bloodline;
-  heritage: Heritage;
+  heritage: HeritageSeed;
   level: number;
   rarity: Rarity;
   energy: number;

@@ -60,6 +60,8 @@ export interface UseMiningShareSubmissionOptions {
   strategy?: SubmissionStrategy;
   /** Notification callback */
   onNotification?: (notification: SubmissionNotification) => void;
+  /** Narrative pipeline callback — called after AI proof is signed and queued */
+  onAIProof?: (proof: AIProof) => void;
 }
 
 export interface UseMiningShareSubmissionReturn {
@@ -319,6 +321,8 @@ export function useMiningShareSubmission(
             message: `Useful AI Task resolved (+${reward.toString()} $BABY)`,
             reward,
           });
+          // Feed the narrative engine with AI proof
+          options.onAIProof?.(proof);
         } else if (duplicate) {
           log.debug("[ShareSubmission] Duplicate AI proof ignored", {
             taskId: proof.taskId,

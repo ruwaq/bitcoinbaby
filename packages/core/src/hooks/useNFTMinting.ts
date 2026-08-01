@@ -23,7 +23,6 @@ import {
   getMiningBoost,
   canLevelUp,
   XP_REQUIREMENTS,
-  EVOLUTION_COSTS,
 } from "@bitcoinbaby/bitcoin";
 import { useNFTStore } from "../stores/nft-store";
 
@@ -61,6 +60,7 @@ export interface UseNFTMintingReturn {
     bloodline: Bloodline;
     baseType: BaseType;
     rarityTier: RarityTier;
+    heritage: number;
   }) => Promise<NFTMintResult>;
 
   /** Submit work proof for XP gain */
@@ -89,7 +89,6 @@ export interface UseNFTMintingReturn {
     canLevel: boolean;
     xpRequired: number;
     currentXp: number;
-    tokenCost: bigint;
   };
 
   /** Get mining boost for an NFT */
@@ -192,6 +191,7 @@ export function useNFTMinting(
       bloodline: Bloodline;
       baseType: BaseType;
       rarityTier: RarityTier;
+      heritage: number;
     }): Promise<NFTMintResult> => {
       if (!charmsRef.current || !mempoolRef.current || !txBuilderRef.current) {
         return { success: false, error: "Clients not initialized" };
@@ -215,6 +215,7 @@ export function useNFTMinting(
           baseType: params.baseType,
           rarityTier: params.rarityTier,
           genesisBlock: blockHeight,
+          heritage: params.heritage,
         });
 
         // Get UTXOs for transaction
@@ -264,6 +265,7 @@ export function useNFTMinting(
           genesisBlock: blockHeight,
           rarityTier: params.rarityTier,
           tokenId: params.tokenId,
+          heritage: params.heritage,
           level: 1,
           xp: 0,
           totalXp: 0,
@@ -271,6 +273,8 @@ export function useNFTMinting(
           lastWorkBlock: blockHeight,
           evolutionCount: 0,
           tokensEarned: 0n,
+          narrativeRoot: "",
+          worldStateRoot: "",
         };
 
         return {
@@ -400,9 +404,7 @@ export function useNFTMinting(
           tokenAppId,
           tokenAppVk,
           nftUtxo,
-          tokenUtxo,
           currentState: nft,
-          tokenAmount,
           ownerAddress,
         });
 
@@ -503,13 +505,11 @@ export function useNFTMinting(
   const checkCanLevelUp = useCallback((nft: SparkNFTState) => {
     const nextLevel = nft.level + 1;
     const xpRequired = XP_REQUIREMENTS[nextLevel] || Infinity;
-    const tokenCost = EVOLUTION_COSTS[nextLevel] || 0n;
 
     return {
       canLevel: canLevelUp(nft),
       xpRequired,
       currentXp: nft.xp,
-      tokenCost,
     };
   }, []);
 

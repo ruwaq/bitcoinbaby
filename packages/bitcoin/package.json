@@ -9,6 +9,7 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
+    "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -29,7 +30,10 @@
   },
   "devDependencies": {
     "@bitcoinbaby/config": "workspace:*",
+    "@eslint/js": "^10.0.1",
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
+    "eslint": "^9.39.2",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.56.1"
   }
 }

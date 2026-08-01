@@ -22,6 +22,8 @@ export interface MiningStats {
   minerType?: string;
   /** Current speed in T/s */
   hashrate?: number;
+  /** AI model/provider name (e.g. "google (gemini-1.5-flash)") */
+  modelName?: string;
 }
 
 export interface MiningStatsGridProps {
@@ -179,8 +181,9 @@ export function MiningStatsGrid({
 
   if (stats.minerType) {
     items.push({
-      label: "Model",
-      value: stats.minerType === "webgpu" ? "Gemma 4 E2B (WebGPU)" : "Gemma 4 E2B (CPU)",
+      label: "Engine",
+      value:
+        stats.modelName || (stats.minerType === "webgpu" ? "WebGPU" : "CPU"),
     });
   }
 

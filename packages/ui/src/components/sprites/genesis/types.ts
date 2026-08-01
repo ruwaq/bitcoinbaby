@@ -10,12 +10,12 @@
 import type {
   Bloodline,
   BaseType as CoreBaseType,
-  Heritage,
+  HeritageSeed,
   RarityTier,
 } from "@bitcoinbaby/core";
 
 // Re-export canonical types
-export type { Bloodline, Heritage, RarityTier };
+export type { Bloodline, HeritageSeed, RarityTier };
 
 /**
  * @deprecated Use RarityTier instead (same values, canonical naming)
@@ -206,45 +206,45 @@ export interface HeritageStyle {
   pattern: string;
 }
 
-export const HERITAGE_STYLES: Record<Heritage, HeritageStyle> = {
-  americas: {
-    name: "Americas",
-    region: "Americas",
+export const HERITAGE_STYLES: Record<number, HeritageStyle> = {
+  0: {
+    name: "Ashlands",
+    region: "Ashlands",
     elementType: "feather",
-    elementColor: "#dc2626", // Red feather
-    secondaryColor: "#059669", // Green
+    elementColor: "#dc2626",
+    secondaryColor: "#059669",
     pattern: "aztec",
   },
-  africa: {
-    name: "Africa",
-    region: "Africa",
+  1: {
+    name: "Verdant Reach",
+    region: "Verdant Reach",
     elementType: "beads",
-    elementColor: "#f59e0b", // Gold beads
-    secondaryColor: "#dc2626", // Red
+    elementColor: "#f59e0b",
+    secondaryColor: "#dc2626",
     pattern: "kente",
   },
-  asia: {
-    name: "Asia",
-    region: "Asia",
+  2: {
+    name: "Iron Peaks",
+    region: "Iron Peaks",
     elementType: "symbol",
-    elementColor: "#dc2626", // Red
-    secondaryColor: "#ffd700", // Gold
+    elementColor: "#dc2626",
+    secondaryColor: "#ffd700",
     pattern: "waves",
   },
-  europa: {
-    name: "Europa",
-    region: "Europa",
+  3: {
+    name: "Timberveil",
+    region: "Timberveil",
     elementType: "jewel",
-    elementColor: "#3b82f6", // Blue sapphire
-    secondaryColor: "#ffd700", // Gold
+    elementColor: "#3b82f6",
+    secondaryColor: "#a78bfa",
     pattern: "celtic",
   },
-  oceania: {
-    name: "Oceania",
-    region: "Oceania",
+  4: {
+    name: "Saltspray Isles",
+    region: "Saltspray Isles",
     elementType: "pattern",
-    elementColor: "#0891b2", // Ocean blue
-    secondaryColor: "#f97316", // Coral
+    elementColor: "#0891b2",
+    secondaryColor: "#f97316",
     pattern: "tribal",
   },
 };
@@ -329,8 +329,8 @@ export interface GenesisSparkSpriteProps {
   baseType: BaseType;
   /** Bloodline for accessories */
   bloodline?: Bloodline;
-  /** Heritage for cultural elements */
-  heritage?: Heritage;
+  /** Heritage seed for cultural elements */
+  heritage?: number;
   /** Rarity for visual effects */
   rarity?: Rarity;
   /** Current state/animation */

@@ -66,7 +66,6 @@ export {
   getMiningBoost,
   canLevelUp,
   getXpForNextLevel,
-  getEvolutionCostDisplay,
   getEvolutionStatus,
   MAX_LEVEL,
   type NFTCardProps,

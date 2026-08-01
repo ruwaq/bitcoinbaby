@@ -22,7 +22,7 @@
 export {
   type BaseType as GenesisBaseType,
   type Bloodline as GenesisBloodline,
-  type Heritage as GenesisHeritage,
+  type HeritageSeed as GenesisHeritage,
   type Rarity as GenesisRarity,
   type GenesisBabyState,
   type BabyState, // Alias for backwards compat

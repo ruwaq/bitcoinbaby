@@ -57,7 +57,7 @@ const STEPS: Step[] = [
     title: "3. Start Mining ⛏️",
     icon: "⛏️",
     description:
-      "Mining earns you $BABY tokens AND trains AI models. Your computer runs a local Gemma 4 model — every inference helps the Genesis Spark learn. Mining also gives your baby XP to level up!",
+      "Mining earns you $SPARK tokens AND powers AI stories. Connect your own AI provider (Gemini, OpenAI, etc.) or use the built-in BabyBrain engine. Mining also gives your baby XP to level up!",
     action: { label: "Go to Mining", tab: "mining" },
   },
   {

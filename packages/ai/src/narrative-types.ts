@@ -24,6 +24,7 @@ export interface SparkNFTState {
   readonly genesisBlock: number;
   readonly rarityTier: RarityTier;
   readonly tokenId: number;
+  readonly heritage: number;
   level: number;
   xp: number;
   totalXp: number;

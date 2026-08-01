@@ -10,6 +10,7 @@
     "./styles/pixel.css": "./src/styles/pixel.css"
   },
   "scripts": {
+    "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -30,17 +31,20 @@
   },
   "devDependencies": {
     "@bitcoinbaby/config": "workspace:*",
+    "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.0.0",
     "@vitejs/plugin-react": "^5.1.4",
     "@webgpu/types": "^0.1.0",
+    "eslint": "^9.39.2",
     "happy-dom": "^20.9.0",
     "jsdom": "^29.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "typescript": "^5.0.0",
+    "typescript-eslint": "^8.56.1",
     "vitest": "^4.1.7"
   }
 }

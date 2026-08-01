@@ -1,10 +1,9 @@
 /**
  * useNarrativePipeline — wires AI output → NarrativeEngine → NarrativeStore → UI.
  *
- * The parent hook (useMiningShareSubmission) already subscribes to
- * onAILocalTaskResolved from the mining singleton. To avoid double-subscription
- * conflicts, this hook exposes a `handleAIProof` function that the parent
- * calls after signing is done.
+ * Two modes:
+ * - World Mode (nftState = null): AI generates world lore, rules, factions
+ * - Baby Mode (nftState set): AI generates stories about the specific NFT baby
  *
  * Flow:
  *   1. AI proof arrives → handleAILocalTaskResolved (useMiningShareSubmission)
@@ -20,6 +19,31 @@ import type { AIProof } from "@bitcoinbaby/ai";
 import { createLogger } from "@bitcoinbaby/shared";
 
 const log = createLogger("useNarrativePipeline");
+
+/** Fixed tokenId for world-mode stories (no NFT owned) */
+const WORLD_TOKEN_ID = -1;
+
+/** Minimal world nftState used when user has no NFT */
+function createWorldNftState(): import("@bitcoinbaby/ai").SparkNFTState {
+  return {
+    dna: "0000000000000000",
+    bloodline: "mystic" as const,
+    baseType: "mystic" as const,
+    genesisBlock: 0,
+    rarityTier: "common" as const,
+    tokenId: WORLD_TOKEN_ID,
+    heritage: 0,
+    level: 1,
+    xp: 0,
+    totalXp: 0,
+    workCount: 0,
+    lastWorkBlock: 0,
+    evolutionCount: 0,
+    tokensEarned: 0n,
+    narrativeRoot: "",
+    worldStateRoot: "",
+  };
+}
 
 let engineInstance: NarrativeEngine | null = null;
 function getEngine(): NarrativeEngine {
@@ -37,9 +61,10 @@ export interface UseNarrativePipelineReturn {
   latestEvent: NarrativeEvent | null;
   narrativeState: NarrativeState | null;
   progressiveTraits: import("@bitcoinbaby/ai").PersonalityTraits | null;
-  /** Call from mining hook after AI proof is signed + queued */
   handleAIProof: (proof: AIProof) => void;
   processBatch: (outputs: string[], modelUsed: string) => Promise<void>;
+  /** Whether operating in world mode (no NFT) */
+  isWorldMode: boolean;
 }
 
 export function useNarrativePipeline({
@@ -50,17 +75,18 @@ export function useNarrativePipeline({
   const engineRef = useRef(getEngine());
   const processedRef = useRef(new Set<string>());
 
+  // Resolve effective state: real NFT or world-mode fallback
+  const effectiveNft = nftState ?? createWorldNftState();
+  const tokenId = effectiveNft.tokenId;
+  const isWorldMode = nftState === null;
+
   useEffect(() => {
-    if (!nftState) return;
-    const initState = NarrativeEngine.initNarrativeState(nftState);
-    store.getOrCreate(nftState.tokenId, initState);
-  }, [nftState?.tokenId]); // eslint-disable-line react-hooks/exhaustive-deps
+    const initState = NarrativeEngine.initNarrativeState(effectiveNft);
+    store.getOrCreate(tokenId, initState);
+  }, [tokenId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAIProof = useCallback(
     (proof: AIProof) => {
-      if (!nftState) return;
-
-      const tokenId = nftState.tokenId;
       const aiOutput = proof.output;
       const modelId = proof.modelId;
 
@@ -74,11 +100,11 @@ export function useNarrativePipeline({
 
       const narrativeState = store.getOrCreate(
         tokenId,
-        NarrativeEngine.initNarrativeState(nftState),
+        NarrativeEngine.initNarrativeState(effectiveNft),
       );
 
       engineRef.current
-        .processAIOutput(aiOutput, nftState, narrativeState, modelId)
+        .processAIOutput(aiOutput, effectiveNft, narrativeState, modelId)
         .then((result) => {
           store.addEvent(tokenId, result.event);
           store.updatePersonality(tokenId, result.updatedPersonality);
@@ -91,26 +117,23 @@ export function useNarrativePipeline({
           });
         });
     },
-    [nftState, store],
+    [tokenId, effectiveNft, store],
   );
 
   const processBatch = useCallback(
     async (outputs: string[], modelUsed: string) => {
-      if (!nftState) return;
-
-      const tokenId = nftState.tokenId;
       const narrativeState = store.getOrCreate(
         tokenId,
-        NarrativeEngine.initNarrativeState(nftState),
+        NarrativeEngine.initNarrativeState(effectiveNft),
       );
 
       for (const output of outputs) {
-        // Re-read fresh state from store for each iteration to avoid mutation
         const currentState =
-          store.states[tokenId] ?? NarrativeEngine.initNarrativeState(nftState);
+          store.states[tokenId] ??
+          NarrativeEngine.initNarrativeState(effectiveNft);
         const result = await engineRef.current.processAIOutput(
           output,
-          nftState,
+          effectiveNft,
           currentState,
           modelUsed,
         );
@@ -123,20 +146,17 @@ export function useNarrativePipeline({
         narrativeState.events[narrativeState.events.length - 1] ?? null,
       );
     },
-    [nftState, store],
+    [tokenId, effectiveNft, store],
   );
 
-  const narrativeState = nftState
-    ? (store.states[nftState.tokenId] ?? null)
-    : null;
+  const narrativeState = store.states[tokenId] ?? null;
 
-  const progressiveTraits =
-    nftState && narrativeState
-      ? NarrativeEngine.getProgressiveTraits(
-          narrativeState.personality,
-          nftState.level,
-        )
-      : null;
+  const progressiveTraits = narrativeState
+    ? NarrativeEngine.getProgressiveTraits(
+        narrativeState.personality,
+        effectiveNft.level,
+      )
+    : null;
 
   return {
     latestEvent,
@@ -144,5 +164,6 @@ export function useNarrativePipeline({
     progressiveTraits,
     handleAIProof,
     processBatch,
+    isWorldMode,
   };
 }

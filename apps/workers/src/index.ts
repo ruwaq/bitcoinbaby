@@ -55,44 +55,14 @@ const app = new Hono<{ Bindings: Env }>();
 // =============================================================================
 
 // CORS for frontend
-// SECURITY: No wildcards with credentials - list exact origins
+// SECURITY: No wildcards with credentials - list exact origins.
+// The allowlist policy lives in src/lib/cors.ts so it can be unit-tested
+// in isolation (see tests/cors-origins.test.ts).
+import { getAllowedOrigin } from "./lib/cors";
 app.use(
   "*",
   cors({
-    origin: (origin) => {
-      const allowedOrigins = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "https://bitcoinbaby.app",
-        "https://www.bitcoinbaby.app",
-        "https://bitcoinbaby.vercel.app",
-      ];
-
-      if (!origin) return allowedOrigins[0];
-
-      if (allowedOrigins.includes(origin)) {
-        return origin;
-      }
-
-      // Allow bitcoinbaby.app subdomains
-      if (/^https:\/\/[a-z0-9-]+\.bitcoinbaby\.app$/.test(origin)) {
-        return origin;
-      }
-
-      // Vercel preview deployments — explicit allowlist only
-      // SECURITY: Do NOT use a broad regex pattern. Only allow known
-      // preview URLs to prevent malicious actors from creating similarly-named
-      // Vercel projects that would bypass CORS.
-      const vercelPreviewAllowlist = [
-        "https://bitcoinbaby-git-main-andeanlabs-projects.vercel.app",
-        "https://bitcoinbaby.vercel.app",
-      ];
-      if (vercelPreviewAllowlist.includes(origin)) {
-        return origin;
-      }
-
-      return null;
-    },
+    origin: getAllowedOrigin,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: [
       "Content-Type",

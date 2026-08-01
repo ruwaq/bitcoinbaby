@@ -10,30 +10,26 @@ import type {
   Bloodline as CoreBloodline,
   BaseType as CoreBaseType,
   RarityTier,
-  Heritage,
+  HeritageSeed,
   SparkNFTState as CoreSparkNFTState,
 } from "@bitcoinbaby/core";
 
 // Re-export canonical types
-export type { RarityTier, Heritage };
+export type { RarityTier, HeritageSeed };
 export type { CoreSparkNFTState };
 
 // =============================================================================
 // EXTENDED UI TYPES
 // These extend the on-chain types for visualization purposes only.
-// Note: "scholar" and "merchant" bloodlines, and "shaman", "elemental", "dragon"
-// base types are UI-only extensions for special visual effects.
 // =============================================================================
 
 /**
  * Extended Bloodline for UI visualization
- * Includes canonical bloodlines + UI-only visual variants
  */
 export type Bloodline = CoreBloodline | "scholar" | "merchant";
 
 /**
  * Extended BaseType for UI visualization
- * Includes canonical base types + UI-only visual variants
  */
 export type BaseType = CoreBaseType | "shaman" | "elemental" | "dragon";
 
@@ -47,6 +43,7 @@ export interface SparkNFTState {
   readonly genesisBlock: number;
   readonly rarityTier: RarityTier;
   readonly tokenId: number;
+  readonly heritage: number;
   level: number;
   xp: number;
   totalXp: number;
@@ -54,6 +51,8 @@ export interface SparkNFTState {
   lastWorkBlock: number;
   evolutionCount: number;
   tokensEarned: bigint;
+  narrativeRoot: string;
+  worldStateRoot: string;
 }
 
 export interface SparkNFTInfo {
@@ -71,7 +70,7 @@ export interface SparkNFTInfo {
 // CONSTANTS
 // =============================================================================
 
-export const MAX_LEVEL = 10;
+export const MAX_LEVEL = 21;
 
 export const XP_REQUIREMENTS: Record<number, number> = {
   2: 100,
@@ -83,40 +82,40 @@ export const XP_REQUIREMENTS: Record<number, number> = {
   8: 8000,
   9: 16000,
   10: 32000,
+  11: 48000,
+  12: 64000,
+  13: 96000,
+  14: 128000,
+  15: 192000,
+  16: 256000,
+  17: 384000,
+  18: 512000,
+  19: 768000,
+  20: 1024000,
 };
 
 export const LEVEL_BOOSTS: Record<number, number> = {
   1: 0,
-  2: 5,
-  3: 10,
-  4: 15,
-  5: 25,
-  6: 35,
-  7: 50,
-  8: 70,
-  9: 90,
-  10: 120,
-};
-
-export const RARITY_BOOSTS: Record<RarityTier, number> = {
-  common: 10,
-  uncommon: 15,
-  rare: 25,
-  epic: 35,
-  legendary: 50,
-  mythic: 100,
-};
-
-export const EVOLUTION_COSTS: Record<number, bigint> = {
-  2: 100n * 100_000_000n,
-  3: 250n * 100_000_000n,
-  4: 500n * 100_000_000n,
-  5: 1000n * 100_000_000n,
-  6: 2500n * 100_000_000n,
-  7: 5000n * 100_000_000n,
-  8: 10000n * 100_000_000n,
-  9: 25000n * 100_000_000n,
-  10: 50000n * 100_000_000n,
+  2: 0.1,
+  3: 0.2,
+  4: 0.3,
+  5: 0.5,
+  6: 1,
+  7: 1.25,
+  8: 1.5,
+  9: 1.75,
+  10: 2,
+  11: 2.5,
+  12: 3,
+  13: 3.5,
+  14: 4,
+  15: 4.5,
+  16: 5,
+  17: 5.5,
+  18: 6,
+  19: 7,
+  20: 8,
+  21: 10,
 };
 
 // =============================================================================
@@ -124,7 +123,7 @@ export const EVOLUTION_COSTS: Record<number, bigint> = {
 // =============================================================================
 
 export function getMiningBoost(nft: SparkNFTState): number {
-  return (LEVEL_BOOSTS[nft.level] ?? 0) + (RARITY_BOOSTS[nft.rarityTier] ?? 0);
+  return LEVEL_BOOSTS[nft.level] ?? 0;
 }
 
 export function canLevelUp(nft: SparkNFTState): boolean {
@@ -137,12 +136,6 @@ export function getXpForNextLevel(level: number): number {
   return XP_REQUIREMENTS[level + 1] ?? 0;
 }
 
-export function getEvolutionCostDisplay(level: number): string {
-  const cost = EVOLUTION_COSTS[level + 1];
-  if (!cost) return "MAX";
-  return `${(Number(cost) / 100_000_000).toLocaleString()} BABTC`;
-}
-
 // =============================================================================
 // EVOLUTION STATUS TYPE
 // =============================================================================
@@ -152,9 +145,8 @@ export interface EvolutionStatus {
   nextLevel: number;
   currentXp: number;
   xpRequired: number;
-  xpProgress: number; // 0-100
+  xpProgress: number;
   canEvolve: boolean;
-  tokenCost: bigint;
   currentBoost: number;
   nextBoost: number;
   boostGain: number;
@@ -164,10 +156,8 @@ export function getEvolutionStatus(nft: SparkNFTState): EvolutionStatus {
   const nextLevel = nft.level + 1;
   const canEvolveNft = canLevelUp(nft);
   const xpRequired = XP_REQUIREMENTS[nextLevel] || 0;
-  const tokenCost = EVOLUTION_COSTS[nextLevel] || 0n;
   const currentBoost = getMiningBoost(nft);
-  const nextBoost =
-    (LEVEL_BOOSTS[nextLevel] || 0) + (RARITY_BOOSTS[nft.rarityTier] || 0);
+  const nextBoost = LEVEL_BOOSTS[nextLevel] || 0;
 
   return {
     currentLevel: nft.level,
@@ -176,7 +166,6 @@ export function getEvolutionStatus(nft: SparkNFTState): EvolutionStatus {
     xpRequired,
     xpProgress: xpRequired > 0 ? (nft.xp / xpRequired) * 100 : 100,
     canEvolve: canEvolveNft,
-    tokenCost,
     currentBoost,
     nextBoost,
     boostGain: nextBoost - currentBoost,

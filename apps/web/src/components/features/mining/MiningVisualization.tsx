@@ -22,6 +22,7 @@ interface MiningVisualizationProps {
   aiStatus?: {
     modelState: "idle" | "loading" | "ready" | "error";
     downloadProgress: number;
+    modelLoaded?: string;
     downloadDetails?: {
       file?: string;
       loaded?: number;
@@ -109,13 +110,13 @@ export function MiningVisualization({
           {aiStatus && aiStatus.modelState === "loading" && (
             <div className="absolute inset-0 bg-amber-950/95 flex flex-col items-center justify-center p-4 z-20 font-pixel">
               <div className="text-pixel-secondary text-pixel-2xs uppercase mb-2 animate-pulse text-center">
-                Loading Gemma AI Model...
+                Initializing AI Engine...
               </div>
-              
+
               {/* Retro pixel progress bar */}
               <div className="w-full max-w-[280px] border-4 border-amber-900/80 bg-black p-1 mb-2">
-                <div 
-                  className="bg-pixel-primary h-4 transition-all duration-300 ease-out" 
+                <div
+                  className="bg-pixel-primary h-4 transition-all duration-300 ease-out"
                   style={{ width: `${aiStatus.downloadProgress || 0}%` }}
                 />
               </div>
@@ -127,9 +128,18 @@ export function MiningVisualization({
                 </span>
                 {aiStatus.downloadDetails && (
                   <span className="text-center truncate max-w-[260px] text-amber-100/70">
-                    {aiStatus.downloadDetails.file && `${aiStatus.downloadDetails.file.split('/').pop()}: `}
-                    {aiStatus.downloadDetails.loaded ? (aiStatus.downloadDetails.loaded / (1024 * 1024)).toFixed(1) : 0}MB 
-                    {aiStatus.downloadDetails.total ? ` / ${(aiStatus.downloadDetails.total / (1024 * 1024)).toFixed(1)}MB` : ""}
+                    {aiStatus.downloadDetails.file &&
+                      `${aiStatus.downloadDetails.file.split("/").pop()}: `}
+                    {aiStatus.downloadDetails.loaded
+                      ? (
+                          aiStatus.downloadDetails.loaded /
+                          (1024 * 1024)
+                        ).toFixed(1)
+                      : 0}
+                    MB
+                    {aiStatus.downloadDetails.total
+                      ? ` / ${(aiStatus.downloadDetails.total / (1024 * 1024)).toFixed(1)}MB`
+                      : ""}
                   </span>
                 )}
               </div>
@@ -143,7 +153,8 @@ export function MiningVisualization({
                 AI LOAD ERROR!
               </div>
               <div className="text-pixel-text text-pixel-3xs mb-4 max-w-[280px] text-red-200/80">
-                Failed to download or initialize local Gemma model. Verify connection & CSP.
+                Failed to initialize AI engine. Check your connection and
+                configured AI provider.
               </div>
               <button
                 onClick={onStart}
@@ -165,17 +176,39 @@ export function MiningVisualization({
             {/* Floating Knowledge/AI Learning Particles */}
             {isRunning && !isPaused && (
               <>
-                <span className="absolute text-sm animate-float-slow left-4 top-2 opacity-0" style={{ animationDelay: '0s' }}>💡</span>
-                <span className="absolute text-xs animate-float-medium right-6 top-3 opacity-0" style={{ animationDelay: '0.6s' }}>✨</span>
-                <span className="absolute text-sm animate-float-fast left-8 top-5 opacity-0" style={{ animationDelay: '1.2s' }}>🧠</span>
-                <span className="absolute text-xs animate-float-slow right-8 top-1 opacity-0" style={{ animationDelay: '1.8s' }}>💬</span>
+                <span
+                  className="absolute text-sm animate-float-slow left-4 top-2 opacity-0"
+                  style={{ animationDelay: "0s" }}
+                >
+                  💡
+                </span>
+                <span
+                  className="absolute text-xs animate-float-medium right-6 top-3 opacity-0"
+                  style={{ animationDelay: "0.6s" }}
+                >
+                  ✨
+                </span>
+                <span
+                  className="absolute text-sm animate-float-fast left-8 top-5 opacity-0"
+                  style={{ animationDelay: "1.2s" }}
+                >
+                  🧠
+                </span>
+                <span
+                  className="absolute text-xs animate-float-slow right-8 top-1 opacity-0"
+                  style={{ animationDelay: "1.8s" }}
+                >
+                  💬
+                </span>
               </>
             )}
 
             {/* Baby and desk */}
             <div className="flex flex-col items-center relative z-10">
               {/* Baby state emoji */}
-              <div className={`text-4xl mb-2 ${isRunning && !isPaused ? "animate-wiggle" : ""}`}>
+              <div
+                className={`text-4xl mb-2 ${isRunning && !isPaused ? "animate-wiggle" : ""}`}
+              >
                 {isRunning ? (isPaused ? "🤔" : "👶") : "😴"}
               </div>
 
@@ -213,7 +246,7 @@ export function MiningVisualization({
               {formatHashrate(effectiveHashrate)}
             </span>
             <HelpTooltip
-              content="Tokens per second processed by Gemma 4 E2B model. Higher speed = faster AI learning and more $BABY rewards."
+              content="AI processing speed. Higher speed = faster AI learning and more $SPARK rewards."
               title="Speed"
               description="With NFT boost applied. Speed depends on device capability (WebGPU/CPU)."
               size="md"
@@ -230,7 +263,7 @@ export function MiningVisualization({
             </div>
           )}
           <div className="font-pixel text-pixel-2xs text-pixel-text-muted mt-2 uppercase">
-            {minerType === "webgpu" ? "WebGPU Gemma 4 E2B" : "CPU Gemma 4 E2B"}
+            {aiStatus?.modelLoaded || "AI Engine"}
             {webgpuAvailable && minerType === "cpu" && (
               <span className="text-pixel-secondary ml-2">
                 (WebGPU Available)

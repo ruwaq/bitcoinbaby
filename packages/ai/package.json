@@ -9,14 +9,17 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
+    "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@bitcoinbaby/shared": "workspace:*",
-    "@huggingface/transformers": "^4.2.0"
+    "@bitcoinbaby/shared": "workspace:*"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^9.39.2",
     "typescript": "^5.0.0",
+    "typescript-eslint": "^8.56.1",
     "@bitcoinbaby/config": "workspace:*"
   }
 }

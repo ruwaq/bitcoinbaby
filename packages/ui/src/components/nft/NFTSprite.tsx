@@ -9,7 +9,7 @@
  */
 
 import { FC, useMemo } from "react";
-import type { Bloodline, BaseType, RarityTier, Heritage } from "./types";
+import type { Bloodline, BaseType, RarityTier, HeritageSeed } from "./types";
 import {
   getNFTVisualConfig,
   resolvePaletteColor,
@@ -35,7 +35,7 @@ interface NFTSpriteProps {
   baseType: BaseType;
   bloodline: Bloodline;
   rarityTier: RarityTier;
-  heritage?: Heritage;
+  heritage?: number;
   dna?: string;
   size?: number;
   className?: string;
@@ -91,16 +91,9 @@ const mapRarity = (rarity: RarityTier): GenesisRarity => {
   return mapping[rarity] || "common";
 };
 
-const mapHeritage = (heritage?: Heritage): GenesisHeritage => {
-  if (!heritage) return "americas";
-  const mapping: Record<Heritage, GenesisHeritage> = {
-    americas: "americas",
-    africa: "africa",
-    asia: "asia",
-    europa: "europa",
-    oceania: "oceania",
-  };
-  return mapping[heritage] || "americas";
+const mapHeritage = (heritage?: number): GenesisHeritage => {
+  if (heritage === undefined) return 0;
+  return heritage as GenesisHeritage;
 };
 
 // =============================================================================

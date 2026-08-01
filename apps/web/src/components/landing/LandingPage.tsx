@@ -11,14 +11,30 @@
  * Once a wallet exists, the full AppShell SPA is shown instead.
  */
 
+import { useState } from "react";
 import { useWalletStore } from "@bitcoinbaby/core";
 import { AppShell } from "@/components/app/AppShell";
+
+const LANDING_DISMISSED_KEY = "bitcoinsparks-landing-dismissed";
 
 export function LandingPage() {
   const wallet = useWalletStore((s) => s.wallet);
 
-  // Show SPA if wallet exists
-  if (wallet) {
+  // Track if user dismissed the landing page
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(LANDING_DISMISSED_KEY) === "true";
+    }
+    return false;
+  });
+
+  const handleGetStarted = () => {
+    localStorage.setItem(LANDING_DISMISSED_KEY, "true");
+    setDismissed(true);
+  };
+
+  // Show SPA if wallet exists OR user dismissed landing
+  if (wallet || dismissed) {
     return <AppShell />;
   }
 
@@ -54,17 +70,14 @@ export function LandingPage() {
 
           {/* Tagline */}
           <p className="font-pixel-body text-body-sm sm:text-body-md text-pixel-text-muted max-w-md mb-8">
-            Raise your AI-powered pixel spark while mining Bitcoin.
-            Proof of Useful Work meets Tamagotchi.
+            Raise your AI-powered pixel spark while mining Bitcoin. Proof of
+            Useful Work meets Tamagotchi.
           </p>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4">
             <button
-              onClick={() => {
-                // This will be handled by the HomeSection welcome flow
-                window.location.href = "/?tab=you";
-              }}
+              onClick={handleGetStarted}
               className="px-8 py-4 font-pixel text-pixel-xs bg-pixel-primary text-black border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none"
             >
               GET STARTED
@@ -99,8 +112,8 @@ export function LandingPage() {
                 1. CREATE SPARK
               </h3>
               <p className="font-pixel-body text-xs text-pixel-text-muted">
-                Mint your Genesis Spark NFT on Bitcoin. Each spark is unique with
-                its own DNA, bloodline, and rarity.
+                Mint your Genesis Spark NFT on Bitcoin. Each spark is unique
+                with its own DNA, bloodline, and rarity.
               </p>
             </div>
 
@@ -111,8 +124,8 @@ export function LandingPage() {
                 2. MINE BITCOIN
               </h3>
               <p className="font-pixel-body text-xs text-pixel-text-muted">
-                Your spark mines Bitcoin via Proof of Useful Work. AI computation
-                earns real hashrate. Higher level = more rewards.
+                Your spark mines Bitcoin via Proof of Useful Work. AI
+                computation earns real hashrate. Higher level = more rewards.
               </p>
             </div>
 
@@ -123,8 +136,8 @@ export function LandingPage() {
                 3. EVOLVE & EARN
               </h3>
               <p className="font-pixel-body text-xs text-pixel-text-muted">
-                Feed, play, and train your spark. Level up through 21 stages
-                — from egg to legend. Earn $SPARK tokens as you grow.
+                Feed, play, and train your spark. Level up through 21 stages —
+                from egg to legend. Earn $SPARK tokens as you grow.
               </p>
             </div>
           </div>
@@ -183,9 +196,7 @@ export function LandingPage() {
             revolution — one pixel at a time.
           </p>
           <button
-            onClick={() => {
-              window.location.href = "/?tab=you";
-            }}
+            onClick={handleGetStarted}
             className="px-8 py-4 font-pixel text-pixel-xs bg-pixel-primary text-black border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none"
           >
             GET YOUR SPARK

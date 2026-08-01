@@ -7,6 +7,35 @@
 
 import * as secp256k1 from "@noble/secp256k1";
 import { ripemd160 } from "@noble/hashes/ripemd160";
+import { sha256 as nobleSha256 } from "@noble/hashes/sha256";
+import { hmac } from "@noble/hashes/hmac";
+
+/**
+ * Initialize the synchronous hash backends required by @noble/secp256k1 v3
+ * for the synchronous Schnorr sign/verify path.
+ *
+ * In @noble/secp256k1 v3.0.0, the sync schnorr.sign() / schnorr.verify()
+ * functions require `hashes.sha256` and `hashes.hmacSha256` to be plugged in
+ * explicitly (the async variants use WebCrypto internally and don't need
+ * this). Without this initialization, calling signSchnorr/verifySchnorr
+ * throws `Error: hashes.sha256 not set` at runtime.
+ *
+ * We use @noble/hashes (already a dependency) as the backend, which is the
+ * recommended setup in the @noble/secp256k1 README.
+ *
+ * This module-level side effect runs once at import time and is idempotent.
+ */
+// NOTE: noble v3 checks `typeof hashes[name] !== 'function'` for the sync path,
+// so `sha256` must be assigned the function directly (NOT wrapped in {sync}).
+secp256k1.hashes.sha256 = nobleSha256;
+secp256k1.hashes.hmacSha256 = (key: Uint8Array, ...msgs: Uint8Array[]) => {
+  const h = hmac.create(nobleSha256, key);
+  for (const msg of msgs) h.update(msg);
+  const digest = h.digest();
+  // Release intermediate HMAC state to avoid lingering key material
+  h.destroy();
+  return digest;
+};
 
 /**
  * Securely generate random bytes

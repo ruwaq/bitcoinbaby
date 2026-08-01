@@ -255,7 +255,6 @@ export class NFTClient extends BaseApiClient {
   ): Promise<
     ApiResponse<{
       nft: NFTRecord;
-      evolutionCost: string;
       previousLevel: number;
       newLevel: number;
     }>

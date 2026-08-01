@@ -42,10 +42,11 @@ export type RarityTier =
 // =============================================================================
 
 /**
- * Heritage (cultural origin) for visual diversity.
- * Used for sprite selection, NOT stored on-chain.
+ * Heritage seed (procedural cultural origin).
+ * 0-4 maps to procedural culture templates, NOT real-world continents.
+ * Discovered through gameplay, not displayed at mint.
  */
-export type Heritage = "americas" | "africa" | "asia" | "europa" | "oceania";
+export type HeritageSeed = 0 | 1 | 2 | 3 | 4;
 
 /**
  * Extended bloodline for UI (includes scholar/merchant)
@@ -98,13 +99,7 @@ export const BLOODLINES: readonly Bloodline[] = [
 /**
  * All valid heritages
  */
-export const HERITAGES: readonly Heritage[] = [
-  "americas",
-  "africa",
-  "asia",
-  "europa",
-  "oceania",
-] as const;
+export const HERITAGE_SEEDS: readonly HeritageSeed[] = [0, 1, 2, 3, 4] as const;
 
 /**
  * All valid rarity tiers (ordered by rarity)
@@ -121,4 +116,4 @@ export const RARITY_TIERS: readonly RarityTier[] = [
 /**
  * Max level for NFTs
  */
-export const MAX_LEVEL = 10;
+export const MAX_LEVEL = 21;

@@ -1,25 +1,16 @@
 import type {
-  Miner,
   MinerEvents,
   MiningResult,
   OrchestratorConfig,
   DeviceCapabilities,
-  BatteryManager,
   XPGainedEvent,
   AITask,
   AIProof,
   AIStatus,
 } from "./types";
-import { CPUMiner } from "./cpu-miner";
-import {
-  detectCapabilities,
-  isOnBattery,
-  isPageVisible,
-  getNavigator,
-} from "./capabilities";
+import { detectCapabilities } from "./capabilities";
 import { MIN_DIFFICULTY } from "../tokenomics/constants";
 import { createLogger } from "@bitcoinbaby/shared";
-import { getApiClient } from "../api/client";
 
 const log = createLogger("Orchestrator");
 import { AIWorkIntegration, type AIWorkResult } from "./ai-integration";
@@ -42,20 +33,17 @@ const defaultConfig: OrchestratorConfig = {
  */
 export class MiningOrchestrator {
   private config: OrchestratorConfig;
-  private activeMiner: Miner | null = null;
   private events: Partial<MinerEvents> = {};
   private isRunning = false;
-  private isStarting = false; // Prevents concurrent start() calls
-  private startCancelled = false; // Tracks if stop() was called during start()
-  private isHandlingError = false; // Prevents race condition in handleMinerError
-  private capabilities: DeviceCapabilities | null = null;
+  private isStarting = false;
+  private startCancelled = false;
   private cleanupFunctions: (() => void)[] = [];
-  private currentBlockData?: string; // Store for fallback recovery
-  private aiIntegration: AIWorkIntegration | null = null; // AI PoUW integration
+  private currentBlockData?: string;
+  private aiIntegration: AIWorkIntegration | null = null;
   private aiHashrate = 0;
   private aiTotalTokens = 0;
   private isPaused = false;
-  private abortController: AbortController | null = null; // For cancelling in-flight operations
+  private abortController: AbortController | null = null;
 
   constructor(config: Partial<OrchestratorConfig> = {}) {
     this.config = { ...defaultConfig, ...config };
@@ -80,7 +68,6 @@ export class MiningOrchestrator {
       {
         enabled: true,
         taskFrequency: this.config.aiTaskFrequency ?? 1,
-        preferWebGPU: this.config.preferWebGPU,
       },
       (status) => {
         this.events.onAIStatusChange?.(status);
@@ -88,21 +75,16 @@ export class MiningOrchestrator {
     );
   }
 
-  /**
-   * Detect device capabilities
-   */
+  // Called by mining-singleton to populate status
   async detectCapabilities(): Promise<DeviceCapabilities> {
-    if (!this.capabilities) {
-      this.capabilities = await detectCapabilities();
-    }
-    return this.capabilities;
+    const caps = await detectCapabilities();
+    return caps;
   }
 
   /**
    * Initialize and start the appropriate miner
    */
   async start(blockData?: string): Promise<void> {
-    // Prevent concurrent start() calls
     if (this.isStarting) {
       log.warn("Start already in progress");
       return;
@@ -113,201 +95,57 @@ export class MiningOrchestrator {
       return;
     }
 
-    // Set flags BEFORE async operations to prevent race conditions
     this.isStarting = true;
     this.startCancelled = false;
     this.isRunning = true;
     this.currentBlockData = blockData;
 
     try {
-      if (this.config.enableAIPoUW) {
-        log.info("Initializing AI engine for PoUW...");
-        if (!this.aiIntegration) {
-          this.aiIntegration = this.createAIIntegration();
-        }
-        await this.aiIntegration.initialize();
-
-        if (this.startCancelled) {
-          log.debug("Start cancelled during AI engine initialization");
-          this.isRunning = false;
-          this.isStarting = false;
-          return;
-        }
-
-        this.aiHashrate = 0;
-        this.isPaused = false;
-
-        // Run AI mining loop asynchronously
-        this.runAILoop();
-
-        this.isStarting = false;
-        this.events.onStatusChange?.("running");
-        return;
+      // Initialize AI integration
+      if (!this.aiIntegration) {
+        this.aiIntegration = this.createAIIntegration();
       }
+      await this.aiIntegration.initialize();
 
-      // Detect capabilities
-      const caps = await this.detectCapabilities();
-
-      // Check if stop() was called during detectCapabilities()
       if (this.startCancelled) {
-        log.debug("Start cancelled during capability detection");
+        log.debug("Start cancelled during AI init");
         this.isRunning = false;
         this.isStarting = false;
         return;
       }
 
-      if (this.config.preferWebGPU && caps.webgpu) {
-        // Use WebGPU miner for 10-100x faster hashing
-        const { WebGPUMiner } = await import("./webgpu-miner");
-
-        // Check again after dynamic import
-        if (this.startCancelled) {
-          log.debug("Start cancelled during WebGPU import");
-          this.isRunning = false;
-          this.isStarting = false;
-          return;
-        }
-
-        this.activeMiner = new WebGPUMiner({
-          difficulty: this.config.initialDifficulty,
-          address: this.config.minerAddress,
-          onHashrateUpdate: (hashrate) =>
-            this.events.onHashrateUpdate?.(hashrate),
-          onWorkFound: (result) => this.handleWorkFound(result),
-          onStatusChange: (status) => this.events.onStatusChange?.(status),
-          onError: (error) => this.handleMinerError(error),
-        });
-      } else if (this.config.fallbackToCPU && caps.workers) {
-        this.activeMiner = this.createCPUMiner();
-      } else {
-        throw new Error("No mining backend available");
-      }
-
-      // Final check before starting
-      if (this.startCancelled) {
-        log.debug("Start cancelled before miner.start()");
-        this.activeMiner?.terminate();
-        this.activeMiner = null;
+      if (!this.aiIntegration.isAvailable()) {
         this.isRunning = false;
         this.isStarting = false;
+        this.events.onStatusChange?.("stopped");
+        this.events.onError?.(
+          new Error(
+            "No AI provider configured. Go to Settings → AI Provider to connect Gemini, OpenAI, or another provider.",
+          ),
+        );
         return;
       }
 
-      // Setup visibility handling
-      if (this.config.throttleWhenHidden) {
-        this.setupVisibilityHandling();
-      }
-
-      // Setup battery handling
-      if (this.config.throttleOnBattery) {
-        this.setupBatteryHandling();
-      }
-
-      await this.activeMiner.start(blockData);
+      this.isPaused = false;
       this.isStarting = false;
       this.events.onStatusChange?.("running");
+
+      this.runAILoop();
     } catch (error) {
-      // Reset state on failure
       this.isRunning = false;
       this.isStarting = false;
-      this.activeMiner = null;
+      this.events.onError?.(
+        error instanceof Error ? error : new Error("Failed to start mining"),
+      );
       throw error;
     }
   }
 
-  /**
-   * Create CPU miner with event handlers
-   */
-  private createCPUMiner(): CPUMiner {
-    return new CPUMiner({
-      difficulty: this.config.initialDifficulty,
-      address: this.config.minerAddress,
-      onHashrateUpdate: (hashrate) => this.events.onHashrateUpdate?.(hashrate),
-      onWorkFound: (result) => this.handleWorkFound(result),
-      onStatusChange: (status) => this.events.onStatusChange?.(status),
-      onError: (error) => {
-        log.error("CPU miner error", { message: error.message });
-        this.events.onError?.(error);
-        // CPU is the last resort, so just stop mining
-        this.isRunning = false;
-        this.events.onStatusChange?.("stopped");
-      },
-    });
-  }
-
-  /**
-   * Handle work found from miners
-   * Integrates AI PoUW by executing AI tasks on each share
-   * AI work is non-blocking and optional
-   *
-   * Also emits XP gained event for NFT system integration
-   */
-  private handleWorkFound(result: MiningResult): void {
-    // Emit XP gained event for NFT system (symbiosis: mining → NFT XP)
-    // Base XP is calculated from difficulty - higher difficulty = more XP
-    const baseXP = this.calculateBaseXP(result.difficulty);
-    this.emitXPGained(result, baseXP);
-
-    // If AI PoUW is not enabled, just pass through
-    if (!this.aiIntegration) {
-      this.events.onWorkFound?.(result);
-      return;
-    }
-
-    // Execute AI task asynchronously (non-blocking)
-    // The share is reported immediately, AI proof is added if available
-    const safeCallback = (res: MiningResult) => {
-      try {
-        this.events.onWorkFound?.(res);
-      } catch (callbackError) {
-        log.error("onWorkFound callback error", { error: callbackError });
-      }
-    };
-
-    this.aiIntegration
-      .onShareFound()
-      .then((aiResult) => {
-        if (aiResult?.success && aiResult.proof) {
-          // Add AI proof to the mining result
-          const enhancedResult: MiningResult = {
-            ...result,
-            aiProof: aiResult.proof,
-          };
-          log.debug("Share with AI proof", {
-            taskId: aiResult.taskId,
-            computeTimeMs: aiResult.computeTime?.toFixed(0),
-          });
-          safeCallback(enhancedResult);
-        } else {
-          // AI failed or skipped, report share without AI proof
-          if (aiResult?.error) {
-            log.warn("AI task failed", { error: aiResult.error });
-          }
-          safeCallback(result);
-        }
-      })
-      .catch((error) => {
-        // AI completely failed, mining continues normally
-        log.warn("AI integration error", { error });
-        safeCallback(result);
-      });
-  }
-
-  /**
-   * Calculate base XP from difficulty
-   * Higher difficulty = more XP (rewards harder work)
-   */
   private calculateBaseXP(difficulty: number): number {
-    // Base: 100 XP at MIN_DIFFICULTY
-    // Each additional difficulty bit doubles the XP
     const difficultyBonus = difficulty - MIN_DIFFICULTY;
     return Math.floor(100 * Math.pow(1.5, difficultyBonus));
   }
 
-  /**
-   * Emit XP gained event for NFT system
-   * This enables the symbiosis between mining and NFT progression
-   */
   private emitXPGained(result: MiningResult, baseXP: number): void {
     if (this.events.onXPGained) {
       const event: XPGainedEvent = {
@@ -319,319 +157,88 @@ export class MiningOrchestrator {
     }
   }
 
-  /**
-   * Stop the active miner
-   *
-   * Thread-safe: Handles concurrent calls and in-progress operations.
-   * Uses AbortController to cancel in-flight async operations (fetch, AI tasks).
-   * Sets flags atomically to ensure clean shutdown.
-   */
   stop(): void {
-    // Cancel any in-progress start() operation
     if (this.isStarting) {
       this.startCancelled = true;
     }
 
-    // Abort any in-flight async operations (AI tasks, network requests)
     if (this.abortController) {
       this.abortController.abort();
       this.abortController = null;
     }
 
-    // Set isRunning to false FIRST to signal other operations to abort
-    // This is checked by handleMinerError() to prevent starting new miners
     const wasRunning = this.isRunning;
     this.isRunning = false;
 
-    if (!wasRunning && !this.isStarting && !this.isHandlingError) {
+    if (!wasRunning && !this.isStarting) {
       return;
-    }
-
-    // Stop the active miner (may be null if stop called during startup)
-    if (this.activeMiner) {
-      this.activeMiner.stop();
     }
 
     this.events.onStatusChange?.("stopped");
   }
 
-  /**
-   * Pause mining
-   */
   pause(): void {
-    if (this.config.enableAIPoUW && this.isRunning) {
+    if (this.isRunning) {
       this.isPaused = true;
       this.events.onStatusChange?.("paused");
-    } else if (this.activeMiner && this.isRunning) {
-      this.activeMiner.pause();
-      this.events.onStatusChange?.("paused");
     }
   }
 
-  /**
-   * Resume mining
-   */
   resume(): void {
-    if (this.config.enableAIPoUW && this.isRunning) {
+    if (this.isRunning) {
       this.isPaused = false;
       this.events.onStatusChange?.("running");
-    } else if (this.activeMiner && this.isRunning) {
-      this.activeMiner.resume();
-      this.events.onStatusChange?.("running");
     }
   }
 
-  /**
-   * Set difficulty
-   *
-   * Enforces MIN_DIFFICULTY to prevent unsustainable emission rates.
-   * Difficulty below MIN_DIFFICULTY will be clamped.
-   */
   setDifficulty(difficulty: number): void {
     const safeDifficulty = Math.max(difficulty, MIN_DIFFICULTY);
-    if (difficulty < MIN_DIFFICULTY) {
-      log.warn("Difficulty below MIN_DIFFICULTY", {
-        requested: difficulty,
-        enforced: safeDifficulty,
-      });
-    }
     this.config.initialDifficulty = safeDifficulty;
-    this.activeMiner?.setDifficulty(safeDifficulty);
   }
 
-  /**
-   * Update orchestrator configuration dynamically
-   */
   updateConfig(config: Partial<OrchestratorConfig>): void {
-    const oldAddress = this.config.minerAddress;
     this.config = { ...this.config, ...config };
-
     if (this.config.initialDifficulty < MIN_DIFFICULTY) {
       this.config.initialDifficulty = MIN_DIFFICULTY;
     }
-
-    if (config.initialDifficulty !== undefined) {
-      this.activeMiner?.setDifficulty(this.config.initialDifficulty);
-    }
-
-    // Pass the new address to active miner if it has a setter
-    if (this.config.minerAddress && this.activeMiner) {
-      this.activeMiner.setAddress?.(this.config.minerAddress);
-    }
-
-    if (oldAddress !== this.config.minerAddress) {
-      log.info("Miner configuration updated dynamically", {
-        oldAddress,
-        newAddress: this.config.minerAddress,
-      });
-    }
   }
 
-  /**
-   * Register event handlers
-   */
   on<K extends keyof MinerEvents>(event: K, handler: MinerEvents[K]): void {
     this.events[event] = handler;
   }
 
-  /**
-   * Terminate and cleanup
-   */
   terminate(): void {
-    // Cancel any in-progress start
     this.startCancelled = true;
     this.isStarting = false;
-    this.isHandlingError = false; // Reset error handling flag
-
     this.stop();
-
-    // Cleanup event listeners
     this.cleanupFunctions.forEach((cleanup) => cleanup());
     this.cleanupFunctions = [];
-
-    this.activeMiner?.terminate();
-    this.activeMiner = null;
-    this.capabilities = null;
-
-    // Cleanup AI integration
     this.aiIntegration?.terminate();
     this.aiIntegration = null;
   }
 
-  /**
-   * Handle miner errors with automatic fallback to CPU
-   * This ensures mining continues even if GPU fails
-   *
-   * FIX: Added race condition protection to prevent issues when stop() is
-   * called during the async fallback operation.
-   */
-  private async handleMinerError(error: Error): Promise<void> {
-    // Prevent concurrent error handling and check if still running
-    if (this.isHandlingError || !this.isRunning) {
-      log.debug("Skipping error handling (not running or already handling)");
-      return;
-    }
-    this.isHandlingError = true;
+  // ==========================================================================
+  // Getters (AI-only mining)
+  // ==========================================================================
 
-    try {
-      log.error("Miner error", { message: error.message });
-
-      // Notify listeners of the error
-      this.events.onError?.(error);
-
-      // If current miner is WebGPU and CPU fallback is enabled, switch to CPU
-      if (
-        this.activeMiner?.type === "webgpu" &&
-        this.config.fallbackToCPU &&
-        this.capabilities?.workers
-      ) {
-        log.info("Falling back to CPU mining...");
-
-        // Stop the failed GPU miner
-        this.activeMiner.terminate();
-
-        // Check if stop() was called during terminate
-        if (!this.isRunning) {
-          log.debug("Stop called during fallback, aborting");
-          return;
-        }
-
-        // Create and start CPU miner
-        this.activeMiner = this.createCPUMiner();
-
-        // Check again before async start
-        if (!this.isRunning) {
-          log.debug("Stop called before CPU start, aborting");
-          this.activeMiner.terminate();
-          this.activeMiner = null;
-          return;
-        }
-
-        try {
-          await this.activeMiner.start(this.currentBlockData);
-
-          // Check if stop was called during start
-          if (!this.isRunning) {
-            log.debug("Stop called during CPU start, stopping");
-            this.activeMiner.stop();
-            return;
-          }
-
-          this.events.onStatusChange?.("running");
-          log.info("CPU fallback successful");
-        } catch (cpuError) {
-          log.error("CPU fallback failed", { error: cpuError });
-          this.isRunning = false;
-          this.activeMiner = null;
-          this.events.onStatusChange?.("stopped");
-          this.events.onError?.(
-            cpuError instanceof Error
-              ? cpuError
-              : new Error("CPU mining failed"),
-          );
-        }
-      } else {
-        // No fallback available, stop mining
-        this.isRunning = false;
-        this.events.onStatusChange?.("stopped");
-      }
-    } finally {
-      this.isHandlingError = false;
-    }
-  }
-
-  /**
-   * Handle page visibility changes
-   */
-  private setupVisibilityHandling(): void {
-    if (typeof document === "undefined") return;
-
-    const handler = () => {
-      if (!this.activeMiner) return;
-
-      if (!isPageVisible()) {
-        this.activeMiner.setThrottle(10); // 10% when hidden
-      } else {
-        this.activeMiner.setThrottle(100); // 100% when visible
-      }
-    };
-
-    document.addEventListener("visibilitychange", handler);
-
-    // Track cleanup function
-    this.cleanupFunctions.push(() => {
-      document.removeEventListener("visibilitychange", handler);
-    });
-  }
-
-  /**
-   * Handle battery status changes
-   */
-  private setupBatteryHandling(): void {
-    const nav = getNavigator();
-    if (!nav?.getBattery) return;
-
-    nav
-      .getBattery()
-      .then((battery: BatteryManager) => {
-        const updateThrottle = () => {
-          if (!this.activeMiner) return;
-
-          if (!battery.charging && battery.level < 0.2) {
-            this.activeMiner.setThrottle(25); // 25% on low battery
-          } else if (!battery.charging) {
-            this.activeMiner.setThrottle(50); // 50% on battery
-          } else {
-            this.activeMiner.setThrottle(100); // 100% when charging
-          }
-        };
-
-        battery.addEventListener("chargingchange", updateThrottle);
-        battery.addEventListener("levelchange", updateThrottle);
-        updateThrottle();
-
-        // Track cleanup function
-        this.cleanupFunctions.push(() => {
-          battery.removeEventListener("chargingchange", updateThrottle);
-          battery.removeEventListener("levelchange", updateThrottle);
-        });
-      })
-      .catch(() => {
-        // Battery API not available
-      });
-  }
-
-  // Getters
   getHashrate(): number {
-    if (this.config.enableAIPoUW) {
-      return this.aiHashrate;
-    }
-    return this.activeMiner?.getHashrate() ?? 0;
+    return this.aiHashrate;
   }
 
   getTotalHashes(): number {
-    if (this.config.enableAIPoUW) {
-      return this.aiTotalTokens;
-    }
-    return this.activeMiner?.getTotalHashes() ?? 0;
+    return this.aiTotalTokens;
   }
 
   getMinerType(): "cpu" | "webgpu" | null {
-    if (!this.isRunning) {
-      return null;
-    }
-    if (this.config.enableAIPoUW) {
-      return this.aiIntegration?.getStatus().hasWebGPU ? "webgpu" : "cpu";
-    }
-    return this.activeMiner?.type ?? null;
+    return this.isRunning ? "cpu" : null;
+  }
+
+  getCapabilities(): DeviceCapabilities | null {
+    return null;
   }
 
   getIsRunning(): boolean {
     return this.isRunning;
-  }
-
-  getCapabilities(): DeviceCapabilities | null {
-    return this.capabilities;
   }
 
   // ==========================================================================
@@ -699,12 +306,10 @@ export class MiningOrchestrator {
    * without leaving dangling promises.
    */
   private async runAILoop(): Promise<void> {
-    // Create fresh AbortController for this mining session
     this.abortController = new AbortController();
     const signal = this.abortController.signal;
 
-    log.info("Starting AI PoUW loop...");
-    const client = getApiClient();
+    log.info("Starting AI mining loop...");
 
     while (this.isRunning && !signal.aborted) {
       if (this.isPaused) {
@@ -712,87 +317,52 @@ export class MiningOrchestrator {
         continue;
       }
 
-      const address = this.config.minerAddress;
-
-      // Validate address to avoid useless requests and console 400 errors (e.g. during wallet loading or status-bar placeholder)
-      if (!address || address === "status-bar" || address.length < 26) {
-        log.debug(
-          "Skipping JIT AI task fetch: Miner address is invalid, empty or status-bar placeholder",
-          { address },
-        );
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-        continue;
-      }
-
       try {
-        log.debug("Fetching JIT AI task from server...");
-        const response = await client.getPouwTask(address);
-
-        if (!response.success || !response.data) {
-          log.warn("Failed to fetch AI task from server, retrying in 5s...", {
-            error: response.error,
-          });
-          await new Promise((resolve) => setTimeout(resolve, 5000));
-          continue;
-        }
-
-        const task = response.data;
-        log.info(
-          `Received AI Task ${task.id} based on block ${task.blockHash}`,
-        );
-
-        // Map PouwTaskResponse to AITask
-        const aiTask: AITask = {
-          id: task.id,
-          type: "pouw",
-          input: task.input,
-          seed: task.seed,
-        };
-
         const startTime = performance.now();
-        const aiResult = await this.aiIntegration!.executeTask(aiTask);
-        const computeTime = performance.now() - startTime;
+        const aiResult = await this.aiIntegration!.executeTask();
 
         if (!aiResult.success || !aiResult.proof) {
-          log.warn("AI Task local execution failed, retrying in 3s...", {
+          log.warn("AI task failed, retrying in 3s...", {
             error: aiResult.error,
           });
           await new Promise((resolve) => setTimeout(resolve, 3000));
           continue;
         }
 
-        log.info(
-          `AI Task ${task.id} completed. Resolving and requesting signature...`,
-        );
-
-        // Deserialize unsigned proof
+        const computeTime = performance.now() - startTime;
         const proofObj = JSON.parse(aiResult.proof) as AIProof;
 
-        // Emit onAILocalTaskResolved to request signing on the frontend
+        // Emit to narrative + signing pipeline
+        const aiTask: AITask = {
+          id: proofObj.taskId,
+          type: "pouw",
+          input: proofObj.inputPrompt,
+          seed: proofObj.seed,
+        };
+
         if (this.events.onAILocalTaskResolved) {
           this.events.onAILocalTaskResolved(proofObj, aiTask);
         }
 
-        // Emit onXPGained event for AI work — uses task metadata as the mining result
+        // XP gain event
         const baseXP = this.calculateBaseXP(MIN_DIFFICULTY);
         const aiMiningResult: MiningResult = {
           hash: proofObj.taskId,
           nonce: 0,
           difficulty: MIN_DIFFICULTY,
           timestamp: proofObj.timestamp,
-          blockData: task.blockHash,
+          blockData: "",
           aiProof: aiResult.proof,
         };
         this.emitXPGained(aiMiningResult, baseXP);
 
-        // Estimate tokens/s
-        const tokenEstimate = Math.ceil(proofObj.output.length / 4) + 1;
-        this.aiTotalTokens += tokenEstimate;
-        const tokensPerSecond = tokenEstimate / (computeTime / 1000);
+        // Update AI metrics (tokens/s)
+        const tokenCount = Math.ceil(proofObj.output.length / 4) + 1;
+        this.aiTotalTokens += tokenCount;
+        const tokensPerSecond = tokenCount / (computeTime / 1000);
         this.aiHashrate = tokensPerSecond;
         this.events.onHashrateUpdate?.(tokensPerSecond);
 
-        // Throttle between tasks to prevent overheating
         await new Promise((resolve) => setTimeout(resolve, 1000));
       } catch (error) {
         log.error("Error in AI mining loop", { error });
@@ -804,6 +374,6 @@ export class MiningOrchestrator {
         await new Promise((resolve) => setTimeout(resolve, 5000));
       }
     }
-    log.info("AI PoUW loop stopped.");
+    log.info("AI mining loop stopped.");
   }
 }

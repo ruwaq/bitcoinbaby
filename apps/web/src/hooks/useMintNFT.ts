@@ -488,6 +488,7 @@ export function useMintNFT(): UseMintNFTReturn {
         genesisBlock: blockHeight,
         rarityTier,
         tokenId: reservedTokenId,
+        heritage: parseInt(dna[2], 16) % 5,
         level: 1,
         xp: 0,
         totalXp: 0,
@@ -495,6 +496,8 @@ export function useMintNFT(): UseMintNFTReturn {
         lastWorkBlock: blockHeight,
         evolutionCount: 0,
         tokensEarned: 0n,
+        narrativeRoot: "",
+        worldStateRoot: "",
       };
 
       log.info("Generated traits:", {

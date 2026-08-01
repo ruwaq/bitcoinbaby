@@ -75,7 +75,6 @@ export {
   type SparkNFTInfo,
   // Constants
   XP_REQUIREMENTS,
-  EVOLUTION_COSTS,
   LEVEL_BOOSTS,
   GENESIS_SPARKS_CONFIG,
   // Functions
@@ -86,7 +85,11 @@ export {
 } from "@bitcoinbaby/bitcoin";
 
 // Heritage and MAX_LEVEL re-exported from shared (Single Source of Truth)
-export { type Heritage, MAX_LEVEL, HERITAGES } from "@bitcoinbaby/shared";
+export {
+  type HeritageSeed,
+  MAX_LEVEL,
+  HERITAGE_SEEDS,
+} from "@bitcoinbaby/shared";
 
 /**
  * Get XP required for next level

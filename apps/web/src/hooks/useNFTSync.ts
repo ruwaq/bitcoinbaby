@@ -157,6 +157,7 @@ function convertToNFTState(record: NFTRecord): SparkNFTState | null {
     baseType: record.baseType,
     genesisBlock: record.genesisBlock,
     rarityTier: record.rarityTier,
+    heritage: 0,
     level: record.level,
     xp: record.xp,
     totalXp: record.totalXp,
@@ -167,6 +168,8 @@ function convertToNFTState(record: NFTRecord): SparkNFTState | null {
       typeof record.tokensEarned === "bigint"
         ? record.tokensEarned
         : BigInt(record.tokensEarned || 0),
+    narrativeRoot: "",
+    worldStateRoot: "",
   };
 }
 

@@ -14,6 +14,7 @@ import {
   SPARK_CONFIG,
   SPARK_METADATA,
   SPARK_TESTNET4,
+  isSPARKConfigured,
 } from "@bitcoinbaby/bitcoin";
 import { pixelBorders } from "@bitcoinbaby/ui";
 
@@ -24,8 +25,9 @@ const EXPLORER_LINKS = {
 };
 
 export function TokenHeader() {
-  const appId = SPARK_TESTNET4.appId;
-  const appVk = SPARK_TESTNET4.appVk;
+  const configured = isSPARKConfigured();
+  const appId = configured ? SPARK_TESTNET4.appId : null;
+  const appVk = configured ? SPARK_TESTNET4.appVk : null;
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -76,19 +78,23 @@ export function TokenHeader() {
       <details className="mt-4 group border-t border-pixel-text-muted/20 pt-4">
         <summary className="font-pixel text-pixel-2xs text-pixel-text-muted hover:text-pixel-primary flex items-center justify-between cursor-pointer list-none [&::-webkit-details-marker]:hidden outline-none select-none">
           <span>DEVELOPER DETAILS / ADVANCED INFO</span>
-          <span className="transform group-open:rotate-180 transition-transform duration-200">▼</span>
+          <span className="transform group-open:rotate-180 transition-transform duration-200">
+            ▼
+          </span>
         </summary>
         <div className="mt-4 flex flex-col gap-4">
           {/* Quick Links */}
           <div className="flex flex-wrap gap-2">
-            <a
-              href={`${EXPLORER_LINKS.charms}/token/${appId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`font-pixel text-pixel-2xs px-3 py-2 bg-pixel-bg-dark ${pixelBorders.thin} hover:border-pixel-primary hover:text-pixel-primary transition-colors`}
-            >
-              EXPLORER
-            </a>
+            {appId && (
+              <a
+                href={`${EXPLORER_LINKS.charms}/token/${appId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`font-pixel text-pixel-2xs px-3 py-2 bg-pixel-bg-dark ${pixelBorders.thin} hover:border-pixel-primary hover:text-pixel-primary transition-colors`}
+              >
+                EXPLORER
+              </a>
+            )}
             <a
               href={EXPLORER_LINKS.charmsProtocol}
               target="_blank"
@@ -108,36 +114,46 @@ export function TokenHeader() {
           </div>
 
           {/* Contract IDs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-4 border-t border-pixel-text-muted/10">
-            <button
-              onClick={() => copyToClipboard(appId)}
-              className="flex items-center gap-2 text-left group"
-            >
-              <span className="font-pixel text-pixel-2xs text-pixel-text-muted">
-                APP ID:
+          {configured && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-4 border-t border-pixel-text-muted/10">
+              <button
+                onClick={() => copyToClipboard(appId!)}
+                className="flex items-center gap-2 text-left group"
+              >
+                <span className="font-pixel text-pixel-2xs text-pixel-text-muted">
+                  APP ID:
+                </span>
+                <span className="font-mono text-pixel-2xs text-pixel-text truncate flex-1 group-hover:text-pixel-primary">
+                  {appId!.slice(0, 16)}...{appId!.slice(-8)}
+                </span>
+                <span className="font-pixel text-pixel-2xs text-pixel-text-muted group-hover:text-pixel-primary">
+                  COPY
+                </span>
+              </button>
+              <button
+                onClick={() => copyToClipboard(appVk!)}
+                className="flex items-center gap-2 text-left group"
+              >
+                <span className="font-pixel text-pixel-2xs text-pixel-text-muted">
+                  APP VK:
+                </span>
+                <span className="font-mono text-pixel-2xs text-pixel-text truncate flex-1 group-hover:text-pixel-primary">
+                  {appVk!.slice(0, 16)}...{appVk!.slice(-8)}
+                </span>
+                <span className="font-pixel text-pixel-2xs text-pixel-text-muted group-hover:text-pixel-primary">
+                  COPY
+                </span>
+              </button>
+            </div>
+          )}
+          {!configured && (
+            <div className="pt-4 border-t border-pixel-text-muted/10">
+              <span className="font-pixel text-pixel-2xs text-pixel-warning">
+                SPARK contract not yet deployed. App ID will appear here after
+                deployment.
               </span>
-              <span className="font-mono text-pixel-2xs text-pixel-text truncate flex-1 group-hover:text-pixel-primary">
-                {appId.slice(0, 16)}...{appId.slice(-8)}
-              </span>
-              <span className="font-pixel text-pixel-2xs text-pixel-text-muted group-hover:text-pixel-primary">
-                COPY
-              </span>
-            </button>
-            <button
-              onClick={() => copyToClipboard(appVk)}
-              className="flex items-center gap-2 text-left group"
-            >
-              <span className="font-pixel text-pixel-2xs text-pixel-text-muted">
-                APP VK:
-              </span>
-              <span className="font-mono text-pixel-2xs text-pixel-text truncate flex-1 group-hover:text-pixel-primary">
-                {appVk.slice(0, 16)}...{appVk.slice(-8)}
-              </span>
-              <span className="font-pixel text-pixel-2xs text-pixel-text-muted group-hover:text-pixel-primary">
-                COPY
-              </span>
-            </button>
-          </div>
+            </div>
+          )}
         </div>
       </details>
     </div>

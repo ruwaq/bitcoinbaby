@@ -101,6 +101,7 @@ export {
   selectTokensAtRisk,
 } from "./dead-letter-store";
 export { useNarrativeStore } from "./narrative-store";
+export { useAIProviderStore, type AIProviderState } from "./ai-provider-store";
 
 // Granular selectors for performance optimization
 export {

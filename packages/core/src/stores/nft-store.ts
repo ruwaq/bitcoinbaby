@@ -16,7 +16,6 @@ import {
   canLevelUp,
   LEVEL_BOOSTS,
   XP_REQUIREMENTS,
-  EVOLUTION_COSTS,
 } from "@bitcoinbaby/bitcoin";
 import { createBigIntStorage } from "./utils/bigint-storage";
 
@@ -246,7 +245,6 @@ export const useNFTStore = create<NFTStore>()(
         const nextLevel = nft.level + 1;
         const canEvolve = canLevelUp(nft);
         const xpRequired = XP_REQUIREMENTS[nextLevel] || 0;
-        const tokenCost = EVOLUTION_COSTS[nextLevel] || 0n;
         const currentBoost = getMiningBoost(nft);
         const nextBoost = LEVEL_BOOSTS[nextLevel] || currentBoost;
 
@@ -257,7 +255,6 @@ export const useNFTStore = create<NFTStore>()(
           xpRequired,
           xpProgress: xpRequired > 0 ? (nft.xp / xpRequired) * 100 : 100,
           canEvolve,
-          tokenCost,
           currentBoost,
           nextBoost,
           boostGain: nextBoost - currentBoost,

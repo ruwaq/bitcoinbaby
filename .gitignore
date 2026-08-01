@@ -42,8 +42,9 @@ apps/native/android/app/build/
 *.apk
 *.ipa
 
-# Claude Code (development tool config)
+# AI coding tools (local session state, not for the repo)
 .claude/
+.zcode/
 
 # Admin wallet (sensitive - never commit!)
 scripts/admin-wallet.md

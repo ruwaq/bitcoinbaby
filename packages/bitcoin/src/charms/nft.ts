@@ -41,7 +41,7 @@ export const GENESIS_SPARKS_CONFIG = {
   },
 
   // Max level
-  maxLevel: 10,
+  maxLevel: 21,
 } as const;
 
 // =============================================================================
@@ -80,15 +80,20 @@ export interface SparkNFTState {
   readonly genesisBlock: number;
   readonly rarityTier: RarityTier;
   readonly tokenId: number; // 1-10000
+  readonly heritage: number; // 0-4 procedural culture seed
 
   // Mutable (evolves with gameplay)
-  level: number; // 1-10
+  level: number; // 1-21
   xp: number; // 0-999 per level
   totalXp: number; // Accumulated lifetime XP
   workCount: number; // Total PoUW tasks completed
   lastWorkBlock: number; // Block of last work submission
   evolutionCount: number; // Times evolved
   tokensEarned: bigint; // Lifetime SPARK earned
+
+  // Narrative state (merkle roots for off-chain verification)
+  narrativeRoot: string; // 32-byte merkle root of narrative event history
+  worldStateRoot: string; // 32-byte merkle root of personality + inventory
 }
 
 /**
@@ -122,52 +127,53 @@ export const XP_REQUIREMENTS: Record<number, number> = {
   8: 8000,
   9: 16000,
   10: 32000,
+  11: 48000,
+  12: 64000,
+  13: 96000,
+  14: 128000,
+  15: 192000,
+  16: 256000,
+  17: 384000,
+  18: 512000,
+  19: 768000,
+  20: 1024000,
+  // Level 21 is max — no XP needed beyond
 };
 
 /**
- * SPARK burn cost for evolution (in base units with 8 decimals)
- */
-export const EVOLUTION_COSTS: Record<number, bigint> = {
-  2: 100n * 100_000_000n, // 100 SPARK
-  3: 250n * 100_000_000n,
-  4: 500n * 100_000_000n,
-  5: 1000n * 100_000_000n,
-  6: 2500n * 100_000_000n,
-  7: 5000n * 100_000_000n,
-  8: 10000n * 100_000_000n,
-  9: 25000n * 100_000_000n,
-  10: 50000n * 100_000_000n,
-};
-
-/**
- * Mining boost percentage by level
- * BALANCED: Very gradual progression, max 4% at level 10
- * Leveling is expensive (burns tokens), so boost is modest
+ * Mining boost percentage by level.
+ * Fair progression: 0% at level 1, 10% at level 21.
+ * Differences are small to keep competition fair.
  */
 export const LEVEL_BOOSTS: Record<number, number> = {
   1: 0,
-  2: 0.25,
-  3: 0.5,
-  4: 0.75,
-  5: 1,
-  6: 1.5,
-  7: 2,
-  8: 2.5,
-  9: 3,
-  10: 4,
+  2: 0.1,
+  3: 0.2,
+  4: 0.3,
+  5: 0.5,
+  6: 1,
+  7: 1.25,
+  8: 1.5,
+  9: 1.75,
+  10: 2,
+  11: 2.5,
+  12: 3,
+  13: 3.5,
+  14: 4,
+  15: 4.5,
+  16: 5,
+  17: 5.5,
+  18: 6,
+  19: 7,
+  20: 8,
+  21: 10,
 };
 
 /**
- * Get total mining boost for an NFT
- * Combines level boost + rarity boost
+ * Get mining boost for an NFT (level only — rarity is visual)
  */
 export function getMiningBoost(nft: SparkNFTState): number {
-  const levelBoost = LEVEL_BOOSTS[nft.level] ?? 0;
-  const rarityBoost =
-    GENESIS_SPARKS_CONFIG.rarityTiers[nft.rarityTier]?.boost ?? 0;
-
-  // Boosts are additive
-  return levelBoost + rarityBoost;
+  return LEVEL_BOOSTS[nft.level] ?? 0;
 }
 
 /**
@@ -295,6 +301,7 @@ export interface NFTGenesisParams {
   baseType: BaseType;
   rarityTier: RarityTier;
   genesisBlock: number;
+  heritage: number;
 }
 
 /**
@@ -310,6 +317,7 @@ export function createNFTGenesisSpell(params: NFTGenesisParams): SpellV2 {
     genesisBlock: params.genesisBlock,
     rarityTier: params.rarityTier,
     tokenId: params.tokenId,
+    heritage: params.heritage,
     level: 1,
     xp: 0,
     totalXp: 0,
@@ -317,6 +325,8 @@ export function createNFTGenesisSpell(params: NFTGenesisParams): SpellV2 {
     lastWorkBlock: params.genesisBlock,
     evolutionCount: 0,
     tokensEarned: 0n,
+    narrativeRoot: "",
+    worldStateRoot: "",
   };
 
   return {
@@ -362,9 +372,7 @@ export function createNFTWorkProofSpell(params: NFTWorkProofParams): SpellV2 {
   // Cap XP at the next level's requirement so the UTXO state stays bounded
   const rawNewXp = params.currentState.xp + xpGain;
   const cappedNewXp =
-    nextLevelReq !== undefined
-      ? Math.min(rawNewXp, nextLevelReq)
-      : rawNewXp;
+    nextLevelReq !== undefined ? Math.min(rawNewXp, nextLevelReq) : rawNewXp;
 
   const newState: SparkNFTState = {
     ...params.currentState,
@@ -412,14 +420,13 @@ export interface NFTLevelUpParams {
   tokenAppId: string;
   tokenAppVk: string;
   nftUtxo: { txid: string; vout: number };
-  tokenUtxo: { txid: string; vout: number };
   currentState: SparkNFTState;
-  tokenAmount: bigint;
   ownerAddress: string;
 }
 
 /**
- * Generate level up spell (burns tokens, increases level)
+ * Generate level up spell (XP-based, no token burning).
+ * Increases level by 1 and resets XP to 0.
  */
 export function createNFTLevelUpSpell(params: NFTLevelUpParams): SpellV2 {
   if (params.currentState.level >= GENESIS_SPARKS_CONFIG.maxLevel) {
@@ -429,47 +436,19 @@ export function createNFTLevelUpSpell(params: NFTLevelUpParams): SpellV2 {
   }
 
   const nftAppRef = `n/${params.nftAppId}/${params.nftAppVk}`;
-  const tokenAppRef = `t/${params.tokenAppId}/${params.tokenAppVk}`;
-
   const nextLevel = params.currentState.level + 1;
-  const burnCost = EVOLUTION_COSTS[nextLevel];
-  const remainingTokens = params.tokenAmount - burnCost;
 
   const newState: SparkNFTState = {
     ...params.currentState,
     level: nextLevel,
-    xp: 0, // Reset XP
+    xp: 0,
     evolutionCount: params.currentState.evolutionCount + 1,
   };
-
-  const outs: SpellV2["outs"] = [
-    {
-      address: params.ownerAddress,
-      charms: {
-        $00: newState,
-      },
-      sats: 546,
-    },
-  ];
-
-  // Add remaining tokens if any
-  if (remainingTokens > 0n) {
-    outs.push({
-      address: params.ownerAddress,
-      charms: {
-        $01: remainingTokens,
-      },
-      sats: 546,
-    });
-  }
-
-  // Burned tokens don't appear in outputs (they're consumed)
 
   return {
     version: 2,
     apps: {
       $00: nftAppRef,
-      $01: tokenAppRef,
     },
     ins: [
       {
@@ -478,13 +457,15 @@ export function createNFTLevelUpSpell(params: NFTLevelUpParams): SpellV2 {
           $00: params.currentState,
         },
       },
+    ],
+    outs: [
       {
-        utxo_id: `${params.tokenUtxo.txid}:${params.tokenUtxo.vout}`,
+        address: params.ownerAddress,
         charms: {
-          $01: params.tokenAmount,
+          $00: newState,
         },
+        sats: 546,
       },
     ],
-    outs,
   };
 }
