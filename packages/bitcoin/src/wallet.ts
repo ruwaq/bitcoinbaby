@@ -23,6 +23,7 @@ import type {
 } from "./types";
 import { InvalidMnemonicError, WalletNotFoundError } from "./errors";
 import { secureErase, bytesToHex } from "./crypto";
+import { createTweakedSigner as createTweakedSignerShared } from "./taproot";
 
 // Initialize BIP32 with secp256k1
 const bip32 = BIP32Factory(ecc);
@@ -344,7 +345,9 @@ export class BitcoinWallet {
   }
 
   /**
-   * Create a tweaked signer for Taproot transactions
+   * Create a tweaked signer for Taproot transactions.
+   *
+   * Delegates to the shared implementation in ./taproot (BIP-340/341/86).
    *
    * SECURITY: Returns both signer and cleanup function.
    * Caller MUST call cleanup() after signing is complete to zero the tweaked key.
@@ -357,75 +360,7 @@ export class BitcoinWallet {
     if (!this.wallet) {
       throw new WalletNotFoundError();
     }
-
-    const privateKey = this.wallet.privateKey;
-
-    // Get public key
-    const publicKey = ecc.pointFromScalar(privateKey);
-    if (!publicKey) {
-      throw new Error("Invalid private key");
-    }
-
-    // x-only internal public key (32 bytes)
-    const xOnlyPubKey = publicKey.slice(1, 33);
-    const internalPubKey = Buffer.from(xOnlyPubKey);
-
-    // BIP86/BIP341 Taproot key path tweak
-    const tweakHash = bitcoin.crypto.taggedHash("TapTweak", internalPubKey);
-
-    // For Taproot, we need to use xOnlyPointAddTweak which handles parity correctly
-    const tweakResult = ecc.xOnlyPointAddTweak(xOnlyPubKey, tweakHash);
-    if (!tweakResult) {
-      throw new Error("Failed to tweak public key");
-    }
-
-    // The tweaked x-only public key (output key)
-    const tweakedPubKey = Buffer.from(tweakResult.xOnlyPubkey);
-
-    // Tweak the private key - need to negate if original pubkey has odd Y
-    let privKeyToTweak = privateKey;
-    if (publicKey[0] === 0x03) {
-      // Odd parity - negate private key before tweaking
-      privKeyToTweak = ecc.privateNegate(privateKey);
-    }
-
-    const tweakedPrivateKey = ecc.privateAdd(privKeyToTweak, tweakHash);
-
-    if (!tweakedPrivateKey) {
-      throw new Error("Failed to tweak private key");
-    }
-
-    // BIP-340: If the tweaked public key has odd Y parity, negate the private key
-    // Per BIP-340 section "Signing": if has_even_y(P) == false, negate the secret key
-    let signingKey = tweakedPrivateKey;
-    if (tweakResult.parity === 1) {
-      signingKey = ecc.privateNegate(tweakedPrivateKey);
-    }
-
-    // SECURITY: Store as Uint8Array so we can zero it later
-    const tweakedKeyArray = new Uint8Array(signingKey);
-
-    return {
-      signer: {
-        // For Taproot: the publicKey must be the TWEAKED/OUTPUT key (what's in the script)
-        publicKey: tweakedPubKey,
-        // signSchnorr is required for Taproot inputs
-        signSchnorr: (hash: Buffer): Buffer => {
-          const signature = ecc.signSchnorr(hash, tweakedKeyArray);
-          return Buffer.from(signature);
-        },
-        // Also provide sign for non-Taproot compatibility
-        sign: (hash: Buffer): Buffer => {
-          const signature = ecc.sign(hash, tweakedKeyArray);
-          return Buffer.from(signature);
-        },
-      },
-      internalPubKey,
-      // SECURITY: Cleanup function to zero the tweaked key
-      cleanup: () => {
-        tweakedKeyArray.fill(0);
-      },
-    };
+    return createTweakedSignerShared(this.wallet.privateKey);
   }
 
   /**
