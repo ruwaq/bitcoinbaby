@@ -168,7 +168,7 @@ export class GameLoop {
    * Run all registered tasks that are due.
    * Each task tracks its own lastRun time for throttling.
    */
-  private updateTasks(dt: number): void {
+  private updateTasks(_dt: number): void {
     const now = performance.now();
 
     for (const task of this.tasks.values()) {

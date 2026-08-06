@@ -9,7 +9,7 @@
  */
 
 import { FC, useMemo } from "react";
-import type { Bloodline, BaseType, RarityTier, HeritageSeed } from "./types";
+import type { Bloodline, BaseType, RarityTier } from "./types";
 import {
   getNFTVisualConfig,
   resolvePaletteColor,

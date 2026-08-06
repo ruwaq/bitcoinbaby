@@ -15,7 +15,7 @@
  */
 
 import { type FC } from "react";
-import { type BabyState, type ColorPalette, BASE_TYPE_COLORS } from "./types";
+import { type BabyState, type ColorPalette } from "./types";
 
 interface AlienSpriteProps {
   size?: number;

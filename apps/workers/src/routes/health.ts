@@ -28,7 +28,7 @@ healthRouter.get("/", async (c) => {
       await redis.ping();
       checks.redis = "ok";
     }
-  } catch (error) {
+  } catch {
     checks.redis = "error";
   }
 
@@ -39,12 +39,12 @@ healthRouter.get("/", async (c) => {
       await c.env.CACHE.get("health-check-test");
       checks.kv = "ok";
     }
-  } catch (error) {
+  } catch {
     checks.kv = "error";
   }
 
   const allHealthy = Object.values(checks).every(
-    (v) => v === "ok" || v === "unknown"
+    (v) => v === "ok" || v === "unknown",
   );
 
   return c.json(
@@ -55,7 +55,7 @@ healthRouter.get("/", async (c) => {
       checks,
       timestamp: Date.now(),
     },
-    allHealthy ? 200 : 503
+    allHealthy ? 200 : 503,
   );
 });
 

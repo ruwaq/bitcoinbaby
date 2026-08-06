@@ -196,7 +196,7 @@ export class MiningStatePersistence {
             reject(lsErr);
           }
         };
-      } catch (err) {
+      } catch {
         // Fallback to localStorage on exception
         try {
           localStorage.setItem(LS_STATE_KEY, JSON.stringify(stateToSave));

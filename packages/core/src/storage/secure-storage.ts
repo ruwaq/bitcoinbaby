@@ -164,10 +164,6 @@ const unlockRateLimiter = {
 };
 
 // Storage keys
-const ENCRYPTED_MNEMONIC_KEY = "encrypted_mnemonic";
-const SALT_KEY = "key_salt";
-const IV_KEY = "encryption_iv";
-
 /**
  * Encrypted wallet data structure
  */
@@ -556,11 +552,14 @@ export const SecureStorage = {
         const waitTime = Math.ceil(unlockRateLimiter.getDelay() / 1000);
         throw new Error(
           `Incorrect password. ${failures} failed attempts. Wait ${waitTime}s before next attempt.`,
+          { cause: error },
         );
       }
 
       // Don't expose specific crypto errors
-      throw new Error("Incorrect password or corrupted data");
+      throw new Error("Incorrect password or corrupted data", {
+        cause: error,
+      });
     }
   },
 

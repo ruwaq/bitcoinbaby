@@ -30,13 +30,8 @@ import {
 import {
   getTabCoordinator,
   MiningTabCoordinator,
-  type TabInfo,
 } from "../mining/tab-coordinator";
-import {
-  getMiningWakeLock,
-  MiningWakeLock,
-  type WakeLockStatus,
-} from "../mining/wake-lock";
+import { getMiningWakeLock, MiningWakeLock } from "../mining/wake-lock";
 import { MIN_DIFFICULTY } from "../tokenomics/constants";
 
 // =============================================================================

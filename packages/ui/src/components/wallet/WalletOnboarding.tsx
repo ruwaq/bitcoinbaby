@@ -146,23 +146,6 @@ export function WalletOnboarding({
   const createSteps = ["Entropy", "Backup", "Verify", "Password"];
   const importSteps = ["Phrase", "Password"];
 
-  const currentStepIndex = useMemo(() => {
-    switch (step) {
-      case "entropy":
-        return 0;
-      case "show-mnemonic":
-        return 1;
-      case "verify-mnemonic":
-        return 2;
-      case "password":
-        return 3;
-      case "import-phrase":
-        return 0;
-      default:
-        return 0;
-    }
-  }, [step]);
-
   // Handle entropy collection complete
   const handleEntropyComplete = useCallback(
     (entropy: Uint8Array) => {

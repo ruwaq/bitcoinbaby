@@ -7,13 +7,7 @@
  * Includes specialized boundaries for different contexts.
  */
 
-import {
-  Component,
-  type ReactNode,
-  type ErrorInfo,
-  useEffect,
-  useState,
-} from "react";
+import { Component, type ReactNode, type ErrorInfo, useState } from "react";
 import { PixelIcon } from "../sprites";
 
 // =============================================================================

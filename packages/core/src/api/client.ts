@@ -101,7 +101,9 @@ async function fetchWithRetry(
 
       // Don't retry on abort (timeout)
       if (lastError.name === "AbortError") {
-        throw new Error(`Request timeout after ${timeoutMs}ms`);
+        throw new Error(`Request timeout after ${timeoutMs}ms`, {
+          cause: error,
+        });
       }
 
       // Retry on network errors

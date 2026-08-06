@@ -255,7 +255,7 @@ export function calculateEngagementMultiplier(
 // REWARD CALCULATION WITH ENGAGEMENT
 // =============================================================================
 
-import { calculateShareReward, BASE_REWARD_PER_SHARE } from "./constants";
+import { calculateShareReward } from "./constants";
 
 /**
  * Calculate final reward including engagement bonuses.

@@ -4,7 +4,7 @@
  * Critical tests for the mining engine to ensure safety and correctness.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 // =============================================================================
 // UTILITY FUNCTION TESTS

@@ -7,7 +7,6 @@ import type {
   BaseType,
   Bloodline,
   BloodlineConfig,
-  Heritage,
   HeritageConfig,
   MoonPhase,
   Season,

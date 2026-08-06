@@ -15,7 +15,7 @@
  */
 
 import { type FC } from "react";
-import { type BabyState, type ColorPalette, parseDNA } from "./types";
+import { type BabyState, type ColorPalette } from "./types";
 
 interface RobotSpriteProps {
   size?: number;

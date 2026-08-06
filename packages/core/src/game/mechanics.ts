@@ -56,8 +56,8 @@ export function calculateDecay(
   const rates = isSleeping ? SLEEP_RATES : DECAY_RATES;
 
   let energy = stats.energy - rates.energy * minutes;
-  let happiness = stats.happiness - rates.happiness * minutes;
-  let hunger = stats.hunger + rates.hunger * minutes;
+  const happiness = stats.happiness - rates.happiness * minutes;
+  const hunger = stats.hunger + rates.hunger * minutes;
 
   // Extra energy drain while mining
   if (isMining && !isSleeping) {
@@ -243,7 +243,9 @@ export function calculateMiningXP(shares: number, stage: SparkStage): number {
 /**
  * Determine the visual state based on baby status
  */
-export function determineVisualState(baby: GameSpark): GameSpark["visualState"] {
+export function determineVisualState(
+  baby: GameSpark,
+): GameSpark["visualState"] {
   // Dead state takes absolute priority
   if (isBabyDead(baby)) {
     return "dead";

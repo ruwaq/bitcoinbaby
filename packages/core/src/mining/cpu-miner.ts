@@ -177,7 +177,7 @@ export class CPUMiner implements Miner {
       const { type, ...data } = event.data;
 
       switch (type) {
-        case "hashrate":
+        case "hashrate": {
           // Store per-worker hashrate and total
           this.workerHashrates.set(workerId, data.hashrate);
           this.workerTotalHashes.set(workerId, data.totalHashes);
@@ -191,6 +191,7 @@ export class CPUMiner implements Miner {
           this.totalHashes = totalHashes;
           this.onHashrateUpdate?.(totalHashrate);
           break;
+        }
 
         case "found":
           this.onWorkFound?.({

@@ -89,7 +89,7 @@ function calculateEffectiveHashrate(
 
 export const useMiningStore = create<MiningStore>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       stats: initialStats,
       isInitialized: false,
       persistedStats: initialPersistedStats,

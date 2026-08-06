@@ -28,12 +28,6 @@ export interface NFTEvolutionPanelProps {
 // HELPERS
 // =============================================================================
 
-function formatTokenAmount(amount: bigint): string {
-  // Convert from raw units (8 decimals) to display
-  const whole = amount / 100_000_000n;
-  return whole.toLocaleString();
-}
-
 // =============================================================================
 // COMPONENT
 // =============================================================================
@@ -41,7 +35,7 @@ function formatTokenAmount(amount: bigint): string {
 export function NFTEvolutionPanel({
   nft,
   evolutionStatus,
-  tokenBalance,
+  tokenBalance: _tokenBalance,
   onEvolve,
   isEvolving = false,
   className,

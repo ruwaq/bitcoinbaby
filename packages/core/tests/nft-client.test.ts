@@ -8,7 +8,7 @@
  * - Error handling
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NFTClient, getNFTClient } from "../src/api/clients/nft-client";
 
 // =============================================================================
@@ -70,11 +70,8 @@ const mockWorkProofResult = {
 // =============================================================================
 
 describe("NFTClient", () => {
-  let client: NFTClient;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    client = new NFTClient("development");
   });
 
   describe("instantiation", () => {

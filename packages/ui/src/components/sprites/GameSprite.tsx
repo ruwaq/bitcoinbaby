@@ -329,7 +329,7 @@ const ChildFormSprite: FC<FormSpriteProps> = ({
   size,
   state,
   palette,
-  variant = 1,
+  variant: _variant = 1,
   className,
 }) => (
   <div className={`relative ${className}`}>
@@ -393,7 +393,7 @@ const TeenFormSprite: FC<FormSpriteProps> = ({
   size,
   state,
   palette,
-  variant = 1,
+  variant: _variant = 1,
   className,
 }) => (
   <div className={`relative ${className}`}>
@@ -448,7 +448,7 @@ const YoungFormSprite: FC<FormSpriteProps> = ({
   size,
   state,
   palette,
-  variant = 1,
+  variant: _variant = 1,
   className,
 }) => (
   <div className={`relative ${className}`}>
@@ -501,7 +501,7 @@ const AdultFormSprite: FC<FormSpriteProps> = ({
   size,
   state,
   palette,
-  variant = 1,
+  variant: _variant = 1,
   className,
 }) => (
   <div className={`relative ${className}`}>
@@ -553,7 +553,7 @@ const MasterFormSprite: FC<FormSpriteProps> = ({
   size,
   state,
   palette,
-  variant = 1,
+  variant: _variant = 1,
   className,
 }) => (
   <div className={`relative ${className}`}>

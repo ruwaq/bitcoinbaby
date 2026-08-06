@@ -429,7 +429,7 @@ function calculateTraitImpacts(
 
 function calculateMoodEffect(
   ctx: NarrativeContext,
-  eventType: NarrativeEventType,
+  _eventType: NarrativeEventType,
 ): Mood | undefined {
   const tone = getTone(ctx.nft.baseType, ctx.nft.bloodline);
   const seed = hashSeed(ctx.aiOutput);

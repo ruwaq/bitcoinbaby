@@ -9,7 +9,7 @@
  * - Mining XP
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   createNewBaby,
   calculateDecay,
@@ -29,12 +29,11 @@ import {
   getDaysUntilDecay,
   GAME_CONFIG,
   DECAY_RATES,
-  EVOLUTION_LEVELS,
   MINING_BONUS,
   LEVEL_DECAY,
   getXPForLevel,
 } from "../src/game";
-import type { BabyStats, GameBaby, BabyProgression } from "../src/game";
+import type { BabyStats, BabyProgression } from "../src/game";
 
 // ============================================
 // Baby Creation Tests

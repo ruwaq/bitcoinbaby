@@ -21,7 +21,6 @@ import {
   claimRewards,
   getStakingSummary,
   type StakingState,
-  type StakingTier,
 } from "../src/game";
 
 // ============================================

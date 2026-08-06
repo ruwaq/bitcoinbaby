@@ -43,7 +43,7 @@ aiProxyExternal.post("/", async (c) => {
   if (!provider || !model || !messages || !apiKey) {
     return c.json(
       { error: "provider, model, messages, and apiKey are required" },
-      400
+      400,
     );
   }
 
@@ -54,7 +54,7 @@ aiProxyExternal.post("/", async (c) => {
 
   try {
     let reqBody: string;
-    let reqHeaders: Record<string, string> = {
+    const reqHeaders: Record<string, string> = {
       "Content-Type": "application/json",
     };
     let url: string;
@@ -141,7 +141,7 @@ aiProxyExternal.post("/", async (c) => {
           error: `Upstream error: ${res.status}`,
           detail: errText.slice(0, 300),
         },
-        res.status === 429 ? 429 : 502
+        res.status === 429 ? 429 : 502,
       );
     }
 

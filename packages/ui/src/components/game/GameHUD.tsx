@@ -56,7 +56,7 @@ const StatBar: FC<{
   icon: IconName;
   value: number;
   isInverted?: boolean;
-}> = ({ label, icon, value, isInverted = false }) => {
+}> = ({ label: _label, icon, value, isInverted = false }) => {
   const variant = getStatVariant(value, isInverted);
   // For inverted stats (like hunger), show 100-value
   const displayValue = isInverted ? 100 - value : value;

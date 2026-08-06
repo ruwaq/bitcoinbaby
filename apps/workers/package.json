@@ -24,6 +24,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@bitcoinbaby/config": "workspace:*",
     "@cloudflare/workers-types": "^4.20260305.0",
     "@eslint/js": "^10.0.1",
     "eslint": "^9.39.2",

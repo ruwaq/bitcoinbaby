@@ -8,10 +8,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import {
-  NFTBonusProvider,
-  createNFTProvider,
-} from "../src/rewards/providers/nft-provider";
+import { createNFTProvider } from "../src/rewards/providers/nft-provider";
 import type { BonusCalculationContext } from "../src/rewards/bonus-engine";
 
 // =============================================================================

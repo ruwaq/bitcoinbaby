@@ -10,7 +10,6 @@ import type {
   CosmicState,
   EnergyStatus,
   Heritage,
-  BALANCE_LIMITS,
 } from "./types";
 import {
   BLOODLINE_CONFIGS,

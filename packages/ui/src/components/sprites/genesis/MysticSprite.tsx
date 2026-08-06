@@ -22,7 +22,7 @@
  */
 
 import { type FC } from "react";
-import { type BabyState, type ColorPalette, BASE_TYPE_COLORS } from "./types";
+import { type BabyState, type ColorPalette } from "./types";
 
 interface MysticSpriteProps {
   size?: number;
@@ -533,11 +533,9 @@ export const MysticSprite: FC<MysticSpriteProps> = ({
   size = 64,
   state = "idle",
   dna = "0000000000",
-  colors: customColors,
+  colors: _customColors,
   className = "",
 }) => {
-  const baseColors = BASE_TYPE_COLORS.mystic;
-  const colors = { ...baseColors, ...customColors };
   const variant = getMysticVariant(dna);
   const isTraditional = isTraditionalVariant(variant);
   const magic = isTraditional ? getTraditionalColors(variant, dna) : null;

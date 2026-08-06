@@ -24,7 +24,6 @@ import {
   canLevelUp,
   XP_REQUIREMENTS,
 } from "@bitcoinbaby/bitcoin";
-import { useNFTStore } from "../stores/nft-store";
 
 // =============================================================================
 // TYPES
@@ -166,7 +165,6 @@ export function useNFTMinting(
   const [error, setError] = useState<string | null>(null);
 
   // NFT store
-  const { addNFT, updateNFT } = useNFTStore();
 
   // Clients
   const charmsRef = useRef<ReturnType<typeof createCharmsClient> | null>(null);
@@ -376,8 +374,8 @@ export function useNFTMinting(
     async (
       nft: SparkNFTState,
       nftUtxo: { txid: string; vout: number },
-      tokenUtxo: { txid: string; vout: number },
-      tokenAmount: bigint,
+      _tokenUtxo: { txid: string; vout: number },
+      _tokenAmount: bigint,
     ): Promise<NFTMintResult> => {
       if (!charmsRef.current || !mempoolRef.current || !txBuilderRef.current) {
         return { success: false, error: "Clients not initialized" };

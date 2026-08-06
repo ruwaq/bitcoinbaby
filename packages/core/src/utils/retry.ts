@@ -5,13 +5,7 @@
  * Implements exponential backoff, jitter, and circuit breaker patterns.
  */
 
-import {
-  AppError,
-  NetworkError,
-  ErrorCode,
-  isAppError,
-  wrapError,
-} from "./errors";
+import { AppError, NetworkError, ErrorCode, wrapError } from "./errors";
 
 // =============================================================================
 // TYPES
