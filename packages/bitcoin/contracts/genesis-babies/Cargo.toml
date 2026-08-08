@@ -13,6 +13,13 @@ name = "genesis_babies"
 charms-sdk = { version = "15.0.0" }
 serde = { version = "1.0", features = ["derive"] }
 
+[dev-dependencies]
+# Direct access to `Transaction`/`App`/`Data` for the integration tests in
+# `tests/contract_integration.rs`. `charms_sdk::data` re-exports the same crate, but
+# listing it as a dev-dep makes the test imports explicit and avoids reaching through the
+# SDK facade.
+charms-data = { version = "15.0.0" }
+
 [profile.release]
 lto = "fat"
 codegen-units = 1
