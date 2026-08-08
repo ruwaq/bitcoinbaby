@@ -369,6 +369,151 @@ fn work_proof_mutating_immutable_dna_is_rejected() {
 }
 
 // =============================================================================
+// WORK (C3 fix — PoW-verified) — accepted / rejected
+//
+// These exercise the new `work` operation end-to-end through `app_contract`.
+// Unlike the deprecated `work_proof` path, XP is NOT a witness input here:
+// `validate_work` re-hashes `challenge:nonce` on-chain and DERIVES the gain via
+// `xp_from_difficulty`. The PoW vector is the same one pinned in the contract's
+// unit tests: challenge "genesis-spark-test" + nonce "745" (integer 1861, hex
+// without 0x prefix) yields a double-SHA256 with exactly 19 leading-zero bits,
+// so `xp_from_difficulty(19) == 130`.
+// =============================================================================
+
+/// Build a one-in / one-out `Transaction` carrying `old` → `new` Spark state.
+/// Same shape every other test constructs inline; factored out to keep the
+/// `work` tests focused on the witness + state-transition under test.
+fn work_tx(old: &SparkNFTState, new: &SparkNFTState) -> Transaction {
+    Transaction {
+        ins: vec![(utxo(), charms_with(old))],
+        refs: vec![],
+        outs: vec![charms_with(new)],
+        coin_ins: None,
+        coin_outs: None,
+        prev_txs: Default::default(),
+        app_public_inputs: Default::default(),
+    }
+}
+
+#[test]
+fn work_op_valid_pow_is_accepted() {
+    let mut old = fresh_mint();
+    old.xp = 50;
+    old.total_xp = 50;
+    old.work_count = 1;
+    old.last_work_block = 199_999;
+
+    // Real mined PoW: "genesis-spark-test:745" hashes with 19 leading-zero bits.
+    let challenge = "genesis-spark-test";
+    let nonce = "745";
+    let difficulty = 19u32;
+    let current_block = 200_000u64;
+
+    // The contract DERIVES the gain from the verified difficulty — it must equal
+    // `xp_from_difficulty(difficulty)`, which is 130 here.
+    let xp_gain = genesis_babies::xp_from_difficulty(difficulty);
+    assert_eq!(xp_gain, 130, "test vector sanity: xp_from_difficulty(19)");
+
+    let mut new = old.clone();
+    new.work_count = old.work_count + 1;
+    new.total_xp = old.total_xp + xp_gain;
+    new.xp = old.xp + xp_gain; // C1a: spendable xp ticks by the same derived gain
+    new.last_work_block = current_block;
+
+    let tx = work_tx(&old, &new);
+    let w = Data::from(&genesis_babies::WorkWitness {
+        operation: "work".into(),
+        challenge: challenge.into(),
+        nonce: nonce.into(),
+        difficulty,
+        current_block,
+    });
+    assert!(
+        run(&app(), &tx, &Data::empty(), &w),
+        "valid work (verified PoW) must be accepted"
+    );
+}
+
+#[test]
+fn work_op_invalid_pow_is_rejected() {
+    let mut old = fresh_mint();
+    old.xp = 50;
+    old.total_xp = 50;
+    old.work_count = 1;
+
+    // Same challenge, but a nonce whose hash does NOT meet difficulty 19.
+    // "genesis-spark-test:bad" double-sha256 has 0 leading-zero bits.
+    let challenge = "genesis-spark-test";
+    let nonce = "bad";
+    let difficulty = 19u32;
+    let current_block = 200_000u64;
+
+    // The attacker still tries to bump the counters as if the PoW were valid.
+    // The contract MUST reject before the counters are even examined, because
+    // `verify_pow` fails on-chain.
+    let xp_gain = genesis_babies::xp_from_difficulty(difficulty);
+    let mut new = old.clone();
+    new.work_count = old.work_count + 1;
+    new.total_xp = old.total_xp + xp_gain;
+    new.xp = old.xp + xp_gain;
+    new.last_work_block = current_block;
+
+    let tx = work_tx(&old, &new);
+    let w = Data::from(&genesis_babies::WorkWitness {
+        operation: "work".into(),
+        challenge: challenge.into(),
+        nonce: nonce.into(),
+        difficulty,
+        current_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "work with a nonce that fails verify_pow must reject (C3)"
+    );
+}
+
+#[test]
+fn work_op_rejects_inflated_xp() {
+    // Direct test that C3 is closed at the integration level: even with a VALID
+    // proof of work, an attacker cannot inject more XP than the on-chain
+    // derivation allows. Here `new.total_xp` is bumped by the derived gain PLUS
+    // an extra 999_999 (and `xp` likewise), simulating the old `xp_gain`-as-free-
+    // input exploit. The contract must reject because the counters no longer
+    // match `old + xp_from_difficulty(difficulty)`.
+    let mut old = fresh_mint();
+    old.xp = 50;
+    old.total_xp = 50;
+    old.work_count = 1;
+
+    let challenge = "genesis-spark-test";
+    let nonce = "745"; // valid PoW at difficulty 19
+    let difficulty = 19u32;
+    let current_block = 200_000u64;
+
+    let derived = genesis_babies::xp_from_difficulty(difficulty); // 130
+    let inflated = derived + 999_999; // the attacker's injected surplus
+
+    let mut new = old.clone();
+    new.work_count = old.work_count + 1;
+    new.total_xp = old.total_xp + inflated; // NOT old.total_xp + derived
+    new.xp = old.xp + inflated; // spendable xp inflated to match (would bypass level-up thresholds)
+    new.last_work_block = current_block;
+
+    let tx = work_tx(&old, &new);
+    let w = Data::from(&genesis_babies::WorkWitness {
+        operation: "work".into(),
+        challenge: challenge.into(),
+        nonce: nonce.into(),
+        difficulty,
+        current_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "work with XP inflated beyond xp_from_difficulty(difficulty) must reject (C3 closed)"
+    );
+}
+
+// =============================================================================
 // LEVEL UP — accepted
 // =============================================================================
 
