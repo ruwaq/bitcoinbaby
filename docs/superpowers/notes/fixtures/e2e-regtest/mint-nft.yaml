@@ -1,0 +1,27 @@
+version: 15
+
+tx:
+  ins:
+    - ca6ff47aed5ee69a206a59f13ee38480a0b5c894f26867dbd018590c688a2c30:1
+  outs:
+    - 0:
+        dna: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        bloodline: royal
+        base_type: human
+        genesis_block: 213
+        rarity_tier: common
+        token_id: 1
+        level: 1
+        xp: 0
+        total_xp: 0
+        work_count: 0
+        last_work_block: 0
+        evolution_count: 0
+        tokens_earned: "0"
+        heritage: 0
+  coins:
+    - amount: 330
+      dest: 5120074ed92bf976a6ea369ba8abdf55832028c711c4e0e1865f45581b056bbe7135
+
+app_public_inputs:
+  "n/9a718c867f3798b6aed8d85d2fc639d94b3731c8207a29822c1fb764a1b46c0f/0d9483a760ef91eef606e84fbff326132b3e611bc913025913bc34b6655b08ba": ~
