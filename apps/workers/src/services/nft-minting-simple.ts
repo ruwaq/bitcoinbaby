@@ -120,9 +120,21 @@ export class NFTMintingServiceSimple {
       // Build spell request
       const spellData = this.buildMintSpell(request);
 
-      // Add prev_txs and binaries to request
+      // Witness for the contract's 4th arg `w`. Per the Charms v15 spike
+      // (docs/superpowers/notes/charms-v15-witness-spike.md), this is a
+      // TOP-LEVEL field of the prover request (sibling of spell/binaries/
+      // prev_txs), keyed by the FULL app string "n/<app_id>/<app_vk>", with
+      // value = hex-CBOR of { operation: "mint" }. Without it, `w` arrives
+      // empty and the contract routes every op to the transfer branch.
+      const appKey = `n/${this.appId}/${NFT_CONTRACT_VK}`;
+      const app_private_inputs: Record<string, string> = {
+        [appKey]: this.buildWitnessHex("mint"),
+      };
+
+      // Add app_private_inputs, prev_txs and binaries to request
       const proverRequest = {
         ...spellData,
+        app_private_inputs,
         prev_txs: [{ bitcoin: prevTxHex }],
         binaries: {
           [NFT_CONTRACT_VK]: NFT_CONTRACT_BINARY,
@@ -151,8 +163,10 @@ export class NFTMintingServiceSimple {
    */
   private async fetchRawTransaction(txid: string): Promise<string> {
     if (
-      txid === "0000000000000000000000000000000000000000000000000000000000000001" ||
-      txid === "0000000000000000000000000000000000000000000000000000000000000002" ||
+      txid ===
+        "0000000000000000000000000000000000000000000000000000000000000001" ||
+      txid ===
+        "0000000000000000000000000000000000000000000000000000000000000002" ||
       this.network === "regtest"
     ) {
       return "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff00ffffffff0100f2052a010000000000000000";
@@ -217,7 +231,7 @@ export class NFTMintingServiceSimple {
 
     // Build CBOR-compatible spell with coins
     const spell = {
-      version: 11,
+      version: 15,
       tx: {
         ins: insBytes,
         outs: [outsMap],
@@ -243,6 +257,19 @@ export class NFTMintingServiceSimple {
       chain: "bitcoin",
       fee_rate: 2.0,
     };
+  }
+
+  /**
+   * Build the hex-CBOR witness for the contract's `w` argument.
+   *
+   * Matches `NFTWitness { operation: String }` in the genesis-babies contract.
+   * For a mint, the contract's `match witness.operation.as_str()` routes to
+   * `validate_mint`. Uses the same cbor2 encoder as the spell.
+   */
+  private buildWitnessHex(operation: string): string {
+    const witness = { operation };
+    const bytes = cbor.encode(witness);
+    return this.bytesToHex(new Uint8Array(bytes));
   }
 
   /**
