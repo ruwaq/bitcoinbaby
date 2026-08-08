@@ -38,6 +38,8 @@ function makeNFT(overrides: Partial<SparkNFTState> = {}): SparkNFTState {
     tokensEarned: 500n,
     narrativeRoot: "",
     worldStateRoot: "",
+    lastSettleBlock: 0,
+    settleCount: 0,
     ...overrides,
   };
 }

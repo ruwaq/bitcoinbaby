@@ -498,6 +498,8 @@ export function useMintNFT(): UseMintNFTReturn {
         tokensEarned: 0n,
         narrativeRoot: "",
         worldStateRoot: "",
+        lastSettleBlock: 0,
+        settleCount: 0,
       };
 
       log.info("Generated traits:", {

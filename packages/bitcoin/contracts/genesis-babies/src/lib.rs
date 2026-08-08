@@ -26,6 +26,14 @@ charms_sdk::app_version!(1);
 // =============================================================================
 
 /// Genesis Spark NFT state (snake_case; mirrors the worker's TS type).
+///
+/// The three settlement fields (`narrative_root`, `last_settle_block`,
+/// `settle_count`) are tagged `#[serde(default)]` so that NFTs minted BEFORE
+/// Fase 2 (which never carried these fields) still deserialize cleanly. This
+/// realizes the spec's "lazy migration" guarantee — existing UTXOs pick up
+/// empty/zero defaults on their first read and migrate the first time a
+/// `settle` op touches them. New fields here MUST stay snake_case to match
+/// the on-chain wire format.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SparkNFTState {
     pub dna: String,           // 64 hex chars
@@ -42,6 +50,17 @@ pub struct SparkNFTState {
     pub evolution_count: u32,
     pub tokens_earned: String,
     pub heritage: u32,         // 0..=4
+    // NUEVO — Block-Tick batch settlement (Fase 2). See spec Sección 2 /
+    // AI_WORLD_ENGINE F7. These are MUTABLE (advanced only by the `settle` op)
+    // and therefore deliberately excluded from `immutable_traits_match`, like
+    // level/xp. They are guarded in EVERY non-settle validator so they cannot
+    // be mutated through work/level_up/etc.
+    #[serde(default)]
+    pub narrative_root: String,    // 64-hex-char (32-byte) Merkle root of events since last settle
+    #[serde(default)]
+    pub last_settle_block: u64,    // bitcoin block height of last settle (0 = never settled)
+    #[serde(default)]
+    pub settle_count: u32,         // anti-replay settlement counter
 }
 
 /// Top-level witness carrying only the operation name. Used to route mint / level_up / transfer.
@@ -82,6 +101,21 @@ pub struct WorkWitness {
     pub nonce: String,       // the nonce that produces a hash with enough leading zeros
     pub difficulty: u32,     // required leading-zero bits
     pub current_block: u64,  // bitcoin block height → becomes last_work_block
+}
+
+/// Witness for the periodic settlement operation (Fase 2). Commits an
+/// accumulated narrative Merkle root to the NFT's on-chain state, advancing
+/// the settlement counter. See spec Sección 2 / AI_WORLD_ENGINE F7.
+///
+/// Like `WorkWitness`, this carries the minimum the contract needs to validate
+/// the STATE TRANSITION. The full cryptographic Merkle inclusion proof is the
+/// EZKL layer's job (spec Sección 5 — not in scope for the wasm MVP); here we
+/// validate structure + transition correctness + anti-replay.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SettleWitness {
+    pub operation: String,      // always "settle"
+    pub narrative_root: String, // new 64-hex-char Merkle root being committed
+    pub settle_block: u64,      // bitcoin block height at settlement
 }
 
 // =============================================================================
@@ -177,6 +211,15 @@ pub fn app_contract(app: &App, tx: &Transaction, _x: &Data, w: &Data) -> bool {
         }
         "level_up" => validate_level_up(app, tx),
         "transfer" => nft_state_preserved(app, tx),
+        // Fase 2: periodic batch settlement — commits a narrative Merkle root
+        // on-chain and advances the settlement counter. See `validate_settle`.
+        "settle" => {
+            let st: SettleWitness = match w.value() {
+                Ok(v) => v,
+                Err(_) => return false,
+            };
+            validate_settle(app, tx, &st)
+        }
         // SECURITY FIX: `90cee8b` returned `true` here, accepting any unknown op.
         _ => false,
     }
@@ -206,10 +249,23 @@ pub fn is_valid_rarity(s: &str) -> bool {
     VALID_RARITIES.contains(&s)
 }
 
+/// A narrative root is a 32-byte Merkle root expressed as exactly 64 hex chars
+/// (lower- or upper-case; both decode to the same 32 bytes). Mirrors the shape
+/// of [`is_valid_dna`]. An EMPTY string is NOT a valid committed root — empty
+/// is the pre-settlement sentinel, only legal on a fresh mint (checked in
+/// [`is_valid_initial_state`]).
+pub fn is_valid_narrative_root(root: &str) -> bool {
+    root.len() == 64 && root.chars().all(|c| c.is_ascii_hexdigit())
+}
+
 /// A freshly minted Spark must start at level 1 with no accumulated XP / work / evolution.
 /// I5: `tokens_earned` must be exactly `"0"` — a fresh mint holds no lifetime token
 /// rewards. (Stored as a decimal string to mirror the worker's `bigint`-as-string
 /// serialization.)
+///
+/// Fase 2: the settlement fields must also be at their zero-point — a fresh mint
+/// has no committed narrative root, has never been settled, and `settle_count` is
+/// zero. (Settlement only ever happens AFTER mint, via the `settle` op.)
 pub fn is_valid_initial_state(s: &SparkNFTState) -> bool {
     s.level == 1
         && s.xp == 0
@@ -217,6 +273,9 @@ pub fn is_valid_initial_state(s: &SparkNFTState) -> bool {
         && s.work_count == 0
         && s.evolution_count == 0
         && s.tokens_earned == "0"
+        && s.narrative_root.is_empty()
+        && s.last_settle_block == 0
+        && s.settle_count == 0
 }
 
 /// Compare the immutable identity traits of two Sparks. Level / xp / work counters / tokens are
@@ -457,6 +516,18 @@ fn validate_work_proof(app: &App, tx: &Transaction, xp_gain: u64, current_block:
     if new.tokens_earned != old.tokens_earned {
         return false;
     }
+    // Fase 2: the settlement fields are owned by the `settle` op. A work proof
+    // must NOT mutate them — otherwise an attacker could forge a narrative root
+    // or roll the settlement counter outside the settle path.
+    if new.narrative_root != old.narrative_root {
+        return false;
+    }
+    if new.last_settle_block != old.last_settle_block {
+        return false;
+    }
+    if new.settle_count != old.settle_count {
+        return false;
+    }
 
     true
 }
@@ -542,6 +613,18 @@ fn validate_work(app: &App, tx: &Transaction, wk: &WorkWitness) -> bool {
     if new.tokens_earned != old.tokens_earned {
         return false;
     }
+    // Fase 2: the settlement fields are owned by the `settle` op. A work
+    // transition must NOT mutate them — otherwise an attacker could forge a
+    // narrative root or roll the settlement counter through a work op.
+    if new.narrative_root != old.narrative_root {
+        return false;
+    }
+    if new.last_settle_block != old.last_settle_block {
+        return false;
+    }
+    if new.settle_count != old.settle_count {
+        return false;
+    }
 
     true
 }
@@ -609,6 +692,117 @@ fn validate_level_up(app: &App, tx: &Transaction) -> bool {
     if new.last_work_block != old.last_work_block {
         return false;
     }
+    // Fase 2: the settlement fields are owned by the `settle` op. A level-up
+    // must NOT mutate them.
+    if new.narrative_root != old.narrative_root {
+        return false;
+    }
+    if new.last_settle_block != old.last_settle_block {
+        return false;
+    }
+    if new.settle_count != old.settle_count {
+        return false;
+    }
+
+    true
+}
+
+/// Settle (Fase 2): periodic batch settlement — commit a narrative Merkle root
+/// to the NFT's on-chain state and advance the settlement counter.
+///
+/// What this validates (and what it deliberately does NOT):
+///   - VALIDATES the STATE TRANSITION (the only thing the wasm MVP can check
+///     trustlessly without block-header access — see spec Sección 4
+///     "Honestidad técnica"):
+///       (1) `narrative_root` is well-formed (64 hex chars) and matches the
+///           witness's claimed root,
+///       (2) `settle_count` ticks by EXACTLY 1 (anti-replay: prevents re-committing
+///           the same root, prevents skipping the counter),
+///       (3) `settle_block` moves STRICTLY forward (prevents settling twice at
+///           the same block height) and is carried into `last_settle_block`,
+///       (4) every gameplay counter (level, xp, total_xp, work_count,
+///           evolution_count, tokens_earned, last_work_block) is UNCHANGED —
+///           settle is NOT a path to forge XP/tokens.
+///   - DOES NOT verify the full Merkle inclusion proof (that is the EZKL
+///     layer's job, spec Sección 5 / Fase 7 — out of scope for the wasm MVP).
+///   - DOES NOT verify the bitcoin block header / SPV (Charms wasm has no
+///     native block-header access; pragmatic MVP accepts the attested block
+///     height, EZKL sampling closes the gap later).
+///
+/// Together with the narrative-field guards added to `validate_work` /
+/// `validate_work_proof` / `validate_level_up`, this means the THREE settlement
+/// fields can ONLY ever change through this one function — they are not
+/// mutatable via any other operation.
+fn validate_settle(app: &App, tx: &Transaction, st: &SettleWitness) -> bool {
+    let Some(old) = single_input_state(app, tx) else {
+        return false;
+    };
+    let Some(new) = single_output_state(app, tx) else {
+        return false;
+    };
+
+    // Identity is immutable (same guard as every other validator).
+    if !immutable_traits_match(&old, &new) {
+        return false;
+    }
+
+    // (1) The committed narrative root must be a well-formed 32-byte hex string,
+    //     and the output state must carry EXACTLY the root the witness attests.
+    //     This binds the published state to the witness (an attacker cannot
+    //     publish one root while attesting another).
+    if !is_valid_narrative_root(&st.narrative_root) {
+        return false;
+    }
+    if new.narrative_root != st.narrative_root {
+        return false;
+    }
+
+    // (2) Settlement counter ticks by EXACTLY 1. `checked_add` defends against
+    //     `u32::MAX` overflow under the abort profile; rejecting the wrap also
+    //     prevents the counter from being reset (anti-replay).
+    let Some(expected_settle_count) = old.settle_count.checked_add(1) else {
+        return false;
+    };
+    if new.settle_count != expected_settle_count {
+        return false;
+    }
+
+    // (3) Settlement block must move STRICTLY forward. This is the anti-replay
+    //     guarantee on the block dimension: a second settle at the same or an
+    //     earlier height is rejected, so each block height can anchor at most
+    //     one settlement per NFT.
+    if st.settle_block <= old.last_settle_block {
+        return false;
+    }
+    if new.last_settle_block != st.settle_block {
+        return false;
+    }
+
+    // (4) Gameplay counters MUST NOT change on settle. Settle anchors narrative
+    //     only; it is NOT a path to forge XP, level, tokens, work count, or
+    //     evolution. This mirrors the symmetric guard each of those validators
+    //     applies to the settlement fields.
+    if new.level != old.level {
+        return false;
+    }
+    if new.xp != old.xp {
+        return false;
+    }
+    if new.total_xp != old.total_xp {
+        return false;
+    }
+    if new.work_count != old.work_count {
+        return false;
+    }
+    if new.evolution_count != old.evolution_count {
+        return false;
+    }
+    if new.tokens_earned != old.tokens_earned {
+        return false;
+    }
+    if new.last_work_block != old.last_work_block {
+        return false;
+    }
 
     true
 }
@@ -637,6 +831,9 @@ mod tests {
             evolution_count: 0,
             tokens_earned: "0".into(),
             heritage: 0,
+            narrative_root: String::new(),
+            last_settle_block: 0,
+            settle_count: 0,
         }
     }
 
@@ -747,6 +944,60 @@ mod tests {
         let mut s = valid_state();
         s.tokens_earned = "0".into();
         assert!(is_valid_initial_state(&s));
+    }
+
+    // --- Fase 2: settlement fields ---------------------------------------
+
+    #[test]
+    fn test_is_valid_narrative_root() {
+        // 64 hex chars pass (lowercase, uppercase, mixed).
+        assert!(is_valid_narrative_root(&"a".repeat(64)));
+        assert!(is_valid_narrative_root(&"0".repeat(64)));
+        assert!(is_valid_narrative_root(&"F".repeat(64)));
+        assert!(is_valid_narrative_root(
+            "0123456789abcdefABCDEF0123456789abcdefABCDEF0123456789abcdefABCD"
+        ));
+
+        // 63 chars fail (one short of a 32-byte root).
+        assert!(!is_valid_narrative_root(&"a".repeat(63)));
+        // 65 chars fail (one long).
+        assert!(!is_valid_narrative_root(&"a".repeat(65)));
+        // Right length, non-hex chars fail.
+        assert!(!is_valid_narrative_root(&"z".repeat(64)));
+        assert!(!is_valid_narrative_root(&"g".repeat(64)));
+        // Empty fails — empty is the pre-settlement sentinel, not a valid root.
+        assert!(!is_valid_narrative_root(""));
+    }
+
+    #[test]
+    fn test_initial_state_requires_empty_settle_fields() {
+        // A fresh mint must start with empty settlement fields.
+        assert!(is_valid_initial_state(&valid_state()));
+
+        // A non-empty narrative_root on a fresh mint must fail — settlement
+        // only happens AFTER mint, via the `settle` op.
+        let mut s = valid_state();
+        s.narrative_root = "a".repeat(64);
+        assert!(
+            !is_valid_initial_state(&s),
+            "fresh mint must not ship with a committed narrative root"
+        );
+
+        // last_settle_block != 0 must fail.
+        let mut s = valid_state();
+        s.last_settle_block = 100;
+        assert!(
+            !is_valid_initial_state(&s),
+            "fresh mint must have last_settle_block == 0"
+        );
+
+        // settle_count != 0 must fail.
+        let mut s = valid_state();
+        s.settle_count = 1;
+        assert!(
+            !is_valid_initial_state(&s),
+            "fresh mint must have settle_count == 0"
+        );
     }
 
     // --- Immutable traits --------------------------------------------------

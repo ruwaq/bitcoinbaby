@@ -65,6 +65,8 @@ function makeRandomNFT(): SparkNFTState {
     tokensEarned: BigInt(Math.floor(Math.random() * 10000)) * 100_000_000n,
     narrativeRoot: "",
     worldStateRoot: "",
+    lastSettleBlock: 0,
+    settleCount: 0,
   };
 }
 

@@ -34,6 +34,9 @@ export interface SparkNFTState {
   tokensEarned: bigint;
   narrativeRoot: string;
   worldStateRoot: string;
+  // Fase 2 settlement state (mirrors on-chain SparkNFTState).
+  lastSettleBlock: number;
+  settleCount: number;
 }
 
 // =============================================================================

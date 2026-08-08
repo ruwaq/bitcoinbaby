@@ -170,6 +170,8 @@ function convertToNFTState(record: NFTRecord): SparkNFTState | null {
         : BigInt(record.tokensEarned || 0),
     narrativeRoot: "",
     worldStateRoot: "",
+    lastSettleBlock: 0,
+    settleCount: 0,
   };
 }
 
