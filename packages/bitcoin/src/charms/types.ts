@@ -20,11 +20,7 @@
  * importing from the versioned modules for cleaner organization.
  */
 
-import {
-  type ScrollsNetwork,
-  type NetworkEndpoints,
-  NETWORK_ENDPOINTS,
-} from "../types";
+import { type ScrollsNetwork, NETWORK_ENDPOINTS } from "../types";
 
 // =============================================================================
 // NETWORK & CONFIG (Re-export from shared types)
@@ -193,7 +189,10 @@ export interface SpellV11Transaction {
  * Keys are app indexes ("0", "1", etc.) from app_public_inputs
  * Values are amounts (number) for tokens or state objects for NFTs
  */
-export type SpellV11Output = Record<string, number | bigint | Record<string, unknown>>;
+export type SpellV11Output = Record<
+  string,
+  number | bigint | Record<string, unknown>
+>;
 
 export interface SpellV11CoinOutput {
   /** Amount in satoshis */

@@ -10,7 +10,6 @@ import { useState, useCallback, useMemo } from "react";
 import {
   calculateNFTPrice,
   validatePurchase,
-  calculatePurchaseOutputs,
   NFT_SALE_CONFIG,
   getTreasuryAddress,
   createMempoolClient,
@@ -96,7 +95,7 @@ export function useNFTSale(options: UseNFTSaleOptions = {}): UseNFTSaleReturn {
    * - Output 2: Change to buyer (if any)
    */
   const purchase = useCallback(
-    async (tokenId: number): Promise<PurchaseResult> => {
+    async (_tokenId: number): Promise<PurchaseResult> => {
       const treasury = getTreasuryAddress();
 
       if (!treasury) {
@@ -126,18 +125,7 @@ export function useNFTSale(options: UseNFTSaleOptions = {}): UseNFTSaleReturn {
           return { success: false, error: "No UTXOs available" };
         }
 
-        // 2. Calculate outputs for NFT purchase
-        const purchaseOutputs = calculatePurchaseOutputs({
-          buyerAddress,
-          buyerUtxos: rawUtxos.map((u) => ({
-            txid: u.txid,
-            vout: u.vout,
-            value: BigInt(u.value),
-          })),
-          tokenId,
-        });
-
-        // 3. Build transaction using TransactionBuilder
+        // 2. Build transaction using TransactionBuilder
         const builder = new TransactionBuilder({
           network,
           enableRBF: true,

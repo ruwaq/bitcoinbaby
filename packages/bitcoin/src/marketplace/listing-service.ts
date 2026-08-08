@@ -23,7 +23,6 @@ import {
   calculateRoyalty,
   calculateBuyerFee,
   calculateSellerReceives,
-  getRoyaltyAddress,
   getMarketplaceFeeAddress,
   validateListingPrice,
 } from "./config";

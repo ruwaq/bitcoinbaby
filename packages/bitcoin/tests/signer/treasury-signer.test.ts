@@ -75,8 +75,7 @@ async function buildUnsignedTxPair(
   const info = wallet.getInfo();
   if (!info) throw new Error("Wallet not initialized");
 
-  // Treasury address (from wallet)
-  const treasuryAddress = info.address;
+  // Treasury address (from wallet) — info.address is the Taproot treasury output target
   const compressed = Buffer.from(info.publicKey, "hex");
   const xOnlyInternal = compressed.subarray(1, 33);
   const network = bitcoin.networks.regtest;
@@ -92,11 +91,7 @@ async function buildUnsignedTxPair(
   const fundingTx = new bitcoin.Transaction();
   fundingTx.addOutput(p2tr.output, 100_000);
   // Add a fake input (will be invalid but the witness is what matters)
-  fundingTx.addInput(
-    Buffer.from("00".repeat(32), "hex"),
-    0,
-    0xffffffff,
-  );
+  fundingTx.addInput(Buffer.from("00".repeat(32), "hex"), 0, 0xffffffff);
   const fundingTxHex = fundingTx.toHex();
   const fundingTxid = fundingTx.getId();
   const fundingVout = 0;
@@ -137,9 +132,7 @@ async function buildUnsignedTxPair(
  * Build a mock BlockchainAPI that returns prev tx hexes we control.
  * rawTxToPsbt calls mempoolClient.getTransactionHex(txid).
  */
-function buildMockBlockchainAPI(
-  prevTxs: Map<string, string>,
-): BlockchainAPI {
+function buildMockBlockchainAPI(prevTxs: Map<string, string>): BlockchainAPI {
   return {
     network: "regtest",
     getBalance: vi.fn(async () => ({
@@ -149,18 +142,18 @@ function buildMockBlockchainAPI(
       total: 0,
     })),
     getUTXOs: vi.fn(async () => []),
-    getTransaction: vi.fn(async () => ({} as never)),
+    getTransaction: vi.fn(async () => ({}) as never),
     broadcastTransaction: vi.fn(async () => "a".repeat(64)),
-    getFeeEstimates: vi.fn(async () => ({ hourFee: 2 } as never)),
+    getFeeEstimates: vi.fn(async () => ({ hourFee: 2 }) as never),
     getBlockHeight: vi.fn(async () => 0),
-    getBlock: vi.fn(async () => ({} as never)),
+    getBlock: vi.fn(async () => ({}) as never),
     getBlockTxids: vi.fn(async () => []),
     getTransactionHex: vi.fn(async (txid: string) => {
       const hex = prevTxs.get(txid);
       if (!hex) throw new Error(`mock: no prev tx for ${txid}`);
       return hex;
     }),
-    waitForConfirmation: vi.fn(async () => ({} as never)),
+    waitForConfirmation: vi.fn(async () => ({}) as never),
     getAddressTransactions: vi.fn(async () => []),
   };
 }

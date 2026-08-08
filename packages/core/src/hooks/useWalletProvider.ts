@@ -19,7 +19,6 @@ import {
   type BitcoinNetwork,
   detectWallets,
   getProvider,
-  getAvailableProviders,
   getBestProvider,
 } from "@bitcoinbaby/bitcoin";
 import { useWalletStore } from "../stores/wallet-store";

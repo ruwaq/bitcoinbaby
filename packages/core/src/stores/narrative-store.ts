@@ -4,7 +4,6 @@ import type {
   NarrativeEvent,
   NarrativeState,
   PersonalityTraits,
-  Archetype,
   Mood,
   Relationship,
   Item,

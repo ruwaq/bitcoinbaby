@@ -237,7 +237,7 @@ describe("Hash Accumulation", () => {
   });
 
   it("should keep remainder after XP award", () => {
-    let accumulated = 1_500_000;
+    const accumulated = 1_500_000;
     const hashesPerXP = DEFAULT_HASHES_PER_XP;
 
     const xp = Math.floor(accumulated / hashesPerXP);
@@ -248,7 +248,7 @@ describe("Hash Accumulation", () => {
   });
 
   it("should detect new hashes from total hash count", () => {
-    let lastHashCount = 5_000_000;
+    const lastHashCount = 5_000_000;
     const currentHashCount = 7_500_000;
 
     const newHashes = currentHashCount - lastHashCount;

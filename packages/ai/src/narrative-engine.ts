@@ -20,7 +20,6 @@ import type {
   NarrativeState,
   NarrativeResult,
   PersonalityTraits,
-  Mood,
   NarrativeContext,
 } from "./narrative-types";
 import {

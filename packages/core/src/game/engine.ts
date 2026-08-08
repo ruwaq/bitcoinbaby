@@ -24,18 +24,13 @@ import {
   calculateOfflineDecay,
   applyAction,
   addXP,
-  checkEvolution,
   determineVisualState,
   createNewBaby,
   getCriticalStats,
   calculateMiningXP,
   calculateLevelDecay,
-  isBabyDead,
 } from "./mechanics";
-import {
-  checkAchievements,
-  calculateAchievementRewardXP,
-} from "./achievements";
+import { checkAchievements } from "./achievements";
 import { GameStorage } from "../storage";
 import type { GameAction, SparkStage } from "./constants";
 import { getGameLoop } from "./game-loop";
@@ -181,7 +176,7 @@ export class GameEngine {
     );
 
     // Apply level decay for inactive miners
-    const { progression, isDead } = calculateLevelDecay(
+    const { progression } = calculateLevelDecay(
       this.state.baby.progression,
       this.state.baby.lastMined,
     );

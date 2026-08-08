@@ -211,12 +211,6 @@ const STORY_TEMPLATES: TemplateSet[] = [
   },
 ];
 
-const ALL_TEMPLATE_SETS = [
-  ...LORE_TEMPLATES,
-  ...TECHNICAL_TEMPLATES,
-  ...STORY_TEMPLATES,
-];
-
 // =============================================================================
 // ENGINE
 // =============================================================================
@@ -323,7 +317,6 @@ export class BabyBrainEngine {
    * Core generation logic — deterministic from seed.
    */
   private generate(prompt: string, seed: string): string {
-    const rng = seededRandom(seed);
     const values = seedToValues(seed, 20);
 
     // Classify the prompt to pick the right template category

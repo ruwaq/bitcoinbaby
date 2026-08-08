@@ -91,7 +91,9 @@ faucetRouter.post("/claim", validateBody(faucetClaimSchema), async (c) => {
           try {
             const text = await doResponse.clone().text();
             if (text) errMsg = text;
-          } catch {}
+          } catch {
+            /* ignore */
+          }
         }
         balanceLogger.error("Faucet DO credit failed", {
           error: errMsg,

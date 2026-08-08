@@ -91,10 +91,11 @@ export {
   HERITAGE_SEEDS,
 } from "@bitcoinbaby/shared";
 
+import { XP_REQUIREMENTS } from "@bitcoinbaby/bitcoin";
+
 /**
  * Get XP required for next level
  */
 export function getXpForNextLevel(level: number): number {
-  const { XP_REQUIREMENTS } = require("@bitcoinbaby/bitcoin");
   return XP_REQUIREMENTS[level + 1] ?? 0;
 }

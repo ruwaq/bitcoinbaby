@@ -12,6 +12,7 @@ import type { UTXO } from "../blockchain/types";
 import type { SpellConfig } from "../scrolls/types";
 import type { SpellV2, SpellV10 } from "../charms/types";
 import { createLogger } from "@bitcoinbaby/shared";
+import { createTweakedSigner as createTweakedSignerShared } from "../taproot";
 
 const log = createLogger("TxBuilder");
 
@@ -19,7 +20,6 @@ const log = createLogger("TxBuilder");
 type Spell = SpellConfig | SpellV2 | SpellV10;
 import type {
   TxUTXO,
-  TxInput,
   TxOutput,
   UnsignedTx,
   SignedTx,
@@ -749,6 +749,7 @@ export class TransactionBuilder {
     } catch (error) {
       throw new Error(
         `PSBT finalization failed: ${error instanceof Error ? error.message : "unknown error"}`,
+        { cause: error },
       );
     }
 
@@ -847,12 +848,9 @@ export class TransactionBuilder {
   }
 
   /**
-   * Create a tweaked signer for Taproot (BIP86 key path spend)
+   * Create a tweaked signer for Taproot (BIP86 key path spend).
    *
-   * For Taproot signing with bitcoinjs-lib:
-   * - publicKey must be the TWEAKED x-only public key (matches the output script)
-   * - The private key must be tweaked with the TapTweak hash
-   * - Signer needs signSchnorr() method for Taproot
+   * Delegates to the shared implementation in ../taproot (BIP-340/341/86).
    *
    * Note: bitcoinjs-lib compares signer.publicKey against the tweaked key
    * extracted from the witnessUtxo script, NOT against tapInternalKey.
@@ -861,63 +859,8 @@ export class TransactionBuilder {
     signer: bitcoin.Signer & { signSchnorr: (hash: Buffer) => Buffer };
     cleanup: () => void;
   } {
-    // Get compressed public key (33 bytes: 02/03 prefix + 32 byte x-coordinate)
-    const publicKey = ecc.pointFromScalar(privateKey);
-    if (!publicKey) {
-      throw new Error("Invalid private key");
-    }
-
-    // Extract x-only public key (32 bytes) - this is the INTERNAL key
-    const xOnlyInternalKey = Buffer.from(publicKey.slice(1, 33));
-
-    // Tweak the key for Taproot (BIP86 key path spend)
-    const tweakHash = bitcoin.crypto.taggedHash("TapTweak", xOnlyInternalKey);
-
-    // Handle parity: if the public key has odd Y coordinate (0x03 prefix),
-    // we need to negate the private key before tweaking
-    let privKeyToTweak = privateKey;
-    if (publicKey[0] === 0x03) {
-      privKeyToTweak = ecc.privateNegate(privateKey);
-    }
-
-    const tweakedPrivateKey = ecc.privateAdd(privKeyToTweak, tweakHash);
-
-    if (!tweakedPrivateKey) {
-      throw new Error("Failed to tweak private key");
-    }
-
-    // Store in a mutable array so we can zero it later
-    const tweakedKeyArray = new Uint8Array(tweakedPrivateKey);
-
-    // Compute the TWEAKED x-only public key
-    // This is what appears in the P2TR output script
-    const tweakedPubKey = ecc.xOnlyPointAddTweak(xOnlyInternalKey, tweakHash);
-    if (!tweakedPubKey) {
-      throw new Error("Failed to compute tweaked public key");
-    }
-    const xOnlyTweakedKey = Buffer.from(tweakedPubKey.xOnlyPubkey);
-
-    // Return signer with TWEAKED publicKey (for matching against output script)
-    const signer = {
-      // publicKey must match the key in the P2TR output script
-      publicKey: xOnlyTweakedKey,
-      sign: (hash: Buffer): Buffer => {
-        // For non-Taproot inputs (ECDSA with original key)
-        const sig = ecc.sign(hash, privateKey);
-        return Buffer.from(sig);
-      },
-      signSchnorr: (hash: Buffer): Buffer => {
-        // For Taproot inputs (Schnorr with TWEAKED key)
-        const sig = ecc.signSchnorr(hash, tweakedKeyArray);
-        return Buffer.from(sig);
-      },
-    };
-
-    // Cleanup function to zero out sensitive key material
-    const cleanup = () => {
-      tweakedKeyArray.fill(0);
-    };
-
+    // internalPubKey is not needed in the builder flow (PSBT already carries it).
+    const { signer, cleanup } = createTweakedSignerShared(privateKey);
     return { signer, cleanup };
   }
 

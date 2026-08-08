@@ -161,9 +161,7 @@ export class TreasurySigner {
     await this.initialize();
     this.isRunning = true;
 
-    log.info(
-      `Starting daemon (poll every ${this.config.pollInterval}ms)`,
-    );
+    log.info(`Starting daemon (poll every ${this.config.pollInterval}ms)`);
 
     // Initial poll
     await this.pollAndProcess();
@@ -207,13 +205,9 @@ export class TreasurySigner {
         results.push(result);
 
         if (result.success) {
-          log.info(
-            `Batch ${batch.id} completed: ${result.txid}`,
-          );
+          log.info(`Batch ${batch.id} completed: ${result.txid}`);
         } else {
-          log.error(
-            `Batch ${batch.id} failed: ${result.error}`,
-          );
+          log.error(`Batch ${batch.id} failed: ${result.error}`);
         }
       }
     } catch (error) {
@@ -552,25 +546,15 @@ export class TreasurySigner {
   }> {
     const walletInfo = this.wallet.getInfo();
 
-    // Check API
-    let apiReachable = false;
-    try {
-      const response = await fetch(`${this.config.apiUrl}/health`);
-      apiReachable = response.ok;
-    } catch {
-      apiReachable = false;
-    }
-
-    // Check Mempool
-    let mempoolReachable = false;
-    try {
-      const response = await fetch(
-        `${this.config.mempoolUrl}/blocks/tip/height`,
-      );
-      mempoolReachable = response.ok;
-    } catch {
-      mempoolReachable = false;
-    }
+    // Check API and Mempool in parallel; each resolves to a boolean regardless of failure
+    const [apiReachable, mempoolReachable] = await Promise.all([
+      fetch(`${this.config.apiUrl}/health`)
+        .then((response) => response.ok)
+        .catch(() => false),
+      fetch(`${this.config.mempoolUrl}/blocks/tip/height`)
+        .then((response) => response.ok)
+        .catch(() => false),
+    ]);
 
     return {
       healthy: apiReachable && mempoolReachable && !!walletInfo,

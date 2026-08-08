@@ -29,14 +29,15 @@ export class OllamaProvider implements AIProvider {
     } catch (err) {
       this.ready = false;
       throw new Error(
-        `Ollama connection failed: ${err instanceof Error ? err.message : String(err)}`
+        `Ollama connection failed: ${err instanceof Error ? err.message : String(err)}`,
+        { cause: err },
       );
     }
   }
 
   async executeTask(
     prompt: string,
-    systemPrompt?: string
+    systemPrompt?: string,
   ): Promise<AIExecutionResult> {
     const start = Date.now();
     const body: Record<string, unknown> = {
@@ -52,8 +53,7 @@ export class OllamaProvider implements AIProvider {
       body: JSON.stringify(body),
     });
 
-    if (!res.ok)
-      throw new Error(`Ollama generation failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Ollama generation failed: ${res.status}`);
 
     const data = (await res.json()) as {
       response: string;

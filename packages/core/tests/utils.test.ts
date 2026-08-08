@@ -24,7 +24,6 @@ import {
   retryOrThrow,
   createCircuitBreaker,
   createRateLimiter,
-  sleep,
   withTimeout,
   debounce,
   throttle,
@@ -324,7 +323,9 @@ describe("Retry Logic", () => {
       for (let i = 0; i < 3; i++) {
         try {
           await breaker.execute(fn);
-        } catch {}
+        } catch {
+          // Expected rejection: trip the circuit breaker
+        }
       }
 
       expect(breaker.getState()).toBe("open");
@@ -337,7 +338,9 @@ describe("Retry Logic", () => {
 
       try {
         await breaker.execute(fn);
-      } catch {}
+      } catch {
+        // Expected rejection: open the circuit breaker
+      }
 
       await expect(breaker.execute(fn)).rejects.toThrow(
         "Circuit breaker is open",
@@ -350,7 +353,9 @@ describe("Retry Logic", () => {
 
       try {
         await breaker.execute(fn);
-      } catch {}
+      } catch {
+        // Expected rejection: trip before manual reset
+      }
 
       breaker.reset();
       expect(breaker.getState()).toBe("closed");

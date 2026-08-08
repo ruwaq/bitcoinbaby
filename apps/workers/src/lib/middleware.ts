@@ -69,7 +69,7 @@ export function validateBody<T extends z.ZodType>(schema: T) {
 
       c.set("validatedBody", result.data);
       await next();
-    } catch (error) {
+    } catch {
       return c.json<ApiResponse>(
         {
           success: false,

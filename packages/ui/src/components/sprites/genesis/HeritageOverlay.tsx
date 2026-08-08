@@ -12,7 +12,7 @@
  */
 
 import { type FC } from "react";
-import { type HeritageSeed, HERITAGE_STYLES } from "./types";
+import { type HeritageSeed } from "./types";
 
 interface HeritageOverlayProps {
   heritage: HeritageSeed;
@@ -81,11 +81,9 @@ const getOceaniaColors = () => HERITAGE_COLORS.oceania;
 export const HeritageOverlay: FC<HeritageOverlayProps> = ({
   heritage,
   size = 64,
-  animated = true,
-  variant = 0,
+  animated: _animated = true,
+  variant: _variant = 0,
 }) => {
-  const style = HERITAGE_STYLES[heritage];
-
   // Americas Heritage - Aztec/Maya/Inca elements
   const renderAmericas = () => {
     const c = getAmericasColors();

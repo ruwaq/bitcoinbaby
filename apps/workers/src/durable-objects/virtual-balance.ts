@@ -80,8 +80,14 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     // Get current schema version
     const versionResult = this.sql.exec("PRAGMA user_version").toArray();
     let userVersion = 0;
-    if (versionResult.length > 0 && versionResult[0] && typeof versionResult[0] === "object") {
-      userVersion = (versionResult[0] as Record<string, unknown>).user_version as number || 0;
+    if (
+      versionResult.length > 0 &&
+      versionResult[0] &&
+      typeof versionResult[0] === "object"
+    ) {
+      userVersion =
+        ((versionResult[0] as Record<string, unknown>)
+          .user_version as number) || 0;
     }
 
     balanceLogger.info("SQLite schema version initialization", {
@@ -179,15 +185,33 @@ export class VirtualBalanceDO extends DurableObject<Env> {
       `);
 
       // Indexes
-      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_proofs_credited ON mining_proofs(credited)`);
-      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_proofs_address ON mining_proofs(address)`);
-      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_proofs_claimed ON mining_proofs(claimed)`);
-      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_proofs_created_at ON mining_proofs(created_at)`);
-      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_claims_address ON claims(address)`);
-      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_claims_status ON claims(status)`);
-      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_submissions_task ON pouw_submissions(task_id)`);
-      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_credit_history_address ON credit_history(address)`);
-      this.sql.exec(`CREATE INDEX IF NOT EXISTS idx_credit_history_created ON credit_history(created_at)`);
+      this.sql.exec(
+        `CREATE INDEX IF NOT EXISTS idx_proofs_credited ON mining_proofs(credited)`,
+      );
+      this.sql.exec(
+        `CREATE INDEX IF NOT EXISTS idx_proofs_address ON mining_proofs(address)`,
+      );
+      this.sql.exec(
+        `CREATE INDEX IF NOT EXISTS idx_proofs_claimed ON mining_proofs(claimed)`,
+      );
+      this.sql.exec(
+        `CREATE INDEX IF NOT EXISTS idx_proofs_created_at ON mining_proofs(created_at)`,
+      );
+      this.sql.exec(
+        `CREATE INDEX IF NOT EXISTS idx_claims_address ON claims(address)`,
+      );
+      this.sql.exec(
+        `CREATE INDEX IF NOT EXISTS idx_claims_status ON claims(status)`,
+      );
+      this.sql.exec(
+        `CREATE INDEX IF NOT EXISTS idx_submissions_task ON pouw_submissions(task_id)`,
+      );
+      this.sql.exec(
+        `CREATE INDEX IF NOT EXISTS idx_credit_history_address ON credit_history(address)`,
+      );
+      this.sql.exec(
+        `CREATE INDEX IF NOT EXISTS idx_credit_history_created ON credit_history(created_at)`,
+      );
 
       userVersion = 1;
     }
@@ -195,23 +219,29 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     // Version 1 -> 2: Add initial migrations for balance columns
     if (userVersion < 2) {
       try {
-        this.sql.exec(`ALTER TABLE balance ADD COLUMN streak_count INTEGER NOT NULL DEFAULT 0`);
-      } catch (err) {
+        this.sql.exec(
+          `ALTER TABLE balance ADD COLUMN streak_count INTEGER NOT NULL DEFAULT 0`,
+        );
+      } catch {
         /* Already exists or safe to ignore */
       }
       try {
         this.sql.exec(`ALTER TABLE balance ADD COLUMN difficulty_state TEXT`);
-      } catch (err) {
+      } catch {
         /* Already exists or safe to ignore */
       }
       try {
-        this.sql.exec(`ALTER TABLE balance ADD COLUMN faucet_last_claim_at INTEGER NOT NULL DEFAULT 0`);
-      } catch (err) {
+        this.sql.exec(
+          `ALTER TABLE balance ADD COLUMN faucet_last_claim_at INTEGER NOT NULL DEFAULT 0`,
+        );
+      } catch {
         /* Already exists or safe to ignore */
       }
       try {
-        this.sql.exec(`ALTER TABLE balance ADD COLUMN faucet_total_claimed TEXT NOT NULL DEFAULT '0'`);
-      } catch (err) {
+        this.sql.exec(
+          `ALTER TABLE balance ADD COLUMN faucet_total_claimed TEXT NOT NULL DEFAULT '0'`,
+        );
+      } catch {
         /* Already exists or safe to ignore */
       }
       userVersion = 2;
@@ -221,17 +251,19 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     if (userVersion < 3) {
       try {
         this.sql.exec(`ALTER TABLE mining_proofs ADD COLUMN address TEXT`);
-      } catch (err) {
+      } catch {
         /* Already exists or safe to ignore */
       }
       try {
-        this.sql.exec(`ALTER TABLE mining_proofs ADD COLUMN claimed INTEGER NOT NULL DEFAULT 0`);
-      } catch (err) {
+        this.sql.exec(
+          `ALTER TABLE mining_proofs ADD COLUMN claimed INTEGER NOT NULL DEFAULT 0`,
+        );
+      } catch {
         /* Already exists or safe to ignore */
       }
       try {
         this.sql.exec(`ALTER TABLE mining_proofs ADD COLUMN claim_id TEXT`);
-      } catch (err) {
+      } catch {
         /* Already exists or safe to ignore */
       }
       userVersion = 3;
@@ -240,16 +272,19 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     // Version 3 -> 4: Add reputation_score and lockout_until to balance
     if (userVersion < 4) {
       try {
-        this.sql.exec(`ALTER TABLE balance ADD COLUMN reputation_score INTEGER DEFAULT 100`);
-      } catch (err) {
+        this.sql.exec(
+          `ALTER TABLE balance ADD COLUMN reputation_score INTEGER DEFAULT 100`,
+        );
+      } catch {
         /* Already exists or safe to ignore */
       }
       try {
-        this.sql.exec(`ALTER TABLE balance ADD COLUMN lockout_until INTEGER DEFAULT 0`);
-      } catch (err) {
+        this.sql.exec(
+          `ALTER TABLE balance ADD COLUMN lockout_until INTEGER DEFAULT 0`,
+        );
+      } catch {
         /* Already exists or safe to ignore */
       }
-      userVersion = 4;
     }
 
     // Set schema version final
@@ -1185,12 +1220,10 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     }
 
     // Calculate totals
-    let totalWork = 0n;
     let actualTokens = 0n;
     const proofHashes: string[] = [];
 
     for (const proof of proofs) {
-      totalWork += calculateWorkFromDifficulty(proof.difficulty);
       actualTokens += BigInt(proof.reward);
       proofHashes.push(proof.hash);
     }
@@ -1483,8 +1516,10 @@ export class VirtualBalanceDO extends DurableObject<Env> {
     const claim = this.claimRepo.get(body.claimId, this.address);
     if (!claim) return this.errorResponse("Claim not found", 404);
 
-    const isDebitedStatus = (s: string) => ["broadcast", "confirmed", "minting"].includes(s);
-    const isErrorStatus = (s: string) => ["failed", "cancelled", "expired"].includes(s);
+    const isDebitedStatus = (s: string) =>
+      ["broadcast", "confirmed", "minting"].includes(s);
+    const isErrorStatus = (s: string) =>
+      ["failed", "cancelled", "expired"].includes(s);
 
     if (isErrorStatus(body.status)) {
       // If the claim was already debited, refund the virtual balance
@@ -1492,13 +1527,13 @@ export class VirtualBalanceDO extends DurableObject<Env> {
         const balance = this.balanceRepo.getOrCreate(this.address);
         const amountToRefund = BigInt(claim.amount);
         balance.virtualBalance += amountToRefund;
-        
+
         if (balance.totalWithdrawn >= amountToRefund) {
           balance.totalWithdrawn -= amountToRefund;
         } else {
           balance.totalWithdrawn = 0n;
         }
-        
+
         this.balanceRepo.update(balance);
         balanceLogger.info("Refunded virtual balance for failed claim", {
           claimId: body.claimId,

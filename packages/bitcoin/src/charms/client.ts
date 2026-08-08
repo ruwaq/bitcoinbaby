@@ -21,7 +21,7 @@ import type {
   FeeEstimates,
 } from "../blockchain/types";
 import { ApiError } from "../errors";
-import { sha256 as cryptoSha256, hexToBytes } from "../crypto";
+import { sha256 as cryptoSha256 } from "../crypto";
 // charms-js SDK for real charm extraction
 import {
   extractCharmsForWallet as charmsJsExtract,
@@ -445,7 +445,8 @@ export class CharmsClient {
       .filter((c) => c.appId === appId && c.appType === "n" && c.state)
       .map((c) => c.state as unknown as SparkNFTState)
       .filter(
-        (state): state is SparkNFTState => state !== null && state !== undefined,
+        (state): state is SparkNFTState =>
+          state !== null && state !== undefined,
       );
   }
 

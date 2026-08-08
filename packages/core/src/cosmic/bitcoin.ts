@@ -157,6 +157,7 @@ async function fetchBitcoinData(
     // Re-throw with context
     throw new Error(
       `Bitcoin data fetch failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      { cause: error },
     );
   }
 }

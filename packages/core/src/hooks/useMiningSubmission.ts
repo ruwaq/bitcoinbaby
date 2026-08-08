@@ -5,10 +5,9 @@
  * This is the bridge between mining work and blockchain transactions.
  */
 
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   createMiningSubmitter,
-  type MiningSubmitterOptions,
   type MiningSubmission,
   type SubmissionResult,
   type MiningProof,

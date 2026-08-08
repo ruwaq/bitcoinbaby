@@ -41,7 +41,7 @@ export const DEV_FUND = {
 // MOCK DATA
 // =============================================================================
 
-function generateMockUtxos(address: string): UTXO[] {
+function generateMockUtxos(_address: string): UTXO[] {
   // Generate 5 UTXOs of varying sizes for realistic testing
   return [
     {

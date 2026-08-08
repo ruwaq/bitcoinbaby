@@ -69,11 +69,6 @@ function formatSatoshis(sats: number): string {
   return `${sats.toLocaleString()} sats`;
 }
 
-function truncateAddress(address: string): string {
-  if (address.length <= 20) return address;
-  return `${address.slice(0, 10)}...${address.slice(-8)}`;
-}
-
 function truncateTxid(txid: string): string {
   return `${txid.slice(0, 8)}...${txid.slice(-8)}`;
 }
@@ -119,7 +114,6 @@ export function TransactionPreview({
 
   const typeInfo = getTransactionTypeInfo(data.type);
   const totalInput = data.inputs.reduce((sum, i) => sum + i.value, 0);
-  const totalOutput = data.outputs.reduce((sum, o) => sum + o.value, 0);
   const recipientOutputs = data.outputs.filter((o) => o.type === "recipient");
   const changeOutput = data.outputs.find((o) => o.type === "change");
 

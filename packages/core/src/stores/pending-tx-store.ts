@@ -11,7 +11,6 @@ import {
   createTxTracker,
   type TxTracker,
   type TrackedTransaction,
-  type TxStatus,
 } from "../utils/tx-tracker";
 import { useNetworkStore } from "./network-store";
 

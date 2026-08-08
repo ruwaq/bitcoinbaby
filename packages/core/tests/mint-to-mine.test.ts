@@ -4,10 +4,9 @@
  * Tests the complete flow from minting an NFT to applying mining boosts.
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   getMiningBoost,
-  GENESIS_BABIES_CONFIG,
   LEVEL_BOOSTS,
   type SparkNFTState,
   type Bloodline,

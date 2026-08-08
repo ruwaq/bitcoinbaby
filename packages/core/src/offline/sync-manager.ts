@@ -370,7 +370,6 @@ class SyncManager {
    */
   async checkHealth(): Promise<boolean> {
     try {
-      const client = getApiClient();
       // Use the same API URL as the client for health check
       const baseUrl =
         typeof window !== "undefined" &&

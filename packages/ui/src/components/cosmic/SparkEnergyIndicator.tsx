@@ -82,16 +82,6 @@ const STATUS_CONFIG: Record<
 };
 
 /**
- * Status emoji mapping
- */
-const STATUS_EMOJI: Record<EnergyStatus, string> = {
-  thriving: "🤩",
-  normal: "🙂",
-  struggling: "😔",
-  critical: "🤕",
-};
-
-/**
  * Format multiplier as percentage
  */
 function formatMultiplier(value: number): string {
@@ -136,39 +126,6 @@ const MultiplierDisplay: FC<{
       <span className={clsx("font-pixel text-xs", config.textClass)}>
         {formatMultiplier(multiplier)}
       </span>
-    </div>
-  );
-};
-
-/**
- * Status badge with icon
- */
-const StatusBadge: FC<{
-  status: EnergyStatus;
-  showDescription?: boolean;
-}> = ({ status, showDescription = false }) => {
-  const config = STATUS_CONFIG[status];
-
-  return (
-    <div
-      className={clsx(
-        "flex items-center gap-2 px-3 py-2",
-        "border-2",
-        config.borderClass,
-        config.bgClass,
-      )}
-    >
-      <span className="text-xl">{STATUS_EMOJI[status]}</span>
-      <div>
-        <span className={clsx("font-pixel text-xs", config.textClass)}>
-          {config.label}
-        </span>
-        {showDescription && (
-          <div className="font-pixel text-[8px] text-pixel-text-muted">
-            {config.description}
-          </div>
-        )}
-      </div>
     </div>
   );
 };
@@ -307,7 +264,6 @@ const EnergyBar: FC<{
   effectiveEnergy: number;
   status: EnergyStatus;
 }> = ({ baseEnergy, effectiveEnergy, status }) => {
-  const config = STATUS_CONFIG[status];
   const maxEnergy = 100;
   const basePercent = Math.min((baseEnergy / maxEnergy) * 100, 100);
   const effectivePercent = Math.min((effectiveEnergy / maxEnergy) * 100, 100);

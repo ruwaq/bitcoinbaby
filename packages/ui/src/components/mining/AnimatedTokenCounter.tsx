@@ -128,7 +128,7 @@ const RewardPopup: React.FC<{
 
 export function AnimatedTokenCounter({
   value,
-  previousValue,
+  previousValue: _previousValue,
   symbol = "$BABY",
   animateIncrements = true,
   animationDuration = 500,
@@ -140,8 +140,6 @@ export function AnimatedTokenCounter({
   className,
 }: AnimatedTokenCounterProps) {
   const currentValue = toBigInt(value);
-  const prevValue =
-    previousValue !== undefined ? toBigInt(previousValue) : currentValue;
 
   // Animation state
   const [displayValue, setDisplayValue] = useState(currentValue);

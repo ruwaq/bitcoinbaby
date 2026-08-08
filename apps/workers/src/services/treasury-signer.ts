@@ -242,7 +242,9 @@ export class TreasurySignerService {
     const genesis = this.env.BABTC_GENESIS;
 
     if (!appVk || !genesis) {
-      throw new Error("BABTC_APP_VK or BABTC_GENESIS is not configured in the environment");
+      throw new Error(
+        "BABTC_APP_VK or BABTC_GENESIS is not configured in the environment",
+      );
     }
 
     const appRef = `${appVk}@${genesis}`;
@@ -418,7 +420,7 @@ export class TreasurySignerService {
     await this.initialize();
 
     // Check Scrolls API
-    let scrollsApiAvailable = false;
+    let scrollsApiAvailable: boolean;
     try {
       const scrollsUrl =
         this.env.SCROLLS_API_URL || "https://scrolls.charms.dev";
@@ -437,7 +439,7 @@ export class TreasurySignerService {
     );
 
     // Determine health status and message
-    let message = "";
+    let message: string;
     let healthy = false;
 
     if (!this.treasuryAddress) {

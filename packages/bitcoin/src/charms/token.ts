@@ -22,12 +22,9 @@ import type {
   SpellV10,
   SpellV11,
   SpellV11Output,
-  SpellV11CoinOutput,
   PoWPrivateInputsV11,
   ProverRequestV11,
   AppType,
-  MiningMintSpellParams,
-  PoWMintSpellParams,
 } from "./types";
 import {
   createPoWMintSpellV9,
@@ -743,9 +740,6 @@ export function createSPARKMintSpellV9WithRewards(
 // =============================================================================
 // SPELL GENERATION V11 (CLI v11.0.1 - Current)
 // =============================================================================
-
-/** Dust limit for spell outputs */
-const MIN_OUTPUT_SATS = 546;
 
 /**
  * PoW mint spell parameters for V11 (CLI v11.0.1)

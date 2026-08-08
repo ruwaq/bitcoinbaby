@@ -11,7 +11,7 @@
  */
 
 import { type FC } from "react";
-import { type Bloodline, BLOODLINE_STYLES } from "./types";
+import { type Bloodline } from "./types";
 
 interface BloodlineOverlayProps {
   bloodline: Bloodline;
@@ -104,8 +104,6 @@ export const BloodlineOverlay: FC<BloodlineOverlayProps> = ({
   size = 64,
   animated = true,
 }) => {
-  const style = BLOODLINE_STYLES[bloodline];
-
   // Royal Bloodline - Nobility and power
   const renderRoyal = () => {
     const c = getRoyalColors();
@@ -969,11 +967,35 @@ export const BloodlineOverlay: FC<BloodlineOverlayProps> = ({
       {isOccludingBloodline && (
         <g clipPath={`url(#eyeWindow-${bloodline})`}>
           {/* Iris glow — punches through hood/helm */}
-          <circle cx="12" cy={EYE_Y} r="1.8" fill={glowingEyeColor} opacity="0.92" />
-          <circle cx="20" cy={EYE_Y} r="1.8" fill={glowingEyeColor} opacity="0.92" />
+          <circle
+            cx="12"
+            cy={EYE_Y}
+            r="1.8"
+            fill={glowingEyeColor}
+            opacity="0.92"
+          />
+          <circle
+            cx="20"
+            cy={EYE_Y}
+            r="1.8"
+            fill={glowingEyeColor}
+            opacity="0.92"
+          />
           {/* Specular highlight */}
-          <circle cx="11.5" cy={EYE_Y - 0.5} r="0.45" fill="#ffffff" opacity="0.9" />
-          <circle cx="19.5" cy={EYE_Y - 0.5} r="0.45" fill="#ffffff" opacity="0.9" />
+          <circle
+            cx="11.5"
+            cy={EYE_Y - 0.5}
+            r="0.45"
+            fill="#ffffff"
+            opacity="0.9"
+          />
+          <circle
+            cx="19.5"
+            cy={EYE_Y - 0.5}
+            r="0.45"
+            fill="#ffffff"
+            opacity="0.9"
+          />
           {/* Outer glow ring */}
           {animated && (
             <>

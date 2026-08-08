@@ -11,7 +11,7 @@
  * Run with: pnpm test tests/e2e/mining-flow.test.ts
  */
 
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   createMiningSubmitter,
   createMempoolClient,
@@ -20,8 +20,6 @@ import {
   countLeadingZeroBits,
   getMerkleProof,
   verifyMerkleProof,
-  reverseHex,
-  buildMerkleTree,
 } from "../../src";
 import { getPublicKey } from "../../src/crypto";
 
@@ -251,7 +249,7 @@ describe("E2E: Mining Flow on Testnet4", () => {
           console.log(`  Block hash: ${tx.status.block_hash}`);
           console.log(`  Block height: ${tx.status.block_height}`);
         }
-      } catch (error) {
+      } catch {
         console.log(`TX not found yet (may still be in mempool)`);
       }
     });

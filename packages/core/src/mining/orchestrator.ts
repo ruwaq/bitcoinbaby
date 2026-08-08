@@ -13,7 +13,7 @@ import { MIN_DIFFICULTY } from "../tokenomics/constants";
 import { createLogger } from "@bitcoinbaby/shared";
 
 const log = createLogger("Orchestrator");
-import { AIWorkIntegration, type AIWorkResult } from "./ai-integration";
+import { AIWorkIntegration } from "./ai-integration";
 
 const defaultConfig: OrchestratorConfig = {
   preferWebGPU: true,

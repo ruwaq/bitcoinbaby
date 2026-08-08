@@ -20,7 +20,7 @@
  *   - Assert it is absent for disallowed origins (security: no leak)
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Env } from "../src/lib/types";

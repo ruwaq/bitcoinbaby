@@ -121,7 +121,6 @@ export function useMiningCosmic(
     effectiveHashrate,
     cosmicMultiplier: storeCosmicMultiplier,
     cosmicStatus: storeCosmicStatus,
-    activeCosmicEffects: storeActiveEffects,
     setCosmicEnergy,
   } = useMiningStore();
 

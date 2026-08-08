@@ -13,11 +13,7 @@ import {
   createTransactionBuilder,
   estimateFee,
 } from "../src/transactions/builder";
-import type {
-  TxUTXO,
-  TxBuilderOptions,
-  CoinSelection,
-} from "../src/transactions/types";
+import type { TxUTXO } from "../src/transactions/types";
 import type { SpellConfig } from "../src/scrolls/types";
 
 // ============================================

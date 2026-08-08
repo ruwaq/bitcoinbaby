@@ -15,7 +15,7 @@
  */
 
 import { type FC } from "react";
-import { type Rarity, RARITY_EFFECTS } from "./types";
+import { type Rarity } from "./types";
 
 interface RarityEffectsProps {
   rarity: Rarity;
@@ -59,7 +59,6 @@ const RARITY_COLORS = {
 };
 
 // Type-specific color getters to avoid union type issues
-const getCommonColors = () => RARITY_COLORS.common;
 const getUncommonColors = () => RARITY_COLORS.uncommon;
 const getRareColors = () => RARITY_COLORS.rare;
 const getEpicColors = () => RARITY_COLORS.epic;
@@ -71,8 +70,6 @@ export const RarityEffects: FC<RarityEffectsProps> = ({
   size = 64,
   animated = true,
 }) => {
-  const effect = RARITY_EFFECTS[rarity];
-
   // Common - no effects, character speaks for itself
   const renderCommon = () => null;
 

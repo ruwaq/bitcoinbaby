@@ -1,20 +1,20 @@
-import { clsx } from 'clsx';
+import { clsx } from "clsx";
 
 /**
  * PixelCard - Card estilo Pixel Art 8-bit con sombra NES
  */
 
-interface CardProps extends React.HTMLAttributes<HTMLDivElement> {}
+type CardProps = React.HTMLAttributes<HTMLDivElement>;
 
 export function Card({ className, children, ...props }: CardProps) {
   return (
     <div
       className={clsx(
-        'bg-pixel-bg-medium',
-        'border-4 border-pixel-border',
-        'p-4',
-        'shadow-[8px_8px_0_0_#000,inset_-4px_-4px_0_0_rgba(0,0,0,0.3),inset_4px_4px_0_0_rgba(255,255,255,0.05)]',
-        className
+        "bg-pixel-bg-medium",
+        "border-4 border-pixel-border",
+        "p-4",
+        "shadow-[8px_8px_0_0_#000,inset_-4px_-4px_0_0_rgba(0,0,0,0.3),inset_4px_4px_0_0_rgba(255,255,255,0.05)]",
+        className,
       )}
       {...props}
     >
@@ -23,16 +23,16 @@ export function Card({ className, children, ...props }: CardProps) {
   );
 }
 
-interface CardHeaderProps extends React.HTMLAttributes<HTMLDivElement> {}
+type CardHeaderProps = React.HTMLAttributes<HTMLDivElement>;
 
 export function CardHeader({ className, children, ...props }: CardHeaderProps) {
   return (
     <div
       className={clsx(
-        'font-pixel text-xs text-pixel-text',
-        'pb-2 mb-3',
-        'border-b-2 border-pixel-border',
-        className
+        "font-pixel text-xs text-pixel-text",
+        "pb-2 mb-3",
+        "border-b-2 border-pixel-border",
+        className,
       )}
       {...props}
     >
@@ -41,12 +41,16 @@ export function CardHeader({ className, children, ...props }: CardHeaderProps) {
   );
 }
 
-interface CardContentProps extends React.HTMLAttributes<HTMLDivElement> {}
+type CardContentProps = React.HTMLAttributes<HTMLDivElement>;
 
-export function CardContent({ className, children, ...props }: CardContentProps) {
+export function CardContent({
+  className,
+  children,
+  ...props
+}: CardContentProps) {
   return (
     <div
-      className={clsx('font-pixel-body text-pixel-text', className)}
+      className={clsx("font-pixel-body text-pixel-text", className)}
       {...props}
     >
       {children}
@@ -54,16 +58,16 @@ export function CardContent({ className, children, ...props }: CardContentProps)
   );
 }
 
-interface CardFooterProps extends React.HTMLAttributes<HTMLDivElement> {}
+type CardFooterProps = React.HTMLAttributes<HTMLDivElement>;
 
 export function CardFooter({ className, children, ...props }: CardFooterProps) {
   return (
     <div
       className={clsx(
-        'pt-3 mt-3',
-        'border-t-2 border-pixel-border',
-        'flex items-center gap-2',
-        className
+        "pt-3 mt-3",
+        "border-t-2 border-pixel-border",
+        "flex items-center gap-2",
+        className,
       )}
       {...props}
     >

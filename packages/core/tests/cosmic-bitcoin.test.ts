@@ -26,13 +26,6 @@ describe("Cosmic Bitcoin Data", () => {
   describe("getBitcoinCosmicData", () => {
     it("should fetch Bitcoin data from mempool.space", async () => {
       // Mock fetch to avoid network calls in tests
-      const mockData = {
-        currentBlock: 880000,
-        nextHalvingBlock: 1050000,
-        blocksUntilHalving: 170000,
-        difficulty: 95672703408223,
-      };
-
       vi.spyOn(global, "fetch").mockImplementation(async (url) => {
         const urlStr = url.toString();
         if (urlStr.includes("/blocks/tip/height")) {

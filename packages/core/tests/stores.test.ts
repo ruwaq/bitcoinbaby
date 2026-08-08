@@ -4,7 +4,7 @@
  * Unit tests for core Zustand stores ensuring state management correctness.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock localStorage for all tests
 const localStorageMock = (() => {

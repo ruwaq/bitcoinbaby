@@ -13,7 +13,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   generateValidProof,
-  generateClaimData,
   generateTxid,
   TEST_ADDRESSES,
   MIN_DIFFICULTY,
