@@ -4,10 +4,12 @@
  *
  * The output states produced here MUST satisfy the on-chain validators in
  * packages/bitcoin/contracts/genesis-babies/src/lib.rs:
- *   - validate_work_proof: work_count+1, total_xp+xp_gain, last_work_block set,
- *     level/evolution_count/immutable traits unchanged.
- *   - validate_level_up:   level+1, xp=0, evolution_count+1, total_xp /
- *     work_count / tokens_earned / last_work_block / immutable traits unchanged.
+ *   - validate_work_proof: work_count+1, total_xp+xp_gain, xp+xp_gain,
+ *     last_work_block set, level/evolution_count/tokens_earned/immutable
+ *     traits unchanged.
+ *   - validate_level_up:   level+1, xp=0, evolution_count+1, old.xp >=
+ *     XP_REQUIREMENTS[next level], total_xp / work_count / tokens_earned /
+ *     last_work_block / immutable traits unchanged.
  *
  * The private witness travels via the TOP-LEVEL `app_private_inputs` field of
  * the prover request (sibling of `spell`), keyed by `"n/<app_id>/<app_vk>"`,
@@ -93,12 +95,17 @@ export function buildWorkProofSpellRequest(
   } = params;
 
   // Output state per validate_work_proof:
-  //   work_count+1, total_xp+xp_gain, last_work_block=currentBlock,
-  //   everything else (incl. immutable traits) unchanged.
+  //   work_count+1, total_xp+xp_gain, xp+xp_gain, last_work_block=currentBlock,
+  //   everything else (incl. immutable traits, tokens_earned) unchanged.
+  //
+  // C1a: the contract now requires `new.xp == old.xp + xp_gain` (it ties the
+  // spendable `xp` balance to the same gain that bumps `total_xp`). We MUST bump
+  // `xp` here in lockstep, otherwise the hardened validator rejects the spell.
   const outState: SparkNFTState = {
     ...currentState,
     work_count: currentState.work_count + 1,
     total_xp: currentState.total_xp + xpGain,
+    xp: currentState.xp + xpGain,
     last_work_block: currentBlock,
   };
 

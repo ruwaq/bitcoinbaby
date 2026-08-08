@@ -33,7 +33,7 @@ const OTHER_ADDRESS =
 // Real-shaped (non-placeholder) app id so the placeholder guard is satisfied.
 const TEST_APP_ID = "deadbeef".repeat(8); // 64 hex chars
 const TEST_APP_VK =
-  "f2b7516b0b43069a4e95f1f5668ddc3aea3a57c313e11f9a9de88c0e4cb9e238";
+  "0d9483a760ef91eef606e84fbff326132b3e611bc913025913bc34b6655b08ba";
 const PLACEHOLDER =
   "0000000000000000000000000000000000000000000000000000000000000000";
 

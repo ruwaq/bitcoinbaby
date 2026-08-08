@@ -65,6 +65,49 @@ pub const VALID_BLOODLINES: &[&str] = &["royal", "warrior", "rogue", "mystic"];
 pub const VALID_BASE_TYPES: &[&str] = &["human", "animal", "robot", "mystic", "alien"];
 pub const VALID_RARITIES: &[&str] = &["common", "uncommon", "rare", "epic", "legendary", "mythic"];
 
+/// XP required to ENTER each level. To go from level N → N+1 the contract requires
+/// `XP_REQUIREMENTS[N+1]`. Mirrors `packages/bitcoin/src/charms/nft.ts:120`
+/// (`XP_REQUIREMENTS`). Level 21 is the cap (MAX_LEVEL); entering it requires the
+/// same threshold as entering 20 (the TS table stops at key 20 — "Level 21 is max,
+/// no XP needed beyond" — but the contract still demands a non-trivial cost to
+/// reach the cap, so we reuse the last entry's value for 21).
+///
+/// Keys cover entering levels 2..=21 inclusive (20 entries). Lookups go through
+/// `xp_required_to_enter`.
+pub const XP_REQUIREMENTS: [(u32, u64); 20] = [
+    (2, 100),
+    (3, 250),
+    (4, 500),
+    (5, 1000),
+    (6, 2000),
+    (7, 4000),
+    (8, 8000),
+    (9, 16000),
+    (10, 32000),
+    (11, 48000),
+    (12, 64000),
+    (13, 96000),
+    (14, 128000),
+    (15, 192000),
+    (16, 256000),
+    (17, 384000),
+    (18, 512000),
+    (19, 768000),
+    (20, 1024000),
+    (21, 1024000), // cap: reuse the 20→21 cost (TS table has no key 21).
+];
+
+/// XP required to ENTER `level`. Returns `None` for level 1 (no XP needed to
+/// exist) or any level beyond `MAX_LEVEL`. For 2..=20 this is the TS
+/// `XP_REQUIREMENTS[level]`; for 21 (the cap) it is `XP_REQUIREMENTS[20]`'s
+/// value (1024000).
+pub fn xp_required_to_enter(level: u32) -> Option<u64> {
+    XP_REQUIREMENTS
+        .iter()
+        .find(|(lvl, _)| *lvl == level)
+        .map(|(_, xp)| *xp)
+}
+
 // =============================================================================
 // CONTRACT ENTRY POINT
 // =============================================================================
@@ -126,12 +169,16 @@ pub fn is_valid_rarity(s: &str) -> bool {
 }
 
 /// A freshly minted Spark must start at level 1 with no accumulated XP / work / evolution.
+/// I5: `tokens_earned` must be exactly `"0"` — a fresh mint holds no lifetime token
+/// rewards. (Stored as a decimal string to mirror the worker's `bigint`-as-string
+/// serialization.)
 pub fn is_valid_initial_state(s: &SparkNFTState) -> bool {
     s.level == 1
         && s.xp == 0
         && s.total_xp == 0
         && s.work_count == 0
         && s.evolution_count == 0
+        && s.tokens_earned == "0"
 }
 
 /// Compare the immutable identity traits of two Sparks. Level / xp / work counters / tokens are
@@ -254,6 +301,12 @@ fn validate_work_proof(app: &App, tx: &Transaction, xp_gain: u64, current_block:
     let Some(expected_total_xp) = old.total_xp.checked_add(xp_gain) else {
         return false;
     };
+    // C1a: `xp` (spendable balance) must tick by the SAME `xp_gain` that bumped
+    // `total_xp`. Without this an attacker could accrue lifetime XP without ever
+    // raising the spendable balance, defeating the level-up threshold check.
+    let Some(expected_xp) = old.xp.checked_add(xp_gain) else {
+        return false;
+    };
 
     if new.work_count != expected_work_count {
         return false;
@@ -261,10 +314,21 @@ fn validate_work_proof(app: &App, tx: &Transaction, xp_gain: u64, current_block:
     if new.total_xp != expected_total_xp {
         return false;
     }
+    // C1a continued: tie spendable `xp` to the same gain.
+    if new.xp != expected_xp {
+        return false;
+    }
     if new.last_work_block != current_block {
         return false;
     }
     if new.evolution_count != old.evolution_count {
+        return false;
+    }
+    // C2: `tokens_earned` must NOT change on a work proof. A work proof accrues
+    // XP only; token rewards are issued by a separate path. Forbidding the change
+    // here prevents an attacker from forging an arbitrary `tokens_earned` baseline
+    // that `validate_level_up` (which requires it unchanged) would then lock in.
+    if new.tokens_earned != old.tokens_earned {
         return false;
     }
 
@@ -295,6 +359,18 @@ fn validate_level_up(app: &App, tx: &Transaction) -> bool {
         return false;
     };
     if new.level != expected_level {
+        return false;
+    }
+
+    // C1b: the spendable `xp` balance must meet the threshold to ENTER the new
+    // level. Combined with C1a (which forces `xp` to actually accrue during work
+    // proofs), this closes the hole where an attacker could level 1→21 in 21
+    // transactions with zero grind. The table mirrors
+    // packages/bitcoin/src/charms/nft.ts `XP_REQUIREMENTS`.
+    let Some(required_xp) = xp_required_to_enter(expected_level) else {
+        return false; // unknown target level
+    };
+    if old.xp < required_xp {
         return false;
     }
 
@@ -435,6 +511,31 @@ mod tests {
         let mut s = valid_state();
         s.evolution_count = 1;
         assert!(!is_valid_initial_state(&s), "evolution_count != 0 must fail");
+
+        // I5: a fresh mint must hold zero lifetime token rewards.
+        let mut s = valid_state();
+        s.tokens_earned = "5".into();
+        assert!(
+            !is_valid_initial_state(&s),
+            "tokens_earned != '0' must fail"
+        );
+
+        // Empty string also fails (must be exactly "0").
+        let mut s = valid_state();
+        s.tokens_earned = "".into();
+        assert!(!is_valid_initial_state(&s), "tokens_earned == '' must fail");
+    }
+
+    // --- tokens_earned == "0" passes --------------------------------------
+
+    #[test]
+    fn test_initial_state_accepts_zero_tokens_earned() {
+        // The valid_state() helper already sets tokens_earned = "0"; sanity-check
+        // the field directly so future edits to the helper can't silently mask a
+        // regression.
+        let mut s = valid_state();
+        s.tokens_earned = "0".into();
+        assert!(is_valid_initial_state(&s));
     }
 
     // --- Immutable traits --------------------------------------------------
@@ -480,5 +581,53 @@ mod tests {
     fn test_max_level() {
         assert_eq!(MAX_LEVEL, 21);
         assert_eq!(MAX_SUPPLY, 10_000);
+    }
+
+    // --- XP requirements table --------------------------------------------
+
+    #[test]
+    fn test_xp_required_to_enter() {
+        // Spot-check a few levels against the TS table (nft.ts:120).
+        assert_eq!(xp_required_to_enter(2), Some(100), "entering level 2");
+        assert_eq!(xp_required_to_enter(3), Some(250));
+        assert_eq!(xp_required_to_enter(4), Some(500));
+        assert_eq!(xp_required_to_enter(5), Some(1000));
+        assert_eq!(xp_required_to_enter(10), Some(32000), "entering level 10");
+        assert_eq!(xp_required_to_enter(11), Some(48000));
+        assert_eq!(xp_required_to_enter(15), Some(192000));
+        assert_eq!(xp_required_to_enter(20), Some(1024000), "entering level 20");
+        // Cap: entering 21 reuses the 20→21 cost.
+        assert_eq!(
+            xp_required_to_enter(21),
+            Some(1024000),
+            "entering cap level 21"
+        );
+
+        // Level 1 is the genesis level; there is no "entering" cost (it's where
+        // you start), so the table deliberately has no entry for it.
+        assert_eq!(xp_required_to_enter(1), None);
+
+        // Levels beyond MAX_LEVEL are unreachable and unmapped.
+        assert_eq!(xp_required_to_enter(0), None);
+        assert_eq!(xp_required_to_enter(22), None);
+        assert_eq!(xp_required_to_enter(u32::MAX), None);
+    }
+
+    #[test]
+    fn test_xp_requirements_table_covers_all_transitions() {
+        // Every level transition 1→2 .. 20→21 must have a requirement. There are
+        // exactly 20 transitions (entering levels 2..=21).
+        assert_eq!(XP_REQUIREMENTS.len(), 20);
+        // And the keys are exactly 2..=21.
+        let mut keys: Vec<u32> = XP_REQUIREMENTS.iter().map(|(k, _)| *k).collect();
+        keys.sort();
+        let expected: Vec<u32> = (2..=21).collect();
+        assert_eq!(keys, expected, "table must cover entering levels 2..=21");
+        // Values are strictly non-decreasing (progression never gets cheaper).
+        let mut prev = 0u64;
+        for (_, v) in XP_REQUIREMENTS {
+            assert!(v >= prev, "XP requirements must be non-decreasing");
+            prev = v;
+        }
     }
 }

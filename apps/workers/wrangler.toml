@@ -101,7 +101,7 @@ PLATFORM_FEE_PERCENT = "20"
 # Update NFT_APP_ID after first successful mint
 NFT_APP_ID = "0000000000000000000000000000000000000000000000000000000000000000"
 # VK is SHA256 of the compiled WASM binary (genesis-babies contract, v15)
-NFT_APP_VK = "f2b7516b0b43069a4e95f1f5668ddc3aea3a57c313e11f9a9de88c0e4cb9e238"
+NFT_APP_VK = "0d9483a760ef91eef606e84fbff326132b3e611bc913025913bc34b6655b08ba"
 
 # Production environment
 [env.production]
@@ -161,7 +161,7 @@ PLATFORM_FEE_PERCENT = "20"
 # Update NFT_APP_ID after first successful mint
 NFT_APP_ID = "0000000000000000000000000000000000000000000000000000000000000000"
 # VK is SHA256 of the compiled WASM binary (genesis-babies contract, v15)
-NFT_APP_VK = "f2b7516b0b43069a4e95f1f5668ddc3aea3a57c313e11f9a9de88c0e4cb9e238"
+NFT_APP_VK = "0d9483a760ef91eef606e84fbff326132b3e611bc913025913bc34b6655b08ba"
 
 # Production AI binding
 [env.production.ai]

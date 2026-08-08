@@ -47,7 +47,7 @@ const baseState: SparkNFTState = {
 };
 
 describe("buildWorkProofSpellRequest", () => {
-  it("produces output state with work_count+1, total_xp+xpGain, last_work_block updated", () => {
+  it("produces output state with work_count+1, total_xp+xpGain, xp+xpGain, last_work_block updated", () => {
     const req = buildWorkProofSpellRequest({
       appId: APP_ID,
       nftUtxo: NFT_UTXO,
@@ -58,9 +58,35 @@ describe("buildWorkProofSpellRequest", () => {
     });
     expect(req.outState.work_count).toBe(1);
     expect(req.outState.total_xp).toBe(150);
+    // C1a: spendable `xp` must tick by the SAME xpGain as total_xp, otherwise
+    // the hardened validate_work_proof rejects the spell.
+    expect(req.outState.xp).toBe(150);
     expect(req.outState.last_work_block).toBe(800001);
     expect(req.outState.level).toBe(1);
     expect(req.outState.evolution_count).toBe(0);
+    // C2: tokens_earned must NOT change on a work proof.
+    expect(req.outState.tokens_earned).toBe(baseState.tokens_earned);
+  });
+
+  it("bumps xp alongside total_xp from a non-zero starting xp (C1a invariant)", () => {
+    // Start with some accrued xp/total_xp and confirm both tick by xpGain.
+    const started: SparkNFTState = {
+      ...baseState,
+      xp: 200,
+      total_xp: 500,
+      work_count: 3,
+    };
+    const req = buildWorkProofSpellRequest({
+      appId: APP_ID,
+      nftUtxo: NFT_UTXO,
+      currentState: started,
+      ownerAddress: OWNER_ADDRESS,
+      xpGain: 75,
+      currentBlock: 800050,
+    });
+    expect(req.outState.xp).toBe(275); // 200 + 75
+    expect(req.outState.total_xp).toBe(575); // 500 + 75
+    expect(req.outState.work_count).toBe(4);
   });
 
   it("preserves immutable traits in the output state", () => {
