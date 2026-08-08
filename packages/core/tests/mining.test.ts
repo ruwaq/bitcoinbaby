@@ -185,6 +185,30 @@ describe("MiningOrchestrator", () => {
 
       expect(true).toBe(true); // No errors thrown
     });
+
+    it("should expose an optional BlockObserver hook (no AI-loop change)", async () => {
+      const { MiningOrchestrator } = await import("../src/mining/orchestrator");
+      const { BlockObserver } = await import("../src/mining/block-observer");
+
+      const orchestrator = new MiningOrchestrator();
+
+      // Initially none attached.
+      expect(orchestrator.getBlockObserver()).toBeNull();
+
+      // Attaching/stripping must not throw and must not start mining.
+      const obs = new BlockObserver({}, {}, async () => ({
+        height: 1,
+        hash: "0".repeat(64),
+        time: 0,
+      }));
+      expect(() => orchestrator.setBlockObserver(obs)).not.toThrow();
+      expect(orchestrator.getBlockObserver()).toBe(obs);
+      expect(orchestrator.getIsRunning()).toBe(false);
+
+      // terminate() clears the hook and stops the observer without throwing.
+      expect(() => orchestrator.terminate()).not.toThrow();
+      expect(orchestrator.getBlockObserver()).toBeNull();
+    });
   });
 
   describe("Lifecycle", () => {

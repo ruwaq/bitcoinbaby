@@ -103,6 +103,20 @@ export {
   type ClientVarDiffState,
 } from "./client-vardiff";
 
+// Block-Tick observer (trustless randomness beacon; player observes real Bitcoin
+// blocks instead of hashing). See spec Sección 4.
+export {
+  BlockObserver,
+  countLeadingZeroBits,
+  defaultRpcUrl,
+  defaultChainTipFetcher,
+  type BlockTick,
+  type BlockObserverConfig,
+  type BlockObserverEvents,
+  type ChainTip,
+  type ChainTipFetcher,
+} from "./block-observer";
+
 // Types
 export type {
   Miner,
