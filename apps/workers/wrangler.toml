@@ -82,7 +82,7 @@ FAUCET_AMOUNT = "5"
 FAUCET_MAX_TOTAL = "50"
 # BABTC Token configuration
 # APP_ID = SHA256 of genesis UTXO - update after V2 contract deployment
-BABTC_APP_ID = "87b5ecfb4c8e2d5f3a6e9b1c7d4f2a8e5b3c6d9f1a4e7b2c5d8f3a6e9b1c7d4f"
+BABTC_APP_ID = "87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681b"
 BABTC_APP_VK = "ab70796e62562b5245cf746d7ecf4b95b86df582921ae42ec2ceea25612807c6"
 BABTC_GENESIS = "b3deba0743aeffd0e455ce442b1693107090341381e3d8bcc5f586667c3e8a81:0"
 # Treasury address - holds BABTC tokens
@@ -95,11 +95,13 @@ PLATFORM_FEE_PERCENT = "20"
 # Genesis Babies NFT configuration
 # NOTE: These are placeholder values - update after NFT contract deployment
 # Genesis Babies NFT - VK from compiled contract
-# APP_ID will be established by first mint (SHA256 of funding UTXO)
+# APP_ID = SHA256 of the genesis funding UTXO. It is set by the genesis mint
+# ritual (Task 4.2 / docs/NFT_DEPLOYMENT_RUNBOOK.md), which is blocked on a
+# human checkpoint. Do NOT set it here until that ritual completes.
 # Update NFT_APP_ID after first successful mint
 NFT_APP_ID = "0000000000000000000000000000000000000000000000000000000000000000"
-# VK is SHA256 of the compiled WASM binary (genesis-babies contract)
-NFT_APP_VK = "04aab369e6cd3210fde734b175e09c599229548eda5c5b283c18630782583a61"
+# VK is SHA256 of the compiled WASM binary (genesis-babies contract, v15)
+NFT_APP_VK = "0d9483a760ef91eef606e84fbff326132b3e611bc913025913bc34b6655b08ba"
 
 # Production environment
 [env.production]
@@ -140,7 +142,7 @@ CHARMS_PROVER_URL = "https://v15.charms.dev"
 SCROLLS_API_URL = "https://scrolls.charms.dev"
 # BABTC Token configuration
 # APP_ID = SHA256 of genesis UTXO - update after V2 contract deployment
-BABTC_APP_ID = "87b5ecfb4c8e2d5f3a6e9b1c7d4f2a8e5b3c6d9f1a4e7b2c5d8f3a6e9b1c7d4f"
+BABTC_APP_ID = "87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681b"
 BABTC_APP_VK = "ab70796e62562b5245cf746d7ecf4b95b86df582921ae42ec2ceea25612807c6"
 BABTC_GENESIS = "b3deba0743aeffd0e455ce442b1693107090341381e3d8bcc5f586667c3e8a81:0"
 # Treasury address for testnet4
@@ -153,11 +155,13 @@ PLATFORM_FEE_PERCENT = "20"
 # Genesis Babies NFT configuration
 # NOTE: These are placeholder values - update after NFT contract deployment
 # Genesis Babies NFT - VK from compiled contract
-# APP_ID will be established by first mint (SHA256 of funding UTXO)
+# APP_ID = SHA256 of the genesis funding UTXO. It is set by the genesis mint
+# ritual (Task 4.2 / docs/NFT_DEPLOYMENT_RUNBOOK.md), which is blocked on a
+# human checkpoint. Do NOT set it here until that ritual completes.
 # Update NFT_APP_ID after first successful mint
 NFT_APP_ID = "0000000000000000000000000000000000000000000000000000000000000000"
-# VK is SHA256 of the compiled WASM binary (genesis-babies contract)
-NFT_APP_VK = "04aab369e6cd3210fde734b175e09c599229548eda5c5b283c18630782583a61"
+# VK is SHA256 of the compiled WASM binary (genesis-babies contract, v15)
+NFT_APP_VK = "0d9483a760ef91eef606e84fbff326132b3e611bc913025913bc34b6655b08ba"
 
 # Production AI binding
 [env.production.ai]

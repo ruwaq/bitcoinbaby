@@ -31,6 +31,7 @@ export interface NFTRecord {
   genesisBlock: number;
   lastWorkBlock: number;
   tokensEarned: string;
+  heritage: number;
 }
 
 export function parseNFTData(
@@ -51,6 +52,7 @@ export function parseNFTData(
     lastWorkBlock: parseInt(data.lastWorkBlock as string, 10) || 0,
     evolutionCount: parseInt(data.evolutionCount as string, 10) || 0,
     tokensEarned: (data.tokensEarned as string) || "0",
+    heritage: parseInt(data.heritage as string, 10) || 0,
     txid: data.txid as string,
     address: data.address as string,
     mintedAt: parseInt(data.mintedAt as string, 10),

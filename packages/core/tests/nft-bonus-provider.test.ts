@@ -2,9 +2,10 @@
  * NFT Bonus Provider Tests
  *
  * Tests for NFT mining boost calculations including:
- * - Level boosts
- * - Rarity boosts
- * - Stacking with diminishing returns
+ * - Level boosts (level-only after refactor 4ad993b)
+ * - Rarity is cosmetic (no longer affects boost)
+ * - Best boost wins across multiple NFTs (no diminishing-returns stacking)
+ * - Max boost cap
  */
 
 import { describe, it, expect } from "vitest";
@@ -17,7 +18,7 @@ import type { BonusCalculationContext } from "../src/rewards/bonus-engine";
 
 interface MockNFT {
   level: number;
-  rarityTier: string;
+  rarityTier?: string;
   boost?: number;
 }
 
@@ -29,28 +30,30 @@ const createMockContext = (nfts: MockNFT[] = []): BonusCalculationContext => ({
   })),
 });
 
-// Level boost values from provider
+// Level boost values from the provider (level-only, rarity is cosmetic).
+// 0% at level 1, 10% at level 21.
 const LEVEL_BOOSTS: Record<number, number> = {
   1: 0,
-  2: 0.25,
-  3: 0.5,
-  4: 0.75,
-  5: 1,
-  6: 1.5,
-  7: 2,
-  8: 2.5,
-  9: 3,
-  10: 4,
-};
-
-// Rarity boost values from provider
-const RARITY_BOOSTS: Record<string, number> = {
-  common: 0.5,
-  uncommon: 1,
-  rare: 2,
-  epic: 3,
-  legendary: 5,
-  mythic: 8,
+  2: 0.1,
+  3: 0.2,
+  4: 0.3,
+  5: 0.5,
+  6: 1,
+  7: 1.25,
+  8: 1.5,
+  9: 1.75,
+  10: 2,
+  11: 2.5,
+  12: 3,
+  13: 3.5,
+  14: 4,
+  15: 4.5,
+  16: 5,
+  17: 5.5,
+  18: 6,
+  19: 7,
+  20: 8,
+  21: 10,
 };
 
 // =============================================================================
@@ -149,8 +152,8 @@ describe("NFTBonusProvider - Level Boosts", () => {
     const context = createMockContext([{ level: 1, rarityTier: "common" }]);
     const result = provider.calculate(context);
 
-    // Level 1: 0% + Common: 0.5% = 0.5%
-    expect(result.percentage).toBe(0.5);
+    // Level 1 = 0% (rarity is cosmetic and adds nothing)
+    expect(result.percentage).toBe(0);
   });
 
   it("should return correct level boost for level 5", () => {
@@ -158,126 +161,114 @@ describe("NFTBonusProvider - Level Boosts", () => {
     const context = createMockContext([{ level: 5, rarityTier: "common" }]);
     const result = provider.calculate(context);
 
-    // Level 5: 1% + Common: 0.5% = 1.5%
-    expect(result.percentage).toBe(1.5);
+    // Level 5 = 0.5%
+    expect(result.percentage).toBe(0.5);
   });
 
-  it("should return max level boost for level 10", () => {
+  it("should return correct level boost for level 10", () => {
     const provider = createNFTProvider();
     const context = createMockContext([{ level: 10, rarityTier: "common" }]);
     const result = provider.calculate(context);
 
-    // Level 10: 4% + Common: 0.5% = 4.5%
-    expect(result.percentage).toBe(4.5);
+    // Level 10 = 2%
+    expect(result.percentage).toBe(2);
+  });
+
+  it("should return max level boost for level 21", () => {
+    const provider = createNFTProvider();
+    const context = createMockContext([{ level: 21, rarityTier: "mythic" }]);
+    const result = provider.calculate(context);
+
+    // Level 21 = 10% (maximum level boost)
+    expect(result.percentage).toBe(10);
   });
 
   it("should handle all level boost values correctly", () => {
     const provider = createNFTProvider();
 
-    for (let level = 1; level <= 10; level++) {
+    for (let level = 1; level <= 21; level++) {
       const context = createMockContext([{ level, rarityTier: "common" }]);
       const result = provider.calculate(context);
-      const expectedBoost = LEVEL_BOOSTS[level] + RARITY_BOOSTS.common;
+      const expectedBoost = LEVEL_BOOSTS[level];
 
       expect(result.percentage).toBe(expectedBoost);
     }
   });
-});
 
-// =============================================================================
-// RARITY BOOST TESTS
-// =============================================================================
-
-describe("NFTBonusProvider - Rarity Boosts", () => {
-  it("should return 0.5% for common rarity", () => {
+  it("should return 0% for an unknown level", () => {
     const provider = createNFTProvider();
-    const context = createMockContext([{ level: 1, rarityTier: "common" }]);
+    const context = createMockContext([{ level: 99 }]);
     const result = provider.calculate(context);
 
-    expect(result.percentage).toBe(RARITY_BOOSTS.common);
-  });
-
-  it("should return 1% for uncommon rarity", () => {
-    const provider = createNFTProvider();
-    const context = createMockContext([{ level: 1, rarityTier: "uncommon" }]);
-    const result = provider.calculate(context);
-
-    expect(result.percentage).toBe(RARITY_BOOSTS.uncommon);
-  });
-
-  it("should return 2% for rare rarity", () => {
-    const provider = createNFTProvider();
-    const context = createMockContext([{ level: 1, rarityTier: "rare" }]);
-    const result = provider.calculate(context);
-
-    expect(result.percentage).toBe(RARITY_BOOSTS.rare);
-  });
-
-  it("should return 3% for epic rarity", () => {
-    const provider = createNFTProvider();
-    const context = createMockContext([{ level: 1, rarityTier: "epic" }]);
-    const result = provider.calculate(context);
-
-    expect(result.percentage).toBe(RARITY_BOOSTS.epic);
-  });
-
-  it("should return 5% for legendary rarity", () => {
-    const provider = createNFTProvider();
-    const context = createMockContext([{ level: 1, rarityTier: "legendary" }]);
-    const result = provider.calculate(context);
-
-    expect(result.percentage).toBe(RARITY_BOOSTS.legendary);
-  });
-
-  it("should return 8% for mythic rarity", () => {
-    const provider = createNFTProvider();
-    const context = createMockContext([{ level: 1, rarityTier: "mythic" }]);
-    const result = provider.calculate(context);
-
-    expect(result.percentage).toBe(RARITY_BOOSTS.mythic);
-  });
-
-  it("should handle unknown rarity tier", () => {
-    const provider = createNFTProvider();
-    const context = createMockContext([{ level: 1, rarityTier: "unknown" }]);
-    const result = provider.calculate(context);
-
-    // Unknown rarity = 0 boost, level 1 = 0 boost
     expect(result.percentage).toBe(0);
   });
+});
 
-  it("should be case insensitive for rarity", () => {
+// =============================================================================
+// RARITY IS COSMETIC TESTS
+// (Post-4ad993b: rarity no longer affects mining boost — it is display-only.)
+// =============================================================================
+
+describe("NFTBonusProvider - Rarity Is Cosmetic", () => {
+  it("should return the same boost for common and mythic at level 1", () => {
     const provider = createNFTProvider();
-    const context = createMockContext([{ level: 1, rarityTier: "MYTHIC" }]);
-    const result = provider.calculate(context);
 
-    expect(result.percentage).toBe(RARITY_BOOSTS.mythic);
+    const common = provider.calculate(
+      createMockContext([{ level: 1, rarityTier: "common" }]),
+    );
+    const mythic = provider.calculate(
+      createMockContext([{ level: 1, rarityTier: "mythic" }]),
+    );
+
+    // Both are level 1 = 0%, rarity adds nothing
+    expect(common.percentage).toBe(0);
+    expect(mythic.percentage).toBe(0);
+    expect(common.percentage).toBe(mythic.percentage);
+  });
+
+  it("should return the same boost for every rarity at the same level", () => {
+    const provider = createNFTProvider();
+    const rarities = [
+      "common",
+      "uncommon",
+      "rare",
+      "epic",
+      "legendary",
+      "mythic",
+    ];
+
+    const boosts = rarities.map((rarityTier) =>
+      provider
+        .calculate(createMockContext([{ level: 10, rarityTier }]))
+        .percentage.toFixed(4),
+    );
+
+    // Every rarity yields the level-10 boost (2%); rarity is ignored
+    expect(boosts.every((b) => b === boosts[0])).toBe(true);
+    expect(boosts[0]).toBe("2.0000");
+  });
+
+  it("should ignore unknown and mixed-case rarity tiers", () => {
+    const provider = createNFTProvider();
+
+    const unknown = provider.calculate(
+      createMockContext([{ level: 5, rarityTier: "unknown" }]),
+    );
+    const mixedCase = provider.calculate(
+      createMockContext([{ level: 5, rarityTier: "MYTHIC" }]),
+    );
+
+    // Both are level 5 = 0.5%, regardless of rarity string
+    expect(unknown.percentage).toBe(0.5);
+    expect(mixedCase.percentage).toBe(0.5);
   });
 });
 
 // =============================================================================
-// COMBINED BOOST TESTS
+// BOOST OVERRIDE TESTS
 // =============================================================================
 
-describe("NFTBonusProvider - Combined Boosts", () => {
-  it("should combine level and rarity boosts additively", () => {
-    const provider = createNFTProvider();
-    const context = createMockContext([{ level: 5, rarityTier: "rare" }]);
-    const result = provider.calculate(context);
-
-    // Level 5: 1% + Rare: 2% = 3%
-    expect(result.percentage).toBe(3);
-  });
-
-  it("should calculate max boost for level 10 mythic", () => {
-    const provider = createNFTProvider();
-    const context = createMockContext([{ level: 10, rarityTier: "mythic" }]);
-    const result = provider.calculate(context);
-
-    // Level 10: 4% + Mythic: 8% = 12%
-    expect(result.percentage).toBe(12);
-  });
-
+describe("NFTBonusProvider - Boost Override", () => {
   it("should use pre-calculated boost if provided", () => {
     const provider = createNFTProvider();
     const context = createMockContext([
@@ -287,88 +278,89 @@ describe("NFTBonusProvider - Combined Boosts", () => {
 
     expect(result.percentage).toBe(10);
   });
+
+  it("should let an explicit boost override the level boost", () => {
+    const provider = createNFTProvider();
+    const context = createMockContext([{ level: 21, boost: 7 }]);
+    const result = provider.calculate(context);
+
+    // Level 21 would be 10%, but the explicit boost (7) wins
+    expect(result.percentage).toBe(7);
+  });
+
+  it("should treat an explicit zero boost as zero", () => {
+    const provider = createNFTProvider();
+    const context = createMockContext([{ level: 21, boost: 0 }]);
+    const result = provider.calculate(context);
+
+    // Explicit boost of 0 overrides the level-21 boost
+    expect(result.percentage).toBe(0);
+  });
 });
 
 // =============================================================================
-// STACKING TESTS
+// BEST BOOST WINS (MULTIPLE NFTS) TESTS
+// (Post-4ad993b: multiple NFTs no longer stack with diminishing returns.
+//  The single best boost is used.)
 // =============================================================================
 
-describe("NFTBonusProvider - Stacking", () => {
-  it("should apply 100% of first NFT boost", () => {
+describe("NFTBonusProvider - Best Boost Wins", () => {
+  it("should use the full boost of a single NFT", () => {
     const provider = createNFTProvider();
-    const context = createMockContext([{ level: 1, rarityTier: "rare" }]); // 2%
+    const context = createMockContext([{ level: 10 }]); // 2%
     const result = provider.calculate(context);
 
-    // First NFT at 100%: 2% * 1.0 = 2%
     expect(result.percentage).toBe(2);
   });
 
-  it("should apply 50% of second NFT boost", () => {
+  it("should pick the highest boost among multiple NFTs", () => {
     const provider = createNFTProvider();
     const context = createMockContext([
-      { level: 1, rarityTier: "rare" }, // 2%
-      { level: 1, rarityTier: "rare" }, // 2%
+      { level: 5 }, // 0.5%
+      { level: 10 }, // 2%
+      { level: 1 }, // 0%
     ]);
     const result = provider.calculate(context);
 
-    // First: 2% * 1.0 = 2%, Second: 2% * 0.5 = 1%, Total: 3%
-    expect(result.percentage).toBe(3);
+    // Best boost wins: max(0.5, 2, 0) = 2%
+    expect(result.percentage).toBe(2);
   });
 
-  it("should apply 25% of third NFT boost", () => {
+  it("should not sum boosts across NFTs", () => {
     const provider = createNFTProvider();
     const context = createMockContext([
-      { level: 1, rarityTier: "rare" }, // 2%
-      { level: 1, rarityTier: "rare" }, // 2%
-      { level: 1, rarityTier: "rare" }, // 2%
+      { level: 10 }, // 2%
+      { level: 10 }, // 2%
+      { level: 10 }, // 2%
     ]);
     const result = provider.calculate(context);
 
-    // 2% * 1.0 + 2% * 0.5 + 2% * 0.25 = 2 + 1 + 0.5 = 3.5%
-    expect(result.percentage).toBe(3.5);
+    // Best-wins, NOT additive stacking: 2%, not 6%
+    expect(result.percentage).toBe(2);
   });
 
-  it("should apply 12.5% of fourth NFT boost", () => {
+  it("should pick the best boost regardless of input order", () => {
     const provider = createNFTProvider();
     const context = createMockContext([
-      { level: 1, rarityTier: "rare" },
-      { level: 1, rarityTier: "rare" },
-      { level: 1, rarityTier: "rare" },
-      { level: 1, rarityTier: "rare" },
+      { level: 1 }, // 0%
+      { level: 21 }, // 10% (highest)
+      { level: 10 }, // 2%
     ]);
     const result = provider.calculate(context);
 
-    // 2 * 1.0 + 2 * 0.5 + 2 * 0.25 + 2 * 0.125 = 2 + 1 + 0.5 + 0.25 = 3.75%
-    expect(result.percentage).toBe(3.75);
+    expect(result.percentage).toBe(10);
   });
 
-  it("should apply 5% for fifth+ NFT boost", () => {
+  it("should pick the best boost when explicit overrides are mixed in", () => {
     const provider = createNFTProvider();
     const context = createMockContext([
-      { level: 1, rarityTier: "rare" },
-      { level: 1, rarityTier: "rare" },
-      { level: 1, rarityTier: "rare" },
-      { level: 1, rarityTier: "rare" },
-      { level: 1, rarityTier: "rare" },
+      { level: 21 }, // 10%
+      { level: 1, boost: 15 }, // 15% (explicit override, highest)
+      { level: 10 }, // 2%
     ]);
     const result = provider.calculate(context);
 
-    // 2*(1 + 0.5 + 0.25 + 0.125 + 0.05) = 2 * 1.925 = 3.85%
-    expect(result.percentage).toBe(3.85);
-  });
-
-  it("should sort NFTs by boost (highest first) before stacking", () => {
-    const provider = createNFTProvider();
-    const context = createMockContext([
-      { level: 1, rarityTier: "common" }, // 0.5%
-      { level: 10, rarityTier: "mythic" }, // 12% (highest)
-      { level: 1, rarityTier: "rare" }, // 2%
-    ]);
-    const result = provider.calculate(context);
-
-    // Sorted: 12%, 2%, 0.5%
-    // 12 * 1.0 + 2 * 0.5 + 0.5 * 0.25 = 12 + 1 + 0.125 = 13.125%
-    expect(result.percentage).toBe(13.125);
+    expect(result.percentage).toBe(15);
   });
 });
 
@@ -380,47 +372,39 @@ describe("NFTBonusProvider - Max Boost Cap", () => {
   it("should cap total boost at 50%", () => {
     const provider = createNFTProvider();
 
-    // Create many high-boost NFTs that would exceed 50%
-    const manyMythics = Array(10)
-      .fill(null)
-      .map(() => ({ level: 10, rarityTier: "mythic" })); // 12% each
-
-    const context = createMockContext(manyMythics);
+    // Explicit boost exceeds the default 50% cap
+    const context = createMockContext([{ level: 1, boost: 75 }]);
     const result = provider.calculate(context);
 
-    expect(result.percentage).toBeLessThanOrEqual(50);
+    expect(result.percentage).toBe(50);
   });
 
   it("should cap multiplier at 1.5", () => {
     const provider = createNFTProvider();
 
-    const manyMythics = Array(10)
-      .fill(null)
-      .map(() => ({ level: 10, rarityTier: "mythic" }));
-
-    const context = createMockContext(manyMythics);
+    const context = createMockContext([{ level: 1, boost: 75 }]);
     const result = provider.calculate(context);
 
-    expect(result.multiplier).toBeLessThanOrEqual(1.5);
+    expect(result.multiplier).toBe(1.5);
   });
 
-  it("should allow custom max boost", () => {
+  it("should allow boost under a custom max boost cap", () => {
     const provider = createNFTProvider({ maxBoostPercent: 20 });
-    const context = createMockContext([{ level: 10, rarityTier: "mythic" }]); // 12%
+    const context = createMockContext([{ level: 21 }]); // 10%
 
     const result = provider.calculate(context);
 
-    // 12% is under 20% cap, should be allowed
-    expect(result.percentage).toBe(12);
+    // 10% is under the 20% cap, should be allowed
+    expect(result.percentage).toBe(10);
   });
 
   it("should apply custom max boost cap", () => {
     const provider = createNFTProvider({ maxBoostPercent: 10 });
-    const context = createMockContext([{ level: 10, rarityTier: "mythic" }]); // 12%
+    const context = createMockContext([{ level: 1, boost: 25 }]); // 25%
 
     const result = provider.calculate(context);
 
-    // 12% exceeds 10% cap, should be capped
+    // 25% exceeds the 10% cap, should be capped
     expect(result.percentage).toBe(10);
   });
 });
@@ -444,49 +428,29 @@ describe("NFTBonusProvider - Metadata", () => {
   it("should include best boost in metadata", () => {
     const provider = createNFTProvider();
     const context = createMockContext([
-      { level: 1, rarityTier: "common" }, // 0.5%
-      { level: 5, rarityTier: "rare" }, // 3% (best)
+      { level: 1, rarityTier: "common" }, // 0%
+      { level: 21, rarityTier: "rare" }, // 10% (best)
     ]);
     const result = provider.calculate(context);
 
-    expect(result.metadata?.details?.bestBoost).toBe(3);
+    expect(result.metadata?.details?.bestBoost).toBe(10);
   });
 
-  it("should include stacked boost in metadata", () => {
-    const provider = createNFTProvider();
-    const context = createMockContext([
-      { level: 1, rarityTier: "rare" },
-      { level: 1, rarityTier: "rare" },
-    ]);
+  it("should reflect the capped boost in bestBoost metadata", () => {
+    const provider = createNFTProvider({ maxBoostPercent: 5 });
+    const context = createMockContext([{ level: 21 }]); // 10% -> capped to 5%
     const result = provider.calculate(context);
 
-    expect(result.metadata?.details?.stackedBoost).toBe(result.percentage);
-  });
-
-  it("should include individual NFT boosts in metadata", () => {
-    const provider = createNFTProvider();
-    const context = createMockContext([
-      { level: 1, rarityTier: "common" }, // 0.5%
-      { level: 5, rarityTier: "rare" }, // 3%
-    ]);
-    const result = provider.calculate(context);
-
-    const nfts = result.metadata?.details?.nfts as Array<{
-      level: number;
-      rarity: string;
-      boost: number;
-    }>;
-
-    expect(nfts).toBeDefined();
-    expect(nfts).toHaveLength(2);
+    expect(result.percentage).toBe(5);
+    expect(result.metadata?.details?.bestBoost).toBe(5);
   });
 
   it("should format label correctly", () => {
     const provider = createNFTProvider();
-    const context = createMockContext([{ level: 5, rarityTier: "rare" }]);
+    const context = createMockContext([{ level: 21, rarityTier: "rare" }]);
     const result = provider.calculate(context);
 
-    expect(result.metadata?.label).toBe("+3.0%");
+    expect(result.metadata?.label).toBe("+10.0%");
   });
 
   it("should include NFT count in description", () => {
@@ -516,12 +480,12 @@ describe("NFTBonusProvider - Metadata", () => {
 describe("NFTBonusProvider - Multiplier", () => {
   it("should convert percentage to multiplier correctly", () => {
     const provider = createNFTProvider();
-    const context = createMockContext([{ level: 5, rarityTier: "rare" }]); // 3%
+    const context = createMockContext([{ level: 21, rarityTier: "rare" }]); // 10%
 
     const result = provider.calculate(context);
 
-    // 3% boost = 1.03 multiplier
-    expect(result.multiplier).toBe(1.03);
+    // 10% boost = 1.1 multiplier
+    expect(result.multiplier).toBe(1.1);
   });
 
   it("should have multiplier of 1.0 for no boost", () => {
@@ -537,8 +501,8 @@ describe("NFTBonusProvider - Multiplier", () => {
     // Create provider with lower cap to test capping behavior
     const provider = createNFTProvider({ maxBoostPercent: 10 });
 
-    // Single level 10 mythic = 12% boost, should be capped at 10%
-    const context = createMockContext([{ level: 10, rarityTier: "mythic" }]);
+    // Explicit 25% boost, should be capped at 10%
+    const context = createMockContext([{ level: 1, boost: 25 }]);
     const result = provider.calculate(context);
 
     // Capped at 10%, so multiplier should be 1.1

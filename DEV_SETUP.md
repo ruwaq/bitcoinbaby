@@ -9,14 +9,17 @@ Esta guía documenta las herramientas y metodologías disponibles en el monorepo
 El Modo Sandbox utiliza un simulador de blockchain en memoria (`MockMempoolClient`) que reemplaza las conexiones a la red real de Bitcoin. Permite probar toda la interfaz visual y flujos del frontend de manera instantánea y libre de fallos de red.
 
 ### Características del Sandbox:
-* **Sin Dependencias:** No requiere Docker ni instalar nodos locales de Bitcoin.
-* **Auto-Faucet Automático:** Al importar cualquier frase semilla, el simulador asigna automáticamente un balance inicial ficticio de **0.5 BTC** (50,000,000 satoshis) para que puedas realizar transacciones inmediatamente.
-* **Confirmación Instantánea:** Los envíos de transacciones, consumos de UTXOs y saldos se actualizan de inmediato en pantalla sin esperar confirmación de bloques.
+
+- **Sin Dependencias:** No requiere Docker ni instalar nodos locales de Bitcoin.
+- **Auto-Faucet Automático:** Al importar cualquier frase semilla, el simulador asigna automáticamente un balance inicial ficticio de **0.5 BTC** (50,000,000 satoshis) para que puedas realizar transacciones inmediatamente.
+- **Confirmación Instantánea:** Los envíos de transacciones, consumos de UTXOs y saldos se actualizan de inmediato en pantalla sin esperar confirmación de bloques.
 
 ### Activación:
+
 Para activar el modo Sandbox, agrega o edita la siguiente línea en tu archivo de variables de entorno de la app web:
 
 **Archivo:** `apps/web/.env.local`
+
 ```env
 NEXT_PUBLIC_USE_MOCK_BLOCKCHAIN=true
 ```
@@ -29,17 +32,26 @@ Reinicia el servidor de desarrollo (`pnpm dev`) y el frontend utilizará automá
 
 Para pruebas integrales reales (E2E), firma de PSBTs reales e interacciones con el protocolo a nivel de red, debes usar un nodo de Bitcoin Core local corriendo en modo **Regtest**.
 
-El monorepo soporta dos maneras sencillas de levantar esta infraestructura local (las dos exponen la API de Mempool/Esplora en el puerto estándar `http://localhost:5000`):
+El monorepo expone la API de Esplora/Mempool en el puerto **`http://localhost:3000`** (NO el 5000, que en macOS está ocupado por ControlCenter/AirPlay). El proxy `chopsticks` sirve la API en la raíz (sin el prefijo `/api`).
 
 ### Opción A: Usando el Docker Compose del Proyecto (Nativo)
 
-Levanta un nodo de Bitcoin Core (`bitcoind`), el indexador de bloques (`electrs`), y el proxy visual (`chopsticks` de Nigiri).
+Levanta un nodo de Bitcoin Core (`bitcoind`), el indexador de bloques (`electrs`), y el proxy con faucet/minería (`chopsticks` de Nigiri). Las imágenes se publican ahora en GHCR (las antiguas `vulpemventures/bitcoin:26.0` y `vulpemventures/chopsticks` fueron eliminadas de Docker Hub):
+
+- `ghcr.io/getumbrel/docker-bitcoind:v30.0` (Bitcoin Core)
+- `ghcr.io/vulpemventures/electrs:latest` (indexador Electrum/Esplora)
+- `ghcr.io/vulpemventures/nigiri-chopsticks:latest` (proxy + faucet + minería)
 
 1. **Levantar contenedores:**
    ```bash
    docker compose up -d
    ```
-2. **Apagar contenedores:**
+2. **Verificar que están corriendo:**
+   ```bash
+   docker compose ps
+   ```
+   `electrs` necesita unos segundos para indexar los bloques iniciales; el primer request puede fallar con connection refused hasta que sincronice.
+3. **Apagar contenedores:**
    ```bash
    docker compose down
    ```
@@ -49,10 +61,12 @@ Levanta un nodo de Bitcoin Core (`bitcoind`), el indexador de bloques (`electrs`
 Nigiri es una herramienta CLI excelente que gestiona este entorno de forma global y te provee de herramientas rápidas.
 
 1. **Instalar Nigiri:**
+
    ```bash
    curl https://getnigiri.vulpem.com | bash
    ```
-   *(Asegúrate de agregar nigiri a tu PATH siguiendo las instrucciones del instalador)*.
+
+   _(Asegúrate de agregar nigiri a tu PATH siguiendo las instrucciones del instalador)_.
 
 2. **Iniciar Entorno:**
    ```bash
@@ -69,34 +83,36 @@ Nigiri es una herramienta CLI excelente que gestiona este entorno de forma globa
 
 ### Interactuar con la Red Regtest Local
 
-Una vez que el entorno local esté activo (ya sea por Opción A o B):
+Una vez que el entorno local esté activo (Opción A), la API + faucet están en el puerto **3000**:
 
-* **Explorador Visual:** Abre [http://localhost:5000](http://localhost:5000) en tu navegador para ver el explorador de bloques local.
-* **Obtener Satoshis (Faucet):**
-  * Si usas Nigiri:
-    ```bash
-    nigiri faucet <tu-direccion-tb1q...>
-    ```
-  * O mediante la API HTTP de Nigiri:
-    ```bash
-    curl -d '{"address":"<tu-direccion>"}' http://localhost:5000/api/faucet
-    ```
-* **Minar Bloques (Confirmar Transacciones):**
-  * Para confirmar las transacciones pendientes en tu pool local, mina bloques manualmente:
-    ```bash
-    nigiri mine 1
-    ```
-  * O mediante API HTTP:
-    ```bash
-    curl -d '{"blocks":1}' http://localhost:5000/api/mine
-    ```
+- **Explorador / API (Esplora):** [http://localhost:3000](http://localhost:3000). La API se sirve en la raíz (sin `/api`), ej. `http://localhost:3000/blocks/tip/height`.
+- **Obtener una dirección nueva (de la wallet del faucet):**
+  ```bash
+  curl -s http://localhost:3000/getnewaddress
+  # => {"address":"bcrt1q..."}
+  ```
+- **Obtener Satoshis (Faucet):** El faucet se llama con un `POST` a `/faucet` indicando `address` y `amount` (en BTC):
+  ```bash
+  curl -s -X POST http://localhost:3000/faucet \
+    -H "Content-Type: application/json" \
+    -d '{"address":"bcrt1q...","amount":0.01}'
+  # => {"txId":"..."}   (se mina automáticamente en un bloque nuevo)
+  ```
+  > Si usas Nigiri CLI en su lugar: `nigiri faucet <tu-direccion-bcrt1q...>`.
+- **Minar Bloques (Confirmar Transacciones):** Con `chopsticks` la minería es **automática** al.broadcastar (`POST /tx` mina un bloque en cuanto recibe la transacción), así que **no hay un endpoint `/mine` separado**. Para forzar bloques sin broadcastar, usa directamente el RPC de `bitcoind` o `nigiri mine 1` si usas la CLI.
+- **Consultar UTXOs / altura:** (electrs debe haber indexado)
+  ```bash
+  curl -s http://localhost:3000/address/bcrt1q.../utxo
+  curl -s http://localhost:3000/blocks/tip/height
+  ```
 
 ### Configuración en la Web App para Regtest:
+
 1. En `apps/web/.env.local`, asegúrate de desactivar el mock si quieres usar Bitcoin Core real:
    ```env
    NEXT_PUBLIC_USE_MOCK_BLOCKCHAIN=false
    ```
-2. En la interfaz web de la aplicación, ve a la sección de configuración/redes y cambia la red activa a **"Bitcoin Regtest (Local)"**. Las llamadas de API apuntarán a `http://localhost:5000/api`.
+2. En la interfaz web de la aplicación, ve a la sección de configuración/redes y cambia la red activa a **"Bitcoin Regtest (Local)"**. Las llamadas de API apuntarán a `http://localhost:3000` (raíz, sin prefijo `/api`).
 
 ---
 
@@ -116,11 +132,11 @@ Para correr el backend local (los Cloudflare Workers que procesan los créditos 
 
 Para garantizar que ningún cambio de red o de transacciones rompa las reglas del monorepo, puedes correr la suite completa de pruebas:
 
-* **Correr todos los tests del monorepo:**
+- **Correr todos los tests del monorepo:**
   ```bash
   pnpm test
   ```
-* **Verificar solo el comportamiento del simulador Mock:**
+- **Verificar solo el comportamiento del simulador Mock:**
   ```bash
   pnpm --filter @bitcoinbaby/bitcoin test --run mock-mempool
   ```

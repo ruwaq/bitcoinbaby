@@ -82,6 +82,7 @@ confirmRouter.post(
         genesisBlock: 0,
         lastWorkBlock: 0,
         tokensEarned: "0",
+        heritage: body.nft?.heritage ?? 0,
       };
 
       // Create NFT record FIRST, then add to indexes

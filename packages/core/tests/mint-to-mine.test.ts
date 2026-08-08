@@ -47,12 +47,14 @@ function createMockNFT(overrides: Partial<SparkNFTState> = {}): SparkNFTState {
 // =============================================================================
 
 describe("Mining Boost Calculation", () => {
+  // Post-4ad993b: mining boost is LEVEL-ONLY. Rarity is cosmetic and adds nothing.
+  // 0% at level 1, 10% at level 21.
   describe("Level-based boosts", () => {
-    it("should return 0.5% boost at level 1 common", () => {
+    it("should return 0% boost at level 1 (no rarity contribution)", () => {
       const nft = createMockNFT({ level: 1, rarityTier: "common" });
       const boost = getMiningBoost(nft);
-      // common rarity adds 0.5% (balanced values), level 1 adds 0%
-      expect(boost).toBe(0.5);
+      // Level 1 = 0%, rarity is cosmetic
+      expect(boost).toBe(0);
     });
 
     it("should increase boost with higher levels", () => {
@@ -69,17 +71,29 @@ describe("Mining Boost Calculation", () => {
     });
 
     it("should match LEVEL_BOOSTS configuration", () => {
-      for (let level = 1; level <= 10; level++) {
+      for (let level = 1; level <= 21; level++) {
         const nft = createMockNFT({ level, rarityTier: "common" });
         const boost = getMiningBoost(nft);
-        // Common = 0.5% (balanced values)
-        const expectedBoost = LEVEL_BOOSTS[level] + 0.5;
-        expect(boost).toBe(expectedBoost);
+        // Level-only boost (rarity is cosmetic)
+        expect(boost).toBe(LEVEL_BOOSTS[level]);
       }
+    });
+
+    it("should return max level boost for level 21", () => {
+      const nft = createMockNFT({ level: 21, rarityTier: "mythic" });
+      const boost = getMiningBoost(nft);
+      // Level 21 = 10% (maximum level boost)
+      expect(boost).toBe(10);
+    });
+
+    it("should return 0 for an unknown level", () => {
+      const nft = createMockNFT({ level: 99, rarityTier: "common" });
+      const boost = getMiningBoost(nft);
+      expect(boost).toBe(0);
     });
   });
 
-  describe("Rarity-based boosts", () => {
+  describe("Rarity is cosmetic (no boost contribution)", () => {
     const rarities: RarityTier[] = [
       "common",
       "uncommon",
@@ -89,33 +103,34 @@ describe("Mining Boost Calculation", () => {
       "mythic",
     ];
 
-    it("should increase boost with higher rarity", () => {
+    it("should return equal boost across all rarities at the same level", () => {
       const boosts = rarities.map((rarityTier) => {
-        const nft = createMockNFT({ level: 1, rarityTier });
+        const nft = createMockNFT({ level: 10, rarityTier });
         return getMiningBoost(nft);
       });
 
-      // Each rarity should have higher or equal boost than previous
-      for (let i = 1; i < boosts.length; i++) {
-        expect(boosts[i]).toBeGreaterThanOrEqual(boosts[i - 1]);
-      }
+      // Every rarity yields the same level-10 boost; rarity is ignored
+      const first = boosts[0];
+      expect(first).toBe(LEVEL_BOOSTS[10]);
+      expect(boosts.every((b) => b === first)).toBe(true);
     });
 
-    it("should have highest boost for mythic rarity", () => {
+    it("should have equal boost for common and mythic at level 1", () => {
       const common = createMockNFT({ level: 1, rarityTier: "common" });
       const mythic = createMockNFT({ level: 1, rarityTier: "mythic" });
 
       const commonBoost = getMiningBoost(common);
       const mythicBoost = getMiningBoost(mythic);
 
-      expect(mythicBoost).toBeGreaterThan(commonBoost);
-      // Mythic (8%) vs Common (0.5%) = 7.5% difference (balanced values)
-      expect(mythicBoost - commonBoost).toBeGreaterThanOrEqual(7);
+      // Both are level 1 = 0%, rarity adds nothing
+      expect(commonBoost).toBe(0);
+      expect(mythicBoost).toBe(0);
+      expect(mythicBoost).toBe(commonBoost);
     });
   });
 
-  describe("Combined level + rarity boosts", () => {
-    it("should add level and rarity boosts together", () => {
+  describe("Level progression (no combined rarity contribution)", () => {
+    it("should derive boost from level alone regardless of rarity", () => {
       const level5Common = createMockNFT({ level: 5, rarityTier: "common" });
       const level5Legendary = createMockNFT({
         level: 5,
@@ -125,19 +140,20 @@ describe("Mining Boost Calculation", () => {
       const commonBoost = getMiningBoost(level5Common);
       const legendaryBoost = getMiningBoost(level5Legendary);
 
-      // Both should have level 5 boost (25%), legendary should have more rarity boost
-      expect(legendaryBoost).toBeGreaterThan(commonBoost);
+      // Same level = same boost; rarity is cosmetic
+      expect(commonBoost).toBe(LEVEL_BOOSTS[5]);
+      expect(legendaryBoost).toBe(LEVEL_BOOSTS[5]);
+      expect(legendaryBoost).toBe(commonBoost);
     });
 
-    it("should cap maximum boost reasonably", () => {
-      const maxedNFT = createMockNFT({ level: 10, rarityTier: "mythic" });
+    it("should cap maximum boost at level 21 value", () => {
+      const maxedNFT = createMockNFT({ level: 21, rarityTier: "mythic" });
       const maxBoost = getMiningBoost(maxedNFT);
 
-      // Balanced values: level 10 (4%) + mythic rarity (8%) = 12%
-      // This is intentionally conservative to prevent pay-to-win
-      expect(maxBoost).toBeLessThanOrEqual(15); // Max reasonable for single NFT
-      expect(maxBoost).toBeGreaterThan(10); // Should be meaningful
-      expect(maxBoost).toBe(12); // Exact expected value
+      // Level 21 = 10% (the maximum level boost); rarity is cosmetic
+      expect(maxBoost).toBeLessThanOrEqual(15); // Conservatively under hard cap
+      expect(maxBoost).toBeGreaterThan(0); // Should be meaningful
+      expect(maxBoost).toBe(10); // Exact max level-21 value
     });
   });
 });
