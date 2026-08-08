@@ -1,4 +1,4 @@
-import type { Miner, MiningResult } from "./types";
+import type { Miner, MiningResult } from "../types";
 import { createLogger } from "@bitcoinbaby/shared";
 
 const log = createLogger("CPUMiner");

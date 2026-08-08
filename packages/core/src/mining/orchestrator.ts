@@ -26,7 +26,13 @@ const defaultConfig: OrchestratorConfig = {
 };
 
 /**
- * MiningOrchestrator - Coordina miners CPU y WebGPU
+ * MiningOrchestrator - Coordinates the AI Proof-of-Useful-Work loop.
+ *
+ * NOTE: This orchestrator does NOT instantiate any miner. BitcoinBaby's
+ * production model is "Block-Tick" (the player observes real Bitcoin blocks and
+ * reacts to them; the player does not mine). `getMinerType()` therefore always
+ * returns `null`. The reference CPU/WebGPU miners live under `./legacy/` but are
+ * not wired in here.
  *
  * Basado en el patron del BRO token:
  * https://github.com/CharmsDev/bro/tree/main/webapp/src/mining
@@ -230,7 +236,10 @@ export class MiningOrchestrator {
   }
 
   getMinerType(): "cpu" | "webgpu" | null {
-    return this.isRunning ? "cpu" : null;
+    // The orchestrator never instantiates a real miner; it only runs the AI
+    // Proof-of-Useful-Work loop. Report `null` honestly so status surfaces
+    // (e.g. via mining-singleton) don't claim a CPU/WebGPU miner is active.
+    return null;
   }
 
   getCapabilities(): DeviceCapabilities | null {

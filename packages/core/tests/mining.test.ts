@@ -246,7 +246,7 @@ describe("MiningOrchestrator", () => {
 describe("CPUMiner", () => {
   describe("Constructor", () => {
     it("should create with default options", async () => {
-      const { CPUMiner } = await import("../src/mining/cpu-miner");
+      const { CPUMiner } = await import("../src/mining/legacy/cpu-miner");
 
       const miner = new CPUMiner();
 
@@ -256,7 +256,7 @@ describe("CPUMiner", () => {
     });
 
     it("should accept custom options", async () => {
-      const { CPUMiner } = await import("../src/mining/cpu-miner");
+      const { CPUMiner } = await import("../src/mining/legacy/cpu-miner");
 
       const onHashrate = vi.fn();
       const onWorkFound = vi.fn();
@@ -276,7 +276,7 @@ describe("CPUMiner", () => {
 
   describe("Throttle", () => {
     it("should clamp throttle to 0-100 range", async () => {
-      const { CPUMiner } = await import("../src/mining/cpu-miner");
+      const { CPUMiner } = await import("../src/mining/legacy/cpu-miner");
 
       const miner = new CPUMiner();
 
@@ -289,7 +289,7 @@ describe("CPUMiner", () => {
 
   describe("Lifecycle", () => {
     it("should handle stop when not started", async () => {
-      const { CPUMiner } = await import("../src/mining/cpu-miner");
+      const { CPUMiner } = await import("../src/mining/legacy/cpu-miner");
 
       const miner = new CPUMiner();
 
@@ -298,7 +298,7 @@ describe("CPUMiner", () => {
     });
 
     it("should handle terminate cleanly", async () => {
-      const { CPUMiner } = await import("../src/mining/cpu-miner");
+      const { CPUMiner } = await import("../src/mining/legacy/cpu-miner");
 
       const miner = new CPUMiner();
 
@@ -308,7 +308,7 @@ describe("CPUMiner", () => {
     });
 
     it("should handle pause/resume when not started", async () => {
-      const { CPUMiner } = await import("../src/mining/cpu-miner");
+      const { CPUMiner } = await import("../src/mining/legacy/cpu-miner");
 
       const miner = new CPUMiner();
 
@@ -320,7 +320,7 @@ describe("CPUMiner", () => {
 
   describe("isRunning semantics", () => {
     it("should return false when not started", async () => {
-      const { CPUMiner } = await import("../src/mining/cpu-miner");
+      const { CPUMiner } = await import("../src/mining/legacy/cpu-miner");
 
       const miner = new CPUMiner();
 

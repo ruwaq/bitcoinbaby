@@ -1,14 +1,22 @@
 /**
  * Mining Module
  *
- * Browser-based mining engine for BitcoinBaby.
- * Supports CPU mining via Web Workers with WebGPU planned.
+ * Production mining engine for BitcoinBaby.
+ *
+ * NOTE: The production model is "Block-Tick" — the player observes real Bitcoin
+ * blocks and reacts to them; the player does NOT mine. The `MiningOrchestrator`
+ * therefore only runs the AI Proof-of-Useful-Work loop, and `getMinerType()`
+ * returns `null` (no real miner is active).
+ *
+ * The BRO-canonical SHA-256d CPU/WebGPU miners still exist as reference
+ * implementations under `./legacy/`, but are intentionally NOT re-exported
+ * from this barrel. Import them explicitly if you ever need them:
+ *   - `./legacy/cpu-miner`
+ *   - `./legacy/webgpu-miner`
  */
 
-// Core mining classes
+// Core orchestrator (AI work loop; no live miner)
 export { MiningOrchestrator } from "./orchestrator";
-export { CPUMiner } from "./cpu-miner";
-export { WebGPUMiner } from "./webgpu-miner";
 
 // Global mining singleton (persists across navigation)
 export {
