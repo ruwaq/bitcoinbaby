@@ -369,3 +369,115 @@ Todo debe pasar antes de declarar el sub-proyecto B completo:
 - Handoff sesión 4→5: `docs/superpowers/notes/SESSION-4-HANDOFF.md`
 - Auditoría previa: `docs/audits/SECURITY_AUDIT_2026-03-08.md`
 - Reportes de investigación sesión 5: Charms ecosystem, economic models, ecological models (en `.claude/memory.md`)
+
+---
+
+# ADDÉNDUM (Sesión 5, post-exploración del código real)
+
+> **Fecha del addéndum:** 2026-08-08 (misma sesión, después de explorar el código real)
+> **Cambio:** El diseño Block-Tick arriba **sigue válido**, pero la **estrategia de implementación cambia** porque una exploración profunda del código (4 agentes leyeron cada `.ts`/`.tsx`/`.rs`) reveló que hay piezas reutilizables, piezas muertas, y fachadas que el spec original no consideraba.
+
+## A1. La verdad del código vs los docs (resumen)
+
+El spec original se basó en `README.md`, `STATUS.md`, `AI_WORLD_ENGINE.md`. El código real muestra un panorama distinto:
+
+### Funciona de verdad (código real y conectado)
+- **Wallet HD** (`packages/bitcoin/src/wallet.ts`): BIP39/86, Taproot, PSBT, zeroing de keys. ✅
+- **Game engine** (`packages/core/src/game/`): decay, 11 achievements, XP, evolutions, game loop fixed-timestep. ✅
+- **15 stores Zustand**: estado real, consumidos por el frontend. ✅
+- **Frontend completo** (`apps/web/src/`): mint flow, marketplace, wallet send, claim — todos cableados a APIs reales, no mocks. ✅
+- **Charms prover integration** (`apps/workers/src/services/`): CBOR real, retry, spells V9/V10/V11. ✅
+- **Contrato NFT v15** (`genesis-babies/src/lib.rs`): 26 tests, estricto en transiciones de estado. ✅
+- **Contrato token v1** (`babtc/src/lib.rs`): PoW on-chain REAL (recomputa double-SHA256). ✅
+
+### Es fachada/muerto/incompleto (crítico)
+- **Mineros muertos**: `cpu-miner.ts` (657 líneas, SHA-256d Web Workers real) y `webgpu-miner.ts` (985 líneas, shader WGSL SHA-256) → **0 instanciaciones**. El `orchestrator.ts` ya no los usa; `getMinerType()` miente ("cpu").
+- **"PoUW" no verificable**: `ai-integration.ts` solo hashea output de API de IA. `baby-brain.ts` (450 líneas) es **template-filling procedural**, no IA. **`packages/ai` no tiene Transformers.js ni ningún modelo** (solo en comentarios).
+- **Sistema PoW clásico DESCONECTADO**: `processMiningCredit` (valida hash256 + difficulty como BRO) y `validateMiningProof` (`proof-validation.ts`) → **código huérfano sin caller**. La ruta `/credit` valida con Schnorr del proof de IA, no PoW.
+- **Contrato `babtc-v2` = CÁSCARA**: `verify_server_signature` retorna `true` tras solo validar longitud (64 chars) + charset hex. `SERVER_PUBKEY_HASH = "DEPLOY_TIME_PUBKEY_HASH"` placeholder jamás leído. Tests con cero cobertura.
+- **NFT on-chain BLOQUEADO**: `NFT_APP_ID = "0000...0000"` placeholder → `/nft/prove`, `/work`, `/evolve` siempre 503.
+- **Signer del tesoro NO EXISTE**: `treasury-signer.ts` comentario "Does NOT do actual signing". `batch-minting.ts` usa `"TREASURY_UTXO_PLACEHOLDER"`. No hay `/api/withdraw`.
+- **Código muerto**: `prover-client.ts` (303 líneas, sin consumidores), configs duplicados (`deployment.ts` vs `testnet4.ts`), dos sistemas baby/spark paralelos.
+
+## A2. Lo que el código cambia en este spec
+
+### Cambio 1: Cerrar C3 reutilizando código existente (no escribiendo nuevo)
+
+El spec original asumía que había que escribir el validador PoW. **Falso**: ya existe en dos lugares:
+
+| Código existente | Dónde | Qué hace | Reutilización |
+|---|---|---|---|
+| `verify_pow` + `count_leading_zeros` + `double_sha256` | `babtc/src/lib.rs:202-228` | Recomputa hash256 on-chain, cuenta leading zeros (estilo BRO) | **Portar a `genesis-babies/src/lib.rs`** para `validate_settle` |
+| `validateMiningProof` + `countLeadingZeroBits` + `hash256Hex` | `apps/workers/src/lib/proof-validation.ts:61-161` | Valida PoW off-chain (hash, nonce, difficulty, dedup KV) | **Cablear a la ruta `/work/:tokenId`** (hoy no lo invoca) |
+| `processMiningCredit` | `apps/workers/src/services/mining-credit.ts` | Orquesta validación PoW → reward BRO-style | **Revivir como caller** del path de settlement |
+| Ruta vieja `POST /:tokenId/work-proof` | `apps/workers/src/routes/nft/evolve.ts:248-361` | YA valida PoW real con `countLeadingZeroBits` + dedup SETNX | **Fuente de inspiración** — pero solo muta Redis, no on-chain |
+
+**Implicación:** la Sección 2 del spec (nueva operación `settle`) se implementa **portando `verify_pow` de babtc a genesis-babies** + **cableando `validateMiningProof` en el worker**, no escribiendo criptografía nueva.
+
+### Cambio 2: Decisión sobre babtc-v2 (cáscara)
+
+El spec original no mencionaba `babtc-v2`. Ahora hay que decidir:
+
+- **Opción A (recomendada):** **Matar `babtc-v2`**. Su verificación de firma es decorativa (retorna `true`); no aporta seguridad. El token de reward real es `babtc` v1 (que SÍ verifica PoW). `babtc-v2` se archiva o elimina.
+- **Opción B:** **Arreglar `babtc-v2`** implementando `verify_server_signature` real (ed25519/HMAC contra pubkey real, no placeholder). Más trabajo, y su modelo (server-signed claims) es ortogonal al Block-Tick.
+
+**Decisión por defecto (avanzo con juicio):** Opción A (matar), a menos que quieras el modelo server-signed para algo específico. Documentar la decisión en el plan.
+
+### Cambio 3: Decisión sobre los mineros muertos
+
+`cpu-miner.ts` y `webgpu-miner.ts` están escritos y correctos pero **0 instanciaciones**. El modelo Block-Tick **no los necesita** (el jugador no mina — observa bloques). Opciones:
+
+- **Opción A (recomendada):** **Aislar en `packages/core/src/mining/legacy/`** con README explicando que son referencia BRO-canónica no usada en producción. No borrar (son código bueno), pero marcar como no-ruta-activa.
+- **Opción B:** **Eliminar.** Código muerto = deuda. Pero se pierde 1600 líneas de implementación SHA-256 WebGPU útil como referencia.
+
+**Decisión por defecto:** Opción A (aislar), porque el código es bueno y puede servir para modo "hardcore mining" opcional futuro. Documentar.
+
+### Cambio 4: EZKL es construir desde cero (no mejorar)
+
+El spec decía "cierra el gap semi-trustless→trustless del PoUW-IA". El código muestra que **no hay PoUW-IA que cerrar** — el proof actual es hash de JSON, y no hay Transformers.js. Por tanto:
+
+- EZKL no es "mejorar PoUW existente", es **construir PoUW desde cero** (cargar modelo ONNX en browser, generar prueba Halo2).
+- Esto es **más trabajo del estimado**. Sub-proyecto B completo se acerca al rango alto (10-12 sesiones, no 8).
+- **Decisión por defecto:** el EZKL pasa a ser **fase final opcional del sub-proyecto B**. El MVP (C3 + batch + fórmula + signer + CI) se entrega primero y ya es defendible. EZKL es "capa trust extra" que puede ir en sub-proyecto B.5 o C.
+
+### Cambio 5: Orden de implementación (limpieza primero)
+
+Antes de añadir Block-Tick, el spec añade una **Fase 0: limpieza de código muerto y reconciliación**:
+1. Aislar mineros muertos (`legacy/`).
+2. Decidir babtc-v2 (matar o arreglar).
+3. Eliminar `prover-client.ts` muerto o revivirlo.
+4. Reconciliar configs duplicadas (`deployment.ts` vs `testnet4.ts`) a una fuente de verdad.
+5. `git rm --cached .claude/memory.md` + `.gitignore`.
+6. Quitar `getMinerType()` mentiroso (devuelve "cpu" sin haber miner).
+
+Esto deja el repo honesto antes de construir sobre él.
+
+## A3. Mapa de código reutilizable (qué tocar en cada fase)
+
+| Fase | Archivo a tocar | Acción |
+|---|---|---|
+| 0. Limpieza | `packages/core/src/mining/{cpu,webgpu}-miner.ts` | Mover a `legacy/` |
+| 0. Limpieza | `packages/bitcoin/contracts/babtc-v2/` | Archivar o eliminar |
+| 0. Limpieza | `apps/workers/src/services/prover-client.ts` | Eliminar o revivir |
+| 0. Limpieza | `packages/bitcoin/src/config/{deployment,testnet4}.ts` | Reconciliar a uno |
+| 0. Limpieza | `.claude/memory.md` | `git rm --cached` + `.gitignore` |
+| 1. C3 | `genesis-babies/src/lib.rs` | Portar `verify_pow` de babtc → nueva op `settle` |
+| 1. C3 | `apps/workers/src/routes/nft/evolve.ts:516-627` | Cablear `validateMiningProof` en `/work/:tokenId` |
+| 1. C3 | `apps/workers/src/services/mining-credit.ts` | Revivir como caller del path PoW |
+| 2. Batch | `packages/bitcoin/src/charms/nft.ts` | Añadir `createSettleSpell` (F7 de AI_WORLD_ENGINE) |
+| 2. Batch | `genesis-babies/src/lib.rs` | Añadir campos `narrative_root`, `last_settle_block`, `settle_count` |
+| 3. Fórmula | `genesis-babies/src/lib.rs` + `babtc/src/lib.rs` + `scripts/signer/mint-babtc.ts` | Alinear a `mined_amount_bro` |
+| 4. Block-Tick | `packages/core/src/mining/orchestrator.ts` | Reemplazar loop IA por observer de bloques |
+| 4. Block-Tick | NUEVO `packages/core/src/mining/block-observer.ts` | Lee block hash, computa tick + clz_observed |
+| 5. Signer | `scripts/signer/generate-wallet.ts` | No imprimir mnemonic a stdout |
+| 6. CI | `.github/workflows/ci.yml` | Crear (hoy no existe) |
+| 7. EZKL (opcional) | NUEVO `packages/ai/src/ezkl/` | Construir desde cero |
+
+## A4. Criterios de aceptación revisados
+
+Los criterios de la Sección 8 se mantienen, pero añaden:
+- **19.** No hay `getMinerType()` que mienta (eliminado o devuelve null si no hay miner).
+- **20.** Mineros muertos aislados en `legacy/` (no en ruta activa).
+- **21.** `babtc-v2` decidido (archivado o arreglado — documentar cuál).
+- **22.** `.claude/memory.md` fuera del tracking git.
+- **23.** Config de deployment reconciliada a una fuente de verdad.
