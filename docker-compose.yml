@@ -1,67 +1,72 @@
-version: '3.8'
-
 services:
   bitcoin:
-    image: vulpemventures/bitcoin:26.0
+    image: ghcr.io/getumbrel/docker-bitcoind:v30.0
     container_name: bitcoin-regtest
     ports:
       - "18443:18443" # RPC
       - "18444:18444" # P2P
-    command: >
-      bitcoind
-      -regtest=1
-      -rpcallowip=0.0.0.0/0
-      -rpcbind=0.0.0.0
-      -rpcuser=bitcoin
-      -rpcpassword=bitcoin
-      -txindex=1
-      -fallbackfee=0.0002
-      -server=1
-      -zmqpubrawblock=tcp://0.0.0.0:28332
-      -zmqpubrawtx=tcp://0.0.0.0:28333
+      - "28332:28332" # ZMQ raw block
+      - "28333:28333" # ZMQ raw tx
+    # Image ENTRYPOINT is already `bitcoind`, so the command list below is just
+    # the arguments (do NOT prepend "bitcoind" — that collides with the
+    # entrypoint and yields "unexpected token 'bitcoind'").
+    command:
+      - -regtest=1
+      - -rpcallowip=0.0.0.0/0
+      - -rpcbind=0.0.0.0:18443
+      - -rpcuser=bitcoin
+      - -rpcpassword=bitcoin
+      - -txindex=1
+      - -fallbackfee=0.0002
+      - -server=1
+      - -zmqpubrawblock=tcp://0.0.0.0:28332
+      - -zmqpubrawtx=tcp://0.0.0.0:28333
     volumes:
-      - bitcoin-data:/data
+      - bitcoin-data:/data/.bitcoin
 
   electrs:
-    image: vulpemventures/electrs:latest
+    image: ghcr.io/vulpemventures/electrs:latest
     container_name: electrs-regtest
     depends_on:
       - bitcoin
     ports:
       - "50001:50001" # Electrum RPC
-      - "30002:30002" # HTTP API (Esplora)
-    command: >
-      /bin/electrs
-      --conf-background
-      --db-dir /data/db
-      --daemon-dir /data/bitcoin
-      --cookie bitcoin:bitcoin
-      --daemon-rpc-addr bitcoin:18443
-      --daemon-p2p-addr bitcoin:18444
-      --electrum-rpc-addr 0.0.0.0:50001
-      --http-addr 0.0.0.0:30002
-      --network regtest
-      --log-filters INFO
+      - "30002:30002" # HTTP API (Esplora) - direct access for debugging
+    # Image ENTRYPOINT is already `/build/electrs`; command is just the flags.
+    command:
+      - --network=regtest
+      - --db-dir=/data/db
+      - --daemon-dir=/data/.bitcoin
+      - --daemon-rpc-addr=bitcoin:18443
+      - --cookie=bitcoin:bitcoin
+      - --electrum-rpc-addr=0.0.0.0:50001
+      - --http-addr=0.0.0.0:30002
+      - --jsonrpc-import
+      - --cors=*
+      - -v
     volumes:
-      - bitcoin-data:/data/bitcoin:ro
+      - bitcoin-data:/data/.bitcoin:ro
       - electrs-data:/data/db
 
   chopsticks:
-    image: vulpemventures/chopsticks:latest
+    image: ghcr.io/vulpemventures/nigiri-chopsticks:latest
     container_name: chopsticks-regtest
     depends_on:
       - bitcoin
       - electrs
     ports:
-      - "5000:5000" # Web Explorer and API
-    command: >
-      chopsticks
-      --bitcoin-addr bitcoin:18443
-      --electrs-addr electrs:30002
-      --network regtest
-      --rpc-user bitcoin
-      --rpc-pass bitcoin
-      --addr 0.0.0.0:5000
+      - "3000:3000" # API + faucet (3000, NOT 5000 which macOS ControlCenter uses)
+    # Image ENTRYPOINT is already `/app`; this Go program uses single-dash
+    # flags. RPC auth is provided via -rpc-cookie (NOT --rpc-user/--rpc-pass,
+    # which do not exist). `--rpc-addr` only sets host:port.
+    command:
+      - -use-faucet
+      - -use-mining
+      - -use-logger
+      - -rpc-addr=bitcoin:18443
+      - -rpc-cookie=bitcoin:bitcoin
+      - -electrs-addr=electrs:30002
+      - -addr=0.0.0.0:3000
 
 volumes:
   bitcoin-data:

@@ -72,7 +72,9 @@ export const MEMPOOL_API_URLS: Record<BitcoinNetwork, string> = {
   mainnet: "https://mempool.space/api",
   testnet: "https://mempool.space/testnet/api",
   testnet4: "https://mempool.space/testnet4/api",
-  regtest: "http://localhost:5000/api",
+  // Chopsticks serves the Esplora API at root (no /api prefix); port 3000 to
+  // avoid the macOS ControlCenter/AirPlay conflict on 5000.
+  regtest: "http://localhost:3000",
 };
 
 /**
@@ -82,7 +84,7 @@ export const EXPLORER_URLS: Record<BitcoinNetwork, string> = {
   mainnet: "https://mempool.space",
   testnet: "https://mempool.space/testnet",
   testnet4: "https://mempool.space/testnet4",
-  regtest: "http://localhost:5000",
+  regtest: "http://localhost:3000",
 };
 
 // =============================================================================

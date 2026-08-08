@@ -71,7 +71,8 @@ const MEMPOOL_API_URLS = {
   mainnet: "https://mempool.space/api",
   testnet: "https://mempool.space/testnet/api",
   testnet4: "https://mempool.space/testnet4/api",
-  regtest: "http://localhost:5000/api",
+  // Chopsticks serves the Esplora API at root (no /api prefix).
+  regtest: "http://localhost:3000",
 };
 
 const REQUEST_TIMEOUT_MS = 10_000;

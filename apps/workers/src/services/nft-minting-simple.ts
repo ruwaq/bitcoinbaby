@@ -153,6 +153,14 @@ export class NFTMintingServiceSimple {
 
   /**
    * Fetch raw transaction hex from mempool API
+   *
+   * NOTE: For regtest this returns a hardcoded stub tx instead of hitting the
+   * network. This is a deliberate test convenience — `nft-mint-witness.test.ts`
+   * uses `network: "regtest"` precisely so it can build a prover request
+   * without any HTTP calls. For a REAL regtest E2E run you would instead fetch
+   * from the local chopsticks Esplora API (`${MEMPOOL_API_URLS.regtest}/tx/${txid}/hex`,
+   * i.e. `http://localhost:3000/tx/<txid>/hex`). The stub is kept as-is so the
+   * unit tests stay isolated and deterministic.
    */
   private async fetchRawTransaction(txid: string): Promise<string> {
     if (
