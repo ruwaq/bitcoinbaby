@@ -58,6 +58,10 @@ scripts/admin-wallet.md
 secrets/
 .env.admin
 
+# Treasury mnemonic (written by scripts/signer/generate-wallet.ts with 0600)
+.treasury-mnemonic.txt
+*mnemonic*.txt
+
 # Documentation (keep only README.md in repo)
 # docs/ — intentionally tracked for design documentation
 # docs/

@@ -6,24 +6,27 @@
  * Run once to create the Treasury wallet, then store the mnemonic securely.
  *
  * Usage:
- *   tsx scripts/signer/generate-wallet.ts
+ *   tsx scripts/signer/generate-wallet.ts [--out <path>]
  *
  * Output:
- *   - Mnemonic (12 words)
- *   - Taproot address (testnet4)
- *   - Derivation path
+ *   - Mnemonic is written to a file with 0600 permissions (NOT stdout).
+ *     Default path: .treasury-mnemonic.txt (relative to cwd). Override with --out.
+ *   - Taproot address + derivation path are printed to stdout (safe to log).
  *
  * SECURITY:
  *   - Run this in a secure environment
  *   - Store mnemonic in password manager (1Password, Bitwarden)
- *   - NEVER commit mnemonic to git
+ *   - NEVER commit mnemonic to git (the default path is gitignored)
  *   - NEVER share mnemonic via email/chat
+ *   - The mnemonic is never written to stdout/stderr (avoids shell history, CI logs)
  */
 
 import * as bip39 from "bip39";
 import { BIP32Factory } from "bip32";
 import * as ecc from "tiny-secp256k1";
 import * as bitcoin from "bitcoinjs-lib";
+import { writeFileSync, chmodSync } from "node:fs";
+import { resolve } from "node:path";
 
 // Initialize crypto
 const bip32 = BIP32Factory(ecc);
@@ -33,7 +36,19 @@ bitcoin.initEccLib(ecc);
 const NETWORK = bitcoin.networks.testnet; // testnet4 uses testnet params
 const DERIVATION_PATH = "m/86'/1'/0'/0/0"; // BIP86 Taproot, testnet
 
+// Parse --out <path> from argv. Default writes to .treasury-mnemonic.txt (gitignored).
+function parseOutPath(): string {
+  const argv = process.argv.slice(2);
+  const idx = argv.indexOf("--out");
+  if (idx !== -1 && argv[idx + 1]) {
+    return resolve(argv[idx + 1]);
+  }
+  return resolve(".treasury-mnemonic.txt");
+}
+
 async function generateWallet() {
+  const mnemonicPath = parseOutPath();
+
   console.log(
     "╔══════════════════════════════════════════════════════════════╗",
   );
@@ -47,10 +62,13 @@ async function generateWallet() {
     "║  ⚠️  SECURITY WARNING                                         ║",
   );
   console.log(
-    "║  Store the mnemonic in a secure password manager.            ║",
+    "║  The mnemonic is written to a file with 0600 permissions.   ║",
   );
   console.log(
-    "║  NEVER share or commit to git!                               ║",
+    "║  It is NEVER printed to stdout/stderr.                       ║",
+  );
+  console.log(
+    "║  Move it to a password manager, then delete the file.        ║",
   );
   console.log(
     "╚══════════════════════════════════════════════════════════════╝",
@@ -74,17 +92,24 @@ async function generateWallet() {
     network: NETWORK,
   });
 
-  // Output
+  // SECURITY: write mnemonic to a file with restrictive permissions, NOT stdout.
+  // This avoids leaking the secret to shell history, CI logs, or process listings.
+  writeFileSync(mnemonicPath, mnemonic + "\n", { mode: 0o600 });
+  chmodSync(mnemonicPath, 0o600); // belt-and-suspenders: enforce 0600 even if umask interfered
+
   console.log(
     "┌──────────────────────────────────────────────────────────────┐",
   );
   console.log(
-    "│ MNEMONIC (12 words) - SAVE SECURELY!                         │",
+    "│ MNEMONIC WRITTEN TO FILE (0600)                              │",
   );
   console.log(
     "├──────────────────────────────────────────────────────────────┤",
   );
-  console.log(`│ ${mnemonic}`);
+  console.log(`│ Path: ${mnemonicPath}`);
+  console.log(
+    "│ Move it to a password manager now, then shred/delete the file.",
+  );
   console.log(
     "└──────────────────────────────────────────────────────────────┘",
   );
@@ -94,7 +119,7 @@ async function generateWallet() {
     "┌──────────────────────────────────────────────────────────────┐",
   );
   console.log(
-    "│ TREASURY ADDRESS (Taproot/P2TR)                              │",
+    "│ TREASURY ADDRESS (Taproot/P2TR) — safe to log                 │",
   );
   console.log(
     "├──────────────────────────────────────────────────────────────┤",
