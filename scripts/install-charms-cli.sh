@@ -3,7 +3,7 @@
 # Charms CLI Installation Script
 # ============================================================================
 #
-# Builds and installs Charms CLI v11.1.0+ from source.
+# Builds and installs Charms CLI v15.0.0 from source.
 # Required for BABTC token minting on Bitcoin.
 #
 # The official cargo install may fail due to SP1 zkVM dependencies.
@@ -34,8 +34,9 @@ error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
 # Configuration
 CHARMS_REPO="https://github.com/CharmsDev/charms.git"
+CHARMS_TAG="v15.0.0"
 BUILD_DIR="/tmp/charms-build-$$"
-MIN_VERSION="11.1.0"
+MIN_VERSION="15.0.0"
 
 # Check prerequisites
 check_prerequisites() {
@@ -84,9 +85,17 @@ clone_repo() {
     # Clean up any existing build directory
     rm -rf "$BUILD_DIR"
 
-    git clone --depth 1 "$CHARMS_REPO" "$BUILD_DIR"
+    # Fetch full history so we can checkout the specific pinned tag.
+    # (A --depth 1 shallow clone only fetches the default branch tip and
+    # cannot checkout arbitrary tags like $CHARMS_TAG.)
+    git clone "$CHARMS_REPO" "$BUILD_DIR"
 
-    success "Repository cloned"
+    pushd "$BUILD_DIR" > /dev/null
+    log "Checking out tag $CHARMS_TAG..."
+    git checkout "$CHARMS_TAG"
+    popd > /dev/null
+
+    success "Repository cloned at $CHARMS_TAG"
 }
 
 # Build CLI
