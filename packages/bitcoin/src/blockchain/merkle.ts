@@ -9,6 +9,7 @@
 
 import { sha256 } from "@noble/hashes/sha256";
 import type { BlockchainAPI } from "./types";
+import { minedAmountBro } from "../charms/bro-reward";
 
 // =============================================================================
 // TYPES
@@ -592,8 +593,14 @@ export function computeMiningHash(
 }
 
 /**
- * Calculate mining reward based on leading zeros and block time
- * Based on BRO token formula
+ * Calculate mining reward based on leading zeros and block time.
+ *
+ * Delegates to the canonical BRO formula in `charms/bro-reward.ts`
+ * (single source of truth). This thin wrapper is kept for backwards
+ * compatibility with the `(leadingZeros, blockTime, startTime, halvingPeriod)`
+ * signature and passes `startTime` / `halvingPeriodSeconds` straight through.
+ *
+ * Based on BRO token formula: DENOMINATION · clz² / 2^halvings.
  */
 export function calculateMiningReward(
   leadingZeros: number,
@@ -601,15 +608,10 @@ export function calculateMiningReward(
   startTime: number,
   halvingPeriodSeconds: number = 14 * 24 * 3600, // 14 days default
 ): bigint {
-  const DENOMINATION = 100_000_000n; // 8 decimals
-  const clz = BigInt(leadingZeros);
-  const clzPow2 = clz * clz;
-
-  const effectiveBlockTime = blockTime < startTime ? startTime : blockTime;
-  const periodsPassed = Math.floor(
-    (effectiveBlockTime - startTime) / halvingPeriodSeconds,
+  return minedAmountBro(
+    leadingZeros,
+    blockTime,
+    halvingPeriodSeconds,
+    startTime,
   );
-  const halvingFactor = 2n ** BigInt(periodsPassed);
-
-  return (DENOMINATION * clzPow2) / halvingFactor;
 }

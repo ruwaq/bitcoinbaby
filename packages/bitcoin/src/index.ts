@@ -104,6 +104,7 @@ export {
   type SPARKMetadata,
   type TokenBalance as CharmsTokenBalance,
   type MiningReward,
+  type MiningRewardBro,
   type TokenMintParamsV10,
   type TokenMintParamsV11,
   SPARK_CONFIG,
@@ -111,6 +112,7 @@ export {
   getCurrentEpoch,
   calculateBlockReward,
   calculateMiningReward,
+  calculateMiningRewardBro,
   calculateRewardForDifficulty,
   getRewardTable,
   formatTokenAmount,
@@ -201,6 +203,14 @@ export {
   MintingError,
   createMintingManager,
 } from "./charms/index";
+
+// Canonical BRO reward formula (single source of truth for off-chain rewards).
+export {
+  minedAmountBro,
+  BRO_DENOMINATION,
+  BRO_START_TIME,
+  BRO_HALVING_PERIOD_SECONDS,
+} from "./charms/bro-reward";
 
 // Scrolls API & Charms Service (signing only)
 export {

@@ -103,6 +103,7 @@ export {
   getCurrentEpoch,
   calculateBlockReward,
   calculateMiningReward,
+  calculateMiningRewardBro,
   calculateRewardForDifficulty,
   getRewardTable,
   formatTokenAmount,
@@ -122,6 +123,15 @@ export {
   addressToScriptPubKeyHex,
   validateAmountForSpell,
 } from "./token";
+export type { MiningRewardBro } from "./token";
+
+// Canonical BRO reward formula (single source of truth for off-chain rewards).
+export {
+  minedAmountBro,
+  BRO_DENOMINATION,
+  BRO_START_TIME,
+  BRO_HALVING_PERIOD_SECONDS,
+} from "./bro-reward";
 
 // =============================================================================
 // NFT (GENESIS BABIES)

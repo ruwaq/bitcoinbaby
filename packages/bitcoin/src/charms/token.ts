@@ -34,6 +34,11 @@ import {
 } from "./types";
 import * as bitcoin from "bitcoinjs-lib";
 import type { BitcoinNetwork } from "../types";
+import {
+  minedAmountBro,
+  BRO_START_TIME,
+  BRO_HALVING_PERIOD_SECONDS,
+} from "./bro-reward";
 
 // =============================================================================
 // NETWORK UTILITIES
@@ -208,18 +213,37 @@ export interface MiningReward {
 // =============================================================================
 
 /**
- * Calculate mining reward based on difficulty (BRO formula)
+ * Calculate mining reward based on difficulty (LEGACY v1-contract formula).
  *
- * Formula: BASE_REWARD * D² / DIFFICULTY_FACTOR
+ * @deprecated This is the LEGACY reward computation, kept ONLY because the v1
+ *   on-chain babtc contract (`packages/bitcoin/contracts/babtc/src/lib.rs`)
+ *   uses the matching `BASE_REWARD * D² / DIFFICULTY_FACTOR` formula and
+ *   rejects mint spells whose reward does not match. Changing this number
+ *   without redeploying the contract would orphan already-minted testnet4
+ *   tokens (new appVk). All callers below build real mint spells that the v1
+ *   contract validates, so they MUST stay on this legacy value until the
+ *   contract is redeployed.
+ *
+ *   The CANONICAL BRO formula lives in `./bro-reward.ts` (`minedAmountBro`)
+ *   and is exposed here as {@link calculateMiningRewardBro}. New off-chain
+ *   code (estimation, analytics, UI projections) should use the canonical one.
+ *   Realignment of this function + the v1 contract + the signer is tracked as
+ *   sub-proyecto C (mainnet). See `docs/superpowers/notes/BRO_ALIGNMENT.md`.
+ *
+ * Legacy formula: BASE_REWARD * D² / DIFFICULTY_FACTOR
  * Where: BASE_REWARD = 1 SPARK, FACTOR = 100
  *
- * Examples:
+ * Examples (legacy, NO halving, /100):
  * - D16 (min): 1 * 256 / 100 = 2.56 SPARK
  * - D20:       1 * 400 / 100 = 4.00 SPARK
  * - D22:       1 * 484 / 100 = 4.84 SPARK
  * - D24:       1 * 576 / 100 = 5.76 SPARK
  * - D28:       1 * 784 / 100 = 7.84 SPARK
  * - D32 (max): 1 * 1024 / 100 = 10.24 SPARK
+ *
+ * For comparison, the CANONICAL BRO values at period 0 (genesis) are 100x
+ * larger because there is no /100 divisor: D16 = 256 BABTC, D32 = 1024 BABTC,
+ * and they halve every 14 days. Use {@link calculateMiningRewardBro}.
  *
  * Harder work = exponentially more reward (D²)
  *
@@ -248,6 +272,82 @@ export function calculateMiningReward(leadingZeros: number): MiningReward {
     stakingShare: (total * BigInt(staking)) / 100n,
     leadingZeros: clampedDifficulty,
     difficulty: clampedDifficulty,
+  };
+}
+
+// =============================================================================
+// CANONICAL BRO REWARD (delegates to ./bro-reward — single source of truth)
+// =============================================================================
+
+/**
+ * Mining reward breakdown using the CANONICAL BRO formula.
+ *
+ * Mirrors the shape of {@link MiningReward} but is computed from
+ * `minedAmountBro` (DENOMINATION · clz² / 2^halvings). The legacy
+ * {@link MiningReward} type is still produced by the deprecated
+ * {@link calculateMiningReward} (v1-contract-locked, /100, no halving).
+ */
+export interface MiningRewardBro {
+  /** Total reward before distribution (canonical BRO base units). */
+  total: bigint;
+  /** Miner's share (90%). */
+  minerShare: bigint;
+  /** Dev fund share (5%). */
+  devShare: bigint;
+  /** Staking pool share (5%). */
+  stakingShare: bigint;
+  /** Leading zeros in hash (difficulty met). */
+  leadingZeros: number;
+  /** Effective difficulty used (clamped to SPARK range). */
+  difficulty: number;
+  /** Block time (unix seconds) used for the halving lookup. */
+  blockTime: number;
+}
+
+/**
+ * Calculate mining reward using the CANONICAL BRO formula.
+ *
+ * This is the recommended off-chain reward computation. It delegates to
+ * {@link minedAmountBro} and applies the same SPARK distribution split
+ * (90/5/5) as the legacy function. Difficulty is clamped to the SPARK range
+ * (D16..D32) for consistency with {@link calculateMiningReward}.
+ *
+ * NOTE: this does NOT yet match what the v1 on-chain contract mints, so do
+ * NOT use it to build mint spells that the v1 contract must validate — use
+ * the legacy {@link calculateMiningReward} for that until sub-proyecto C.
+ * Use this for estimation, analytics, dashboards, and forward-looking UI.
+ *
+ * @param leadingZeros - Number of leading zero bits in hash (clamped D16..D32).
+ * @param blockTime - Unix seconds of the block being rewarded (default: now).
+ * @returns Mining reward breakdown in canonical BRO base units.
+ */
+export function calculateMiningRewardBro(
+  leadingZeros: number,
+  blockTime: number = Math.floor(Date.now() / 1000),
+): MiningRewardBro {
+  const { minDifficulty, maxDifficulty } = SPARK_CONFIG.rewards;
+  const { miner, dev, staking } = SPARK_CONFIG.distribution;
+
+  const difficulty = Math.max(
+    minDifficulty,
+    Math.min(maxDifficulty, leadingZeros),
+  );
+
+  const total = minedAmountBro(
+    difficulty,
+    blockTime,
+    BRO_HALVING_PERIOD_SECONDS,
+    BRO_START_TIME,
+  );
+
+  return {
+    total,
+    minerShare: (total * BigInt(miner)) / 100n,
+    devShare: (total * BigInt(dev)) / 100n,
+    stakingShare: (total * BigInt(staking)) / 100n,
+    leadingZeros: difficulty,
+    difficulty,
+    blockTime,
   };
 }
 
