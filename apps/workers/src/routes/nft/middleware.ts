@@ -41,6 +41,7 @@ export const confirmNftSchema = z.object({
       totalXp: z.number().int().min(0),
       workCount: z.number().int().min(0),
       evolutionCount: z.number().int().min(0),
+      heritage: z.number().int().min(0).max(4).optional(),
     })
     .optional(),
 });
@@ -145,6 +146,7 @@ export const sparkNftStateSchema = z.object({
   last_work_block: z.number().int().min(0),
   evolution_count: z.number().int().min(0),
   tokens_earned: z.string(),
+  heritage: z.number().int().min(0).max(4),
 });
 
 /**
@@ -203,6 +205,7 @@ export const proveNftSchema = z.object({
     lastWorkBlock: z.number().int().min(0).default(0),
     evolutionCount: z.number().int().min(0).default(0),
     tokensEarned: z.string().default("0"),
+    heritage: z.number().int().min(0).max(4).default(0),
   }),
   /** Funding UTXO */
   fundingUtxo: z.object({

@@ -294,6 +294,7 @@ function buildGenesisNftState(genesisBlock: number): SparkNFTState {
     last_work_block: genesisBlock,
     evolution_count: 0,
     tokens_earned: "0",
+    heritage: 0,
   };
 }
 

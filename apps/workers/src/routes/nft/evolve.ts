@@ -500,6 +500,7 @@ function nftRecordToSparkState(data: Record<string, unknown>): SparkNFTState {
     last_work_block: parseInt(data.lastWorkBlock as string, 10) || 0,
     evolution_count: parseInt(data.evolutionCount as string, 10) || 0,
     tokens_earned: (data.tokensEarned as string) || "0",
+    heritage: parseInt(data.heritage as string, 10) || 0,
   };
 }
 

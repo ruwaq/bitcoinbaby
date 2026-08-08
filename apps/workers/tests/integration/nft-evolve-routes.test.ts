@@ -64,6 +64,7 @@ function makeNftRecord(
     evolutionCount: "0",
     genesisBlock: "0",
     tokensEarned: "0",
+    heritage: "0",
     ...overrides,
   };
 }

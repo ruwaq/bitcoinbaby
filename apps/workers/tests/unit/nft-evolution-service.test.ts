@@ -43,6 +43,7 @@ const baseState: SparkNFTState = {
   last_work_block: 800000,
   evolution_count: 0,
   tokens_earned: "0",
+  heritage: 0,
 };
 
 describe("buildWorkProofSpellRequest", () => {

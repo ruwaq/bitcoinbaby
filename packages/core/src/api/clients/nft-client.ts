@@ -64,6 +64,7 @@ export interface ProveNFTRequest {
     lastWorkBlock: number;
     evolutionCount: number;
     tokensEarned: string;
+    heritage: number;
   };
   fundingUtxo: {
     txid: string;

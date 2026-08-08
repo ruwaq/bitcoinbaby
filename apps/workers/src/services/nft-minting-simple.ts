@@ -42,6 +42,7 @@ export interface NFTMintRequest {
     lastWorkBlock: number;
     evolutionCount: number;
     tokensEarned: string;
+    heritage: number;
   };
   fundingUtxo: {
     txid: string;
@@ -199,6 +200,7 @@ export class NFTMintingServiceSimple {
       last_work_block: request.nftState.lastWorkBlock,
       evolution_count: request.nftState.evolutionCount,
       tokens_earned: request.nftState.tokensEarned,
+      heritage: request.nftState.heritage,
     };
 
     // Build the CBOR spell via the shared util (byte-compatible with the

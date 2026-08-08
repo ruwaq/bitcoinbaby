@@ -52,6 +52,7 @@ function buildRequest(): Parameters<NFTMintingServiceSimple["processMint"]>[0] {
       lastWorkBlock: 0,
       evolutionCount: 0,
       tokensEarned: "0",
+      heritage: 0,
     },
     fundingUtxo: {
       txid: "00".repeat(32),

@@ -26,6 +26,7 @@ export interface SparkNFTState {
   last_work_block: number;
   evolution_count: number;
   tokens_earned: string;
+  heritage: number;
 }
 
 /** Spell version required by the Charms v15 prover (rejects version 11). */
