@@ -6,32 +6,24 @@
  */
 
 import { nftLogger } from "../lib/logger";
-import * as cbor from "cbor2";
 import {
   NFT_CONTRACT_VK,
   NFT_CONTRACT_BINARY,
 } from "../lib/nft-contract-binary";
 import { MEMPOOL_API_URLS, type BitcoinNetwork } from "../config/bitcoin";
+import {
+  type SparkNFTState,
+  addressToScriptPubkey,
+  buildEmptyAppPublicInputs,
+  encodeCborHex,
+  utxoToBytes,
+  SPELL_VERSION,
+  NFT_DUST_SATS,
+  DEFAULT_FEE_RATE,
+} from "./nft-spell-utils";
 
-// =============================================================================
-// TYPES
-// =============================================================================
-
-export interface SparkNFTState {
-  dna: string;
-  bloodline: string;
-  base_type: string;
-  genesis_block: number;
-  rarity_tier: string;
-  token_id: number;
-  level: number;
-  xp: number;
-  total_xp: number;
-  work_count: number;
-  last_work_block: number;
-  evolution_count: number;
-  tokens_earned: string;
-}
+// Re-export so existing callers can import SparkNFTState from this module.
+export type { SparkNFTState };
 
 export interface NFTMintRequest {
   tokenId: number;
@@ -209,45 +201,23 @@ export class NFTMintingServiceSimple {
       tokens_earned: request.nftState.tokensEarned,
     };
 
-    // Convert UTXO string to bytes (36 bytes: 32 txid reversed + 4 index LE)
-    const insBytes = [this.utxoToBytes(fundingUtxoStr)];
-
-    // Convert outputs to Map with integer keys
-    const outsMap = new Map<number, unknown>();
-    outsMap.set(0, nftState);
-
-    // Convert app key to tuple [tag, identity_bytes, vk_bytes]
-    // Use the VK from our compiled binary
-    const appTuple: [string, Uint8Array, Uint8Array] = [
-      "n",
-      this.hexToBytes(this.appId),
-      this.hexToBytes(NFT_CONTRACT_VK),
-    ];
-    const appPublicInputs = new Map<unknown, unknown>();
-    appPublicInputs.set(appTuple, null);
-
-    // Convert owner address to script pubkey
-    const scriptPubkey = this.addressToScriptPubkey(request.ownerAddress);
-
-    // Build CBOR-compatible spell with coins
-    const spell = {
-      version: 15,
+    // Build the CBOR spell via the shared util (byte-compatible with the
+    // previous inline encoding). version 15, 330-sat coin output to the owner.
+    const spellObject = {
+      version: SPELL_VERSION,
       tx: {
-        ins: insBytes,
-        outs: [outsMap],
+        ins: [utxoToBytes(fundingUtxoStr)],
+        outs: [new Map<number, unknown>([[0, nftState]])],
         coins: [
           {
-            amount: 330, // NFT dust amount
-            dest: scriptPubkey,
+            amount: NFT_DUST_SATS,
+            dest: addressToScriptPubkey(request.ownerAddress),
           },
         ],
       },
-      app_public_inputs: appPublicInputs,
+      app_public_inputs: buildEmptyAppPublicInputs(this.appId),
     };
-
-    // Encode to CBOR and convert to hex
-    const cborBytes = cbor.encode(spell);
-    const spellHex = this.bytesToHex(new Uint8Array(cborBytes));
+    const spellHex = encodeCborHex(spellObject);
 
     return {
       spell: spellHex,
@@ -255,7 +225,7 @@ export class NFTMintingServiceSimple {
       funding_utxo_value: request.fundingUtxo.value,
       change_address: request.ownerAddress,
       chain: "bitcoin",
-      fee_rate: 2.0,
+      fee_rate: DEFAULT_FEE_RATE,
     };
   }
 
@@ -264,95 +234,11 @@ export class NFTMintingServiceSimple {
    *
    * Matches `NFTWitness { operation: String }` in the genesis-babies contract.
    * For a mint, the contract's `match witness.operation.as_str()` routes to
-   * `validate_mint`. Uses the same cbor2 encoder as the spell.
+   * `validate_mint`. Uses the same cbor2 encoder as the spell (via the shared
+   * util).
    */
   private buildWitnessHex(operation: string): string {
-    const witness = { operation };
-    const bytes = cbor.encode(witness);
-    return this.bytesToHex(new Uint8Array(bytes));
-  }
-
-  /**
-   * Convert UTXO string to 36-byte array
-   */
-  private utxoToBytes(utxoStr: string): Uint8Array {
-    const [txidHex, indexStr] = utxoStr.split(":");
-    const index = parseInt(indexStr, 10);
-
-    const bytes = new Uint8Array(36);
-    // Reverse txid bytes (Bitcoin display order)
-    for (let i = 0; i < 32; i++) {
-      bytes[i] = parseInt(
-        txidHex.substring((31 - i) * 2, (31 - i) * 2 + 2),
-        16,
-      );
-    }
-    // Index as little-endian u32
-    bytes[32] = index & 0xff;
-    bytes[33] = (index >> 8) & 0xff;
-    bytes[34] = (index >> 16) & 0xff;
-    bytes[35] = (index >> 24) & 0xff;
-
-    return bytes;
-  }
-
-  private hexToBytes(hex: string): Uint8Array {
-    const bytes = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < hex.length; i += 2) {
-      bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
-    }
-    return bytes;
-  }
-
-  private bytesToHex(bytes: Uint8Array): string {
-    return Array.from(bytes)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-  }
-
-  /**
-   * Convert bech32 address to script pubkey bytes
-   */
-  private addressToScriptPubkey(address: string): Uint8Array {
-    const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
-
-    const pos = address.lastIndexOf("1");
-    if (pos < 1) throw new Error(`Invalid bech32 address: ${address}`);
-
-    const data: number[] = [];
-    for (let i = pos + 1; i < address.length; i++) {
-      const idx = BECH32_CHARSET.indexOf(address.charAt(i).toLowerCase());
-      if (idx === -1) throw new Error(`Invalid bech32 character: ${address}`);
-      data.push(idx);
-    }
-
-    // Remove checksum (last 6 chars)
-    const payload = data.slice(0, -6);
-    const version = payload[0];
-
-    // Convert 5-bit groups to 8-bit bytes
-    let acc = 0;
-    let bits = 0;
-    const result: number[] = [];
-    for (const value of payload.slice(1)) {
-      acc = (acc << 5) | value;
-      bits += 5;
-      while (bits >= 8) {
-        bits -= 8;
-        result.push((acc >> bits) & 0xff);
-      }
-    }
-
-    const program = new Uint8Array(result);
-
-    // Build script pubkey
-    const opVersion = version === 0 ? 0x00 : 0x50 + version;
-    const scriptPubkey = new Uint8Array(2 + program.length);
-    scriptPubkey[0] = opVersion;
-    scriptPubkey[1] = program.length;
-    scriptPubkey.set(program, 2);
-
-    return scriptPubkey;
+    return encodeCborHex({ operation });
   }
 
   private async submitToProver(proverRequest: object): Promise<NFTMintResult> {
