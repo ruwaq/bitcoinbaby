@@ -40,7 +40,8 @@
 | Contrato | App ID |
 |----------|--------|
 | BABTC Token | `87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681b` |
-| Genesis Babies NFT | `74587afb39bca62d55aeaf4bee91a571de2449495eab3486798d6abf4a939659` |
+| Genesis Babies NFT | TBD — contrato reescrito para Charms v15 (Task 1.2). El app ID `74587afb...` listado abajo es VIEJO/será reemplazado. El nuevo app ID se establece en el genesis mint (docs/NFT_DEPLOYMENT_RUNBOOK.md). |
+| Genesis Babies NFT (viejo, Charms pre-v15) | `74587afb39bca62d55aeaf4bee91a571de2449495eab3486798d6abf4a939659` |
 
 ### 7. Deployment
 
