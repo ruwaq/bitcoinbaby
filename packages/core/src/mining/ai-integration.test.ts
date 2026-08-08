@@ -9,9 +9,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { AIWorkIntegration } from "./ai-integration";
 import type { AITask, AIProof } from "./types";
 
-// Mock @bitcoinbaby/ai to provide AIOrchestrator in test environment
+// Mock @bitcoinbaby/ai to provide AIOrchestrator in test environment.
+// The mock must implement `configure()` so the production init path reaches the
+// `modelState === "ready"` branch (initialize() calls `orchestrator.configure(config)`).
 vi.mock("@bitcoinbaby/ai", () => {
   class MockAIOrchestrator {
+    async configure(_config: unknown): Promise<void> {
+      // No-op: accept the provider config so initialization succeeds.
+    }
+
     async execute(_prompt: string, _systemPrompt?: string) {
       return {
         text: "The AI generated a fascinating story about blockchain discovery.",
