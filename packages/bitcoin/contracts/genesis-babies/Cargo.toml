@@ -12,6 +12,10 @@ name = "genesis_babies"
 [dependencies]
 charms-sdk = { version = "15.0.0" }
 serde = { version = "1.0", features = ["derive"] }
+# sha2: required to close C3 — on-chain re-derivation of XP from a verified
+# proof-of-work hash. Mirrors the babtc token contract's PoW primitives
+# (`double_sha256` / `count_leading_zeros` / `verify_pow`). Same version as babtc.
+sha2 = { version = "0.10.9" }
 
 [dev-dependencies]
 # Direct access to `Transaction`/`App`/`Data` for the integration tests in
