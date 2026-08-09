@@ -56,8 +56,10 @@ check_file() {
   # --- Pattern 3: Private keys (hex 64 chars) ---
   # Excludes obvious test vectors: all-zeros/ones/ff key, and the two
   # canonical bitcoin test txids (...0001 / ...0002) used as fixtures.
-  # Also excludes PUBLIC Charms verification keys (VKs) and the babtc genesis
-  # UTXO txid — these are public by design (see docs/audits/VK_RECONCILIATION.md).
+  # Also excludes PUBLIC Charms verification keys (VKs) — both the embedded
+  # ones (deployed on-chain) and the current-source cargo-build VKs — and the
+  # babtc genesis UTXO txid. These are public by design
+  # (see docs/audits/VK_RECONCILIATION.md and SESSION-9-HANDOFF.md §1).
   local hex_matches
   hex_matches=$(echo "$added_lines" \
     | grep -v '0000000000000000000000000000000000000000000000000000000000000000' \
@@ -71,6 +73,9 @@ check_file() {
     | grep -v '0d9483a760ef91eef606e84fbff326132b3e611bc913025913bc34b6655b08ba' \
     | grep -v '72cddbf02e3412f92ed134fd88dffdfa918c74faf5695db118ff6cb98fc602f0' \
     | grep -v 'b3deba0743aeffd0e455ce442b1693107090341381e3d8bcc5f586667c3e8a81' \
+    | grep -v '3f0fcafea6303322ee29acaa39ee8da69f3dc3fee68a77a3d897bed745f9ebc8' \
+    | grep -v '8ffa21e1702455e7464e003a276eabb9a5e06b8c1948c3e317a67c3447536706' \
+    | grep -v '2501737a1bd73549677f276e0c93ce87328b076cfe1cacd9f493b50c7f435ae2' \
     | grep -oE '\b[a-fA-F0-9]{64}\b' || true)
 
   if [ -n "$hex_matches" ]; then
