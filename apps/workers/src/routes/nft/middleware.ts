@@ -147,6 +147,13 @@ export const sparkNftStateSchema = z.object({
   evolution_count: z.number().int().min(0),
   tokens_earned: z.string(),
   heritage: z.number().int().min(0).max(4),
+  // Settlement fields (Fase 2, spec sección 3). The contract's NFTState uses
+  // `#[serde(default)]` for lazy migration of pre-settlement NFTs; these are
+  // optional here for the same reason. Non-settle validators (work/level_up)
+  // check immutability of these fields; only the settle op advances them.
+  narrative_root: z.string().optional(),
+  last_settle_block: z.number().int().min(0).optional(),
+  settle_count: z.number().int().min(0).optional(),
 });
 
 /**
