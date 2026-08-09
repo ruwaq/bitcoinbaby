@@ -49,6 +49,18 @@ export interface NFTMintRequest {
     vout: number;
     value: number;
   };
+  /**
+   * Atomic payment (D3 unified /mint flow). When both are set, the spell
+   * emits a second coin output paying `priceSats` to `treasuryAddress`, so a
+   * single Bitcoin tx is simultaneously the mint AND the payment. This closes
+   * the "mint without paying" bug at the root: no payment output → prover
+   * cannot produce a valid spell from this request.
+   *
+   * When omitted, the spell is the legacy 1-output (NFT-only) shape, used by
+   * existing tests and the reserve→prove→confirm flow until D3.4 removes it.
+   */
+  treasuryAddress?: string;
+  priceSats?: number;
 }
 
 export interface NFTMintResult {
@@ -181,7 +193,14 @@ export class NFTMintingServiceSimple {
   }
 
   /**
-   * Build V11 spell with CBOR encoding
+   * Build V15 spell with CBOR encoding.
+   *
+   * Output layout:
+   *   - vout 0: NFT coin (NFT_DUST_SATS) to the owner — carries the Charms state.
+   *   - vout 1 (only when `treasuryAddress` + `priceSats` are set): payment to
+   *     the treasury. Atomic /mint: the mint and the payment are the same tx,
+   *     so it is impossible to mint without paying. The prover adds the change
+   *     output back to `change_address` (= owner) at `fee_rate`.
    */
   private buildMintSpell(request: NFTMintRequest): {
     spell: string;
@@ -211,6 +230,22 @@ export class NFTMintingServiceSimple {
       heritage: request.nftState.heritage,
     };
 
+    // coins[0] = NFT dust output (carries the Charms state at outs[0]).
+    // coins[1] = treasury payment (atomic /mint). The prover appends a change
+    // output to `change_address` (= owner) automatically.
+    const coins: { amount: number; dest: Uint8Array }[] = [
+      {
+        amount: NFT_DUST_SATS,
+        dest: addressToScriptPubkey(request.ownerAddress),
+      },
+    ];
+    if (request.treasuryAddress && request.priceSats) {
+      coins.push({
+        amount: request.priceSats,
+        dest: addressToScriptPubkey(request.treasuryAddress),
+      });
+    }
+
     // Build the CBOR spell via the shared util (byte-compatible with the
     // previous inline encoding). version 15, 330-sat coin output to the owner.
     const spellObject = {
@@ -218,12 +253,7 @@ export class NFTMintingServiceSimple {
       tx: {
         ins: [utxoToBytes(fundingUtxoStr)],
         outs: [new Map<number, unknown>([[0, nftState]])],
-        coins: [
-          {
-            amount: NFT_DUST_SATS,
-            dest: addressToScriptPubkey(request.ownerAddress),
-          },
-        ],
+        coins,
       },
       app_public_inputs: buildEmptyAppPublicInputs(this.appId),
     };
