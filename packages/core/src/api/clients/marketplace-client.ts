@@ -164,26 +164,12 @@ export class MarketplaceClient extends BaseApiClient {
   }
 
   // ===========================================================================
-  // MINTING & EVOLUTION
+  // EVOLUTION
   // ===========================================================================
-
-  /**
-   * Prove NFT mint via backend
-   */
-  async proveNFT(params: ProveNFTParams): Promise<ApiResponse<NFTProveResult>> {
-    return this.post<NFTProveResult>("/api/nft/prove", params);
-  }
-
-  /**
-   * Claim an NFT by providing the mint transaction ID
-   * Verifies the transaction on blockchain and registers the NFT
-   */
-  async claimNFT(
-    txid: string,
-    address: string,
-  ): Promise<ApiResponse<NFTRecord>> {
-    return this.post<NFTRecord>("/api/nft/claim", { txid, address });
-  }
+  // NOTE (D6): the minting methods (proveNFT, claimNFT) that used to live here
+  // were removed. Minting now goes through the unified /mint flow exposed on
+  // NFTClient.prepareMint + finalizeMint (see nft-client.ts). Only evolution
+  // confirmation remains in this section.
 
   /**
    * Confirm on-chain evolution transaction
