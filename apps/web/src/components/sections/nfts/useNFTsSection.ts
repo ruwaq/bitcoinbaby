@@ -21,7 +21,6 @@ export function useNFTsSection() {
   const [mintState, setMintState] = useState<MintState>("info");
   const [evolvingIds, setEvolvingIds] = useState<Set<number>>(new Set());
   const [listingIds, setListingIds] = useState<Set<number>>(new Set());
-  const [claimTxid, setClaimTxid] = useState("");
   const [selectedNFT, setSelectedNFT] = useState<SparkNFTState | null>(null);
   const [listFeedback, setListFeedback] = useState<ListFeedback | null>(null);
 
@@ -61,17 +60,8 @@ export function useNFTsSection() {
   const handleViewCollection = useCallback(() => {
     setMintState("info");
     nfts.minting.reset();
-    nfts.claiming.reset();
     setActiveTab("collection");
-  }, [nfts.minting, nfts.claiming]);
-
-  const handleClaimNFT = useCallback(async () => {
-    if (!claimTxid.trim()) return;
-    const result = await nfts.claiming.claim(claimTxid);
-    if (result.success) {
-      setClaimTxid("");
-    }
-  }, [claimTxid, nfts.claiming]);
+  }, [nfts.minting]);
 
   const handleSelectNFT = useCallback(
     (nft: SparkNFTState) => {
@@ -163,8 +153,6 @@ export function useNFTsSection() {
     mintState,
     evolvingIds,
     listingIds,
-    claimTxid,
-    setClaimTxid,
     selectedNFT,
     setSelectedNFT,
     listFeedback,
@@ -181,7 +169,6 @@ export function useNFTsSection() {
     handleCancelMint,
     handleMintAnother,
     handleViewCollection,
-    handleClaimNFT,
     handleSelectNFT,
     handleEvolve,
     handleListNFT,

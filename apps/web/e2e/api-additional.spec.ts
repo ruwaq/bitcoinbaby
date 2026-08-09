@@ -6,9 +6,7 @@ import { test, expect } from "./fixtures";
  * Tests for balance, leaderboard, game state, and admin endpoints.
  */
 
-const API_URL =
-  process.env.API_URL ||
-  "http://localhost:8787";
+const API_URL = process.env.API_URL || "http://localhost:8787";
 
 const TEST_ADDRESS = "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx";
 
@@ -170,7 +168,9 @@ test.describe("Error Responses", () => {
   });
 
   test("should return proper error structure", async ({ request }) => {
-    const response = await request.post(`${API_URL}/api/nft/prove`, {
+    // Uses the unified /mint/prepare endpoint (D6). The old /prove route was
+    // removed; posting an empty body must yield a structured validation error.
+    const response = await request.post(`${API_URL}/api/nft/mint/prepare`, {
       data: {},
     });
 

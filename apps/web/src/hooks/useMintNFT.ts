@@ -1,18 +1,20 @@
 /**
  * useMintNFT Hook
  *
- * NFT minting hook for testnet4 production.
- * Uses Charms Prover API for real on-chain NFT minting.
- * Requires connected wallet - no demo mode.
+ * NFT minting hook for testnet4 production, using the unified /mint flow (D6).
  *
  * Flow:
- * 1. Reserve tokenId from server
- * 2. Generate traits (DNA, bloodline, rarity)
- * 3. Get funding UTXO from wallet
- * 4. Submit to prover API
- * 5. Sign commitTx and spellTx
- * 6. Broadcast both transactions
- * 7. Confirm with server
+ * 1. Get funding UTXO from wallet
+ * 2. POST /api/nft/mint/prepare — server derives tokenId + traits and builds
+ *    an atomic spell (NFT coin + treasury payment in the same Bitcoin tx).
+ *    Returns unsigned commitTxHex + spellTxHex.
+ * 3. Sign commitTx and spellTx with the wallet
+ * 4. Broadcast commit, wait for confirmation, broadcast spell
+ * 5. POST /api/nft/mint/finalize — server verifies the spell on-chain and
+ *    persists the NFT.
+ *
+ * Traits are generated server-side (never by the client) — this closes the
+ * mythic-always bug (#2) and the free-mint bug (#1).
  */
 
 "use client";
@@ -28,9 +30,6 @@ import {
   createMempoolClient,
   rawTxToPsbt,
   Psbt,
-  type Bloodline,
-  type BaseType,
-  type RarityTier,
   type SparkNFTState,
 } from "@bitcoinbaby/bitcoin";
 import { createLogger } from "@bitcoinbaby/shared";
@@ -46,117 +45,110 @@ const CONFIRMATION_TIMEOUT_MS =
     ? parseInt(process.env.CONFIRMATION_TIMEOUT_MS, 10)
     : 600000) || 600000;
 
-// =============================================================================
-// PERSISTENT CONFIRMATION QUEUE (localStorage)
-// =============================================================================
+/** Minimum funding UTXO value to cover price (5000) + dust (330) + fee reserve
+ *  (1000), matching the server's check in routes/nft/mint.ts. */
+const MIN_FUNDING_SATS = 6330;
 
-interface PendingConfirmation {
-  tokenId: number;
+// =============================================================================
+// PERSISTENT FINALIZE QUEUE (localStorage)
+// =============================================================================
+// If finalizeMint fails (network error, server restart, etc.), the NFT is
+// already on-chain but the indexer doesn't know yet. We persist the spellTxid
+// so we can retry finalize on the next app load.
+
+interface PendingFinalize {
   spellTxid: string;
   address: string;
-  nftData: {
-    dna: string;
-    bloodline: string;
-    baseType: string;
-    rarityTier: string;
-    level: number;
-    xp: number;
-    totalXp: number;
-    workCount: number;
-    evolutionCount: number;
-  };
-  attemptId: string | null;
-  commitTxid: string | null;
+  tokenId: number;
   timestamp: number;
   retryCount: number;
 }
 
-const CONFIRMATION_QUEUE_KEY = "bb_pending_confirmations";
+const FINALIZE_QUEUE_KEY = "bb_pending_finalizes";
 
-function loadConfirmationQueue(): PendingConfirmation[] {
+function loadFinalizeQueue(): PendingFinalize[] {
   try {
-    const raw = localStorage.getItem(CONFIRMATION_QUEUE_KEY);
+    const raw = localStorage.getItem(FINALIZE_QUEUE_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as PendingConfirmation[];
+    return JSON.parse(raw) as PendingFinalize[];
   } catch {
     return [];
   }
 }
 
-function saveConfirmationQueue(queue: PendingConfirmation[]): void {
+function saveFinalizeQueue(queue: PendingFinalize[]): void {
   try {
-    localStorage.setItem(CONFIRMATION_QUEUE_KEY, JSON.stringify(queue));
+    localStorage.setItem(FINALIZE_QUEUE_KEY, JSON.stringify(queue));
   } catch {
-    // localStorage full or unavailable - log but don't throw
-    log.warn("Failed to persist confirmation queue");
+    log.warn("Failed to persist finalize queue");
   }
 }
 
 /**
- * Retry a single pending confirmation with exponential backoff.
+ * Retry a single pending finalize with exponential backoff.
  * Returns true if successful, false if should remain queued.
  */
-async function retryConfirmation(
+async function retryFinalize(
   apiClient: ReturnType<typeof getApiClient>,
-  item: PendingConfirmation,
+  item: PendingFinalize,
 ): Promise<boolean> {
-  const { tokenId, spellTxid, address, nftData, attemptId, commitTxid } = item;
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      await apiClient.confirmNFTMint(tokenId, spellTxid, address, nftData);
-      if (attemptId) {
-        await apiClient.updateMintAttempt(attemptId, "confirmed", {
-          commitTxid: commitTxid || undefined,
-          spellTxid,
-        });
-      }
-      log.info(`Retry confirmation succeeded for token ${tokenId}:`, {
-        attempt: attempt + 1,
+      const result = await apiClient.finalizeMint({
+        spellTxid: item.spellTxid,
+        address: item.address,
       });
-      return true;
+      if (result.success) {
+        log.info(`Retry finalize succeeded for token ${item.tokenId}:`, {
+          attempt: attempt + 1,
+        });
+        return true;
+      }
+      // A 409 means the spell tx was already finalized — treat as success.
+      lastError = result.error;
     } catch (err) {
       lastError = err;
-      if (attempt < 2) {
-        const delay = 2000 * 2 ** attempt; // 2s, 4s, 8s
-        log.warn(
-          `Retry confirmation attempt ${attempt + 1}/3 failed for token ${tokenId}, retrying in ${delay}ms`,
-        );
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
+    }
+    if (attempt < 2) {
+      const delay = 2000 * 2 ** attempt; // 2s, 4s
+      log.warn(
+        `Retry finalize attempt ${attempt + 1}/3 failed for token ${item.tokenId}, retrying in ${delay}ms`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
-  log.error(`All retry attempts failed for token ${tokenId}:`, {
+  log.error(`All retry attempts failed for token ${item.tokenId}:`, {
     error: lastError,
   });
   return false;
 }
 
 /**
- * Process the persistent confirmation queue (called on app load and after new mints).
- * Items that succeed are removed. Items that exhaust all retries are kept for next load.
+ * Process the persistent finalize queue (called on app load and after new
+ * mints). Items that succeed are removed. Items that exhaust all retries are
+ * kept for the next load.
  */
-async function processConfirmationQueue(): Promise<void> {
-  const queue = loadConfirmationQueue();
+async function processFinalizeQueue(): Promise<void> {
+  const queue = loadFinalizeQueue();
   if (queue.length === 0) return;
 
-  log.info(`Processing ${queue.length} pending confirmations from queue`);
+  log.info(`Processing ${queue.length} pending finalizes from queue`);
   const apiClient = getApiClient();
-  const remaining: PendingConfirmation[] = [];
+  const remaining: PendingFinalize[] = [];
 
   for (const item of queue) {
-    const success = await retryConfirmation(apiClient, item);
+    const success = await retryFinalize(apiClient, item);
     if (!success) {
-      const updated = { ...item, retryCount: item.retryCount + 1 };
-      remaining.push(updated);
+      remaining.push({ ...item, retryCount: item.retryCount + 1 });
     }
   }
 
-  saveConfirmationQueue(remaining);
+  saveFinalizeQueue(remaining);
   if (remaining.length > 0) {
-    log.warn(`${remaining.length} confirmations still pending after retry`);
+    log.warn(`${remaining.length} finalizes still pending after retry`);
   }
 }
 
@@ -176,14 +168,12 @@ export interface MintResult {
 export type MintStep =
   | "idle"
   | "checking_prover"
-  | "reserving"
-  | "generating_traits"
-  | "proving"
+  | "preparing"
   | "signing_commit"
   | "signing_spell"
   | "broadcasting_commit"
   | "broadcasting_spell"
-  | "confirming"
+  | "finalizing"
   | "success"
   | "error";
 
@@ -207,42 +197,8 @@ export interface UseMintNFTReturn {
 }
 
 // =============================================================================
-// TRAIT GENERATION HELPERS
+// PSBT HELPERS
 // =============================================================================
-
-const BLOODLINES: Bloodline[] = ["royal", "warrior", "rogue", "mystic"];
-
-function generateDNA(): string {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function rollBloodline(dna: string): Bloodline {
-  const roll = parseInt(dna.substring(4, 6), 16) % 4;
-  return BLOODLINES[roll];
-}
-
-function rollBaseType(dna: string): BaseType {
-  const roll = parseInt(dna.substring(6, 10), 16) % 100;
-  if (roll < 1) return "alien"; // 1%
-  if (roll < 6) return "robot"; // 5%
-  if (roll < 15) return "mystic"; // 9%
-  if (roll < 30) return "animal"; // 15%
-  return "human"; // 70%
-}
-
-function rollRarity(dna: string): RarityTier {
-  const roll = parseInt(dna.substring(0, 4), 16) % 1000;
-  if (roll < 5) return "mythic"; // 0.5%
-  if (roll < 30) return "legendary"; // 2.5%
-  if (roll < 100) return "epic"; // 7%
-  if (roll < 250) return "rare"; // 15%
-  if (roll < 500) return "uncommon"; // 25%
-  return "common"; // 50%
-}
 
 /**
  * Check if string is a PSBT (vs raw transaction)
@@ -250,19 +206,13 @@ function rollRarity(dna: string): RarityTier {
  * Can be hex encoded or base64 encoded
  */
 function isPsbt(data: string): boolean {
-  // Check hex format: 70736274ff
-  if (data.toLowerCase().startsWith("70736274ff")) {
-    return true;
-  }
-  // Check base64 format: cHNidP8 (base64 of "psbt\xff")
-  if (data.startsWith("cHNidP8")) {
-    return true;
-  }
+  if (data.toLowerCase().startsWith("70736274ff")) return true;
+  if (data.startsWith("cHNidP8")) return true;
   return false;
 }
 
 /**
- * Extract raw transaction hex from a signed/finalized PSBT
+ * Extract raw transaction hex from a signed/finalized PSBT.
  * After signing, the wallet returns a PSBT in hex format.
  * We need to extract the final transaction to broadcast.
  */
@@ -287,7 +237,7 @@ function getSuggestedAction(errorMessage: string): string {
     lower.includes("fund your wallet") ||
     lower.includes("no utxo")
   ) {
-    return "Fund your wallet first — you need at least 2,000 sats to cover fees.";
+    return `Fund your wallet first — you need at least ${MIN_FUNDING_SATS.toLocaleString()} sats to cover the mint price + dust + fee.`;
   }
 
   if (
@@ -324,10 +274,10 @@ function getSuggestedAction(errorMessage: string): string {
 
   if (
     lower.includes("max supply") ||
-    lower.includes("reserve") ||
-    lower.includes("supply")
+    lower.includes("supply") ||
+    lower.includes("below the minimum")
   ) {
-    return "NFT supply may be exhausted. Check the explorer to see available NFTs.";
+    return "NFT supply may be exhausted, or your UTXO is too small. Check the explorer and your wallet balance.";
   }
 
   if (lower.includes("wallet") || lower.includes("connect")) {
@@ -375,15 +325,15 @@ export function useMintNFT(): UseMintNFTReturn {
   // Wallet connection check
   const isWalletConnected = Boolean(wallet?.address && signPsbt);
 
-  // Process any pending confirmations from previous sessions on mount
+  // Process any pending finalizes from previous sessions on mount
   useEffect(() => {
-    processConfirmationQueue().catch((err) =>
-      log.warn("Failed to process confirmation queue:", { error: err }),
+    processFinalizeQueue().catch((err) =>
+      log.warn("Failed to process finalize queue:", { error: err }),
     );
   }, []);
 
   /**
-   * Mint NFT using Charms Prover
+   * Mint NFT using the unified /mint flow.
    */
   const mint = useCallback(async (): Promise<MintResult> => {
     // Require wallet
@@ -419,15 +369,11 @@ export function useMintNFT(): UseMintNFTReturn {
       log.info(`Prover health OK (latency: ${healthResult.data.latencyMs}ms)`);
     } catch {
       log.warn("Prover health check failed, proceeding anyway");
-      // Don't block on health check failure - prover might still work
     }
-
-    setCurrentStep("reserving");
 
     // Fetch UTXOs from mempool
     const utxos = await mempoolClient.getUTXOs(wallet.address);
 
-    // Check UTXOs
     if (!utxos || utxos.length === 0) {
       setIsLoading(false);
       setCurrentStep("error");
@@ -438,91 +384,29 @@ export function useMintNFT(): UseMintNFTReturn {
       };
     }
 
-    // Find a suitable funding UTXO (at least 2000 sats for fees)
-    const fundingUtxo = utxos.find((u: { value: number }) => u.value >= 2000);
+    // Find a suitable funding UTXO covering price + dust + fee
+    const fundingUtxo = utxos.find(
+      (u: { value: number }) => u.value >= MIN_FUNDING_SATS,
+    );
     if (!fundingUtxo) {
       setIsLoading(false);
       setCurrentStep("error");
-      setError("No UTXO with at least 2000 sats available");
+      setError(
+        `No UTXO with at least ${MIN_FUNDING_SATS} sats available (price + dust + fee)`,
+      );
       return {
         success: false,
-        error: "No UTXO with at least 2000 sats available",
+        error: `No UTXO with at least ${MIN_FUNDING_SATS} sats available (price + dust + fee)`,
       };
     }
 
-    // Track reserved token ID and attempt ID for cleanup on error
-    let reservedTokenId: number | null = null;
-    let attemptId: string | null = null;
-
     try {
-      // Step 1: Reserve next NFT ID from server (now tracks attempt)
-      const reserveResult = await apiClient.reserveNFT(wallet.address);
+      // Step 1: prepare the atomic mint server-side. The server picks the
+      // tokenId, derives the traits, and builds the atomic spell (NFT coin +
+      // treasury payment in the same tx). We get back the unsigned hexes.
+      setCurrentStep("preparing");
 
-      if (!reserveResult.success || !reserveResult.data) {
-        throw new Error(
-          reserveResult.error ||
-            "Failed to reserve NFT ID - max supply reached?",
-        );
-      }
-
-      reservedTokenId = reserveResult.data.tokenId;
-      attemptId = reserveResult.data.attemptId;
-      log.info(
-        `Reserved token ID: ${reservedTokenId} (total: ${reserveResult.data.totalMinted}, attemptId: ${attemptId})`,
-      );
-
-      // Step 2: Generate NFT traits
-      setCurrentStep("generating_traits");
-      const dna = generateDNA();
-      const bloodline = rollBloodline(dna);
-      const baseType = rollBaseType(dna);
-      const rarityTier = rollRarity(dna);
-
-      // Get current block height for genesisBlock
-      const blockHeight = await mempoolClient.getBlockHeight();
-
-      const nftState: SparkNFTState = {
-        dna,
-        bloodline,
-        baseType,
-        genesisBlock: blockHeight,
-        rarityTier,
-        tokenId: reservedTokenId,
-        heritage: parseInt(dna[2], 16) % 5,
-        level: 1,
-        xp: 0,
-        totalXp: 0,
-        workCount: 0,
-        lastWorkBlock: blockHeight,
-        evolutionCount: 0,
-        tokensEarned: 0n,
-        narrativeRoot: "",
-        worldStateRoot: "",
-        lastSettleBlock: 0,
-        settleCount: 0,
-      };
-
-      log.info("Generated traits:", {
-        tokenId: reservedTokenId,
-        bloodline,
-        baseType,
-        rarityTier,
-      });
-
-      // Step 3: Submit to prover API
-      setCurrentStep("proving");
-
-      // Update attempt status to proving
-      if (attemptId) {
-        apiClient
-          .updateMintAttempt(attemptId, "proving")
-          .catch((err) =>
-            log.warn("Failed to update attempt:", { error: err }),
-          );
-      }
-
-      log.info("Submitting to prover...", {
-        tokenId: reservedTokenId,
+      log.info("Calling /mint/prepare...", {
         address: wallet.address,
         fundingUtxo: {
           txid: fundingUtxo.txid,
@@ -531,112 +415,74 @@ export function useMintNFT(): UseMintNFTReturn {
         },
       });
 
-      let proveResult;
-      try {
-        proveResult = await apiClient.proveNFT({
-          tokenId: reservedTokenId,
-          address: wallet.address,
-          nftState: {
-            ...nftState,
-            // API expects tokensEarned as string
-            tokensEarned: nftState.tokensEarned.toString(),
-          },
-          fundingUtxo: {
-            txid: fundingUtxo.txid,
-            vout: fundingUtxo.vout,
-            value: fundingUtxo.value,
-          },
-        });
-        log.info("Prover response received:", { result: proveResult });
-      } catch (proveError) {
-        log.error("Prover request failed:", { error: proveError });
-        throw proveError;
+      const prepareResult = await apiClient.prepareMint({
+        address: wallet.address,
+        fundingUtxo: {
+          txid: fundingUtxo.txid,
+          vout: fundingUtxo.vout,
+          value: fundingUtxo.value,
+        },
+      });
+
+      if (!prepareResult.success || !prepareResult.data) {
+        throw new Error(prepareResult.error || "Failed to prepare NFT mint");
       }
 
-      if (!proveResult.success || !proveResult.data) {
-        log.error("Prover returned error:", { result: proveResult });
-        throw new Error(
-          proveResult.error || "Failed to generate NFT proof from prover",
-        );
-      }
+      const { tokenId, traits, commitTxHex, spellTxHex } = prepareResult.data;
 
-      const { commitTxHex, spellTxHex } = proveResult.data;
-
-      log.info("Prover returned transactions:", {
-        commitTxid: proveResult.data.commitTxid,
-        spellTxid: proveResult.data.spellTxid,
-        hasCommitTx: Boolean(commitTxHex),
-        hasSpellTx: Boolean(spellTxHex),
-        spellTxPrefix: spellTxHex?.slice(0, 20),
-        spellTxLength: spellTxHex?.length,
+      log.info("Mint prepared:", {
+        tokenId,
+        traits: {
+          bloodline: traits.bloodline,
+          baseType: traits.baseType,
+          rarityTier: traits.rarityTier,
+        },
+        priceSats: prepareResult.data.priceSats,
+        treasuryAddress: prepareResult.data.treasuryAddress,
       });
 
       if (!spellTxHex) {
-        throw new Error("Prover did not return spell transaction");
+        throw new Error("Server did not return spell transaction");
       }
 
-      // Detect if prover returned PSBT or raw transaction
+      // Step 2: Sign the commit + spell transactions
       const commitIsPsbt = commitTxHex ? isPsbt(commitTxHex) : false;
       const spellIsPsbt = isPsbt(spellTxHex);
 
-      log.info("Transaction formats:", {
-        commitIsPsbt,
-        spellIsPsbt,
-        // Log first 40 chars for debugging
-        spellPrefix: spellTxHex.slice(0, 40),
-      });
-
       let finalCommitHex: string | null = null;
       let finalSpellHex: string = spellTxHex;
-      let broadcastCommitTxid: string | null = null;
 
-      // Step 4: Handle commit transaction (if present)
+      // 2a. Commit transaction (if present)
       if (commitTxHex) {
         if (commitIsPsbt) {
-          // PSBT needs signing
           setCurrentStep("signing_commit");
-
-          // Update attempt status to signing
-          if (attemptId) {
-            apiClient
-              .updateMintAttempt(attemptId, "signing")
-              .catch((err) =>
-                log.warn("Failed to update attempt:", { error: err }),
-              );
-          }
-
           log.info("Signing commit PSBT...");
-
           const signed = await signPsbt(commitTxHex);
           if (!signed) {
             throw new Error("Commit transaction signing was cancelled");
           }
           finalCommitHex = signed;
         } else {
-          // Raw transaction - ready to broadcast
           log.info("Commit is raw TX, skipping signing");
           finalCommitHex = commitTxHex;
         }
       } else {
-        log.info("No commit transaction from prover, skipping commit");
+        log.info("No commit transaction from prepare, skipping commit");
       }
 
-      // Step 5: Handle spell transaction
+      // 2b. Spell transaction
       if (spellIsPsbt) {
-        // Already a PSBT - sign directly
         setCurrentStep("signing_spell");
         log.info("Signing spell PSBT...");
-
         const signed = await signPsbt(spellTxHex);
         if (!signed) {
           throw new Error("Spell transaction signing was cancelled");
         }
         finalSpellHex = signed;
       } else {
-        // Raw transaction from V11 prover - convert to PSBT and sign
+        // Raw transaction from the prover — convert to PSBT and sign
         setCurrentStep("signing_spell");
         log.info("Converting raw TX to PSBT for signing...");
-
         try {
           const psbtHex = await rawTxToPsbt(
             spellTxHex,
@@ -646,7 +492,6 @@ export function useMintNFT(): UseMintNFTReturn {
             network,
           );
           log.info("PSBT created, requesting wallet signature...");
-
           const signed = await signPsbt(psbtHex);
           if (!signed) {
             throw new Error("Spell transaction signing was cancelled");
@@ -661,22 +506,12 @@ export function useMintNFT(): UseMintNFTReturn {
         }
       }
 
-      // Step 6: Broadcast commit transaction (if present)
+      // Step 3: Broadcast commit transaction (if present)
+      let broadcastCommitTxid: string | null = null;
       if (finalCommitHex) {
         setCurrentStep("broadcasting_commit");
 
-        // Update attempt status to broadcasting
-        if (attemptId) {
-          apiClient
-            .updateMintAttempt(attemptId, "broadcasting")
-            .catch((err) =>
-              log.warn("Failed to update attempt:", { error: err }),
-            );
-        }
-
         log.info("Broadcasting commit transaction...");
-
-        // Extract raw transaction from signed PSBT if needed
         const commitRawTx = isPsbt(finalCommitHex)
           ? extractRawTxFromPsbt(finalCommitHex)
           : finalCommitHex;
@@ -689,9 +524,9 @@ export function useMintNFT(): UseMintNFTReturn {
         setCommitTxid(broadcastCommitTxid);
         log.info("Commit TX broadcast:", { txid: broadcastCommitTxid });
 
-        // C1 FIX: Wait for commit confirmation before broadcasting spell.
-        // Without this, the spell references a UTXO that may not exist yet in
-        // the mempool — resulting in a rejected spell or orphan risk.
+        // Wait for commit confirmation before broadcasting spell. Without
+        // this, the spell references a UTXO that may not exist yet in the
+        // mempool — resulting in a rejected spell (C1 fix).
         log.info(
           `Polling for commit confirmation (timeout: ${CONFIRMATION_TIMEOUT_MS}ms)...`,
         );
@@ -715,7 +550,7 @@ export function useMintNFT(): UseMintNFTReturn {
                 return;
               }
             } catch {
-              // Transaction not found yet or not confirmed — this is expected during polling
+              // Transaction not found yet or not confirmed — expected during polling
             }
 
             if (Date.now() - startTime >= CONFIRMATION_TIMEOUT_MS) {
@@ -728,13 +563,11 @@ export function useMintNFT(): UseMintNFTReturn {
               return;
             }
 
-            // Exponential backoff polling: 1s, 2s, 4s, 8s, 16s (capped)
             const elapsed = Date.now() - startTime;
             const nextDelay = Math.min(Math.max(1000, elapsed / 2), 16000);
             setTimeout(poll, nextDelay);
           };
 
-          // Start first poll after 1 second (give mempool time to propagate)
           setTimeout(poll, 1000);
         });
 
@@ -747,11 +580,9 @@ export function useMintNFT(): UseMintNFTReturn {
         log.info("Skipping commit broadcast (single-tx flow)");
       }
 
-      // Step 7: Broadcast spell transaction
+      // Step 4: Broadcast spell transaction
       setCurrentStep("broadcasting_spell");
 
-      // Extract raw transaction from signed PSBT
-      // The wallet returns a finalized PSBT in hex, but mempool needs raw TX
       const spellRawTx = isPsbt(finalSpellHex)
         ? extractRawTxFromPsbt(finalSpellHex)
         : finalSpellHex;
@@ -778,7 +609,6 @@ export function useMintNFT(): UseMintNFTReturn {
         throw broadcastError;
       }
       setSpellTxid(broadcastSpellTxid);
-
       log.info("Spell TX broadcast:", { txid: broadcastSpellTxid });
 
       // Track pending transactions
@@ -787,70 +617,66 @@ export function useMintNFT(): UseMintNFTReturn {
         addTransaction(
           broadcastCommitTxid,
           "nft_mint",
-          `Genesis Spark #${reservedTokenId} commit`,
+          `Genesis Spark #${tokenId} commit`,
         );
       }
       addTransaction(
         broadcastSpellTxid,
         "nft_mint",
-        `Genesis Spark #${reservedTokenId} spell`,
+        `Genesis Spark #${tokenId} spell`,
       );
 
-      // Step 8: Confirm the mint with server
-      setCurrentStep("confirming");
+      // Step 5: Finalize with server (verify on-chain + persist).
+      // Robust finalize with retry + persistent fallback queue: if the call
+      // fails (network error, server restart, etc.), the NFT is already
+      // on-chain and we queue the finalize for the next app load.
+      setCurrentStep("finalizing");
 
-      // C2 FIX: Robust confirmation with retry + persistent fallback queue.
-      // If confirmNFTMint or updateMintAttempt fail (network error, server
-      // restart, etc.), we retry with exponential backoff, and if all retries
-      // are exhausted we queue the confirmation in localStorage so it can be
-      // retried on the next app load.
-
-      // Build confirmation payload
-      const confirmationNftData = {
-        dna: nftState.dna,
-        bloodline: nftState.bloodline,
-        baseType: nftState.baseType,
-        rarityTier: nftState.rarityTier,
-        level: nftState.level,
-        xp: nftState.xp,
-        totalXp: nftState.totalXp,
-        workCount: nftState.workCount,
-        evolutionCount: nftState.evolutionCount,
-      };
-
-      const pendingItem: PendingConfirmation = {
-        tokenId: reservedTokenId,
+      const pendingItem: PendingFinalize = {
         spellTxid: broadcastSpellTxid,
         address: wallet.address,
-        nftData: confirmationNftData,
-        attemptId: attemptId || null,
-        commitTxid: broadcastCommitTxid || null,
+        tokenId,
         timestamp: Date.now(),
         retryCount: 0,
       };
 
-      // Fire non-blocking confirmation with retry + persistent queue
       (async () => {
-        const success = await retryConfirmation(apiClient, pendingItem);
+        const success = await retryFinalize(apiClient, pendingItem);
         if (!success) {
-          // All retries exhausted — persist for next app load
           log.warn(
             "NFT minted on blockchain but server sync pending (queued for retry):",
-            { tokenId: reservedTokenId, spellTxid: broadcastSpellTxid },
+            { tokenId, spellTxid: broadcastSpellTxid },
           );
-          const queue = loadConfirmationQueue();
+          const queue = loadFinalizeQueue();
           queue.push(pendingItem);
-          saveConfirmationQueue(queue);
-          // TODO: surface this warning to the user via some UI mechanism
-          // (e.g. toast: "NFT minted on blockchain but server sync pending")
+          saveFinalizeQueue(queue);
         } else {
-          log.info("Confirmation succeeded:", { tokenId: reservedTokenId });
+          log.info("Finalize succeeded:", { tokenId });
         }
       })();
 
-      // Clear reservedTokenId on success (no cleanup needed)
-      reservedTokenId = null;
-      attemptId = null;
+      // Build the displayable NFT state from the server-generated traits.
+      const blockHeight = await mempoolClient.getBlockHeight();
+      const nftState: SparkNFTState = {
+        dna: traits.dna,
+        bloodline: traits.bloodline as SparkNFTState["bloodline"],
+        baseType: traits.baseType as SparkNFTState["baseType"],
+        genesisBlock: blockHeight,
+        rarityTier: traits.rarityTier as SparkNFTState["rarityTier"],
+        tokenId,
+        heritage: 0,
+        level: 1,
+        xp: 0,
+        totalXp: 0,
+        workCount: 0,
+        lastWorkBlock: blockHeight,
+        evolutionCount: 0,
+        tokensEarned: 0n,
+        narrativeRoot: "",
+        worldStateRoot: "",
+        lastSettleBlock: 0,
+        settleCount: 0,
+      };
 
       setLastMinted(nftState);
       setCurrentStep("success");
@@ -867,25 +693,6 @@ export function useMintNFT(): UseMintNFTReturn {
       setError(message);
       setSuggestedAction(getSuggestedAction(message));
       setCurrentStep("error");
-
-      // Update attempt status to failed
-      if (attemptId) {
-        apiClient
-          .updateMintAttempt(attemptId, "failed", { error: message })
-          .catch((updateErr) =>
-            log.warn("Failed to update attempt:", { error: updateErr }),
-          );
-      }
-
-      // Release reserved token ID if mint failed after reservation
-      if (reservedTokenId !== null) {
-        log.info(`Releasing reserved token ID ${reservedTokenId} due to error`);
-        apiClient.releaseNFT(reservedTokenId).catch((releaseErr) =>
-          log.warn(`Failed to release token ${reservedTokenId}:`, {
-            error: releaseErr,
-          }),
-        );
-      }
 
       return { success: false, error: message };
     } finally {
