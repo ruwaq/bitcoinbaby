@@ -53,8 +53,12 @@ genesis/commit UTXO", the precise statement is **app id = SHA256 of the funding
 UTXO the spell spends** — known up front.
 
 The deploy script computes this with Node's `crypto`:
+
 ```ts
-appId = crypto.createHash("sha256").update(`${fundingTxid}:${fundingVout}`, "utf8").digest("hex");
+appId = crypto
+  .createHash("sha256")
+  .update(`${fundingTxid}:${fundingVout}`, "utf8")
+  .digest("hex");
 ```
 
 ---
@@ -106,6 +110,7 @@ pnpm tsx scripts/deploy-nft-contract.ts \
 ```
 
 Optional flags:
+
 - `--network testnet4` (default) — mempool API base for prev-tx fetch.
 - `--prover-url https://v15.charms.dev` (default) — the prover.
 - `--dry-run` — build + post to the prover, but skip the signing pause (useful
@@ -115,6 +120,7 @@ Optional flags:
   human reviews.
 
 The script will:
+
 1. Print the computed `app_id = SHA256("<txid>:<vout>")`.
 2. Build the v15 genesis spell (token_id=1, deterministic DNA/traits).
 3. Fetch the funding tx's prev-tx hex from mempool.
@@ -201,7 +207,7 @@ Both should show as confirmed. The spell tx output 0 is your minted NFT UTXO.
 Back in the deploy-script terminal, the script prompted:
 
 ```
-Paste the COMMIT tx txid once broadcast (or press Enter to skip ...): 
+Paste the COMMIT tx txid once broadcast (or press Enter to skip ...):
 ```
 
 Paste the **commit txid**. The script will re-affirm the app id. (It was
@@ -209,6 +215,7 @@ already known from the funding UTXO; the script just prints it prominently for
 the config step.)
 
 If you killed the script, you can recompute it by hand:
+
 ```sh
 echo -n "<fundingTxid>:<fundingVout>" | shasum -a 256
 ```
@@ -220,12 +227,14 @@ add `--apply` to write them automatically):
 
 **`apps/workers/wrangler.toml`** — set `NFT_APP_ID` in **both** `[vars]` (dev)
 and `[env.production.vars]` (prod):
+
 ```toml
 NFT_APP_ID = "<the-64-hex-app-id>"
 ```
 
 **`packages/bitcoin/src/config/testnet4.ts`** — update the
 `GENESIS_SPARKS_TESTNET4.appId` fallback string:
+
 ```ts
 appId:
   process.env.NEXT_PUBLIC_GBABY_APP_ID ||
@@ -234,6 +243,7 @@ appId:
 ```
 
 Then redeploy:
+
 ```sh
 # Dev/staging
 pnpm --filter @bitcoinbaby/workers deploy
@@ -251,14 +261,71 @@ The worker previously returned `503` / "NFT app ID not yet established" because
 # Replace <worker-host> with your Cloudflare worker URL
 curl -s "https://<worker-host>/health" | jq .
 # Expect: nft / app_id fields populated, no 503.
-
-# Try a mint (requires auth / faucet balance per the worker's normal flow):
-curl -sX POST "https://<worker-host>/nft/mint" -H "Content-Type: application/json" \
-  -d '{"ownerAddress":"tb1p..."}' | jq .
 ```
 
 You can also confirm the app exists on Charms' indexer (Scrolls):
 https://scrolls.charms.dev/ — search for the app id.
+
+---
+
+## Post-genesis mint flow — `POST /mint/prepare` + `/mint/finalize`
+
+After the genesis mint above establishes the app id, **all subsequent mints**
+go through the unified two-step flow (sub-proyecto D3). The legacy
+`/reserve → /prove → /confirm` triplet and `/claim` were removed.
+
+### Step 1 — `POST /api/nft/mint/prepare`
+
+The client provides its address + the UTXO it will spend to pay for the mint.
+The server derives the tokenId and traits, builds an **atomic** spell (the
+NFT coin and the treasury payment are in the SAME Bitcoin tx), and returns
+unsigned hex.
+
+```sh
+curl -sX POST "https://<worker-host>/api/nft/mint/prepare" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "address": "tb1p...",
+        "fundingUtxo": { "txid": "...", "vout": 0, "value": 10000 }
+      }' | jq .
+# → { tokenId, traits, commitTxHex, spellTxHex, priceSats, treasuryAddress, ... }
+```
+
+The UTXO must:
+
+- belong to `address` (verified on-chain),
+- be unspent,
+- have `value ≥ NFT_MINT_PRICE_SATS (5000) + NFT_DUST_SATS (330) + fee reserve (1000)`.
+
+Traits are generated **server-side** from the funding txid; the client never
+supplies them. See `docs/ECONOMICS.md` for pricing.
+
+### Step 2 — client signs + broadcasts
+
+Sign `commitTxHex` then `spellTxHex` (same procedure as genesis Steps 3-4
+above), broadcast commit first, wait 1 confirmation, broadcast spell.
+
+### Step 3 — `POST /api/nft/mint/finalize`
+
+Once the spell tx is confirmed, the client finalizes:
+
+```sh
+curl -sX POST "https://<worker-host>/api/nft/mint/finalize" \
+  -H "Content-Type: application/json" \
+  -d '{ "spellTxid": "<the-broadcast-spell-txid>", "address": "tb1p..." }' | jq .
+# → { confirmed: true, tokenId, traits }
+```
+
+The server verifies on-chain that the spell tx is confirmed and pays the NFT
+dust to the owner + the price to the treasury, then persists the NFT to the
+indexer (`nft:minted`, `nft:owned`, `nft:all-tokens`).
+
+### Why two steps?
+
+Because the worker is stateless about wallet keys: the client must sign the
+spell, so the server cannot both build and confirm in one call. The
+`/prepare` → broadcast → `/finalize` split mirrors Bitcoin's own build →
+sign → confirm lifecycle and keeps the atomic payment trustless.
 
 ---
 
@@ -291,6 +358,7 @@ contract returned `false` (rejected the operation). Common causes:
    rejected.
 
 To debug, run the CLI mock locally against the same spell:
+
 ```sh
 charms spell check --spell spell.yaml --prev-txs <hex> \
   --app-bins <wasm> --private-inputs priv.yaml
@@ -321,6 +389,7 @@ the raw tx via `bitcoinjs-lib`'s `Transaction.setWitness`.
 ### Version skew (CLI / prover / contract)
 
 All three must agree on v15:
+
 - CLI: `charms --version` -> v15.x
 - Prover: `curl -s https://v15.charms.dev/ready` (the `v15` subdomain implies
   v15, but confirm).
@@ -333,6 +402,7 @@ A v11 spell/contract against the v15 prover will fail with a vague error.
 The VK is the SHA256 of the compiled `.wasm`. If you rebuild the contract
 (even with trivial changes), the VK changes and `nft-contract-binary.ts` must
 be regenerated:
+
 ```sh
 cd packages/bitcoin/contracts/genesis-babies
 cargo build --release --target wasm32-wasip1
