@@ -209,18 +209,20 @@ export const unlistBodySchema = z.object({
   sellerAddress: bitcoinAddressSchema,
   /** Unix timestamp (ms) - must be within 5 minutes */
   timestamp: z.number().int().positive(),
-  /** Schnorr signature (64 bytes hex) of: unlist:{tokenId}:{timestamp} */
+  /**
+   * Schnorr signature (64 bytes hex) of: unlist:{tokenId}:{timestamp}.
+   * REQUIRED (D4.3): previously optional for backward compat, which let
+   * anyone who knew sellerAddress + tokenId unlist an NFT (bug #11).
+   */
   signature: z
     .string()
     .length(128)
-    .regex(/^[a-fA-F0-9]+$/)
-    .optional(), // Optional for backward compatibility
+    .regex(/^[a-fA-F0-9]+$/),
   /** x-only public key (32 bytes hex) for signature verification */
   publicKey: z
     .string()
     .length(64)
-    .regex(/^[a-fA-F0-9]+$/)
-    .optional(),
+    .regex(/^[a-fA-F0-9]+$/),
 });
 
 export const explorerQuerySchema = z.object({

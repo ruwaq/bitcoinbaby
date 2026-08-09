@@ -14,15 +14,10 @@ import {
   TimeoutError,
   EXTERNAL_API,
 } from "../../lib/helpers";
-import {
-  validateBody,
-  validateParams,
-} from "../../lib/middleware";
+import { validateBody, validateParams } from "../../lib/middleware";
 import { nftLogger } from "../../lib/logger";
-import {
-  tokenIdParamSchema,
-  buyNftSchema,
-} from "./middleware";
+import { tokenIdParamSchema, buyNftSchema } from "./middleware";
+import { NFT_DUST_SATS } from "../../services/nft-spell-utils";
 
 const marketplaceLogger = nftLogger.child({ component: "marketplace" });
 
@@ -154,29 +149,31 @@ buyRouter.post(
       if (nftUtxoTxid && nftUtxoVoutStr !== undefined) {
         const nftUtxoVout = parseInt(nftUtxoVoutStr, 10);
         const spendsNftUtxo = txData.vin.some(
-          (input) => input.txid === nftUtxoTxid && input.vout === nftUtxoVout
+          (input) => input.txid === nftUtxoTxid && input.vout === nftUtxoVout,
         );
         if (!spendsNftUtxo) {
           return errorResponse(
             c,
             "Transaction does not spend the listed NFT UTXO",
-            400
+            400,
           );
         }
       }
 
-      // Verify that the NFT (546 sats dust UTXO) is transferred to the buyer
+      // Verify that the NFT (dust UTXO) is transferred to the buyer.
+      // NFT_DUST_SATS (330) matches what the mint spell emits — the previous
+      // hard-coded 546 broke every resale because minted NFTs carry 330 sats.
       const nftTransferOutput = txData.vout.find(
         (output) =>
           output.scriptpubkey_address === buyerAddress &&
-          output.value === 546
+          output.value === NFT_DUST_SATS,
       );
 
       if (!nftTransferOutput) {
         return errorResponse(
           c,
-          "Transaction does not transfer the NFT UTXO (546 sats) to the buyer",
-          400
+          `Transaction does not transfer the NFT UTXO (${NFT_DUST_SATS} sats) to the buyer`,
+          400,
         );
       }
 

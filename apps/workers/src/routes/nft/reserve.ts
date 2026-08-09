@@ -14,6 +14,7 @@ import { getRedis } from "../../lib/redis";
 import { errorResponse, successResponse } from "../../lib/helpers";
 import { validateBody, validateParams } from "../../lib/middleware";
 import { nftLogger } from "../../lib/logger";
+import { constantTimeEqual } from "../../lib/encoding";
 import { getNFTMintingServiceSimple } from "../../services/nft-minting-simple";
 import { getNetworkForEnvironment } from "../../config/bitcoin";
 import { addressParamSchema } from "./middleware";
@@ -149,6 +150,18 @@ reserveRouter.post(
     }),
   ),
   async (c) => {
+    // Admin-only: this mutates indexer attempt state and is not part of the
+    // normal client mint flow (bug #10).
+    const adminKey = c.req.header("X-Admin-Key");
+    const expectedKey = c.env.ADMIN_KEY;
+    if (
+      !expectedKey ||
+      !adminKey ||
+      !constantTimeEqual(adminKey, expectedKey)
+    ) {
+      return errorResponse(c, "Unauthorized - admin key required", 401);
+    }
+
     const { attemptId, status, error, commitTxid, spellTxid } =
       c.get("validatedBody");
 

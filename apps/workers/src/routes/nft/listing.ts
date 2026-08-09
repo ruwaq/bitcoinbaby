@@ -8,14 +8,8 @@ import { Hono } from "hono";
 import * as bitcoin from "bitcoinjs-lib";
 import type { Env } from "../../lib/types";
 import { getRedis } from "../../lib/redis";
-import {
-  errorResponse,
-  successResponse,
-} from "../../lib/helpers";
-import {
-  validateBody,
-  validateParams,
-} from "../../lib/middleware";
+import { errorResponse, successResponse } from "../../lib/helpers";
+import { validateBody, validateParams } from "../../lib/middleware";
 import { nftLogger } from "../../lib/logger";
 import {
   tokenIdParamSchema,
@@ -229,7 +223,11 @@ listingRouter.post("/list", validateBody(listNftSchema), async (c) => {
     if (sellerPsbt) {
       const validation = validateListingSighash(sellerPsbt);
       if (!validation.valid) {
-        return errorResponse(c, validation.error || "Invalid PSBT SIGHASH", 400);
+        return errorResponse(
+          c,
+          validation.error || "Invalid PSBT SIGHASH",
+          400,
+        );
       }
     }
 
@@ -329,34 +327,28 @@ listingRouter.delete(
         return errorResponse(c, "Only the seller can unlist", 403);
       }
 
-      // Signature verification (if provided)
-      if (signature && publicKey) {
-        const { verifySchnorrSignature, createAuthMessage } =
-          await import("../../lib/crypto");
+      // Signature verification (REQUIRED since D4.3). The schema no longer
+      // accepts requests without signature+publicKey, so the warn-only path
+      // that anyone could unlist with just sellerAddress + tokenId is gone.
+      const { verifySchnorrSignature, createAuthMessage } =
+        await import("../../lib/crypto");
 
-        const message = createAuthMessage("unlist", tokenId, timestamp);
-        const isValid = await verifySchnorrSignature(
-          signature,
-          message,
-          publicKey,
-        );
+      const message = createAuthMessage("unlist", tokenId, timestamp);
+      const isValid = await verifySchnorrSignature(
+        signature,
+        message,
+        publicKey,
+      );
 
-        if (!isValid) {
-          marketplaceLogger.warn("Invalid unlist signature", {
-            tokenId,
-            address: sellerAddress.slice(0, 10),
-          });
-          return errorResponse(c, "Invalid signature", 401);
-        }
-
-        marketplaceLogger.info("Signature verified for unlist", { tokenId });
-      } else {
-        // Backward compatibility warning - will be removed in future
-        marketplaceLogger.warn("Unlist without signature (deprecated)", {
+      if (!isValid) {
+        marketplaceLogger.warn("Invalid unlist signature", {
           tokenId,
           address: sellerAddress.slice(0, 10),
         });
+        return errorResponse(c, "Invalid signature", 401);
       }
+
+      marketplaceLogger.info("Signature verified for unlist", { tokenId });
 
       // Check for replay attack - use timestamp as nonce
       const nonceKey = `nft:unlist-nonce:${sellerAddress}:${tokenId}:${timestamp}`;

@@ -10,6 +10,7 @@ import { getRedis } from "../../lib/redis";
 import { errorResponse, successResponse } from "../../lib/helpers";
 import { validateParams } from "../../lib/middleware";
 import { nftLogger } from "../../lib/logger";
+import { constantTimeEqual } from "../../lib/encoding";
 import { getNetworkForEnvironment, EXPLORER_URLS } from "../../config/bitcoin";
 import {
   tokenIdParamSchema,
@@ -298,6 +299,14 @@ confirmRouter.get("/stats", async (c) => {
  * Example: POST /api/nft/migrate-index {"tokenIds": [1, 3, 9443]}
  */
 confirmRouter.post("/migrate-index", async (c) => {
+  // Admin-only: this mutates the global nft:all-tokens index and the mint
+  // counter. Public access would let anyone corrupt the indexer (bug #10).
+  const adminKey = c.req.header("X-Admin-Key");
+  const expectedKey = c.env.ADMIN_KEY;
+  if (!expectedKey || !adminKey || !constantTimeEqual(adminKey, expectedKey)) {
+    return errorResponse(c, "Unauthorized - admin key required", 401);
+  }
+
   try {
     if (!c.env.UPSTASH_REDIS_REST_URL || !c.env.UPSTASH_REDIS_REST_TOKEN) {
       return errorResponse(c, "Redis not configured", 500);
