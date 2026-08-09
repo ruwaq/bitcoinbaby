@@ -154,9 +154,17 @@ todos los consumidores se alinean"_.
 **Acción correcta (bloqueada por follow-up #3):** NO regenerar aislado. La regeneración va
 **bundled con el redeploy on-chain + reset testnet4** (follow-up #3). Hasta entonces, los
 binarios stale están _intencionalmente_ alineados con lo on-chain — es lo correcto para que
-producción funcione. Lo que falta es **proceso**: añadir un CI check que detecte la divergencia
-source-vs-embebido automáticamente para que no vuelva a pasar desapercibida (ver
-`VK_RECONCILIATION.md` Fase 0.3).
+producción funcione.
+
+**Guardián local IMPLEMENTADO (Fase 0.3 de `VK_RECONCILIATION.md`):** `scripts/verify-vks.sh`
+
+- hook `.husky/pre-push` + `pnpm verify:vks`. El hook solo corre cuando un push toca
+  `packages/bitcoin/contracts/*/src/` y es **advisory** (reporta, no bloquea — respeta que el
+  stale actual es intencional). Modo `--strict` para CI/release. NOTA: GitHub Actions está
+  deshabilitado en el repo (`actions/permissions: enabled=false`), así que el job
+  `contract-vk-check` de `ci.yml` no corre — el guardián local es lo que protege hoy. Cuando se
+  rehabilite Actions + se haga el redeploy on-chain, el job de CI debe invocar
+  `scripts/verify-vks.sh --strict` para reusar la lógica (no duplicar).
 
 **Datos probatorios del build limpio** (reproducibles con `cargo clean && cargo build --release
 --target wasm32-wasip1` en cada `packages/bitcoin/contracts/<contrato>`):
