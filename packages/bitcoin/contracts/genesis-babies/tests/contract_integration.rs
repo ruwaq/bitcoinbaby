@@ -3,14 +3,18 @@
 //! These tests exercise the FULL contract path — `app_contract(app, tx, x, w)` — with
 //! hand-built `Transaction` values, the same function the Charms runtime invokes when it
 //! runs our wasm via `charms spell check` / `spell prove`. They are the strongest local
-//! validation of the work_proof and level_up paths (which `charms spell check --mock`
-//! cannot reach, because resolving input charm data requires an enchanted prev-tx that
-//! only a paid prover can produce).
+//! validation of the level_up path and the work_proof REJECTION guard (which `charms
+//! spell check --mock` cannot reach, because resolving input charm data requires an
+//! enchanted prev-tx that only a paid prover can produce).
 //!
 //! What is covered here (and the complementary `charms spell check` coverage):
 //!   - mint           : ALSO covered end-to-end via `scripts/validate-nft-contract.ts`
 //!                      (YAML spell -> wasm). The cases below mirror those fixtures.
-//!   - work_proof     : covered ONLY here (ins + outs + witness constructed in-process).
+//!   - work_proof     : DISABLED post-reset (C3 closure, D2). The single
+//!                      `work_proof_op_rejected_after_c3_closure` test proves
+//!                      the op falls through to `_ => false`; there are no
+//!                      legacy NFTs to migrate, so no accept-path coverage is
+//!                      wanted.
 //!   - level_up       : covered ONLY here.
 //!   - transfer / unknown op : covered ONLY here.
 //!
@@ -219,15 +223,41 @@ fn mint_with_existing_input_nft_is_rejected() {
 }
 
 // =============================================================================
-// WORK PROOF — accepted
+// WORK PROOF — disabled post-reset (C3 closure, spec D2)
 // =============================================================================
+//
+// `work_proof` was a live (deprecated) operation before the Big-Bang Reset. It
+// trusted `xp_gain` from the witness — exactly the C3 exploit vector (a client
+// with prover access could claim `xp_gain = 999_999` and the contract would
+// accept it, since nothing re-derived the gain on-chain). Post-reset there are
+// no legacy NFTs to migrate, so the match arm was removed entirely and the op
+// now falls through to `_ => false`.
+//
+// The single test below is the canonical C3-closure guard: a PERFECTLY VALID
+// `work_proof` transition (every counter ticks by the witness-claimed gain,
+// which the OLD `validate_work_proof` would have accepted) MUST now be
+// rejected, because the op no longer exists in the dispatcher. (The obsolete
+// accept/reject tests that exercised `validate_work_proof` directly were
+// removed when the arm was taken out: by vacuous truth they had stopped
+// testing what their names claimed.)
 
 #[test]
-fn work_proof_valid_is_accepted() {
+fn work_proof_op_rejected_after_c3_closure() {
+    // C3 closure (sub-proyecto C, spec decisión D2): the `work_proof` op is
+    // DISABLED post-reset. It trusted `xp_gain` from the witness (the C3
+    // exploit vector — a client with prover access could claim xp_gain =
+    // 999_999 and the contract accepted it). New work MUST go through op
+    // `work` (PoW-verified, xp_gain derived via xp_from_difficulty). There
+    // are no legacy NFTs to migrate in a Big-Bang Reset, so we don't need
+    // backwards compatibility.
+    //
+    // This test builds a transition that the OLD `validate_work_proof` would
+    // have ACCEPTED (every counter ticks by the witness-claimed `xp_gain`),
+    // and asserts the contract now REJECTS it — proving the match arm is gone
+    // and the op falls through to `_ => false`.
     let mut old = fresh_mint();
     old.xp = 50;
     old.total_xp = 50;
-    // one prior work proof already happened
     old.work_count = 1;
     old.last_work_block = 199_999;
 
@@ -236,58 +266,10 @@ fn work_proof_valid_is_accepted() {
     let mut new = old.clone();
     new.work_count = old.work_count + 1;
     new.total_xp = old.total_xp + xp_gain;
-    new.xp = old.xp + xp_gain; // C1a: spendable xp must tick by the same gain
+    new.xp = old.xp + xp_gain; // would satisfy C1a under the old validator
     new.last_work_block = current_block;
 
-    let tx = Transaction {
-        ins: vec![(utxo(), charms_with(&old))],
-        refs: vec![],
-        outs: vec![charms_with(&new)],
-        coin_ins: None,
-        coin_outs: None,
-        prev_txs: Default::default(),
-        app_public_inputs: Default::default(),
-    };
-    let w = Data::from(&genesis_babies::WorkProofWitness {
-        operation: "work_proof".into(),
-        xp_gain,
-        current_block,
-    });
-    assert!(
-        run(&app(), &tx, &Data::empty(), &w),
-        "valid work_proof must be accepted"
-    );
-}
-
-// =============================================================================
-// WORK PROOF — rejected
-// =============================================================================
-
-#[test]
-fn work_proof_without_work_count_increment_is_rejected() {
-    let mut old = fresh_mint();
-    old.xp = 50;
-    old.total_xp = 50;
-    old.work_count = 1;
-
-    let xp_gain = 25u64;
-    let current_block = 200_000u64;
-    let mut new = old.clone();
-    // BUG under test: work_count NOT incremented.
-    new.work_count = old.work_count;
-    new.total_xp = old.total_xp + xp_gain;
-    new.xp = old.xp + xp_gain;
-    new.last_work_block = current_block;
-
-    let tx = Transaction {
-        ins: vec![(utxo(), charms_with(&old))],
-        refs: vec![],
-        outs: vec![charms_with(&new)],
-        coin_ins: None,
-        coin_outs: None,
-        prev_txs: Default::default(),
-        app_public_inputs: Default::default(),
-    };
+    let tx = work_tx(&old, &new);
     let w = Data::from(&genesis_babies::WorkProofWitness {
         operation: "work_proof".into(),
         xp_gain,
@@ -295,79 +277,7 @@ fn work_proof_without_work_count_increment_is_rejected() {
     });
     assert!(
         !run(&app(), &tx, &Data::empty(), &w),
-        "work_proof without work_count+1 must reject"
-    );
-}
-
-#[test]
-fn work_proof_xp_not_tied_to_gain_is_rejected() {
-    // C1a regression: an attacker accrues total_xp but never raises the spendable xp.
-    let mut old = fresh_mint();
-    old.xp = 50;
-    old.total_xp = 50;
-    old.work_count = 1;
-
-    let xp_gain = 25u64;
-    let current_block = 200_000u64;
-    let mut new = old.clone();
-    new.work_count = old.work_count + 1;
-    new.total_xp = old.total_xp + xp_gain;
-    new.xp = old.xp; // BUG under test: spendable xp not bumped
-    new.last_work_block = current_block;
-
-    let tx = Transaction {
-        ins: vec![(utxo(), charms_with(&old))],
-        refs: vec![],
-        outs: vec![charms_with(&new)],
-        coin_ins: None,
-        coin_outs: None,
-        prev_txs: Default::default(),
-        app_public_inputs: Default::default(),
-    };
-    let w = Data::from(&genesis_babies::WorkProofWitness {
-        operation: "work_proof".into(),
-        xp_gain,
-        current_block,
-    });
-    assert!(
-        !run(&app(), &tx, &Data::empty(), &w),
-        "work_proof where xp != old.xp + xp_gain must reject (C1a)"
-    );
-}
-
-#[test]
-fn work_proof_mutating_immutable_dna_is_rejected() {
-    let mut old = fresh_mint();
-    old.xp = 50;
-    old.total_xp = 50;
-    old.work_count = 1;
-
-    let xp_gain = 25u64;
-    let current_block = 200_000u64;
-    let mut new = old.clone();
-    new.work_count = old.work_count + 1;
-    new.total_xp = old.total_xp + xp_gain;
-    new.xp = old.xp + xp_gain;
-    new.last_work_block = current_block;
-    new.dna = "b".repeat(64); // BUG under test: dna is immutable
-
-    let tx = Transaction {
-        ins: vec![(utxo(), charms_with(&old))],
-        refs: vec![],
-        outs: vec![charms_with(&new)],
-        coin_ins: None,
-        coin_outs: None,
-        prev_txs: Default::default(),
-        app_public_inputs: Default::default(),
-    };
-    let w = Data::from(&genesis_babies::WorkProofWitness {
-        operation: "work_proof".into(),
-        xp_gain,
-        current_block,
-    });
-    assert!(
-        !run(&app(), &tx, &Data::empty(), &w),
-        "work_proof mutating dna must reject"
+        "work_proof op is disabled post-reset (C3 closure, D2); even a valid-looking transition must reject"
     );
 }
 

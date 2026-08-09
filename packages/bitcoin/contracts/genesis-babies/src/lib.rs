@@ -77,6 +77,13 @@ pub struct NFTWitness {
 /// on-chain re-derivation in `validate_work_proof`). This struct is kept ONLY for backwards
 /// compatibility with already-minted NFTs; new work MUST go through [`WorkWitness`] + the `work`
 /// operation, where XP is *derived on-chain* from the verified proof-of-work difficulty.
+///
+/// **C3 closure (sub-proyecto C, spec D2):** the `"work_proof"` match arm was
+/// removed in a Big-Bang Reset (no legacy NFTs to migrate). This struct is now
+/// ONLY referenced by the integration tests that assert the op is REJECTED; it
+/// is no longer deserialized by `app_contract`. Kept for documentation; do NOT
+/// re-wire.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkProofWitness {
     pub operation: String, // always "work_proof"
@@ -191,15 +198,16 @@ pub fn app_contract(app: &App, tx: &Transaction, _x: &Data, w: &Data) -> bool {
 
     match witness.operation.as_str() {
         "mint" => validate_mint(app, tx),
-        "work_proof" => {
-            // The work_proof path needs `xp_gain` + `current_block`, which only exist on the
-            // richer `WorkProofWitness`. Re-deserialize `w` as that shape.
-            let wp: WorkProofWitness = match w.value() {
-                Ok(v) => v,
-                Err(_) => return false,
-            };
-            validate_work_proof(app, tx, wp.xp_gain, wp.current_block)
-        }
+        // C3 closure (sub-proyecto C, spec decisión D2): the `work_proof` op is
+        // DISABLED post-reset. It trusted `xp_gain` from the witness (the C3
+        // exploit vector — a client with prover access could claim xp_gain =
+        // 999_999 and the contract accepted it). New work MUST go through op
+        // `work` (PoW-verified, xp_gain derived via xp_from_difficulty).
+        // There are no legacy NFTs to migrate in a Big-Bang Reset.
+        //
+        // To re-enable (NOT RECOMMENDED): add a "work_proof" arm here. The
+        // `work_proof_op_rejected_after_c3_closure` integration test (in
+        // tests/contract_integration.rs) will fail as a guard.
         // C3 fix: the `work` operation re-derives XP on-chain from a verified
         // proof-of-work hash. Supersedes the deprecated `work_proof` path.
         "work" => {
@@ -461,6 +469,12 @@ fn validate_mint(app: &App, tx: &Transaction) -> bool {
 /// can claim an arbitrary gain. Kept only for backwards compatibility with
 /// already-minted NFTs. New work MUST use [`validate_work`], which derives XP
 /// on-chain from a verified proof-of-work difficulty.
+///
+/// **C3 closure (sub-proyecto C, spec D2):** the `"work_proof"` match arm was
+/// removed in a Big-Bang Reset (no legacy NFTs to migrate). This function is
+/// therefore DEAD CODE — kept for documentation of the historical bug, NOT
+/// re-wired. Do NOT call it from `app_contract`.
+#[allow(dead_code)]
 fn validate_work_proof(app: &App, tx: &Transaction, xp_gain: u64, current_block: u64) -> bool {
     let Some(old) = single_input_state(app, tx) else {
         return false;
