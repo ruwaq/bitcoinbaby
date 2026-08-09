@@ -3,7 +3,7 @@
 > **Fecha:** 2026-08-09
 > **Branch:** `feat/subproyecto-d-nft-hardening`
 > **Main al iniciar sesión:** `8803964` (sub-proyecto C Fases 0-2 done)
-> **Estado:** Sub-proyecto D **COMPLETO (Fases D1-D5)**. Todos los bugs críticos del catálogo cerrados con tests. El código está listo para PR; faltan solo los follow-ups operativos (binarios WASM, decisiones de deploy) y la integración web del nuevo flujo `/mint`.
+> **Estado:** Sub-proyecto D **COMPLETO (Fases D1-D6)**, incluyendo la migración web al flujo `/mint`. Todos los bugs críticos del catálogo cerrados con tests. El código está listo para PR; faltan solo los follow-ups operativos (binarios WASM, decisiones de deploy) y el hardening de `/unlist` con firma (sesión separada).
 
 ---
 
@@ -14,9 +14,10 @@ Sub-proyecto C (mainnet launch) — Fases 0-2 done, 3-5 bloqueadas por cuota pro
 Sub-proyecto D (NFT hardening + venta) — COMPLETO ✅
    ├─ Fase D1 — Fix contrato genesis-babies (PoW replay)        ✅ SESSION-8
    ├─ Fase D2 — SPARK_START_TIME (mining emisión)               ✅ SESSION-8
-   ├─ Fase D3 — Unificar flujo de minteo (worker)               ✅ SESSION-9 (esta sesión)
+   ├─ Fase D3 — Unificar flujo de minteo (worker)               ✅ SESSION-9
    ├─ Fase D4 — Fix marketplace (dust + hardening)              ✅ SESSION-9
-   └─ Fase D5 — Precio + docs + handoff                         ✅ SESSION-9
+   ├─ Fase D5 — Precio + docs + handoff                         ✅ SESSION-9
+   └─ Fase D6 — Migración web al flujo /mint unificado          ✅ SESSION-9 (añadida tras hallar el frontend roto)
 ```
 
 **Spec completo:** `docs/superpowers/specs/2026-08-09-subproyecto-c-mainnet-launch-design.md`
@@ -51,7 +52,7 @@ simultáneamente el pago (al treasury) y el mint (coin NFT al comprador).
 ### Fase D4 — Marketplace hardening (commit `77ac2dc`)
 
 - **D4.1:** `buy.ts` ahora chequea el output NFT contra `NFT_DUST_SATS` (330) en vez del hardcode `546`. **Esto es lo que rompía toda reventa** (NFTs se mintean a 330, buy exigía 546).
-- **D4.2:** `/migrate-index` y `/update-attempt` ahora requieren header `X-Admin-Key` (constantTimeEqual vs `ADMIN_KEY`).
+- **D4.2:** `/migrate-index` ahora requiere header `X-Admin-Key` (constantTimeEqual vs `ADMIN_KEY`). `/update-attempt` **NO** se gatedó — es un endpoint de tracking que el browser llama en cada paso del mint (ver fix `389aa23` abajo).
 - **D4.3:** `/unlist` requiere firma Schnorr (schema ya no acepta requests sin `signature`+`publicKey`; eliminada rama warn-only).
 
 ### Fase D5 — Docs (esta sesión)
@@ -64,20 +65,20 @@ simultáneamente el pago (al treasury) y el mint (coin NFT al comprador).
 
 ## Bugs cerrados (catálogo SESSION-8)
 
-| #    | Severidad    | Estado     | Cierre                                                                                 |
-| ---- | ------------ | ---------- | -------------------------------------------------------------------------------------- |
-| #1   | CRÍTICO      | ✅         | Pago atómico en misma tx que mint — no se puede mintear sin pagar                      |
-| #2   | CRÍTICO      | ✅         | Traits server-side desde txid; cliente nunca los manda                                 |
-| #3   | CRÍTICO      | ✅         | `/prepare` verifica ownership del fundingUtxo on-chain                                 |
-| #4   | CRÍTICO      | ✅         | Locks SETNX por funding outpoint (/prepare) y spell txid (/finalize)                   |
-| #5   | CRÍTICO      | ✅         | Anti-replay por spell txid (`nft:minted:txid:{spellTxid}`)                             |
-| #6   | CRÍTICO      | ✅         | `/finalize` verifica spell tx on-chain (confirmed + outputs)                           |
-| Dust | CRÍTICO func | ✅         | buy.ts usa NFT_DUST_SATS (330) consistente con mint                                    |
-| #7   | ALTO         | ⚠️ parcial | `/list` legacy sin firma on-chain — NO tocado esta sesión (D4.3 cerró unlist, no list) |
-| #8   | ALTO         | ✅         | tokenId server-side vía `incr`                                                         |
-| #9   | MEDIO        | ✅         | `/finalize` escribe `nft:all-tokens`                                                   |
-| #10  | MEDIO        | ✅         | Auth ADMIN_KEY en `/migrate-index` + `/update-attempt`                                 |
-| #11  | MEDIO        | ✅         | `/unlist` requiere firma Schnorr                                                       |
+| #    | Severidad    | Estado     | Cierre                                                                                                                                                                                  |
+| ---- | ------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #1   | CRÍTICO      | ✅         | Pago atómico en misma tx que mint — no se puede mintear sin pagar                                                                                                                       |
+| #2   | CRÍTICO      | ✅         | Traits server-side desde txid; cliente nunca los manda                                                                                                                                  |
+| #3   | CRÍTICO      | ✅         | `/prepare` verifica ownership del fundingUtxo on-chain                                                                                                                                  |
+| #4   | CRÍTICO      | ✅         | Locks SETNX por funding outpoint (/prepare) y spell txid (/finalize)                                                                                                                    |
+| #5   | CRÍTICO      | ✅         | Anti-replay por spell txid (`nft:minted:txid:{spellTxid}`)                                                                                                                              |
+| #6   | CRÍTICO      | ✅         | `/finalize` verifica spell tx on-chain (confirmed + outputs)                                                                                                                            |
+| Dust | CRÍTICO func | ✅         | buy.ts usa NFT_DUST_SATS (330) consistente con mint                                                                                                                                     |
+| #7   | ALTO         | ⚠️ parcial | `/list` legacy sin firma on-chain — NO tocado esta sesión (D4.3 cerró unlist, no list)                                                                                                  |
+| #8   | ALTO         | ✅         | tokenId server-side vía `incr`                                                                                                                                                          |
+| #9   | MEDIO        | ✅         | `/finalize` escribe `nft:all-tokens`                                                                                                                                                    |
+| #10  | MEDIO        | ✅ parcial | Auth ADMIN_KEY en `/migrate-index`. `/update-attempt` quedó público (es tracking del browser, no admin); hardening real requiere validar que el attemptId pertenezca al caller — futuro |
+| #11  | MEDIO        | ✅         | `/unlist` requiere firma Schnorr                                                                                                                                                        |
 
 **Pendiente honesto:** bug #7 (`/list` legacy sin verificación on-chain de ownership del UTXO listado) NO se cerró. El plan D4.3 original solo apuntaba a `/unlist`. Es trabajo futuro de seguridad, no bloquea el flujo normal.
 
@@ -85,16 +86,20 @@ simultáneamente el pago (al treasury) y el mint (coin NFT al comprador).
 
 ## Estado de verificación
 
-- **Tests workers:** 177 verde (11 archivos). Baseline SESSION-8 era 154; +23 nuevos (2 witness D3.3, 13 mint D3.1/3.2, 8 marketplace D4).
+- **Tests globales:** 1309 verde (`pnpm -r test`). shared 34, bitcoin 563, core 473, workers 177, ui 40, web 22.
 - **Typecheck:** limpio en 7 packages (`pnpm -r typecheck`).
-- **Lint workers:** 0 errores (6 warnings `any` preexistentes en test files).
+- **Lint workers:** 0 errores. **Lint web:** 17 errores preexistentes en `useVirtualBalance.ts` y otros archivos NO tocados esta sesión (mi migración redujo warnings de 15 a 12).
 - **Working tree:** limpio al final de la sesión.
 
 ---
 
-## Commits de la sesión (5, esta branch)
+## Commits de la sesión (9, esta branch)
 
 ```
+c94f64e feat(web): migrate NFT mint UI to unified /mint flow (D6)
+9b6b7bc refactor(core): prepareMint + finalizeMint replace 5 legacy NFT methods (D6.1-D6.3)
+389aa23 fix(nft): revert admin gate on /update-attempt (regression from D4.2)
+d3cd6c4 docs(nft): ECONOMICS + /mint runbook + SESSION-9 handoff (D5)
 77ac2dc feat(marketplace): fix dust mismatch + admin auth + signature-required unlist (D4)
 775a561 refactor(nft): remove legacy reserve/prove/confirm/claim routes (D3.4)
 064e4a9 feat(nft): unified /mint/prepare + /mint/finalize routes (D3.1, D3.2)
@@ -102,11 +107,15 @@ simultáneamente el pago (al treasury) y el mint (coin NFT al comprador).
 9a9d277 chore(workers): NFT mint shared prereqs for D3 (D0)
 ```
 
-Branch base: `feat/subproyecto-c-fases-0-2` (`8803964`). Total branch: 8 commits (D1+D2 SESSION-8 + D0+D3+D4 SESSION-9).
+Branch base: `feat/subproyecto-c-fases-0-2` (`8803964`). Total branch: 11 commits (D1+D2 SESSION-8 + D0+D3+D4+D5+D6+fix-D4.2 SESSION-9).
 
 ---
 
 ## ⚠️ FOLLOW-UPS (NO bloqueantes para PR, pero importantes)
+
+### 0. `/unlist` con firma Schnorr (NUEVO, dejado para sesión separada)
+
+D4.3 endureció el endpoint `/unlist` para requerir firma Schnorr, pero el browser no tiene capacidad de firmar mensajes (`useWalletStore` solo expone `signPsbt`). El frontend `useMarketplace.unlistNFT` sigue enviando sin firma → **el marketplace unlist devuelve 400 hoy**. Para repararlo: añadir `signMessage` al wallet store + cablear `useMarketplace.unlistNFT` para firmar `unlist:{tokenId}:{timestamp}`. Trabajo de una sesión.
 
 ### 1. Regenerar binarios WASM embebidos (arrastrado de SESSION-7, MÁS urgente ahora)
 
@@ -141,14 +150,15 @@ El frontend (`apps/web`) probablemente llama aún a `/reserve`+`/prove`+`/confir
 
 Opciones ordenadas por prioridad lógica:
 
-1. **Follow-up #1 (binarios WASM)** — rápido, desbloquea cualquier test E2E real. Último commit antes de PR.
-2. **Follow-up #2 (integración web)** — necesario para que el producto funcione end-to-end. Investigar scope primero.
-3. **PR a main** — una vez verificados #1 y #2. La branch tiene 8 commits atómicamente verdes.
-4. **Bug #7** — hardening adicional, no bloqueante.
+1. **Follow-up #0 (`/unlist` con firma)** — el marketplace unlist está roto hoy (devuelve 400). Requiere añadir `signMessage` al wallet store. Es el único flujo roto post-D6.
+2. **Follow-up #1 (binarios WASM)** — rápido, desbloquea cualquier test E2E real. Último commit antes de PR.
+3. **PR a main** — una vez verificados #0 y #1. La branch tiene 11 commits atómicamente verdes; 1309 tests + typecheck limpio.
+4. **Bug #7** (`/list` legacy sin verificación on-chain) — hardening adicional, no bloqueante.
+5. **E2E reales en testnet4** — los e2e (`apps/web/e2e/nft-minting.spec.ts`) están reescritos contra `/mint` pero requieren worker deploy + fondos para correr de verdad.
 
 **Contexto clave para cualquiera de estos:**
 
-- El flujo canónico de minteo ahora es `POST /mint/prepare` → sign+broadcast → `POST /mint/finalize` (ver `routes/nft/mint.ts`).
+- El flujo canónico de minteo ahora es `POST /mint/prepare` → sign+broadcast → `POST /mint/finalize` (backend `routes/nft/mint.ts`, frontend `apps/web/src/hooks/useMintNFT.ts`).
 - El modelo de pago es atómico: misma tx Bitcoin = mint + pago al treasury.
 - Traits son server-side, seed = `{fundingTxid}:{tokenId}`.
 - `docs/ECONOMICS.md` tiene todos los números.
