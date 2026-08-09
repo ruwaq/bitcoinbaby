@@ -327,28 +327,44 @@ listingRouter.delete(
         return errorResponse(c, "Only the seller can unlist", 403);
       }
 
-      // Signature verification (REQUIRED since D4.3). The schema no longer
-      // accepts requests without signature+publicKey, so the warn-only path
-      // that anyone could unlist with just sellerAddress + tokenId is gone.
-      const { verifySchnorrSignature, createAuthMessage } =
-        await import("../../lib/crypto");
+      // Signature verification.
+      //
+      // The signature is OPTIONAL today: the browser wallet's signMessage is a
+      // broken ECDSA placeholder (packages/bitcoin/src/wallet.ts:249), and the
+      // external providers (Unisat/Xverse) each use incompatible signing
+      // schemes that don't match the Schnorr BIP-340 this verifier expects.
+      //
+      // Hardening /unlist to REQUIRE a signature was D4.3, but it left the
+      // endpoint unusable (every browser request 400'd). Reverted for now: if
+      // a signature is present we verify it; if not, we log a warning and
+      // proceed. Bug #11 stays open until signMessage implements real Schnorr
+      // BIP-340 with an x-only pubkey — tracked as the signMessage follow-up.
+      if (signature && publicKey) {
+        const { verifySchnorrSignature, createAuthMessage } =
+          await import("../../lib/crypto");
 
-      const message = createAuthMessage("unlist", tokenId, timestamp);
-      const isValid = await verifySchnorrSignature(
-        signature,
-        message,
-        publicKey,
-      );
+        const message = createAuthMessage("unlist", tokenId, timestamp);
+        const isValid = await verifySchnorrSignature(
+          signature,
+          message,
+          publicKey,
+        );
 
-      if (!isValid) {
-        marketplaceLogger.warn("Invalid unlist signature", {
-          tokenId,
-          address: sellerAddress.slice(0, 10),
-        });
-        return errorResponse(c, "Invalid signature", 401);
+        if (!isValid) {
+          marketplaceLogger.warn("Invalid unlist signature", {
+            tokenId,
+            address: sellerAddress.slice(0, 10),
+          });
+          return errorResponse(c, "Invalid signature", 401);
+        }
+
+        marketplaceLogger.info("Signature verified for unlist", { tokenId });
+      } else {
+        marketplaceLogger.warn(
+          "Unlist without signature (bug #11 still open, signMessage follow-up pending)",
+          { tokenId, address: sellerAddress.slice(0, 10) },
+        );
       }
-
-      marketplaceLogger.info("Signature verified for unlist", { tokenId });
 
       // Check for replay attack - use timestamp as nonce
       const nonceKey = `nft:unlist-nonce:${sellerAddress}:${tokenId}:${timestamp}`;

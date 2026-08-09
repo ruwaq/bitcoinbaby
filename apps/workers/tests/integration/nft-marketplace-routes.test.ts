@@ -1,14 +1,19 @@
 /**
  * NFT Marketplace hardening — D4
  *
- * Covers the three D4 fixes:
+ * Covers the three D4 fixes (with their current status):
  *   - D4.1: /buy now accepts the NFT dust output at NFT_DUST_SATS (330),
  *           matching what the mint spell emits. The previous hard-coded 546
  *           broke every resale of a freshly minted NFT.
- *   - D4.2: /migrate-index and /update-attempt now require the X-Admin-Key
- *           header (bug #10: unauthenticated indexer mutation).
- *   - D4.3: /unlist now requires a valid Schnorr signature (bug #11: the
- *           warn-only path let anyone unlist with just address + tokenId).
+ *   - D4.2: /migrate-index requires the X-Admin-Key header (bug #10).
+ *           NOTE: /update-attempt was wrongly gated too and later reverted
+ *           (commit 389aa23) — it is a per-user tracking endpoint the browser
+ *           calls at every mint step, not an admin operation.
+ *   - D4.3 (REVERTED): /unlist was hardened to require a Schnorr signature,
+ *           but the browser wallet's signMessage cannot produce Schnorr
+ *           BIP-340 yet, so the endpoint was unusable. Reverted to optional:
+ *           the signature is verified if present, otherwise a warning is
+ *           logged. Bug #11 stays open until the signMessage follow-up lands.
  *
  * The marketplace happy paths are intricate (PSBT listings, on-chain payment
  * verification, Schnorr auth). Rather than reconstruct all of it, each test
@@ -331,10 +336,16 @@ describe("D4.2 — admin-only indexer endpoints (bug #10)", () => {
 });
 
 // =============================================================================
-// D4.3 — /unlist requires a Schnorr signature (bug #11)
+// D4.3 (reverted) — /unlist signature is optional until signMessage lands
 // =============================================================================
+// D4.3 made the signature required, but the browser wallet's signMessage is a
+// broken ECDSA placeholder that cannot produce Schnorr BIP-340 signatures, so
+// the hardened endpoint was unusable (every browser request 400'd). Reverted:
+// the signature is OPTIONAL today — if present it's verified, if absent the
+// handler logs a warning and proceeds. Bug #11 stays open until the
+// signMessage follow-up implements real Schnorr with an x-only pubkey.
 
-describe("D4.3 — DELETE /api/nft/unlist/:tokenId requires a signature (bug #11)", () => {
+describe("D4.3 (reverted) — DELETE /api/nft/unlist/:tokenId signature is optional", () => {
   let app: Hono<{ Bindings: Partial<Env> }>;
   let redis: ReturnType<typeof makeRedisMock>;
 
@@ -351,7 +362,7 @@ describe("D4.3 — DELETE /api/nft/unlist/:tokenId requires a signature (bug #11
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("rejects with 400 when signature is missing (schema enforces it now)", async () => {
+  it("accepts WITHOUT a signature (bug #11 open until signMessage follow-up)", async () => {
     const timestamp = Date.now();
     const res = await app.request(
       `/api/nft/unlist/${TOKEN_ID}`,
@@ -363,10 +374,8 @@ describe("D4.3 — DELETE /api/nft/unlist/:tokenId requires a signature (bug #11
       BASE_ENV as unknown as Env,
     );
 
-    // The schema rejects before the handler runs.
-    expect(res.status).toBe(400);
-    // And no listing was deleted.
-    expect(redis.del).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(redis.del).toHaveBeenCalledWith(`nft:listing:${TOKEN_ID}`);
   });
 
   it("accepts when a valid signature is provided", async () => {
@@ -387,7 +396,7 @@ describe("D4.3 — DELETE /api/nft/unlist/:tokenId requires a signature (bug #11
     expect(redis.del).toHaveBeenCalledWith(`nft:listing:${TOKEN_ID}`);
   });
 
-  it("rejects with 401 when the signature is invalid", async () => {
+  it("rejects with 401 when the signature is present but invalid", async () => {
     vi.mocked(verifySchnorrSignature).mockResolvedValue(false);
     const timestamp = Date.now();
     const res = await app.request(

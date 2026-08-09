@@ -211,18 +211,21 @@ export const unlistBodySchema = z.object({
   timestamp: z.number().int().positive(),
   /**
    * Schnorr signature (64 bytes hex) of: unlist:{tokenId}:{timestamp}.
-   * REQUIRED (D4.3): previously optional for backward compat, which let
-   * anyone who knew sellerAddress + tokenId unlist an NFT (bug #11).
+   * OPTIONAL today: the browser wallet's signMessage does not yet produce
+   * Schnorr BIP-340 signatures (see listing.ts handler comment). Required
+   * once the signMessage follow-up lands. Bug #11 stays open meanwhile.
    */
   signature: z
     .string()
     .length(128)
-    .regex(/^[a-fA-F0-9]+$/),
+    .regex(/^[a-fA-F0-9]+$/)
+    .optional(),
   /** x-only public key (32 bytes hex) for signature verification */
   publicKey: z
     .string()
     .length(64)
-    .regex(/^[a-fA-F0-9]+$/),
+    .regex(/^[a-fA-F0-9]+$/)
+    .optional(),
 });
 
 export const explorerQuerySchema = z.object({
