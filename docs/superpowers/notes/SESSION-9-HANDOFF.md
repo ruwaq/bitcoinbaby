@@ -1,9 +1,9 @@
 # Handoff — Sesión 9 → Sesión 10
 
 > **Fecha:** 2026-08-09
-> **Branch:** `feat/subproyecto-d-nft-hardening`
-> **Main al iniciar sesión:** `8803964` (sub-proyecto C Fases 0-2 done)
-> **Estado:** Sub-proyecto D **COMPLETO (Fases D1-D6)**, incluyendo la migración web al flujo `/mint`. Todos los bugs críticos del catálogo cerrados con tests. El código está listo para PR; faltan solo los follow-ups operativos (binarios WASM, decisiones de deploy) y el hardening de `/unlist` con firma (sesión separada).
+> **Branch:** `feat/subproyecto-d-nft-hardening` → **MERGED a `main` via PR #7** (merge commit `c166db4`, 2026-08-09).
+> **Main al iniciar sesión:** `8803964` (sub-proyecto C Fases 0-2 done) → **Main al cerrar:** `c166db4`.
+> **Estado:** Sub-proyecto D **COMPLETO (Fases D1-D6) y MERGEADO a main**, incluyendo la migración web al flujo `/mint`. Todos los bugs críticos del catálogo cerrados con tests. Quedan los follow-ups operativos (binarios WASM — ver §1, decisiones de deploy) y el hardening de `/unlist` con firma (sesión separada).
 
 ---
 
@@ -125,22 +125,51 @@ El backend `/unlist` y la verificación Schnorr (`lib/crypto.ts:verifySchnorrSig
 
 Trabajo real (no es cablear): (a) implementar Schnorr BIP-340 con taproot tweak en el internal wallet, (b) añadir `publicKey` al type `SignedMessage`, (c) decidir cómo manejar Unisat/Xverse (¿adaptar su salida a Schnorr, o marcarlos como no-soportados para unlist?), (d) cablear al `useWalletStore` + `useMarketplace.unlistNFT`, (e) re-endurecer el schema a `.required()`. Bug #11 (MEDIO, sin pérdida de fondos) queda abierto mientras tanto.
 
-### 1. Regenerar binarios WASM embebidos (arrastrado de SESSION-7, MÁS urgente ahora)
+### 1. Binarios WASM embebidos: stale vs source, ALINEADOS vs on-chain (NO regenerar suelto)
 
-D1 (SESSION-8) cambió `genesis-babies/src/lib.rs` → nuevo VK. Los 3 binarios WASM embebidos (`babtc-contract-binary.ts`, `babtc-v2-contract-binary.ts`, `nft-contract-binary.ts`) están **stale**. Acción:
+> **Actualizado 2026-08-09 (post-PR #7 merge)** tras verificación empírica.
+> La versión anterior de esta sección llamaba al regenerado "fix rápido / último commit antes del PR".
+> **Eso es falso y peligroso** — medí los 3 builds y el resultado lo desmiente. No regenerar suelto.
 
-```sh
-cd packages/bitcoin/contracts/genesis-babies
-cargo build --release --target wasm32-wasip1
-charms app vk target/wasm32-wasip1/release/genesis_babies.wasm
-# pegar VK + binario en apps/workers/src/lib/nft-contract-binary.ts
+**Medición empírica (cargo clean + build --release --target wasm32-wasip1 sobre source actual de `main`):**
+
+| Contrato             | VK embebido (bytes)     | VK cargo build limpio (bytes) | ¿Stale vs source? |
+| -------------------- | ----------------------- | ----------------------------- | ----------------- |
+| babtc v1             | `ab70796e...` (88,233)  | `3f0fcafe...` (259,297)       | ✗ SÍ              |
+| babtc v2             | `bad3cb4e...` (250,242) | `8ffa21e1...` (263,688)       | ✗ SÍ              |
+| genesis-babies (NFT) | `0d9483a7...` (264,108) | `2501737a...` (278,766)       | ✗ SÍ              |
+
+**Los 3 están stale vs el source actual.** Pero los 3 VK embebidos son los mismos que usan
+**todos los consumers** (`wrangler.toml:86,104,153,171`, `batch-minting.ts:100`,
+`config/testnet4.ts`) y — críticamente — el babtc v1 (`ab70796e...`) es el VK del contrato
+**desplegado on-chain en testnet4** (genesis `b3deba0743...:0`, block ~75000, 2026-02-18;
+ver `docs/audits/DEPLOYMENT.md:23`).
+
+**Consecuencia: regenerar los binarios sin redeployar on-chain ROMPE el runtime.** Los
+nuevos VK (`3f0fcafe/8ffa21e1/2501737a`) producirían appRefs (`t/<appId>/<vk>`) que la chain
+no reconoce → todas las spells se rechazan. Esto es justo el riesgo que `VK_RECONCILIATION.md:61`
+liga al **reset de testnet4**: _"Tras el reset, el nuevo deployment define el VK canónico y
+todos los consumidores se alinean"_.
+
+**Acción correcta (bloqueada por follow-up #3):** NO regenerar aislado. La regeneración va
+**bundled con el redeploy on-chain + reset testnet4** (follow-up #3). Hasta entonces, los
+binarios stale están _intencionalmente_ alineados con lo on-chain — es lo correcto para que
+producción funcione. Lo que falta es **proceso**: añadir un CI check que detecte la divergencia
+source-vs-embebido automáticamente para que no vuelva a pasar desapercibida (ver
+`VK_RECONCILIATION.md` Fase 0.3).
+
+**Datos probatorios del build limpio** (reproducibles con `cargo clean && cargo build --release
+--target wasm32-wasip1` en cada `packages/bitcoin/contracts/<contrato>`):
+
+```
+babtc/target/.../babtc-contract.wasm           259297 b  sha256=3f0fcafea6303322ee29acaa39ee8da69f3dc3fee68a77a3d897bed745f9ebc8
+babtc-v2/target/.../babtc-v2-contract.wasm     263688 b  sha256=8ffa21e1702455e7464e003a276eabb9a5e06b8c1948c3e317a67c3447536706
+genesis-babies/target/.../genesis-babies.wasm  278766 b  sha256=2501737a1bd73549677f276e0c93ce87328b076cfe1cacd9f493b50c7f435ae2
 ```
 
-Hacerlo como **último commit antes del PR**.
+### 2. Integración web del nuevo flujo `/mint` (NUEVO, esta sesión) — ✅ HECHO en D6
 
-### 2. Integración web del nuevo flujo `/mint` (NUEVO, esta sesión)
-
-El frontend (`apps/web`) probablemente llama aún a `/reserve`+`/prove`+`/confirm` que ya no existen. **No busqué ni toqué el web esta sesión** — estaba fuera del alcance aprobado (plan D3-D5 era workers + docs). Próxima sesión: grep de `reserve`/`prove`/`confirm`/`claim` en `apps/web/src` y migrar al flujo `/mint/prepare`+`/mint/finalize`.
+**✅ HECHO en D6 (commits `9b6b7bc` + `c94f64e`, merged via PR #7).** La migración web al flujo `/mint/prepare`+`/mint/finalize` quedó completa en esta misma sesión (D6). `useMintNFT.ts` reescrito, `useClaimNFT.ts` eliminado, `NFTMintFlow.tsx` migrado, e2e actualizados. Las rutas legacy `/reserve`+`/prove`+`/confirm`+`/claim` fueron eliminadas del backend en D3.4 (commit `775a561`). Esta sección se conserva solo como historial — no hay trabajo pendiente aquí.
 
 ### 3. Bug #7: `/list` legacy sin verificación on-chain
 
@@ -158,11 +187,10 @@ El frontend (`apps/web`) probablemente llama aún a `/reserve`+`/prove`+`/confir
 
 Opciones ordenadas por prioridad lógica:
 
-1. **Follow-up #1 (binarios WASM)** — rápido, desbloquea cualquier test E2E real. Último commit antes de mergear el PR del sub-proyecto D.
+1. **Follow-up #1 (binarios WASM)** — **NO accionable suelto.** Verificados stale vs source pero alineados con lo on-chain (sección §1 arriba). La regeneración va bundled con el redeploy on-chain + reset testnet4 (follow-up #3). Lo único accionable aislado es añadir un CI check que detecte la divergencia. **No llamar a esto "fix rápido" — medir antes.**
 2. **Follow-up #0 (signMessage Schnorr + re-endurecer /unlist)** — una sesión entera. Bug #11 (MEDIO) queda abierto mientras tanto; el marketplace unlist funciona (sin firma) y no hay pérdida de fondos.
 3. **Bug #7** (`/list` legacy sin verificación on-chain) — hardening adicional, no bloqueante.
 4. **E2E reales en testnet4** — los e2e (`apps/web/e2e/nft-minting.spec.ts`) están reescritos contra `/mint` pero requieren worker deploy + fondos para correr de verdad.
-5. **E2E reales en testnet4** — los e2e (`apps/web/e2e/nft-minting.spec.ts`) están reescritos contra `/mint` pero requieren worker deploy + fondos para correr de verdad.
 
 **Contexto clave para cualquiera de estos:**
 
