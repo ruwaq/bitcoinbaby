@@ -305,8 +305,17 @@ describe("D4.2 — admin-only indexer endpoints (bug #10)", () => {
     expect(redis.sadd).toHaveBeenCalledWith("nft:all-tokens", "1");
   });
 
-  it("POST /api/nft/update-attempt rejects without X-Admin-Key (401)", async () => {
+  it("POST /api/nft/update-attempt accepts WITHOUT admin key (per-user tracking, not admin)", async () => {
+    // /update-attempt is a per-user mint-progress tracking endpoint called by
+    // the browser at each mint step. It must NOT require X-Admin-Key (that would
+    // break client tracking and would force exposing the admin key to the
+    // browser). Only /migrate-index is admin-gated.
     const redis = makeRedisMock();
+    redis.hgetall.mockResolvedValue({
+      attemptId: "a1",
+      tokenId: "1",
+      status: "proving",
+    } as never);
     vi.mocked(getRedis).mockReturnValue(redis as unknown as Redis);
     const app = buildReserveApp();
 
@@ -316,8 +325,8 @@ describe("D4.2 — admin-only indexer endpoints (bug #10)", () => {
       BASE_ENV as unknown as Env,
     );
 
-    expect(res.status).toBe(401);
-    expect(redis.hset).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(redis.hset).toHaveBeenCalled();
   });
 });
 

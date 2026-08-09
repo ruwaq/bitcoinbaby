@@ -14,7 +14,6 @@ import { getRedis } from "../../lib/redis";
 import { errorResponse, successResponse } from "../../lib/helpers";
 import { validateBody, validateParams } from "../../lib/middleware";
 import { nftLogger } from "../../lib/logger";
-import { constantTimeEqual } from "../../lib/encoding";
 import { getNFTMintingServiceSimple } from "../../services/nft-minting-simple";
 import { getNetworkForEnvironment } from "../../config/bitcoin";
 import { addressParamSchema } from "./middleware";
@@ -126,10 +125,15 @@ reserveRouter.get(
 /**
  * POST /update-attempt - Update mint attempt status
  *
- * Called by client to update the status of a mint attempt.
+ * Called by the client at each step of the minting process so the user can see
+ * the progress of their own mint. This is a per-user tracking endpoint, NOT an
+ * admin operation (unlike /migrate-index, which mutates the global index and is
+ * admin-gated).
  *
- * NOTE (D4.2): this endpoint is admin-gated via ADMIN_KEY. It mutates indexer
- * state and is not part of the normal client mint flow.
+ * SECURITY NOTE: the endpoint accepts any attemptId. A hardened version would
+ * verify the attemptId belongs to the caller's address, but that requires an
+ * identity mechanism this endpoint does not have today. Leaving it open matches
+ * the pre-D4.2 behavior the browser relies on; tightening it is future work.
  */
 reserveRouter.post(
   "/update-attempt",
@@ -150,18 +154,6 @@ reserveRouter.post(
     }),
   ),
   async (c) => {
-    // Admin-only: this mutates indexer attempt state and is not part of the
-    // normal client mint flow (bug #10).
-    const adminKey = c.req.header("X-Admin-Key");
-    const expectedKey = c.env.ADMIN_KEY;
-    if (
-      !expectedKey ||
-      !adminKey ||
-      !constantTimeEqual(adminKey, expectedKey)
-    ) {
-      return errorResponse(c, "Unauthorized - admin key required", 401);
-    }
-
     const { attemptId, status, error, commitTxid, spellTxid } =
       c.get("validatedBody");
 
