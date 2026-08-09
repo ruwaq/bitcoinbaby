@@ -281,8 +281,9 @@ describe("DashboardSection", () => {
   it("should show welcome screen when no wallet is connected", () => {
     render(<DashboardSection />, { wrapper: createWrapper() });
 
-    // Should show the welcome message with CTA to create wallet
-    expect(screen.getByText("Welcome to BitcoinBaby")).toBeDefined();
+    // The no-wallet state shows a "Start Mining" CTA (renamed from the old
+    // "Welcome to BitcoinBaby" copy in the 2026-06-11 architecture unification).
+    expect(screen.getByText("Start Mining")).toBeDefined();
     expect(screen.getByText("CREATE WALLET")).toBeDefined();
   });
 
@@ -290,7 +291,7 @@ describe("DashboardSection", () => {
     // Verifies the no-wallet path is consistent
     render(<DashboardSection />, { wrapper: createWrapper() });
 
-    expect(screen.getByText("Welcome to BitcoinBaby")).toBeDefined();
+    expect(screen.getByText("Start Mining")).toBeDefined();
     expect(screen.getByText("CREATE WALLET")).toBeDefined();
   });
 
