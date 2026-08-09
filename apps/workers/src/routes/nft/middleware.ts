@@ -150,14 +150,31 @@ export const sparkNftStateSchema = z.object({
 });
 
 /**
- * POST /api/nft/work/:tokenId — accrue XP via a work-proof spell.
+ * POST /api/nft/work/:tokenId — accrue XP via a PoW-verified work spell (op `work`).
+ *
+ * C3 CLOSURE: the client supplies PoW inputs (challenge, nonce, difficulty,
+ * proof hash/blockData); the server validates the proof cryptographically via
+ * `validateMiningProof` and derives xp_gain from the verified difficulty. The
+ * client NEVER supplies xp_gain — that was the C3 exploit vector (a client with
+ * prover access could claim xp_gain = 999_999 and the old work_proof contract
+ * accepted it because it didn't re-derive on-chain).
  */
 export const workRouteSchema = z.object({
   ownerAddress: bitcoinAddressSchema,
   /** Block height the work was performed against (becomes last_work_block). */
   currentBlock: z.number().int().min(0),
-  /** XP to add on top of the current state (carried privately in the witness). */
-  xpGain: z.number().int().min(1),
+  /** PoW challenge (e.g. "tokenId:blockHeight"). Contract re-hashes this. */
+  challenge: z.string().min(1),
+  /** Nonce (hex, no 0x prefix) that satisfies the difficulty. */
+  nonce: z.string().min(1),
+  /** Required leading-zero bits the hash must have. Drives xp_gain derivation. */
+  difficulty: z.number().int().min(16),
+  /** The PoW hash the client claims (hex, 64 chars). */
+  proofHash: z.string().regex(/^[0-9a-fA-F]{64}$/),
+  /** blockData for validateMiningProof: "block:address:nonceHex". */
+  proofBlockData: z.string().min(1),
+  /** Optional proof timestamp (ms) for freshness check. */
+  proofTimestamp: z.number().int().optional(),
   /** The NFT UTXO to spend (current location of the NFT coin). */
   nftUtxo: nftUtxoSchema,
   /** Optional client-observed state for cross-checking the indexer. */

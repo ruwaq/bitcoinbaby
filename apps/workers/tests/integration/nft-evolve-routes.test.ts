@@ -3,7 +3,7 @@
  *
  * Exercises the REAL Hono router end-to-end via `app.request()`, the same
  * pattern used by claim-routes-http.test.ts. The evolution routes:
- *   POST /api/nft/work/:tokenId    — accrue XP (work_proof spell)
+ *   POST /api/nft/work/:tokenId    — accrue XP via a PoW-verified `work` spell (C3 closure)
  *   POST /api/nft/evolve/:tokenId  — level up (level_up spell)
  *
  * Both validate ownership against the indexer (Redis `nft:owned:<addr>`), guard
@@ -13,6 +13,7 @@
  *
  * We stub:
  *   - getRedis (ownership check + NFT state read) with controllable return values
+ *   - validateMiningProof (so the happy path doesn't need a real PoW solution)
  *   - global fetch (prover POST + mempool prev-tx fetch)
  *
  * Tests assert the route's REAL behavior — not a tautology.
@@ -41,6 +42,23 @@ const TOKEN_ID = 1;
 const NFT_UTXO = {
   txid: "ab".repeat(32),
   vout: 0,
+};
+
+/**
+ * Valid-shaped PoW body for POST /work/:tokenId (C3 closure). The hash/nonce
+ * don't need to be a real solution because `validateMiningProof` is mocked to
+ * return `valid: true` — this fixture just needs to satisfy the new
+ * `workRouteSchema` (challenge, nonce, difficulty, proofHash, proofBlockData)
+ * and NOT carry `xpGain` (the rejected exploit vector).
+ */
+const WORK_PROOF_BODY = {
+  ownerAddress: TEST_ADDRESS,
+  currentBlock: 800050,
+  challenge: "1:800050",
+  nonce: "1a2b",
+  difficulty: 16,
+  proofHash: "0".repeat(64),
+  proofBlockData: "800050:tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx:1a2b",
 };
 
 /** NFT record shape as stored in Redis (camelCase hset fields). */
@@ -105,6 +123,25 @@ vi.mock("../../src/lib/redis", () => ({
 }));
 
 import { getRedis } from "../../src/lib/redis";
+
+// Mock `validateMiningProof` so the /work route's happy-path test doesn't need
+// a genuine PoW solution (real hash256). The crypto path is unit-tested in
+// nft-evolution-service.test.ts; here we only need it to return `valid`. We
+// preserve the module's other real exports (e.g. countLeadingZeroBits) via
+// importOriginal so the legacy /:tokenId/work-proof route on the same router
+// keeps working if exercised.
+vi.mock("../../src/lib/proof-validation", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../src/lib/proof-validation")>();
+  return {
+    ...actual,
+    validateMiningProof: vi
+      .fn()
+      .mockResolvedValue({ valid: true, calculatedReward: 100n }),
+  };
+});
+
+import { validateMiningProof } from "../../src/lib/proof-validation";
 
 // =============================================================================
 // FETCH MOCK (prover + mempool prev-tx)
@@ -201,6 +238,11 @@ describe("POST /api/nft/work/:tokenId", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Restore the default valid proof; individual tests can override.
+    vi.mocked(validateMiningProof).mockResolvedValue({
+      valid: true,
+      calculatedReward: 100n,
+    });
     redis = makeRedisMock();
     vi.mocked(getRedis).mockReturnValue(redis as unknown as Redis);
     app = buildTestApp();
@@ -209,7 +251,7 @@ describe("POST /api/nft/work/:tokenId", () => {
     vi.unstubAllGlobals();
   });
 
-  it("returns 200 with commitTxHex + spellTxHex for a valid owner", async () => {
+  it("returns 200 with commitTxHex + spellTxHex for a valid owner + valid PoW", async () => {
     const { getProverRequest } = stubFetchCapture();
     redis.sismember.mockResolvedValue(1 as never);
     redis.hgetall.mockResolvedValue(makeNftRecord() as never);
@@ -217,12 +259,7 @@ describe("POST /api/nft/work/:tokenId", () => {
     const res = await sendRequest(
       app,
       `/api/nft/work/${TOKEN_ID}`,
-      postJson({
-        ownerAddress: TEST_ADDRESS,
-        currentBlock: 800001,
-        xpGain: 150,
-        nftUtxo: NFT_UTXO,
-      }),
+      postJson({ ...WORK_PROOF_BODY, nftUtxo: NFT_UTXO }),
     );
 
     expect(res.status).toBe(200);
@@ -234,13 +271,87 @@ describe("POST /api/nft/work/:tokenId", () => {
     expect(json.data?.commitTxHex).toBeTruthy();
     expect(json.data?.spellTxHex).toBeTruthy();
 
+    // The route MUST validate the PoW server-side (C3 closure).
+    expect(validateMiningProof).toHaveBeenCalledTimes(1);
+
     // The route must have proxied to the prover with prev_txs populated.
     const captured = getProverRequest();
     expect(captured, "prover POST must have been captured").toBeTruthy();
     expect(Array.isArray(captured!.body.prev_txs)).toBe(true);
     expect(captured!.body.prev_txs.length).toBeGreaterThan(0);
-    // app_private_inputs must carry the work_proof witness.
+    // app_private_inputs must carry the `work` witness (NOT work_proof).
     expect(captured!.body.app_private_inputs).toBeDefined();
+    const witnessHex = Object.values(
+      captured!.body.app_private_inputs as Record<string, string>,
+    )[0];
+    // 'work' (0x776f726b) must be present in the CBOR witness; the legacy
+    // 'work_proof' op must NOT.
+    expect(witnessHex.toLowerCase()).toContain("776f726b"); // 'work' ascii hex
+  });
+
+  it("builds op 'work' (C3 closure) — NOT op 'work_proof'", async () => {
+    const { getProverRequest } = stubFetchCapture();
+    redis.sismember.mockResolvedValue(1 as never);
+    redis.hgetall.mockResolvedValue(makeNftRecord() as never);
+
+    await sendRequest(
+      app,
+      `/api/nft/work/${TOKEN_ID}`,
+      postJson({ ...WORK_PROOF_BODY, nftUtxo: NFT_UTXO }),
+    );
+
+    const captured = getProverRequest();
+    expect(captured, "prover POST must have been captured").toBeTruthy();
+    // Witness must carry 'work' but never the legacy 'work_proof' witness op.
+    const witnessHex = Object.values(
+      captured!.body.app_private_inputs as Record<string, string>,
+    )[0];
+    // 'work_proof' in ascii hex — must NOT appear in the witness.
+    const workProofMarker = Buffer.from("work_proof", "ascii")
+      .toString("hex")
+      .toLowerCase();
+    expect(witnessHex.toLowerCase()).not.toContain(workProofMarker);
+  });
+
+  it("rejects the C3 exploit vector: body with `xpGain` fails validation (400)", async () => {
+    stubFetchCapture();
+    redis.sismember.mockResolvedValue(1 as never);
+    redis.hgetall.mockResolvedValue(makeNftRecord() as never);
+
+    const res = await sendRequest(
+      app,
+      `/api/nft/work/${TOKEN_ID}`,
+      postJson({
+        ownerAddress: TEST_ADDRESS,
+        currentBlock: 800050,
+        xpGain: 999_999, // the exploit — must be rejected by the schema
+        nftUtxo: NFT_UTXO,
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    // The PoW must NEVER have been validated (schema rejected before it).
+    expect(validateMiningProof).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when the PoW is cryptographically invalid (validateMiningProof rejects)", async () => {
+    stubFetchCapture();
+    redis.sismember.mockResolvedValue(1 as never);
+    redis.hgetall.mockResolvedValue(makeNftRecord() as never);
+    vi.mocked(validateMiningProof).mockResolvedValueOnce({
+      valid: false,
+      reason: "Hash does not meet difficulty",
+    });
+
+    const res = await sendRequest(
+      app,
+      `/api/nft/work/${TOKEN_ID}`,
+      postJson({ ...WORK_PROOF_BODY, nftUtxo: NFT_UTXO }),
+    );
+
+    expect(res.status).toBe(400);
+    const json = (await res.json()) as { error?: string };
+    expect(json.error).toMatch(/proof of work rejected/i);
   });
 
   it("returns 403 when the requester is not the owner", async () => {
@@ -251,9 +362,8 @@ describe("POST /api/nft/work/:tokenId", () => {
       app,
       `/api/nft/work/${TOKEN_ID}`,
       postJson({
+        ...WORK_PROOF_BODY,
         ownerAddress: OTHER_ADDRESS,
-        currentBlock: 800001,
-        xpGain: 150,
         nftUtxo: NFT_UTXO,
       }),
     );
@@ -268,12 +378,7 @@ describe("POST /api/nft/work/:tokenId", () => {
     const res = await sendRequest(
       app,
       `/api/nft/work/${TOKEN_ID}`,
-      postJson({
-        ownerAddress: TEST_ADDRESS,
-        currentBlock: 800001,
-        xpGain: 150,
-        nftUtxo: NFT_UTXO,
-      }),
+      postJson({ ...WORK_PROOF_BODY, nftUtxo: NFT_UTXO }),
       { ...TEST_ENV, NFT_APP_ID: PLACEHOLDER },
     );
 
@@ -289,12 +394,7 @@ describe("POST /api/nft/work/:tokenId", () => {
     const res = await sendRequest(
       app,
       `/api/nft/work/${TOKEN_ID}`,
-      postJson({
-        ownerAddress: TEST_ADDRESS,
-        currentBlock: 800001,
-        xpGain: 150,
-        nftUtxo: NFT_UTXO,
-      }),
+      postJson({ ...WORK_PROOF_BODY, nftUtxo: NFT_UTXO }),
     );
 
     expect(res.status).toBe(404);
