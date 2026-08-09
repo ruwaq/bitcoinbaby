@@ -199,6 +199,45 @@ export const evolveRouteSchema = z.object({
   currentState: sparkNftStateSchema.optional(),
 });
 
+// =============================================================================
+// UNIFIED /mint SCHEMAS (D3) — replaces reserve/prove/confirm/claim
+// =============================================================================
+
+/**
+ * Body for `POST /mint/prepare`.
+ *
+ * The client only provides its address + the UTXO it will spend to pay for the
+ * mint. The server derives everything else: tokenId, traits, the spell, and the
+ * treasury payment output. Traits are NEVER accepted from the client — that was
+ * the root cause of the mythic-always bug (#2).
+ */
+export const mintPrepareSchema = z.object({
+  address: bitcoinAddressSchema,
+  fundingUtxo: z.object({
+    txid: z
+      .string()
+      .length(64)
+      .regex(/^[a-fA-F0-9]+$/),
+    vout: z.number().int().min(0),
+    value: z.number().int().positive(),
+  }),
+});
+
+/**
+ * Body for `POST /mint/finalize`.
+ *
+ * After the client signs and broadcasts the spell tx returned by /prepare, it
+ * calls /finalize with the resulting spellTxid. The server verifies the tx
+ * on-chain (confirmed + correct outputs) and persists the NFT.
+ */
+export const mintFinalizeSchema = z.object({
+  spellTxid: z
+    .string()
+    .length(64)
+    .regex(/^[a-fA-F0-9]+$/),
+  address: bitcoinAddressSchema,
+});
+
 export const proveNftSchema = z.object({
   /** Reserved token ID */
   tokenId: z.number().int().positive(),
