@@ -72,6 +72,12 @@ export interface PoWPrivateInputsV11 {
   nonce: string;
   /** Required leading zero bits */
   difficulty: number;
+  /**
+   * Bitcoin block time (unix seconds) at which the work was mined. Required by
+   * the canonical BRO formula's halving schedule (mirrors `block_time` in the
+   * contract's MiningWitness, added in sub-proyecto C Task 2.1).
+   */
+  block_time: number;
 }
 
 /**

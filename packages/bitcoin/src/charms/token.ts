@@ -867,6 +867,12 @@ export interface TokenMintParamsV11 {
   nonce: string;
   /** Difficulty level (leading zero bits in hash) */
   difficulty: number;
+  /**
+   * Bitcoin block time (unix seconds) at which the work was mined. Forwarded
+   * into the witness `block_time` field consumed by the contract's canonical
+   * BRO reward formula.
+   */
+  blockTime: number;
   /** UTXO to consume for the spell */
   inputUtxo: {
     txid: string;
@@ -964,6 +970,7 @@ export function createSPARKMintSpellV11(params: TokenMintParamsV11): {
     challenge: params.challenge,
     nonce: params.nonce,
     difficulty: params.difficulty,
+    block_time: params.blockTime,
   };
 
   // Create full prover request

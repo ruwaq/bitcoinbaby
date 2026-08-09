@@ -23,6 +23,7 @@ import * as ecc from "tiny-secp256k1";
 import * as bitcoin from "bitcoinjs-lib";
 import * as readline from "readline";
 import { createHash } from "crypto";
+import { minedAmountBro } from "@bitcoinbaby/bitcoin";
 
 // Initialize crypto
 const bip32 = BIP32Factory(ecc);
@@ -205,19 +206,39 @@ function addressToScriptPubKey(address: string): string {
   return Buffer.from(script).toString("hex");
 }
 
-function calculateReward(difficulty: number): {
+/**
+ * Calculate BABTC reward — delegates to the canonical BRO formula.
+ *
+ * Was: `2^(difficulty - MIN_DIFFICULTY) * 1000` (divergent formula A in
+ * BRO_ALIGNMENT.md, the most divergent of the variants). Now delegates to
+ * `minedAmountBro(difficulty, blockTime)` which is
+ * `1e8 · clz² / 2^halvings`, matching the on-chain babtc contract (sub-proyecto
+ * C Task 2.1) and packages/bitcoin/src/charms/bro-reward.ts.
+ *
+ * CRITICAL: the `blockTime` passed here MUST be the same value used in the
+ * witness `private_inputs.block_time`, so the reward the signer computes
+ * matches what the contract derives on-chain.
+ *
+ * Distribution aligns with the rest of the codebase (90% miner, 5% dev,
+ * 5% staking — see SPARK_CONFIG.distribution), replacing the prior 70/20/10
+ * split that diverged from token.ts and the contract.
+ *
+ * @param difficulty leading-zero bits of the PoW hash
+ * @param blockTime unix seconds of the block (must match witness block_time)
+ */
+function calculateReward(
+  difficulty: number,
+  blockTime: number,
+): {
   total: bigint;
   miner: bigint;
   dev: bigint;
   staking: bigint;
 } {
-  // BRO-style reward: 2^(difficulty - MIN_DIFFICULTY) * 1000
-  const exponent = Math.max(0, difficulty - MIN_DIFFICULTY);
-  const total = BigInt(Math.pow(2, exponent) * 1000);
-
-  // Distribution: 70% miner, 20% dev, 10% staking
-  const miner = (total * 70n) / 100n;
-  const dev = (total * 20n) / 100n;
+  const total = minedAmountBro(difficulty, blockTime);
+  // Distribution: 90% miner, 5% dev, 5% staking (matches SPARK_CONFIG).
+  const miner = (total * 90n) / 100n;
+  const dev = (total * 5n) / 100n;
   const staking = total - miner - dev;
 
   return { total, miner, dev, staking };
@@ -232,6 +253,7 @@ interface SpellV11 {
     pow_challenge: string;
     pow_nonce: string;
     pow_difficulty: number;
+    block_time: number;
   };
   tx: {
     ins: Array<{ txid: string; vout: number }>;
@@ -245,13 +267,18 @@ function createMintSpell(
   miningResult: MiningResult,
   inputUtxo: { txid: string; vout: number },
 ): SpellV11 {
-  const reward = calculateReward(miningResult.difficulty);
+  // Capture the block time ONCE so the reward calculation and the witness
+  // field are guaranteed identical (the contract derives the reward from
+  // block_time, so any mismatch would cause the prover to reject the spell).
+  const blockTime = Math.floor(Date.now() / 1000);
+  const reward = calculateReward(miningResult.difficulty, blockTime);
 
   console.log(`\n📜 Creating mint spell...`);
   console.log(`   Total reward: ${reward.total} BABTC`);
-  console.log(`   Miner share: ${reward.miner} (70%)`);
-  console.log(`   Dev share: ${reward.dev} (20%)`);
-  console.log(`   Staking share: ${reward.staking} (10%)`);
+  console.log(`   Miner share: ${reward.miner} (90%)`);
+  console.log(`   Dev share: ${reward.dev} (5%)`);
+  console.log(`   Staking share: ${reward.staking} (5%)`);
+  console.log(`   Block time: ${blockTime}`);
 
   // Create the spell structure
   const spell: SpellV11 = {
@@ -272,6 +299,9 @@ function createMintSpell(
       pow_challenge: miningResult.challenge,
       pow_nonce: miningResult.nonce,
       pow_difficulty: miningResult.difficulty,
+      // Mirrors MiningWitness.block_time in the contract (Task 2.1); MUST be
+      // the same value passed to calculateReward above.
+      block_time: blockTime,
     },
     tx: {
       ins: [inputUtxo],
