@@ -579,6 +579,8 @@ export function addressToScriptPubkey(address: string): string {
 }
 
 /**
- * NFT dust output amount (minimum for Charms NFTs)
+ * NFT dust output amount (minimum for Charms NFTs).
+ * Canonical source: `services/nft-spell-utils.ts` — re-exported here so legacy
+ * consumers (e.g. batch-minting.ts) keep a single source of truth.
  */
-export const NFT_DUST_SATS = 330;
+export { NFT_DUST_SATS } from "../services/nft-spell-utils";

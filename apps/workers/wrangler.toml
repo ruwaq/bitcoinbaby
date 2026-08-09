@@ -102,6 +102,13 @@ PLATFORM_FEE_PERCENT = "20"
 NFT_APP_ID = "0000000000000000000000000000000000000000000000000000000000000000"
 # VK is SHA256 of the compiled WASM binary (genesis-babies contract, v15)
 NFT_APP_VK = "0d9483a760ef91eef606e84fbff326132b3e611bc913025913bc34b6655b08ba"
+# NFT mint pricing (D3 — unified /mint flow)
+# Default 5000 sats ≈ $3 at 60k sats/USD. Cover gas + proof + margin (≈75%).
+# Override at deploy via Cloudflare dashboard if sats/USD shifts significantly.
+NFT_MINT_PRICE_SATS = "5000"
+# TODO(deploy): replace with the real mainnet treasury before production deploy.
+# Default here is the testnet4 treasury from packages/bitcoin/src/config/treasury.ts.
+NFT_TREASURY_ADDRESS = "tb1p7kk2fuf8kv5vjftczlezfded94v9ay9s0h7ggd87k5d5ws744lesw7smmu"
 
 # Production environment
 [env.production]
@@ -162,6 +169,12 @@ PLATFORM_FEE_PERCENT = "20"
 NFT_APP_ID = "0000000000000000000000000000000000000000000000000000000000000000"
 # VK is SHA256 of the compiled WASM binary (genesis-babies contract, v15)
 NFT_APP_VK = "0d9483a760ef91eef606e84fbff326132b3e611bc913025913bc34b6655b08ba"
+# NFT mint pricing (D3 — unified /mint flow)
+# Default 5000 sats ≈ $3 at 60k sats/USD. Cover gas + proof + margin (≈75%).
+NFT_MINT_PRICE_SATS = "5000"
+# TODO(deploy): replace with the real mainnet treasury before production deploy.
+# Default here is the testnet4 treasury from packages/bitcoin/src/config/treasury.ts.
+NFT_TREASURY_ADDRESS = "tb1p7kk2fuf8kv5vjftczlezfded94v9ay9s0h7ggd87k5d5ws744lesw7smmu"
 
 # Production AI binding
 [env.production.ai]

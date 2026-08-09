@@ -52,6 +52,10 @@ export interface Env {
   // Genesis Sparks NFT configuration
   NFT_APP_ID?: string;
   NFT_APP_VK?: string;
+  // NFT mint pricing + treasury (D3 unified /mint flow)
+  // Price in sats (default 5000 ≈ $3). Treasury receives BTC from NFT sales.
+  NFT_MINT_PRICE_SATS?: string;
+  NFT_TREASURY_ADDRESS?: string;
 
   // Phase configuration
   PHASE?: string;
