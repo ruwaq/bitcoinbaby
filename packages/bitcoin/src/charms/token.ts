@@ -36,7 +36,7 @@ import * as bitcoin from "bitcoinjs-lib";
 import type { BitcoinNetwork } from "../types";
 import {
   minedAmountBro,
-  BRO_START_TIME,
+  SPARK_START_TIME,
   BRO_HALVING_PERIOD_SECONDS,
 } from "./bro-reward";
 
@@ -340,7 +340,7 @@ export function calculateMiningRewardBro(
     difficulty,
     blockTime,
     BRO_HALVING_PERIOD_SECONDS,
-    BRO_START_TIME,
+    SPARK_START_TIME,
   );
 
   return {

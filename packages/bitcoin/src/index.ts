@@ -208,7 +208,7 @@ export {
 export {
   minedAmountBro,
   BRO_DENOMINATION,
-  BRO_START_TIME,
+  SPARK_START_TIME,
   BRO_HALVING_PERIOD_SECONDS,
 } from "./charms/bro-reward";
 

@@ -129,7 +129,7 @@ export type { MiningRewardBro } from "./token";
 export {
   minedAmountBro,
   BRO_DENOMINATION,
-  BRO_START_TIME,
+  SPARK_START_TIME,
   BRO_HALVING_PERIOD_SECONDS,
 } from "./bro-reward";
 
