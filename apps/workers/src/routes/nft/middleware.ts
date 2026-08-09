@@ -20,40 +20,6 @@ export const addressParamSchema = z.object({
   address: bitcoinAddressSchema,
 });
 
-export const reserveNftSchema = z.object({
-  address: bitcoinAddressSchema,
-});
-
-export const confirmNftSchema = z.object({
-  txid: z
-    .string()
-    .length(64)
-    .regex(/^[a-fA-F0-9]+$/),
-  address: bitcoinAddressSchema,
-  nft: z
-    .object({
-      dna: z.string(),
-      bloodline: z.string(),
-      baseType: z.string(),
-      rarityTier: z.string(),
-      level: z.number().int().min(1),
-      xp: z.number().int().min(0),
-      totalXp: z.number().int().min(0),
-      workCount: z.number().int().min(0),
-      evolutionCount: z.number().int().min(0),
-      heritage: z.number().int().min(0).max(4).optional(),
-    })
-    .optional(),
-});
-
-export const claimNftSchema = z.object({
-  txid: z
-    .string()
-    .length(64)
-    .regex(/^[a-fA-F0-9]+$/),
-  address: bitcoinAddressSchema,
-});
-
 export const listNftSchema = z.object({
   tokenId: z.number().int().positive(),
   price: z.number().int().min(1000, "Minimum price is 1000 satoshis"),
@@ -147,17 +113,41 @@ export const sparkNftStateSchema = z.object({
   evolution_count: z.number().int().min(0),
   tokens_earned: z.string(),
   heritage: z.number().int().min(0).max(4),
+  // Settlement fields (Fase 2, spec sección 3). The contract's NFTState uses
+  // `#[serde(default)]` for lazy migration of pre-settlement NFTs; these are
+  // optional here for the same reason. Non-settle validators (work/level_up)
+  // check immutability of these fields; only the settle op advances them.
+  narrative_root: z.string().optional(),
+  last_settle_block: z.number().int().min(0).optional(),
+  settle_count: z.number().int().min(0).optional(),
 });
 
 /**
- * POST /api/nft/work/:tokenId — accrue XP via a work-proof spell.
+ * POST /api/nft/work/:tokenId — accrue XP via a PoW-verified work spell (op `work`).
+ *
+ * C3 CLOSURE: the client supplies PoW inputs (challenge, nonce, difficulty,
+ * proof hash/blockData); the server validates the proof cryptographically via
+ * `validateMiningProof` and derives xp_gain from the verified difficulty. The
+ * client NEVER supplies xp_gain — that was the C3 exploit vector (a client with
+ * prover access could claim xp_gain = 999_999 and the old work_proof contract
+ * accepted it because it didn't re-derive on-chain).
  */
 export const workRouteSchema = z.object({
   ownerAddress: bitcoinAddressSchema,
   /** Block height the work was performed against (becomes last_work_block). */
   currentBlock: z.number().int().min(0),
-  /** XP to add on top of the current state (carried privately in the witness). */
-  xpGain: z.number().int().min(1),
+  /** PoW challenge (e.g. "tokenId:blockHeight"). Contract re-hashes this. */
+  challenge: z.string().min(1),
+  /** Nonce (hex, no 0x prefix) that satisfies the difficulty. */
+  nonce: z.string().min(1),
+  /** Required leading-zero bits the hash must have. Drives xp_gain derivation. */
+  difficulty: z.number().int().min(16),
+  /** The PoW hash the client claims (hex, 64 chars). */
+  proofHash: z.string().regex(/^[0-9a-fA-F]{64}$/),
+  /** blockData for validateMiningProof: "block:address:nonceHex". */
+  proofBlockData: z.string().min(1),
+  /** Optional proof timestamp (ms) for freshness check. */
+  proofTimestamp: z.number().int().optional(),
   /** The NFT UTXO to spend (current location of the NFT coin). */
   nftUtxo: nftUtxoSchema,
   /** Optional client-observed state for cross-checking the indexer. */
@@ -175,39 +165,20 @@ export const evolveRouteSchema = z.object({
   currentState: sparkNftStateSchema.optional(),
 });
 
-export const proveNftSchema = z.object({
-  /** Reserved token ID */
-  tokenId: z.number().int().positive(),
-  /** Owner's Bitcoin address */
+// =============================================================================
+// UNIFIED /mint SCHEMAS (D3) — replaces reserve/prove/confirm/claim
+// =============================================================================
+
+/**
+ * Body for `POST /mint/prepare`.
+ *
+ * The client only provides its address + the UTXO it will spend to pay for the
+ * mint. The server derives everything else: tokenId, traits, the spell, and the
+ * treasury payment output. Traits are NEVER accepted from the client — that was
+ * the root cause of the mythic-always bug (#2).
+ */
+export const mintPrepareSchema = z.object({
   address: bitcoinAddressSchema,
-  /** NFT initial state */
-  nftState: z.object({
-    dna: z
-      .string()
-      .length(64)
-      .regex(/^[a-fA-F0-9]+$/),
-    bloodline: z.enum(["royal", "warrior", "rogue", "mystic"]),
-    baseType: z.enum(["human", "animal", "robot", "mystic", "alien"]),
-    genesisBlock: z.number().int().min(0),
-    rarityTier: z.enum([
-      "common",
-      "uncommon",
-      "rare",
-      "epic",
-      "legendary",
-      "mythic",
-    ]),
-    tokenId: z.number().int().positive(),
-    level: z.number().int().min(1).max(10).default(1),
-    xp: z.number().int().min(0).default(0),
-    totalXp: z.number().int().min(0).default(0),
-    workCount: z.number().int().min(0).default(0),
-    lastWorkBlock: z.number().int().min(0).default(0),
-    evolutionCount: z.number().int().min(0).default(0),
-    tokensEarned: z.string().default("0"),
-    heritage: z.number().int().min(0).max(4).default(0),
-  }),
-  /** Funding UTXO */
   fundingUtxo: z.object({
     txid: z
       .string()
@@ -218,17 +189,37 @@ export const proveNftSchema = z.object({
   }),
 });
 
+/**
+ * Body for `POST /mint/finalize`.
+ *
+ * After the client signs and broadcasts the spell tx returned by /prepare, it
+ * calls /finalize with the resulting spellTxid. The server verifies the tx
+ * on-chain (confirmed + correct outputs) and persists the NFT.
+ */
+export const mintFinalizeSchema = z.object({
+  spellTxid: z
+    .string()
+    .length(64)
+    .regex(/^[a-fA-F0-9]+$/),
+  address: bitcoinAddressSchema,
+});
+
 export const unlistBodySchema = z.object({
   /** Seller's Bitcoin address */
   sellerAddress: bitcoinAddressSchema,
   /** Unix timestamp (ms) - must be within 5 minutes */
   timestamp: z.number().int().positive(),
-  /** Schnorr signature (64 bytes hex) of: unlist:{tokenId}:{timestamp} */
+  /**
+   * Schnorr signature (64 bytes hex) of: unlist:{tokenId}:{timestamp}.
+   * OPTIONAL today: the browser wallet's signMessage does not yet produce
+   * Schnorr BIP-340 signatures (see listing.ts handler comment). Required
+   * once the signMessage follow-up lands. Bug #11 stays open meanwhile.
+   */
   signature: z
     .string()
     .length(128)
     .regex(/^[a-fA-F0-9]+$/)
-    .optional(), // Optional for backward compatibility
+    .optional(),
   /** x-only public key (32 bytes hex) for signature verification */
   publicKey: z
     .string()

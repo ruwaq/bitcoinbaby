@@ -89,11 +89,6 @@ export {
   type UseNFTSyncReturn,
 } from "./useNFTSync";
 export {
-  useClaimNFT,
-  type ClaimResult,
-  type UseClaimNFTReturn,
-} from "./useClaimNFT";
-export {
   useMarketplace,
   type UseMarketplaceReturn,
   type ListResult,

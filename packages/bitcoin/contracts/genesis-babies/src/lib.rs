@@ -77,6 +77,13 @@ pub struct NFTWitness {
 /// on-chain re-derivation in `validate_work_proof`). This struct is kept ONLY for backwards
 /// compatibility with already-minted NFTs; new work MUST go through [`WorkWitness`] + the `work`
 /// operation, where XP is *derived on-chain* from the verified proof-of-work difficulty.
+///
+/// **C3 closure (sub-proyecto C, spec D2):** the `"work_proof"` match arm was
+/// removed in a Big-Bang Reset (no legacy NFTs to migrate). This struct is now
+/// ONLY referenced by the integration tests that assert the op is REJECTED; it
+/// is no longer deserialized by `app_contract`. Kept for documentation; do NOT
+/// re-wire.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkProofWitness {
     pub operation: String, // always "work_proof"
@@ -94,13 +101,21 @@ pub struct WorkProofWitness {
 /// `challenge` / `nonce` follow the same `format!("{}:{}", challenge, nonce)`
 /// convention as the babtc token contract and the off-chain worker's miner
 /// (hex nonce without `0x` prefix).
+///
+/// **Anti-replay (sub-proyecto D, Fase D1.2):** the `challenge` is NOT a free
+/// input. The contract reconstructs the canonical challenge from the NFT's
+/// state as `format!("{}:{}", token_id, work_count)` and rejects the transition
+/// unless `wk.challenge` matches it. This binds each PoW to a specific NFT AND
+/// to a specific work index, so a single mined PoW cannot be replayed across
+/// NFTs or reused for successive work ops on the same NFT. The worker must
+/// build the challenge the same way (see `buildWorkSpellRequest`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkWitness {
     pub operation: String,   // always "work"
-    pub challenge: String,   // the data being hashed (e.g. "tokenId:blockHeight")
+    pub challenge: String,   // MUST equal format!("{}:{}", token_id, work_count)
     pub nonce: String,       // the nonce that produces a hash with enough leading zeros
-    pub difficulty: u32,     // required leading-zero bits
-    pub current_block: u64,  // bitcoin block height → becomes last_work_block
+    pub difficulty: u32,     // required leading-zero bits (MIN_DIFFICULTY_FOR_XP..=MAX_DIFFICULTY)
+    pub current_block: u64,  // bitcoin block height → must be > old.last_work_block
 }
 
 /// Witness for the periodic settlement operation (Fase 2). Commits an
@@ -191,15 +206,16 @@ pub fn app_contract(app: &App, tx: &Transaction, _x: &Data, w: &Data) -> bool {
 
     match witness.operation.as_str() {
         "mint" => validate_mint(app, tx),
-        "work_proof" => {
-            // The work_proof path needs `xp_gain` + `current_block`, which only exist on the
-            // richer `WorkProofWitness`. Re-deserialize `w` as that shape.
-            let wp: WorkProofWitness = match w.value() {
-                Ok(v) => v,
-                Err(_) => return false,
-            };
-            validate_work_proof(app, tx, wp.xp_gain, wp.current_block)
-        }
+        // C3 closure (sub-proyecto C, spec decisión D2): the `work_proof` op is
+        // DISABLED post-reset. It trusted `xp_gain` from the witness (the C3
+        // exploit vector — a client with prover access could claim xp_gain =
+        // 999_999 and the contract accepted it). New work MUST go through op
+        // `work` (PoW-verified, xp_gain derived via xp_from_difficulty).
+        // There are no legacy NFTs to migrate in a Big-Bang Reset.
+        //
+        // To re-enable (NOT RECOMMENDED): add a "work_proof" arm here. The
+        // `work_proof_op_rejected_after_c3_closure` integration test (in
+        // tests/contract_integration.rs) will fail as a guard.
         // C3 fix: the `work` operation re-derives XP on-chain from a verified
         // proof-of-work hash. Supersedes the deprecated `work_proof` path.
         "work" => {
@@ -276,6 +292,9 @@ pub fn is_valid_initial_state(s: &SparkNFTState) -> bool {
         && s.narrative_root.is_empty()
         && s.last_settle_block == 0
         && s.settle_count == 0
+        // D1.5: heritage is an immutable trait (0..=4); bound it at mint so a
+        // malformed client cannot permanently set an out-of-range value.
+        && s.heritage <= 4
 }
 
 /// Compare the immutable identity traits of two Sparks. Level / xp / work counters / tokens are
@@ -302,6 +321,14 @@ pub fn immutable_traits_match(a: &SparkNFTState, b: &SparkNFTState) -> bool {
 /// Minimum difficulty (leading-zero bits) for a work proof to earn any XP.
 /// Mirrors `MIN_DIFFICULTY_FOR_XP` in `apps/workers/src/routes/nft/middleware.ts`.
 pub const MIN_DIFFICULTY_FOR_XP: u32 = 16;
+
+/// Maximum difficulty (leading-zero bits) a work proof may declare. Anything
+/// higher is rejected outright, capping the XP a single PoW can yield and
+/// keeping the on-chain difficulty bound equal to the worker's
+/// `MAX_DIFFICULTY` (`apps/workers/src/lib/proof-validation.ts`). Without this
+/// cap a witness could declare an arbitrarily large difficulty and (if a
+/// matching nonce were found) claim an outsized `xp_from_difficulty` reward.
+pub const MAX_DIFFICULTY: u32 = 32;
 
 /// Double SHA256 (Bitcoin standard hash256). Ported verbatim from the babtc
 /// token contract — `packages/bitcoin/contracts/babtc/src/lib.rs`.
@@ -417,6 +444,15 @@ fn single_output_state(app: &App, tx: &Transaction) -> Option<SparkNFTState> {
 
 /// Mint: validate the freshly-created Spark. Per the spike (Section 6) the state is read from
 /// `tx.outs` (the published charm output), NOT from the public input `x`.
+///
+/// **Uniqueness of `token_id` is enforced OFF-CHAIN (A-1).** Charms contracts
+/// are stateless over the global set of minted ids, so this validator only
+/// checks the RANGE `1..=MAX_SUPPLY` (via [`is_valid_token_id`]) — it cannot
+/// detect a duplicate `token_id` minted in a separate transaction. Preventing
+/// duplicate ids is the worker's responsibility: the server assigns every mint
+/// a fresh id from a monotonic counter (`nft:minted:count`), and never accepts
+/// a client-supplied id. A duplicate on-chain can therefore only occur if the
+/// worker itself is compromised or races.
 fn validate_mint(app: &App, tx: &Transaction) -> bool {
     // Genesis: there must be NO input NFT for this app.
     let in_states = collect_nft_states(app, tx.ins.iter().map(|(_, c)| c));
@@ -461,6 +497,12 @@ fn validate_mint(app: &App, tx: &Transaction) -> bool {
 /// can claim an arbitrary gain. Kept only for backwards compatibility with
 /// already-minted NFTs. New work MUST use [`validate_work`], which derives XP
 /// on-chain from a verified proof-of-work difficulty.
+///
+/// **C3 closure (sub-proyecto C, spec D2):** the `"work_proof"` match arm was
+/// removed in a Big-Bang Reset (no legacy NFTs to migrate). This function is
+/// therefore DEAD CODE — kept for documentation of the historical bug, NOT
+/// re-wired. Do NOT call it from `app_contract`.
+#[allow(dead_code)]
 fn validate_work_proof(app: &App, tx: &Transaction, xp_gain: u64, current_block: u64) -> bool {
     let Some(old) = single_input_state(app, tx) else {
         return false;
@@ -532,19 +574,26 @@ fn validate_work_proof(app: &App, tx: &Transaction, xp_gain: u64, current_block:
     true
 }
 
-/// Work (C3 fix): accrue XP from PoW-verified mining. Unlike the deprecated
-/// [`validate_work_proof`], XP is DERIVED on-chain from the verified difficulty
-/// via [`xp_from_difficulty`], never accepted as a free witness input.
+/// Work (C3 fix + D1 anti-replay): accrue XP from PoW-verified mining. Unlike
+/// the deprecated [`validate_work_proof`], XP is DERIVED on-chain from the
+/// verified difficulty via [`xp_from_difficulty`], never accepted as a free
+/// witness input.
 ///
 /// Invariants enforced (same shape as `validate_work_proof` so the economic
 /// guarantees C1a / C2 are preserved):
 ///   - exactly one input + one output NFT for this app,
 ///   - immutable identity traits unchanged,
 ///   - level unchanged,
-///   - the proof-of-work hash actually meets `difficulty` (NEW — closes C3),
+///   - the proof-of-work hash actually meets `difficulty` (closes C3),
+///   - `difficulty` is within `[MIN_DIFFICULTY_FOR_XP, MAX_DIFFICULTY]` (D1.3),
+///   - the `challenge` equals the canonical `"{token_id}:{work_count}"` derived
+///     from the NFT's state (D1.2 — binds the PoW to THIS NFT + THIS work index,
+///     blocking cross-NFT and same-NFT replay),
 ///   - `work_count` ticks by exactly 1,
 ///   - `total_xp` and spendable `xp` both tick by the DERIVED `xp_gain`,
-///   - `last_work_block` becomes the witness's `current_block`,
+///   - `last_work_block` becomes the witness's `current_block`, which must
+///     STRICTLY advance over `old.last_work_block` (D1.1 — anti-replay on the
+///     block dimension, mirroring `validate_settle`),
 ///   - `evolution_count` and `tokens_earned` are unchanged.
 fn validate_work(app: &App, tx: &Transaction, wk: &WorkWitness) -> bool {
     let Some(old) = single_input_state(app, tx) else {
@@ -554,7 +603,25 @@ fn validate_work(app: &App, tx: &Transaction, wk: &WorkWitness) -> bool {
         return false;
     };
 
-    // (1) Verify the proof of work on-chain (ported from babtc). This is the
+    // (0) Difficulty cap (D1.3). Reject an out-of-range difficulty before any
+    //     PoW math runs, so a witness cannot claim an oversized reward via an
+    //     absurd difficulty. Bounds match the worker's MAX_DIFFICULTY.
+    if wk.difficulty < MIN_DIFFICULTY_FOR_XP || wk.difficulty > MAX_DIFFICULTY {
+        return false;
+    }
+
+    // (1) Bind the challenge to THIS NFT + THIS work index (D1.2). The
+    //     challenge is reconstructed from the pre-transition state, so a PoW
+    //     mined once cannot be replayed across NFTs (different token_id) or
+    //     reused for the next work op on the same NFT (different work_count).
+    //     This must run BEFORE verify_pow: the canonical challenge is the one
+    //     being hashed, not whatever the witness supplies.
+    let expected_challenge = format!("{}:{}", old.token_id, old.work_count);
+    if wk.challenge != expected_challenge {
+        return false;
+    }
+
+    // (2) Verify the proof of work on-chain (ported from babtc). This is the
     //     crux of the C3 fix: the contract re-hashes `challenge:nonce` itself
     //     and rejects the transition if the leading-zero-bit count falls short
     //     of the claimed `difficulty`.
@@ -562,7 +629,7 @@ fn validate_work(app: &App, tx: &Transaction, wk: &WorkWitness) -> bool {
         return false;
     }
 
-    // (2) DERIVE the XP gain from the verified difficulty — NOT from the
+    // (3) DERIVE the XP gain from the verified difficulty — NOT from the
     //     witness. The witness carries no `xp_gain` field at all.
     let xp_gain = xp_from_difficulty(wk.difficulty);
     // A difficulty at/above the minimum always yields a strictly positive gain;
@@ -572,7 +639,7 @@ fn validate_work(app: &App, tx: &Transaction, wk: &WorkWitness) -> bool {
         return false;
     }
 
-    // (3) Identity immutable, level unchanged (same invariants as work_proof).
+    // (4) Identity immutable, level unchanged (same invariants as work_proof).
     if !immutable_traits_match(&old, &new) {
         return false;
     }
@@ -580,7 +647,7 @@ fn validate_work(app: &App, tx: &Transaction, wk: &WorkWitness) -> bool {
         return false;
     }
 
-    // (4) Counters tick by the DERIVED amount (checked arithmetic under
+    // (5) Counters tick by the DERIVED amount (checked arithmetic under
     //     `panic = "abort"` + `overflow-checks`).
     let Some(expected_work_count) = old.work_count.checked_add(1) else {
         return false;
@@ -601,6 +668,13 @@ fn validate_work(app: &App, tx: &Transaction, wk: &WorkWitness) -> bool {
         return false;
     }
     if new.xp != expected_xp {
+        return false;
+    }
+    // (6) Anti-replay on the block dimension (D1.1 — mirrors `validate_settle`).
+    //     The witness's block must STRICTLY advance over the last worked block:
+    //     a replay at the same or an earlier height is rejected, so each block
+    //     height can anchor at most one work transition per NFT.
+    if wk.current_block <= old.last_work_block {
         return false;
     }
     if new.last_work_block != wk.current_block {

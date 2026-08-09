@@ -423,6 +423,88 @@ export function createNFTWorkProofSpell(params: NFTWorkProofParams): SpellV2 {
 }
 
 /**
+ * Work spell parameters (C3 closure — op `work`, PoW-verified on-chain).
+ *
+ * Carries the inputs needed to structure the spell's public_inputs (challenge,
+ * difficulty, block_height) and the state transition (work_count bump,
+ * last_work_block advance). The nonce and the full witness are NOT carried here
+ * — the caller (buildWorkSpellRequest) assembles `app_private_inputs`
+ * separately, since the prover takes it as a sibling field to the spell.
+ */
+export interface NFTWorkParams {
+  appId: string;
+  appVk: string;
+  nftUtxo: { txid: string; vout: number };
+  currentState: SparkNFTState;
+  ownerAddress: string;
+  /** The PoW challenge (e.g. "tokenId:blockHeight"). Surfaced in public_inputs. */
+  challenge: string;
+  /** Required leading-zero bits the hash must have. Drives xp_gain derivation. */
+  difficulty: number;
+  /** Bitcoin block height → becomes lastWorkBlock. */
+  currentBlock: number;
+}
+
+/**
+ * Generate work spell (op `work` — C3 closure). Structures only the spell's
+ * public_inputs (challenge, difficulty, block_height) and the state transition
+ * (workCount bump, lastWorkBlock advance). The contract verifies the PoW
+ * on-chain via the private witness `w` and derives xp_gain via
+ * `xp_from_difficulty`; that witness (carrying the nonce) is assembled by the
+ * caller, NOT here.
+ *
+ * The caller (buildWorkSpellRequest in the worker) is responsible for bumping
+ * xp/totalXp in the outState to match the contract's derived value, because
+ * the contract enforces `new.xp == old.xp + xp_from_difficulty(difficulty)`.
+ */
+export function createNFTWorkSpell(params: NFTWorkParams): SpellV2 {
+  const appRef = `n/${params.appId}/${params.appVk}`;
+
+  // Only bump workCount + lastWorkBlock. xp/totalXp left unchanged — the caller
+  // bumps them to match the contract's derived xp_gain.
+  // (See buildWorkSpellRequest in nft-evolution-service.ts, Task 1.2.)
+  const newState: SparkNFTState = {
+    ...params.currentState,
+    workCount: params.currentState.workCount + 1,
+    lastWorkBlock: params.currentBlock,
+  };
+
+  return {
+    version: 2,
+    apps: {
+      $00: appRef,
+    },
+    // public_inputs (`_x`) is NOT dereferenced by `validate_work` — the
+    // contract reads challenge/nonce/difficulty from the PRIVATE witness `w`
+    // (`app_private_inputs`). We surface challenge/difficulty/block_height
+    // here as informational public inputs; the nonce lives in the witness,
+    // which the caller (buildWorkSpellRequest, Task 1.2) constructs.
+    public_inputs: {
+      challenge: params.challenge,
+      difficulty: params.difficulty,
+      block_height: params.currentBlock,
+    },
+    ins: [
+      {
+        utxo_id: `${params.nftUtxo.txid}:${params.nftUtxo.vout}`,
+        charms: {
+          $00: params.currentState,
+        },
+      },
+    ],
+    outs: [
+      {
+        address: params.ownerAddress,
+        charms: {
+          $00: newState,
+        },
+        sats: 546,
+      },
+    ],
+  };
+}
+
+/**
  * Level up spell parameters
  */
 export interface NFTLevelUpParams {

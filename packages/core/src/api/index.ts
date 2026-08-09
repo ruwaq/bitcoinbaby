@@ -18,6 +18,10 @@ export {
   type NFTExplorerQuery,
   type NFTExplorerResponse,
   type NFTGlobalStats,
+  type NFTProveResult,
+  type MintTraits,
+  type MintPrepareResult,
+  type MintFinalizeResult,
 } from "./client";
 export type { MintAttempt } from "./clients/nft-client";
 export type {

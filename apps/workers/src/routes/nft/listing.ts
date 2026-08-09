@@ -8,14 +8,8 @@ import { Hono } from "hono";
 import * as bitcoin from "bitcoinjs-lib";
 import type { Env } from "../../lib/types";
 import { getRedis } from "../../lib/redis";
-import {
-  errorResponse,
-  successResponse,
-} from "../../lib/helpers";
-import {
-  validateBody,
-  validateParams,
-} from "../../lib/middleware";
+import { errorResponse, successResponse } from "../../lib/helpers";
+import { validateBody, validateParams } from "../../lib/middleware";
 import { nftLogger } from "../../lib/logger";
 import {
   tokenIdParamSchema,
@@ -229,7 +223,11 @@ listingRouter.post("/list", validateBody(listNftSchema), async (c) => {
     if (sellerPsbt) {
       const validation = validateListingSighash(sellerPsbt);
       if (!validation.valid) {
-        return errorResponse(c, validation.error || "Invalid PSBT SIGHASH", 400);
+        return errorResponse(
+          c,
+          validation.error || "Invalid PSBT SIGHASH",
+          400,
+        );
       }
     }
 
@@ -329,7 +327,18 @@ listingRouter.delete(
         return errorResponse(c, "Only the seller can unlist", 403);
       }
 
-      // Signature verification (if provided)
+      // Signature verification.
+      //
+      // The signature is OPTIONAL today: the browser wallet's signMessage is a
+      // broken ECDSA placeholder (packages/bitcoin/src/wallet.ts:249), and the
+      // external providers (Unisat/Xverse) each use incompatible signing
+      // schemes that don't match the Schnorr BIP-340 this verifier expects.
+      //
+      // Hardening /unlist to REQUIRE a signature was D4.3, but it left the
+      // endpoint unusable (every browser request 400'd). Reverted for now: if
+      // a signature is present we verify it; if not, we log a warning and
+      // proceed. Bug #11 stays open until signMessage implements real Schnorr
+      // BIP-340 with an x-only pubkey — tracked as the signMessage follow-up.
       if (signature && publicKey) {
         const { verifySchnorrSignature, createAuthMessage } =
           await import("../../lib/crypto");
@@ -351,11 +360,10 @@ listingRouter.delete(
 
         marketplaceLogger.info("Signature verified for unlist", { tokenId });
       } else {
-        // Backward compatibility warning - will be removed in future
-        marketplaceLogger.warn("Unlist without signature (deprecated)", {
-          tokenId,
-          address: sellerAddress.slice(0, 10),
-        });
+        marketplaceLogger.warn(
+          "Unlist without signature (bug #11 still open, signMessage follow-up pending)",
+          { tokenId, address: sellerAddress.slice(0, 10) },
+        );
       }
 
       // Check for replay attack - use timestamp as nonce

@@ -3,14 +3,18 @@
 //! These tests exercise the FULL contract path — `app_contract(app, tx, x, w)` — with
 //! hand-built `Transaction` values, the same function the Charms runtime invokes when it
 //! runs our wasm via `charms spell check` / `spell prove`. They are the strongest local
-//! validation of the work_proof and level_up paths (which `charms spell check --mock`
-//! cannot reach, because resolving input charm data requires an enchanted prev-tx that
-//! only a paid prover can produce).
+//! validation of the level_up path and the work_proof REJECTION guard (which `charms
+//! spell check --mock` cannot reach, because resolving input charm data requires an
+//! enchanted prev-tx that only a paid prover can produce).
 //!
 //! What is covered here (and the complementary `charms spell check` coverage):
 //!   - mint           : ALSO covered end-to-end via `scripts/validate-nft-contract.ts`
 //!                      (YAML spell -> wasm). The cases below mirror those fixtures.
-//!   - work_proof     : covered ONLY here (ins + outs + witness constructed in-process).
+//!   - work_proof     : DISABLED post-reset (C3 closure, D2). The single
+//!                      `work_proof_op_rejected_after_c3_closure` test proves
+//!                      the op falls through to `_ => false`; there are no
+//!                      legacy NFTs to migrate, so no accept-path coverage is
+//!                      wanted.
 //!   - level_up       : covered ONLY here.
 //!   - transfer / unknown op : covered ONLY here.
 //!
@@ -219,15 +223,41 @@ fn mint_with_existing_input_nft_is_rejected() {
 }
 
 // =============================================================================
-// WORK PROOF — accepted
+// WORK PROOF — disabled post-reset (C3 closure, spec D2)
 // =============================================================================
+//
+// `work_proof` was a live (deprecated) operation before the Big-Bang Reset. It
+// trusted `xp_gain` from the witness — exactly the C3 exploit vector (a client
+// with prover access could claim `xp_gain = 999_999` and the contract would
+// accept it, since nothing re-derived the gain on-chain). Post-reset there are
+// no legacy NFTs to migrate, so the match arm was removed entirely and the op
+// now falls through to `_ => false`.
+//
+// The single test below is the canonical C3-closure guard: a PERFECTLY VALID
+// `work_proof` transition (every counter ticks by the witness-claimed gain,
+// which the OLD `validate_work_proof` would have accepted) MUST now be
+// rejected, because the op no longer exists in the dispatcher. (The obsolete
+// accept/reject tests that exercised `validate_work_proof` directly were
+// removed when the arm was taken out: by vacuous truth they had stopped
+// testing what their names claimed.)
 
 #[test]
-fn work_proof_valid_is_accepted() {
+fn work_proof_op_rejected_after_c3_closure() {
+    // C3 closure (sub-proyecto C, spec decisión D2): the `work_proof` op is
+    // DISABLED post-reset. It trusted `xp_gain` from the witness (the C3
+    // exploit vector — a client with prover access could claim xp_gain =
+    // 999_999 and the contract accepted it). New work MUST go through op
+    // `work` (PoW-verified, xp_gain derived via xp_from_difficulty). There
+    // are no legacy NFTs to migrate in a Big-Bang Reset, so we don't need
+    // backwards compatibility.
+    //
+    // This test builds a transition that the OLD `validate_work_proof` would
+    // have ACCEPTED (every counter ticks by the witness-claimed `xp_gain`),
+    // and asserts the contract now REJECTS it — proving the match arm is gone
+    // and the op falls through to `_ => false`.
     let mut old = fresh_mint();
     old.xp = 50;
     old.total_xp = 50;
-    // one prior work proof already happened
     old.work_count = 1;
     old.last_work_block = 199_999;
 
@@ -236,58 +266,10 @@ fn work_proof_valid_is_accepted() {
     let mut new = old.clone();
     new.work_count = old.work_count + 1;
     new.total_xp = old.total_xp + xp_gain;
-    new.xp = old.xp + xp_gain; // C1a: spendable xp must tick by the same gain
+    new.xp = old.xp + xp_gain; // would satisfy C1a under the old validator
     new.last_work_block = current_block;
 
-    let tx = Transaction {
-        ins: vec![(utxo(), charms_with(&old))],
-        refs: vec![],
-        outs: vec![charms_with(&new)],
-        coin_ins: None,
-        coin_outs: None,
-        prev_txs: Default::default(),
-        app_public_inputs: Default::default(),
-    };
-    let w = Data::from(&genesis_babies::WorkProofWitness {
-        operation: "work_proof".into(),
-        xp_gain,
-        current_block,
-    });
-    assert!(
-        run(&app(), &tx, &Data::empty(), &w),
-        "valid work_proof must be accepted"
-    );
-}
-
-// =============================================================================
-// WORK PROOF — rejected
-// =============================================================================
-
-#[test]
-fn work_proof_without_work_count_increment_is_rejected() {
-    let mut old = fresh_mint();
-    old.xp = 50;
-    old.total_xp = 50;
-    old.work_count = 1;
-
-    let xp_gain = 25u64;
-    let current_block = 200_000u64;
-    let mut new = old.clone();
-    // BUG under test: work_count NOT incremented.
-    new.work_count = old.work_count;
-    new.total_xp = old.total_xp + xp_gain;
-    new.xp = old.xp + xp_gain;
-    new.last_work_block = current_block;
-
-    let tx = Transaction {
-        ins: vec![(utxo(), charms_with(&old))],
-        refs: vec![],
-        outs: vec![charms_with(&new)],
-        coin_ins: None,
-        coin_outs: None,
-        prev_txs: Default::default(),
-        app_public_inputs: Default::default(),
-    };
+    let tx = work_tx(&old, &new);
     let w = Data::from(&genesis_babies::WorkProofWitness {
         operation: "work_proof".into(),
         xp_gain,
@@ -295,79 +277,7 @@ fn work_proof_without_work_count_increment_is_rejected() {
     });
     assert!(
         !run(&app(), &tx, &Data::empty(), &w),
-        "work_proof without work_count+1 must reject"
-    );
-}
-
-#[test]
-fn work_proof_xp_not_tied_to_gain_is_rejected() {
-    // C1a regression: an attacker accrues total_xp but never raises the spendable xp.
-    let mut old = fresh_mint();
-    old.xp = 50;
-    old.total_xp = 50;
-    old.work_count = 1;
-
-    let xp_gain = 25u64;
-    let current_block = 200_000u64;
-    let mut new = old.clone();
-    new.work_count = old.work_count + 1;
-    new.total_xp = old.total_xp + xp_gain;
-    new.xp = old.xp; // BUG under test: spendable xp not bumped
-    new.last_work_block = current_block;
-
-    let tx = Transaction {
-        ins: vec![(utxo(), charms_with(&old))],
-        refs: vec![],
-        outs: vec![charms_with(&new)],
-        coin_ins: None,
-        coin_outs: None,
-        prev_txs: Default::default(),
-        app_public_inputs: Default::default(),
-    };
-    let w = Data::from(&genesis_babies::WorkProofWitness {
-        operation: "work_proof".into(),
-        xp_gain,
-        current_block,
-    });
-    assert!(
-        !run(&app(), &tx, &Data::empty(), &w),
-        "work_proof where xp != old.xp + xp_gain must reject (C1a)"
-    );
-}
-
-#[test]
-fn work_proof_mutating_immutable_dna_is_rejected() {
-    let mut old = fresh_mint();
-    old.xp = 50;
-    old.total_xp = 50;
-    old.work_count = 1;
-
-    let xp_gain = 25u64;
-    let current_block = 200_000u64;
-    let mut new = old.clone();
-    new.work_count = old.work_count + 1;
-    new.total_xp = old.total_xp + xp_gain;
-    new.xp = old.xp + xp_gain;
-    new.last_work_block = current_block;
-    new.dna = "b".repeat(64); // BUG under test: dna is immutable
-
-    let tx = Transaction {
-        ins: vec![(utxo(), charms_with(&old))],
-        refs: vec![],
-        outs: vec![charms_with(&new)],
-        coin_ins: None,
-        coin_outs: None,
-        prev_txs: Default::default(),
-        app_public_inputs: Default::default(),
-    };
-    let w = Data::from(&genesis_babies::WorkProofWitness {
-        operation: "work_proof".into(),
-        xp_gain,
-        current_block,
-    });
-    assert!(
-        !run(&app(), &tx, &Data::empty(), &w),
-        "work_proof mutating dna must reject"
+        "work_proof op is disabled post-reset (C3 closure, D2); even a valid-looking transition must reject"
     );
 }
 
@@ -406,9 +316,10 @@ fn work_op_valid_pow_is_accepted() {
     old.work_count = 1;
     old.last_work_block = 199_999;
 
-    // Real mined PoW: "genesis-spark-test:745" hashes with 19 leading-zero bits.
-    let challenge = "genesis-spark-test";
-    let nonce = "745";
+    // Canonical challenge (D1.2): "{token_id}:{work_count}" = "1:1".
+    // Real mined PoW: "1:1:2751" double-sha256 has 19 leading-zero bits.
+    let challenge = format!("{}:{}", old.token_id, old.work_count);
+    let nonce = "2751";
     let difficulty = 19u32;
     let current_block = 200_000u64;
 
@@ -444,9 +355,9 @@ fn work_op_invalid_pow_is_rejected() {
     old.total_xp = 50;
     old.work_count = 1;
 
-    // Same challenge, but a nonce whose hash does NOT meet difficulty 19.
-    // "genesis-spark-test:bad" double-sha256 has 0 leading-zero bits.
-    let challenge = "genesis-spark-test";
+    // Canonical challenge (D1.2): "1:1", but a nonce whose hash does NOT meet
+    // difficulty 19. "1:1:bad" double-sha256 has 0 leading-zero bits.
+    let challenge = format!("{}:{}", old.token_id, old.work_count);
     let nonce = "bad";
     let difficulty = 19u32;
     let current_block = 200_000u64;
@@ -488,8 +399,9 @@ fn work_op_rejects_inflated_xp() {
     old.total_xp = 50;
     old.work_count = 1;
 
-    let challenge = "genesis-spark-test";
-    let nonce = "745"; // valid PoW at difficulty 19
+    // Canonical challenge (D1.2): "1:1", valid PoW at difficulty 19.
+    let challenge = format!("{}:{}", old.token_id, old.work_count);
+    let nonce = "2751"; // "1:1:2751" double-sha256 has 19 leading-zero bits
     let difficulty = 19u32;
     let current_block = 200_000u64;
 
@@ -513,6 +425,172 @@ fn work_op_rejects_inflated_xp() {
     assert!(
         !run(&app(), &tx, &Data::empty(), &w),
         "work with XP inflated beyond xp_from_difficulty(difficulty) must reject (C3 closed)"
+    );
+}
+
+// =============================================================================
+// WORK — D1 anti-replay (sub-proyecto D, Fase D1)
+//
+// These four tests pin the anti-replay guarantees added to `validate_work`:
+//   - D1.1: the witness block must STRICTLY advance over `old.last_work_block`,
+//   - D1.2: the challenge must equal the canonical "{token_id}:{work_count}",
+//   - D1.3: difficulty must be within [MIN_DIFFICULTY_FOR_XP, MAX_DIFFICULTY].
+// They are the regression net for the C3-reopening bugs (PoW replay across
+// NFTs and across successive work ops) documented in the sub-proyecto D audit.
+// =============================================================================
+
+#[test]
+fn work_op_rejects_non_advancing_block() {
+    // D1.1: a work op whose witness block is <= the last worked block must be
+    // rejected, even with a valid canonical challenge + valid PoW. This blocks
+    // the simplest replay (re-submit the same op at the same block height).
+    let mut old = fresh_mint();
+    old.xp = 50;
+    old.total_xp = 50;
+    old.work_count = 1;
+    old.last_work_block = 200_000; // the NFT already worked at this block
+
+    // Canonical challenge "1:1", valid PoW at difficulty 19.
+    let challenge = format!("{}:{}", old.token_id, old.work_count);
+    let nonce = "2751";
+    let difficulty = 19u32;
+    // Attacker reuses the SAME block (not strictly greater) — must reject.
+    let current_block = 200_000u64;
+
+    let xp_gain = genesis_babies::xp_from_difficulty(difficulty);
+    let mut new = old.clone();
+    new.work_count = old.work_count + 1;
+    new.total_xp = old.total_xp + xp_gain;
+    new.xp = old.xp + xp_gain;
+    new.last_work_block = current_block; // == old.last_work_block (no advance)
+
+    let tx = work_tx(&old, &new);
+    let w = Data::from(&genesis_babies::WorkWitness {
+        operation: "work".into(),
+        challenge,
+        nonce: nonce.into(),
+        difficulty,
+        current_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "work at a non-advancing block must reject (D1.1 anti-replay)"
+    );
+}
+
+#[test]
+fn work_op_rejects_reused_challenge_across_works() {
+    // D1.2: a PoW mined for work index N cannot be replayed at work index N+1.
+    // The canonical challenge is "{token_id}:{work_count}", so once work_count
+    // ticks the challenge string changes and the SAME (nonce, difficulty) pair
+    // no longer validates against the new expected challenge.
+    let mut old = fresh_mint();
+    old.xp = 50;
+    old.total_xp = 50;
+    old.work_count = 2; // this NFT already did 2 works
+    old.last_work_block = 199_999;
+
+    // Attacker reuses the PoW mined for "1:1" (the first work op) at work_count=2.
+    // The contract expects challenge "1:2", so "1:1" must be rejected outright.
+    let stale_challenge = format!("{}:{}", old.token_id, 1u64); // "1:1", not "1:2"
+    let nonce = "2751"; // valid PoW for "1:1", NOT for "1:2"
+    let difficulty = 19u32;
+    let current_block = 200_000u64;
+
+    let xp_gain = genesis_babies::xp_from_difficulty(difficulty);
+    let mut new = old.clone();
+    new.work_count = old.work_count + 1;
+    new.total_xp = old.total_xp + xp_gain;
+    new.xp = old.xp + xp_gain;
+    new.last_work_block = current_block;
+
+    let tx = work_tx(&old, &new);
+    let w = Data::from(&genesis_babies::WorkWitness {
+        operation: "work".into(),
+        challenge: stale_challenge,
+        nonce: nonce.into(),
+        difficulty,
+        current_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "a PoW mined for a previous work index must reject (D1.2 challenge binding)"
+    );
+}
+
+#[test]
+fn work_op_rejects_challenge_for_wrong_token() {
+    // D1.2 (cross-NFT dimension): a PoW mined for token A cannot be replayed on
+    // token B, because the canonical challenge embeds the token_id.
+    let mut old = fresh_mint();
+    old.token_id = 2; // this NFT is token #2
+    old.xp = 50;
+    old.total_xp = 50;
+    old.work_count = 1;
+    old.last_work_block = 199_999;
+
+    // Attacker mined "2:1:302506" (valid for token 2)... but tries to replay a
+    // PoW mined for token 1's challenge "1:1" instead. Must reject.
+    let wrong_challenge = format!("{}:{}", 1u32, old.work_count); // "1:1", not "2:1"
+    let nonce = "2751"; // valid PoW for "1:1", not for "2:1"
+    let difficulty = 19u32;
+    let current_block = 200_000u64;
+
+    let xp_gain = genesis_babies::xp_from_difficulty(difficulty);
+    let mut new = old.clone();
+    new.work_count = old.work_count + 1;
+    new.total_xp = old.total_xp + xp_gain;
+    new.xp = old.xp + xp_gain;
+    new.last_work_block = current_block;
+
+    let tx = work_tx(&old, &new);
+    let w = Data::from(&genesis_babies::WorkWitness {
+        operation: "work".into(),
+        challenge: wrong_challenge,
+        nonce: nonce.into(),
+        difficulty,
+        current_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "a PoW mined for another token_id must reject (D1.2 cross-NFT binding)"
+    );
+}
+
+#[test]
+fn work_op_rejects_excessive_difficulty() {
+    // D1.3: a difficulty above MAX_DIFFICULTY must be rejected before any PoW
+    // math runs. Without the cap, a witness could declare an absurd difficulty
+    // and (if a matching nonce existed) claim an outsized xp_from_difficulty.
+    let mut old = fresh_mint();
+    old.xp = 50;
+    old.total_xp = 50;
+    old.work_count = 1;
+    old.last_work_block = 199_999;
+
+    let challenge = format!("{}:{}", old.token_id, old.work_count);
+    let nonce = "0"; // irrelevant: the cap check rejects before verify_pow
+    let excessive_difficulty = genesis_babies::MAX_DIFFICULTY + 1; // 33
+    let current_block = 200_000u64;
+
+    let xp_gain = genesis_babies::xp_from_difficulty(excessive_difficulty);
+    let mut new = old.clone();
+    new.work_count = old.work_count + 1;
+    new.total_xp = old.total_xp + xp_gain;
+    new.xp = old.xp + xp_gain;
+    new.last_work_block = current_block;
+
+    let tx = work_tx(&old, &new);
+    let w = Data::from(&genesis_babies::WorkWitness {
+        operation: "work".into(),
+        challenge,
+        nonce: nonce.into(),
+        difficulty: excessive_difficulty,
+        current_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "a difficulty above MAX_DIFFICULTY must reject (D1.3 cap)"
     );
 }
 

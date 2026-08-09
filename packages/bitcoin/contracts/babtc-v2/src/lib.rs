@@ -21,7 +21,9 @@
 //! - Same security via server signature
 
 use charms_sdk::data::{check, sum_token_amount, App, Data, Transaction, TOKEN};
+use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
+use sha2::Sha256;
 
 // =============================================================================
 // CONFIGURATION
@@ -32,11 +34,6 @@ const DENOMINATION: u64 = 100_000_000;
 
 /// Work divisor for token calculation: tokens = totalWork / WORK_DIVISOR
 const WORK_DIVISOR: u64 = 100;
-
-/// Server public key for signature verification (set at deployment)
-/// This is the SHA256 of the ADMIN_KEY used for signing
-/// In production, this should be a proper asymmetric key
-const SERVER_PUBKEY_HASH: &str = "DEPLOY_TIME_PUBKEY_HASH";
 
 // =============================================================================
 // TYPES
@@ -158,36 +155,74 @@ fn calculate_tokens(total_work: u64) -> u64 {
     total_work.saturating_mul(DENOMINATION) / WORK_DIVISOR
 }
 
-/// Verify server signature over claim data
-/// Signature message format: address|totalWork|proofCount|merkleRoot|tokenAmount|timestamp|nonce
-fn verify_server_signature(witness: &ClaimWitness) -> bool {
-    // For V2, we use a simplified verification:
-    // The server signature is an HMAC-SHA256 that the prover verifies
-    // against the hardcoded SERVER_PUBKEY_HASH
-    //
-    // In production, this should use proper asymmetric signatures (ed25519)
-    // For now, we trust that the signature format is correct
+/// The server's secret key (32 bytes, hex). Used to sign claims.
+/// This is a PLACEHOLDER — the real value is generated at deploy time from the
+/// treasury signer and set via a build-time env var or manual replacement
+/// before compiling the mainnet wasm. It must NEVER be committed for real.
+/// For testnet/dev it can be any 32-byte hex.
+///
+/// TODO (deploy): replace this with the real treasury secret before mainnet
+/// compile. The secret is generated alongside the treasury mnemonic via
+/// scripts/signer/generate-wallet.ts (extend it to also output this key).
+const SERVER_SECRET_HEX: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
-    // Verify signature is not empty and has correct format (64 hex chars)
+type HmacSha256 = Hmac<Sha256>;
+
+/// Canonical message that the server signs. MUST match exactly what
+/// scripts/signer and apps/workers/src/services/claim-minting-service.ts
+/// produce when signing. Field order is fixed; changes here break all
+/// existing claims (acceptable in a Big-Bang Reset).
+fn signed_message(witness: &ClaimWitness) -> String {
+    format!(
+        "{}|{}|{}|{}|{}|{}|{}",
+        witness.address,
+        witness.total_work,
+        witness.proof_count,
+        witness.merkle_root,
+        witness.token_amount,
+        witness.timestamp,
+        witness.nonce,
+    )
+}
+
+/// Verify the server signature cryptographically (HMAC-SHA256).
+///
+/// Replaces the decorative check that returned `true` for any 64-hex string.
+/// The signature is an HMAC-SHA256 of `signed_message(witness)` under
+/// SERVER_SECRET. A claim without the secret cannot forge a valid signature.
+fn verify_server_signature(witness: &ClaimWitness) -> bool {
+    // (1) Format checks (kept from the old implementation).
     if witness.server_signature.len() != 64 {
         eprintln!("Invalid signature length: {}", witness.server_signature.len());
         return false;
     }
-
-    // Verify signature contains only hex characters
     if !witness.server_signature.chars().all(|c| c.is_ascii_hexdigit()) {
         eprintln!("Signature contains invalid characters");
         return false;
     }
 
-    // Note: Full signature verification requires the server's secret key
-    // In zkVM, we verify the signature was created correctly by checking
-    // that the claim data matches what was signed
-    //
-    // The actual cryptographic verification happens when the spell is submitted
-    // to the prover, which has access to verify the signature chain
+    // (2) Decode the hex signature to 32 bytes.
+    let sig_bytes = match hex::decode(&witness.server_signature) {
+        Ok(b) => b,
+        Err(_) => return false,
+    };
 
-    true
+    // (3) Decode the server secret to bytes.
+    let secret_bytes = match hex::decode(SERVER_SECRET_HEX) {
+        Ok(b) => b,
+        Err(_) => return false, // misconfigured secret — fail closed
+    };
+
+    // (4) Compute HMAC-SHA256 of the canonical message.
+    let mut mac = match HmacSha256::new_from_slice(&secret_bytes) {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
+    mac.update(signed_message(witness).as_bytes());
+
+    // (5) Constant-time verification. verify_slice returns Ok(()) on match,
+    // Err otherwise. It is NOT susceptible to timing attacks.
+    mac.verify_slice(&sig_bytes).is_ok()
 }
 
 // =============================================================================
@@ -220,5 +255,92 @@ mod tests {
         // Invalid length
         let short_sig = "abc123";
         assert!(short_sig.len() != 64);
+    }
+
+    #[test]
+    fn test_verify_server_signature_accepts_valid_hmac() {
+        let mut witness = ClaimWitness {
+            address: "tb1ptestaddress".to_string(),
+            total_work: 100,
+            proof_count: 1,
+            merkle_root: "a".repeat(64),
+            token_amount: 1_000_000,
+            timestamp: 1_000_000,
+            nonce: "1".to_string(),
+            server_signature: String::new(),
+        };
+        // Compute a REAL HMAC under the placeholder secret, over the canonical
+        // message. This is exactly what the signer will do at deploy time.
+        let secret = hex::decode(SERVER_SECRET_HEX).unwrap();
+        let mut mac = HmacSha256::new_from_slice(&secret).unwrap();
+        mac.update(signed_message(&witness).as_bytes());
+        witness.server_signature = hex::encode(mac.finalize().into_bytes());
+        assert!(
+            verify_server_signature(&witness),
+            "a correctly-computed HMAC must verify"
+        );
+    }
+
+    #[test]
+    fn test_verify_server_signature_rejects_all_zeros() {
+        // A signature of all zeros must NEVER verify as valid.
+        let witness = ClaimWitness {
+            address: "tb1ptestaddress".to_string(),
+            total_work: 100,
+            proof_count: 1,
+            merkle_root: "a".repeat(64),
+            token_amount: 1_000_000,
+            timestamp: 1_000_000,
+            nonce: "1".to_string(),
+            server_signature: "0".repeat(64), // 64 hex chars, all zeros
+        };
+        assert!(
+            !verify_server_signature(&witness),
+            "all-zeros signature must be rejected"
+        );
+    }
+
+    #[test]
+    fn test_verify_server_signature_rejects_wrong_length() {
+        let mut witness = ClaimWitness {
+            address: "tb1ptestaddress".to_string(),
+            total_work: 100,
+            proof_count: 1,
+            merkle_root: "a".repeat(64),
+            token_amount: 1_000_000,
+            timestamp: 1_000_000,
+            nonce: "1".to_string(),
+            server_signature: "abc".to_string(), // too short
+        };
+        assert!(!verify_server_signature(&witness));
+        witness.server_signature = "x".repeat(64); // wrong charset (not hex)
+        assert!(!verify_server_signature(&witness));
+    }
+
+    #[test]
+    fn test_verify_server_signature_rejects_tampered_message() {
+        // Compute a REAL valid HMAC for w1, then tamper token_amount on w2
+        // (keeping the same signature). The signature must bind to token_amount:
+        // w1 verifies, w2 does not.
+        let mut w1 = ClaimWitness {
+            address: "tb1ptestaddress".to_string(),
+            total_work: 100,
+            proof_count: 1,
+            merkle_root: "a".repeat(64),
+            token_amount: 1_000_000,
+            timestamp: 1_000_000,
+            nonce: "1".to_string(),
+            server_signature: String::new(),
+        };
+        let secret = hex::decode(SERVER_SECRET_HEX).unwrap();
+        let mut mac = HmacSha256::new_from_slice(&secret).unwrap();
+        mac.update(signed_message(&w1).as_bytes());
+        w1.server_signature = hex::encode(mac.finalize().into_bytes());
+
+        let mut w2 = w1.clone();
+        w2.token_amount = 2_000_000; // tampered — signature no longer matches
+
+        assert!(verify_server_signature(&w1), "original must verify");
+        assert!(!verify_server_signature(&w2), "tampered message must be rejected");
     }
 }

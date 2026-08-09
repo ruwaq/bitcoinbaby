@@ -7,9 +7,7 @@ import { test, expect } from "./fixtures";
  * The app uses tab-based navigation on the main page.
  */
 
-const API_URL =
-  process.env.API_URL ||
-  "http://localhost:8787";
+const API_URL = process.env.API_URL || "http://localhost:8787";
 
 const TEST_ADDRESS = "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx";
 
@@ -60,43 +58,14 @@ test.describe("API Health Check", () => {
   });
 });
 
-test.describe("NFT Reserve API", () => {
-  test("should reserve and release NFT token ID", async ({ request }) => {
-    // Reserve a token ID with a valid address
-    const reserveResponse = await request.post(`${API_URL}/api/nft/reserve`, {
-      data: {
-        address: TEST_ADDRESS,
-      },
-    });
-    expect(reserveResponse.ok()).toBeTruthy();
-
-    const reserveData = await reserveResponse.json();
-    expect(reserveData.success).toBe(true);
-    expect(reserveData.data).toHaveProperty("tokenId");
-    expect(reserveData.data.tokenId).toBeGreaterThan(0);
-
-    const tokenId = reserveData.data.tokenId;
-
-    // Release the token ID (cleanup)
-    const releaseResponse = await request.post(
-      `${API_URL}/api/nft/release/${tokenId}`,
-    );
-    expect(releaseResponse.ok()).toBeTruthy();
-
-    const releaseData = await releaseResponse.json();
-    expect(releaseData.success).toBe(true);
-  });
-});
-
-test.describe("NFT Prover API", () => {
-  test("should validate prover endpoint exists", async ({ request }) => {
-    // The prove endpoint requires POST with body, so we test with invalid request
-    // to verify endpoint exists and returns proper validation error
-    const response = await request.post(`${API_URL}/api/nft/prove`, {
+test.describe("NFT Mint Prepare API (D6 unified /mint)", () => {
+  test("should validate /mint/prepare endpoint exists", async ({ request }) => {
+    // Test with empty body to verify the endpoint exists and returns a
+    // validation error (400), not a 404.
+    const response = await request.post(`${API_URL}/api/nft/mint/prepare`, {
       data: {},
     });
 
-    // Should return validation error (400) not 404
     expect(response.status()).toBe(400);
 
     const data = await response.json();
@@ -104,13 +73,75 @@ test.describe("NFT Prover API", () => {
     expect(data).toHaveProperty("error");
   });
 
-  test("should reject prove request with missing fields", async ({
+  test("should reject /mint/prepare with missing fundingUtxo", async ({
     request,
   }) => {
-    const response = await request.post(`${API_URL}/api/nft/prove`, {
+    const response = await request.post(`${API_URL}/api/nft/mint/prepare`, {
       data: {
-        tokenId: 1,
-        // Missing: address, nftState, fundingUtxo
+        address: TEST_ADDRESS,
+        // Missing: fundingUtxo
+      },
+    });
+
+    expect(response.status()).toBe(400);
+
+    const data = await response.json();
+    expect(data.success).toBe(false);
+    expect(data.details).toBeDefined();
+  });
+
+  test("should NOT accept client-supplied traits in /mint/prepare (bug #2)", async ({
+    request,
+  }) => {
+    // The new flow derives traits server-side. Even if the client sends them,
+    // they must be ignored (the schema only accepts address + fundingUtxo).
+    const response = await request.post(`${API_URL}/api/nft/mint/prepare`, {
+      data: {
+        address: TEST_ADDRESS,
+        fundingUtxo: {
+          txid: "ab".repeat(32),
+          vout: 0,
+          value: 10000,
+        },
+        // Attacker tries to inject mythic rarity:
+        rarityTier: "mythic",
+        dna: "ff".repeat(32),
+      },
+    });
+
+    // The schema rejects unknown keys OR the request proceeds ignoring them.
+    // Either way, the response must not echo back the injected traits.
+    if (response.ok()) {
+      const data = await response.json();
+      // If the server accepted the request, traits in the response must be
+      // server-generated (deterministic from txid), never the injected values.
+      expect(data.data?.traits?.rarityTier).not.toBe("mythic");
+    }
+  });
+});
+
+test.describe("NFT Mint Finalize API (D6 unified /mint)", () => {
+  test("should validate /mint/finalize endpoint exists", async ({
+    request,
+  }) => {
+    const response = await request.post(`${API_URL}/api/nft/mint/finalize`, {
+      data: {},
+    });
+
+    expect(response.status()).toBe(400);
+
+    const data = await response.json();
+    expect(data.success).toBe(false);
+    expect(data).toHaveProperty("error");
+  });
+
+  test("should reject /mint/finalize with missing fields", async ({
+    request,
+  }) => {
+    const response = await request.post(`${API_URL}/api/nft/mint/finalize`, {
+      data: {
+        spellTxid: "ab".repeat(32),
+        // Missing: address
       },
     });
 

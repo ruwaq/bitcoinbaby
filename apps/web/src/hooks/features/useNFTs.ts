@@ -11,7 +11,6 @@ import {
 } from "@bitcoinbaby/core";
 import { useMintNFT, type MintStep } from "@/hooks/useMintNFT";
 import { useNFTSync, useInvalidateNFTs } from "@/hooks/useNFTSync";
-import { useClaimNFT } from "@/hooks/useClaimNFT";
 import { useVirtualBalance } from "@/hooks/useVirtualBalance";
 import { useMarketplace } from "@/hooks/useMarketplace";
 import { useEvolution } from "@/hooks/useEvolution";
@@ -70,15 +69,6 @@ export interface UseNFTsReturn {
       sats: bigint;
     };
     transactionDetails: TransactionDetails;
-  };
-
-  // Claiming
-  claiming: {
-    claim: (txid: string) => Promise<{ success: boolean; error?: string }>;
-    isLoading: boolean;
-    error: string | null;
-    lastClaimed: NFTRecord | null;
-    reset: () => void;
   };
 
   // Marketplace
@@ -175,15 +165,6 @@ export function useNFTs(): UseNFTsReturn {
     isWalletConnected,
   } = useMintNFT();
 
-  // Claim NFT hook
-  const {
-    isLoading: isClaiming,
-    error: claimError,
-    lastClaimed,
-    claim,
-    reset: resetClaim,
-  } = useClaimNFT();
-
   // Virtual balance for $BABY tokens
   const { virtualBalance } = useVirtualBalance({ address: walletAddress });
 
@@ -269,19 +250,6 @@ export function useNFTs(): UseNFTsReturn {
     [pendingTransactions],
   );
 
-  // Wrapper for claim that invalidates after success
-  const handleClaim = useCallback(
-    async (claimTxid: string) => {
-      const result = await claim(claimTxid);
-      if (result.success) {
-        invalidateNFTs();
-        refreshNFTs();
-      }
-      return result;
-    },
-    [claim, invalidateNFTs, refreshNFTs],
-  );
-
   return {
     collection: {
       nfts: ownedNFTs,
@@ -311,14 +279,6 @@ export function useNFTs(): UseNFTsReturn {
         sats: price.priceSats,
       },
       transactionDetails,
-    },
-
-    claiming: {
-      claim: handleClaim,
-      isLoading: isClaiming,
-      error: claimError,
-      lastClaimed,
-      reset: resetClaim,
     },
 
     marketplace: {

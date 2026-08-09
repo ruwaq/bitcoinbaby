@@ -17,6 +17,7 @@ import {
   calculateRarityScore,
   createNFTGenesisSpell,
   createNFTWorkProofSpell,
+  createNFTWorkSpell,
   createNFTLevelUpSpell,
   type SparkNFTState,
   type Bloodline,
@@ -622,6 +623,109 @@ describe("createNFTWorkProofSpell", () => {
     expect(newState.rarityTier).toBe(mockState.rarityTier);
     expect(newState.genesisBlock).toBe(mockState.genesisBlock);
     expect(newState.tokenId).toBe(mockState.tokenId);
+  });
+});
+
+describe("createNFTWorkSpell", () => {
+  const baseState: SparkNFTState = {
+    dna: "a".repeat(64),
+    bloodline: "royal",
+    baseType: "human",
+    genesisBlock: 100,
+    rarityTier: "common",
+    tokenId: 1,
+    heritage: 0,
+    level: 1,
+    xp: 0,
+    totalXp: 0,
+    workCount: 0,
+    lastWorkBlock: 100,
+    evolutionCount: 0,
+    tokensEarned: 0n,
+    narrativeRoot: "",
+    worldStateRoot: "",
+    lastSettleBlock: 0,
+    settleCount: 0,
+  };
+
+  const defaultParams = {
+    appId: "deadbeef".repeat(8),
+    appVk: "cafe".repeat(16),
+    nftUtxo: { txid: "a".repeat(64), vout: 0 },
+    currentState: baseState,
+    ownerAddress: "tb1ptestaddress",
+    challenge: "1:100",
+    difficulty: 16,
+    currentBlock: 150,
+  };
+
+  it("builds a spell with operation 'work' (PoW-verified, C3 closure)", () => {
+    const spell = createNFTWorkSpell(defaultParams);
+    expect(spell.version).toBe(2);
+    expect(spell.apps.$00).toBe(
+      `n/${defaultParams.appId}/${defaultParams.appVk}`,
+    );
+    expect(spell.apps.$00).toContain("deadbeef");
+    // public_inputs must expose challenge + difficulty so the contract can
+    // re-verify the PoW (not trust the witness).
+    expect(spell.public_inputs).toHaveProperty("challenge");
+    expect(spell.public_inputs).toHaveProperty("difficulty");
+    expect(spell.public_inputs).toHaveProperty("block_height");
+  });
+
+  it("references the NFT input UTXO and includes current state", () => {
+    const spell = createNFTWorkSpell(defaultParams);
+    expect(spell.ins).toHaveLength(1);
+    expect(spell.ins[0].utxo_id).toBe(
+      `${defaultParams.nftUtxo.txid}:${defaultParams.nftUtxo.vout}`,
+    );
+    expect(spell.ins[0].charms.$00).toEqual(baseState);
+  });
+
+  it("emits one output to the owner at dust limit", () => {
+    const spell = createNFTWorkSpell(defaultParams);
+    expect(spell.outs).toHaveLength(1);
+    expect(spell.outs[0].address).toBe(defaultParams.ownerAddress);
+    expect(spell.outs[0].sats).toBe(546);
+  });
+
+  it("bumps workCount and lastWorkBlock; leaves xp derivation to the contract", () => {
+    const spell = createNFTWorkSpell({
+      ...defaultParams,
+      currentBlock: 200,
+    });
+    const newState = spell.outs[0].charms.$00 as SparkNFTState;
+    // workCount bumps; lastWorkBlock advances to currentBlock.
+    expect(newState.workCount).toBe(1);
+    expect(newState.lastWorkBlock).toBe(200);
+    // XP/totalXp: this spell does NOT compute xp_gain (the contract derives it
+    // on-chain via xp_from_difficulty). The builder leaves them unchanged —
+    // the caller (buildWorkSpellRequest in Task 1.2) is responsible for bumping
+    // xp/totalXp in the outState to match the contract's derived value.
+    // Here we only assert the builder doesn't touch them.
+    expect(newState.xp).toBe(baseState.xp);
+    expect(newState.totalXp).toBe(baseState.totalXp);
+  });
+
+  it("preserves immutable identity traits (dna, bloodline, baseType, tokenId)", () => {
+    const spell = createNFTWorkSpell(defaultParams);
+    const newState = spell.outs[0].charms.$00 as SparkNFTState;
+    expect(newState.dna).toBe(baseState.dna);
+    expect(newState.bloodline).toBe(baseState.bloodline);
+    expect(newState.baseType).toBe(baseState.baseType);
+    expect(newState.tokenId).toBe(baseState.tokenId);
+    expect(newState.rarityTier).toBe(baseState.rarityTier);
+    expect(newState.genesisBlock).toBe(baseState.genesisBlock);
+    // Settlement state must NOT advance via work (only via settle op).
+    expect(newState.lastSettleBlock).toBe(baseState.lastSettleBlock);
+    expect(newState.settleCount).toBe(baseState.settleCount);
+  });
+
+  it("exposes PoW inputs in public_inputs so the contract re-verifies on-chain", () => {
+    const spell = createNFTWorkSpell(defaultParams);
+    expect(spell.public_inputs?.challenge).toBe(defaultParams.challenge);
+    expect(spell.public_inputs?.difficulty).toBe(defaultParams.difficulty);
+    expect(spell.public_inputs?.block_height).toBe(defaultParams.currentBlock);
   });
 });
 

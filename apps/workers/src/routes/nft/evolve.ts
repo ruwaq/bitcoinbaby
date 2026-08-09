@@ -36,8 +36,8 @@ import {
   MEMPOOL_API_URLS,
 } from "../../config/bitcoin";
 import {
-  buildWorkProofSpellRequest,
   buildLevelUpSpellRequest,
+  buildWorkSpellRequest,
   MAX_LEVEL,
   type SparkNFTState,
 } from "../../services/nft-evolution-service";
@@ -364,10 +364,10 @@ evolveRouter.post(
 // ON-CHAIN EVOLUTION (Charms v15 spells)
 // =============================================================================
 //
-// POST /api/nft/work/:tokenId    — accrue XP via a work_proof spell
+// POST /api/nft/work/:tokenId    — accrue XP via a PoW-verified `work` spell (C3 closure)
 // POST /api/nft/evolve/:tokenId  — level up via a level_up spell
 //
-// Both build the spell via the evolution service (build{WorkProof,LevelUp}
+// Both build the spell via the evolution service (build{Work,LevelUp}
 // SpellRequest), fetch the prev_tx hex for the NFT UTXO, attach it to
 // proverRequest.prev_txs, and POST to the Charms v15 prover. On success they
 // return { commitTxHex, spellTxHex } so the client can sign + broadcast — the
@@ -505,13 +505,18 @@ function nftRecordToSparkState(data: Record<string, unknown>): SparkNFTState {
 }
 
 /**
- * POST /work/:tokenId — accrue XP via a work_proof spell.
+ * POST /work/:tokenId — accrue XP via a PoW-verified `work` spell (C3 closure).
  *
- * Body: { ownerAddress, currentBlock, xpGain, nftUtxo: {txid, vout}, currentState? }
+ * Body: { ownerAddress, currentBlock, challenge, nonce, difficulty, proofHash,
+ *         proofBlockData, proofTimestamp?, nftUtxo, currentState? }
  *
  * Validates ownership + NFT_APP_ID, reads the NFT's current state from the
- * indexer, builds a work_proof spell, fetches the prev_tx, calls the prover,
- * and returns { commitTxHex, spellTxHex }.
+ * indexer, validates the PoW server-side (`validateMiningProof`), builds a
+ * `work` spell (op `work`, not `work_proof`), fetches the prev_tx, calls the
+ * prover, and returns { commitTxHex, spellTxHex }.
+ *
+ * SECURITY (C3): xp_gain is DERIVED from the verified difficulty, never
+ * accepted from the client. The contract re-derives it on-chain too.
  */
 evolveRouter.post(
   "/work/:tokenId",
@@ -519,11 +524,21 @@ evolveRouter.post(
   validateBody(workRouteSchema),
   async (c) => {
     const { tokenId } = c.get("validatedParams");
-    const { ownerAddress, currentBlock, xpGain, nftUtxo, currentState } =
-      c.get("validatedBody");
+    const {
+      ownerAddress,
+      currentBlock,
+      challenge,
+      nonce,
+      difficulty,
+      proofHash,
+      proofBlockData,
+      proofTimestamp,
+      nftUtxo,
+      currentState,
+    } = c.get("validatedBody");
 
     try {
-      // Guard: evolution also needs the deployed NFT app on-chain.
+      // Guard: evolution needs the deployed NFT app on-chain.
       const appConfig = resolveNftAppConfig(c.env);
       if (appConfig.status === "unavailable") {
         if (appConfig.reason === "placeholder") {
@@ -563,8 +578,7 @@ evolveRouter.post(
 
       let state = nftRecordToSparkState(nftData);
 
-      // If the client supplied an observed state, fail loudly on drift so the
-      // prover isn't asked to prove a transition the client doesn't expect.
+      // If the client supplied an observed state, fail loudly on drift.
       if (currentState) {
         if (currentState.token_id !== state.token_id) {
           return errorResponse(
@@ -576,14 +590,20 @@ evolveRouter.post(
         state = currentState;
       }
 
-      const { proverRequest } = buildWorkProofSpellRequest({
+      // Build the PoW-verified `work` spell (throws if PoW invalid).
+      const { proverRequest } = await buildWorkSpellRequest({
         appId: appConfig.appId,
         appVk: appConfig.appVk,
         nftUtxo,
         currentState: state,
         ownerAddress,
-        xpGain,
+        challenge,
+        nonce,
+        difficulty,
         currentBlock,
+        proofHash,
+        proofBlockData,
+        proofTimestamp,
       });
 
       // Fetch the prev_tx for the NFT UTXO and attach it before proving.
@@ -591,21 +611,25 @@ evolveRouter.post(
       const prevTxHex = await fetchPrevTxHex(nftUtxo.txid, network);
       proverRequest.prev_txs = [{ bitcoin: prevTxHex }];
 
-      nftLogger.info("Submitting work_proof spell to prover", {
-        tokenId,
-        owner: ownerAddress.slice(0, 10),
-        xpGain,
-        currentBlock,
-      });
+      nftLogger.info(
+        "Submitting work spell to prover (op 'work', C3 closure)",
+        {
+          tokenId,
+          owner: ownerAddress.slice(0, 10),
+          difficulty,
+          challenge,
+          currentBlock,
+        },
+      );
 
       const proverUrl = c.env.PROVER_URL || "https://v15.charms.dev";
       const { commitTxHex, spellTxHex } = await submitEvolutionSpell(
         proverUrl,
         proverRequest,
-        { tokenId, op: "work_proof" },
+        { tokenId, op: "work" },
       );
 
-      nftLogger.info("Work_proof spell generated", { tokenId });
+      nftLogger.info("Work spell generated (op 'work')", { tokenId });
 
       return successResponse(c, {
         tokenId,
@@ -620,6 +644,15 @@ evolveRouter.post(
         ],
       });
     } catch (error) {
+      // Distinguish PoW validation failures (client error) from prover errors.
+      const msg = error instanceof Error ? error.message : String(error);
+      if (
+        msg.startsWith("Invalid proof of work") ||
+        msg.includes("below minimum")
+      ) {
+        nftLogger.warn("[NFT] Work spell PoW rejected", { tokenId, msg });
+        return errorResponse(c, `Proof of work rejected: ${msg}`, 400);
+      }
       nftLogger.error("[NFT] Work spell error:", error);
       return errorResponse(c, "Failed to prove work spell", 500);
     }

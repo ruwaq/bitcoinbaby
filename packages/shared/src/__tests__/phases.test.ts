@@ -112,21 +112,14 @@ describe("Phase 1 (NFTs + Faucet)", () => {
       expect(config.features.onChainEvolution).toBe(false);
     });
 
-    it("sets defaultTab to 'baby'", () => {
+    it("sets defaultTab to 'home'", () => {
       const config = mod.getPhaseConfig();
-      expect(config.defaultTab).toBe("dashboard");
+      expect(config.defaultTab).toBe("home");
     });
 
     it("has correct visibleTabs", () => {
       const config = mod.getPhaseConfig();
-      expect(config.visibleTabs).toEqual([
-        "dashboard",
-        "nfts",
-        "wallet",
-        "more",
-      ]);
-      // Mining is integrated into Dashboard in all phases
-      expect(config.visibleTabs).toContain("dashboard");
+      expect(config.visibleTabs).toEqual(["home", "explore", "you"]);
     });
   });
 
@@ -217,19 +210,14 @@ describe("Phase 2 (Mining)", () => {
       expect(config.features.onChainEvolution).toBe(false);
     });
 
-    it("sets defaultTab to 'token'", () => {
+    it("sets defaultTab to 'home'", () => {
       const config = mod.getPhaseConfig();
-      expect(config.defaultTab).toBe("dashboard");
+      expect(config.defaultTab).toBe("home");
     });
 
     it("has correct visibleTabs with mining", () => {
       const config = mod.getPhaseConfig();
-      expect(config.visibleTabs).toEqual([
-        "dashboard",
-        "nfts",
-        "wallet",
-        "more",
-      ]);
+      expect(config.visibleTabs).toEqual(["home", "explore", "you"]);
     });
   });
 
@@ -284,18 +272,13 @@ describe("Phase 3 (Game)", () => {
       expect(config.features.onChainEvolution).toBe(true);
     });
 
-    it("sets defaultTab to 'baby'", () => {
-      expect(mod.getPhaseConfig().defaultTab).toBe("dashboard");
+    it("sets defaultTab to 'home'", () => {
+      expect(mod.getPhaseConfig().defaultTab).toBe("home");
     });
 
     it("has all tabs visible", () => {
       const config = mod.getPhaseConfig();
-      expect(config.visibleTabs).toEqual([
-        "dashboard",
-        "nfts",
-        "wallet",
-        "more",
-      ]);
+      expect(config.visibleTabs).toEqual(["home", "explore", "you"]);
     });
   });
 

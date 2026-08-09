@@ -111,19 +111,36 @@ describe("NFTClient API Response Structure", () => {
     expect(response.data).toHaveProperty("count");
   });
 
-  it("should have correct shape for reserveNFT response", () => {
+  it("should have correct shape for prepareMint response", () => {
+    // prepareMint replaces the old reserveNFT. The response carries the
+    // server-derived tokenId + traits + the unsigned commit/spell hexes.
     const response = {
       success: true,
       data: {
         tokenId: 43,
-        totalMinted: 42,
-        attemptId: "attempt-uuid-123",
+        traits: {
+          dna: "deadbeef".repeat(8),
+          bloodline: "royal",
+          baseType: "human",
+          rarityTier: "rare",
+        },
+        commitTxHex: "dead",
+        spellTxHex: "beef",
+        commitTxid: "ab".repeat(32),
+        spellTxid: "cd".repeat(32),
+        priceSats: 5000,
+        treasuryAddress: "tb1p7kk2example",
+        nextSteps: [],
       },
     };
 
     expect(response.data).toHaveProperty("tokenId");
-    expect(response.data).toHaveProperty("totalMinted");
-    expect(response.data).toHaveProperty("attemptId");
+    expect(response.data).toHaveProperty("traits");
+    expect(response.data.traits).toHaveProperty("dna");
+    expect(response.data.traits).toHaveProperty("rarityTier");
+    expect(response.data).toHaveProperty("commitTxHex");
+    expect(response.data).toHaveProperty("spellTxHex");
+    expect(response.data).toHaveProperty("priceSats");
   });
 
   it("should have correct shape for getOwnedNFTs response", () => {
@@ -222,80 +239,31 @@ describe("WorkProofData validation", () => {
 // PROVE NFT REQUEST VALIDATION TESTS
 // =============================================================================
 
-describe("ProveNFTRequest validation", () => {
-  it("should have all required fields", () => {
+describe("prepareMint request validation (D6)", () => {
+  it("should only require address + fundingUtxo (no client-supplied traits)", () => {
+    // The unified /mint/prepare flow derives traits server-side. The client
+    // must NOT send dna/bloodline/baseType/rarityTier — that was the root
+    // cause of the mythic-always bug (#2). This test pins the contract.
     const request = {
-      tokenId: 1,
       address: "tb1qtest",
-      nftState: {
-        dna: "abc123",
-        bloodline: "royal",
-        baseType: "human",
-        genesisBlock: 100000,
-        rarityTier: "rare",
-        tokenId: 1,
-        level: 1,
-        xp: 0,
-        totalXp: 0,
-        workCount: 0,
-        lastWorkBlock: 100000,
-        evolutionCount: 0,
-        tokensEarned: "0",
-      },
       fundingUtxo: {
-        txid: "abc123",
+        txid: "ab".repeat(32),
         vout: 0,
         value: 10000,
       },
     };
 
-    expect(request).toHaveProperty("tokenId");
     expect(request).toHaveProperty("address");
-    expect(request).toHaveProperty("nftState");
     expect(request).toHaveProperty("fundingUtxo");
-  });
-
-  it("should validate nftState has all fields", () => {
-    const nftState = {
-      dna: "abc123",
-      bloodline: "royal",
-      baseType: "human",
-      genesisBlock: 100000,
-      rarityTier: "rare",
-      tokenId: 1,
-      level: 1,
-      xp: 0,
-      totalXp: 0,
-      workCount: 0,
-      lastWorkBlock: 100000,
-      evolutionCount: 0,
-      tokensEarned: "0",
-    };
-
-    const requiredFields = [
-      "dna",
-      "bloodline",
-      "baseType",
-      "genesisBlock",
-      "rarityTier",
-      "tokenId",
-      "level",
-      "xp",
-      "totalXp",
-      "workCount",
-      "lastWorkBlock",
-      "evolutionCount",
-      "tokensEarned",
-    ];
-
-    for (const field of requiredFields) {
-      expect(nftState).toHaveProperty(field);
-    }
+    // Explicitly assert traits are NOT part of the request.
+    expect(request).not.toHaveProperty("nftState");
+    expect(request).not.toHaveProperty("traits");
+    expect(request).not.toHaveProperty("tokenId");
   });
 
   it("should validate fundingUtxo structure", () => {
     const fundingUtxo = {
-      txid: "abc123def456",
+      txid: "ab".repeat(32),
       vout: 0,
       value: 10000,
     };
@@ -303,6 +271,18 @@ describe("ProveNFTRequest validation", () => {
     expect(fundingUtxo.txid).toMatch(/^[a-f0-9]+$/i);
     expect(fundingUtxo.vout).toBeGreaterThanOrEqual(0);
     expect(fundingUtxo.value).toBeGreaterThan(0);
+  });
+
+  it("finalizeMint should only require spellTxid + address", () => {
+    const request = {
+      spellTxid: "cd".repeat(32),
+      address: "tb1qtest",
+    };
+
+    expect(request).toHaveProperty("spellTxid");
+    expect(request).toHaveProperty("address");
+    expect(request).not.toHaveProperty("nft");
+    expect(request).not.toHaveProperty("tokenId");
   });
 });
 

@@ -520,30 +520,6 @@ export class BitcoinBabyClient {
   }
 
   /**
-   * Reserve next NFT ID (atomic increment)
-   * Returns the reserved token ID for minting and an attemptId for tracking
-   * No retry - atomic operation must not be duplicated
-   */
-  async reserveNFT(
-    address: string,
-  ): Promise<
-    ApiResponse<{ tokenId: number; totalMinted: number; attemptId: string }>
-  > {
-    const response = await fetchWithRetry(
-      `${this.baseUrl}/api/nft/reserve`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address }),
-      },
-      0, // No retries - atomic counter
-    );
-    return response.json() as Promise<
-      ApiResponse<{ tokenId: number; totalMinted: number; attemptId: string }>
-    >;
-  }
-
-  /**
    * Get mint attempts for an address
    * Shows pending, failed, and recent successful mints
    */
@@ -584,56 +560,6 @@ export class BitcoinBabyClient {
   }
 
   /**
-   * Release a reserved NFT ID (when mint fails after reservation)
-   * This allows the ID to be re-used
-   */
-  async releaseNFT(
-    tokenId: number,
-  ): Promise<ApiResponse<{ released: boolean }>> {
-    const response = await fetchWithRetry(
-      `${this.baseUrl}/api/nft/release/${tokenId}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      },
-      0, // No retries - release is idempotent but should not spam
-    );
-    return response.json() as Promise<ApiResponse<{ released: boolean }>>;
-  }
-
-  /**
-   * Confirm NFT mint after successful broadcast
-   * Records the txid, address and full NFT data for indexing
-   */
-  async confirmNFTMint(
-    tokenId: number,
-    txid: string,
-    address: string,
-    nftData?: {
-      dna: string;
-      bloodline: string;
-      baseType: string;
-      rarityTier: string;
-      level: number;
-      xp: number;
-      totalXp: number;
-      workCount: number;
-      evolutionCount: number;
-    },
-  ): Promise<ApiResponse<{ confirmed: boolean }>> {
-    const response = await fetchWithRetry(
-      `${this.baseUrl}/api/nft/confirm/${tokenId}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ txid, address, nft: nftData }),
-      },
-      1, // Single retry - idempotent
-    );
-    return response.json() as Promise<ApiResponse<{ confirmed: boolean }>>;
-  }
-
-  /**
    * Get all NFTs owned by an address
    * Returns full NFT state for display
    */
@@ -656,53 +582,27 @@ export class BitcoinBabyClient {
     return response.json() as Promise<ApiResponse<NFTRecord | null>>;
   }
 
+  // ===========================================================================
+  // UNIFIED /mint FLOW (D3 + D6)
+  // ===========================================================================
+
   /**
-   * Submit NFT to Charms prover for proof generation
+   * Step 1 of the unified mint: prepare the atomic spell server-side.
    *
-   * Returns commit + spell transaction hexes that need to be signed.
-   * After signing, broadcast commitTx first, then spellTx.
+   * The server derives the tokenId + traits (the client never sends traits —
+   * closes the mythic-always bug #2), verifies the funding UTXO belongs to the
+   * caller, and builds an atomic spell where the NFT coin and the treasury
+   * payment are in the SAME Bitcoin tx (closes the free-mint bug #1).
    *
-   * Flow:
-   * 1. Reserve tokenId via reserveNFT()
-   * 2. Generate NFT traits locally
-   * 3. Call proveNFT() to get transactions
-   * 4. Sign both transactions with wallet
-   * 5. Broadcast commitTx, then spellTx
-   * 6. Confirm via confirmNFTMint()
+   * Returns the unsigned commit + spell hexes that the client must sign and
+   * broadcast (commit first), then call `finalizeMint`.
    */
-  async proveNFT(params: {
-    tokenId: number;
+  async prepareMint(params: {
     address: string;
-    nftState: {
-      dna: string;
-      bloodline: "royal" | "warrior" | "rogue" | "mystic";
-      baseType: "human" | "animal" | "robot" | "mystic" | "alien";
-      genesisBlock: number;
-      rarityTier:
-        | "common"
-        | "uncommon"
-        | "rare"
-        | "epic"
-        | "legendary"
-        | "mythic";
-      tokenId: number;
-      level?: number;
-      xp?: number;
-      totalXp?: number;
-      workCount?: number;
-      lastWorkBlock?: number;
-      evolutionCount?: number;
-      tokensEarned?: string;
-      heritage?: number;
-    };
-    fundingUtxo: {
-      txid: string;
-      vout: number;
-      value: number;
-    };
-  }): Promise<ApiResponse<NFTProveResult>> {
+    fundingUtxo: { txid: string; vout: number; value: number };
+  }): Promise<ApiResponse<MintPrepareResult>> {
     const response = await fetchWithRetry(
-      `${this.baseUrl}/api/nft/prove`,
+      `${this.baseUrl}/api/nft/mint/prepare`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -711,28 +611,30 @@ export class BitcoinBabyClient {
       0, // No retries - prover takes time
       120_000, // 2 minute timeout for proof generation
     );
-    return response.json() as Promise<ApiResponse<NFTProveResult>>;
+    return response.json() as Promise<ApiResponse<MintPrepareResult>>;
   }
 
   /**
-   * Claim an NFT by providing the mint transaction ID
-   * Verifies the transaction on blockchain and registers the NFT
-   * Used to claim NFTs minted before the indexing system
+   * Step 2 of the unified mint: finalize after broadcasting the spell tx.
+   *
+   * The server verifies the spell tx on-chain (confirmed + NFT dust to owner
+   * + price to treasury) and persists the NFT to the indexer. Closes the
+   * blind-trust bug #6 and the replay bug #5.
    */
-  async claimNFT(
-    txid: string,
-    address: string,
-  ): Promise<ApiResponse<NFTRecord>> {
+  async finalizeMint(params: {
+    spellTxid: string;
+    address: string;
+  }): Promise<ApiResponse<MintFinalizeResult>> {
     const response = await fetchWithRetry(
-      `${this.baseUrl}/api/nft/claim`,
+      `${this.baseUrl}/api/nft/mint/finalize`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ txid, address }),
+        body: JSON.stringify(params),
       },
-      0, // No retries - could result in duplicate claims
+      1, // Single retry - idempotent on success
     );
-    return response.json() as Promise<ApiResponse<NFTRecord>>;
+    return response.json() as Promise<ApiResponse<MintFinalizeResult>>;
   }
 
   // ===========================================================================
@@ -961,6 +863,57 @@ export interface NFTProveResult {
   spellTxid: string;
   /** Instructions for next steps */
   nextSteps: string[];
+}
+
+// =============================================================================
+// UNIFIED /mint FLOW (D3 + D6)
+// =============================================================================
+
+/**
+ * NFT traits generated server-side by /mint/prepare.
+ *
+ * The client never supplies these — that was the root cause of the
+ * mythic-always bug (#2). The server derives them deterministically from the
+ * funding txid, so they are unfakeable.
+ */
+export interface MintTraits {
+  dna: string;
+  bloodline: string;
+  baseType: string;
+  rarityTier: string;
+}
+
+/**
+ * Response from `POST /api/nft/mint/prepare`.
+ *
+ * The server picks the tokenId, derives traits, and builds an atomic spell
+ * (NFT coin + treasury payment in the same Bitcoin tx). The client must sign
+ * `commitTxHex` and `spellTxHex`, broadcast them, then call `finalizeMint`.
+ */
+export interface MintPrepareResult {
+  tokenId: number;
+  traits: MintTraits;
+  commitTxHex: string;
+  spellTxHex: string;
+  commitTxid: string;
+  spellTxid: string;
+  /** Mint price in sats paid to the treasury in the atomic tx */
+  priceSats: number;
+  /** Treasury address receiving the payment */
+  treasuryAddress: string;
+  nextSteps: string[];
+}
+
+/**
+ * Response from `POST /api/nft/mint/finalize`.
+ *
+ * The server verifies the spell tx on-chain (confirmed + outputs) and persists
+ * the NFT to the indexer.
+ */
+export interface MintFinalizeResult {
+  confirmed: boolean;
+  tokenId: number;
+  traits: MintTraits;
 }
 
 /**

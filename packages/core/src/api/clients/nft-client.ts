@@ -11,6 +11,7 @@
 import { HTTP_TIMEOUTS } from "@bitcoinbaby/shared";
 import { BaseApiClient, type Environment } from "./base-client";
 import type { ApiResponse, NFTRecord } from "../types";
+import type { MintPrepareResult, MintFinalizeResult } from "../client";
 
 // =============================================================================
 // TYPES
@@ -128,22 +129,6 @@ export class NFTClient extends BaseApiClient {
   }
 
   /**
-   * Reserve next NFT ID (atomic increment)
-   * Returns the reserved token ID for minting and an attemptId for tracking
-   */
-  async reserveNFT(
-    address: string,
-  ): Promise<
-    ApiResponse<{ tokenId: number; totalMinted: number; attemptId: string }>
-  > {
-    return this.post<{
-      tokenId: number;
-      totalMinted: number;
-      attemptId: string;
-    }>("/api/nft/reserve", { address });
-  }
-
-  /**
    * Get mint attempts for an address
    * Shows pending, failed, and recent successful mints
    */
@@ -172,31 +157,6 @@ export class NFTClient extends BaseApiClient {
         ...options,
       },
     );
-  }
-
-  /**
-   * Release a reserved NFT ID (when mint fails after reservation)
-   */
-  async releaseNFT(
-    tokenId: number,
-  ): Promise<ApiResponse<{ released: boolean }>> {
-    return this.post<{ released: boolean }>(`/api/nft/release/${tokenId}`);
-  }
-
-  /**
-   * Confirm NFT mint after successful broadcast
-   */
-  async confirmNFTMint(
-    tokenId: number,
-    txid: string,
-    address: string,
-    nftData?: NFTMintData,
-  ): Promise<ApiResponse<{ confirmed: boolean }>> {
-    return this.post<{ confirmed: boolean }>(`/api/nft/confirm/${tokenId}`, {
-      txid,
-      address,
-      nft: nftData,
-    });
   }
 
   /**
@@ -231,19 +191,35 @@ export class NFTClient extends BaseApiClient {
     );
   }
 
+  // ===========================================================================
+  // UNIFIED /mint FLOW (D3 + D6)
+  // ===========================================================================
+
   /**
-   * Request NFT proof from Charms prover
-   * Returns commit + spell transactions for signing
-   * Uses extended timeout to allow for prover retries
+   * Step 1: prepare the atomic mint spell server-side. Server picks tokenId +
+   * traits and returns unsigned commit + spell hexes. See client.ts:prepareMint
+   * for the full contract.
    */
-  async proveNFT(
-    request: ProveNFTRequest,
-  ): Promise<ApiResponse<ProveNFTResult>> {
-    return this.postWithTimeout<ProveNFTResult>(
-      "/api/nft/prove",
-      request,
+  async prepareMint(params: {
+    address: string;
+    fundingUtxo: { txid: string; vout: number; value: number };
+  }): Promise<ApiResponse<MintPrepareResult>> {
+    return this.postWithTimeout<MintPrepareResult>(
+      "/api/nft/mint/prepare",
+      params,
       HTTP_TIMEOUTS.PROVER_FULL,
     );
+  }
+
+  /**
+   * Step 2: finalize after broadcasting the spell tx. Server verifies the tx
+   * on-chain and persists the NFT.
+   */
+  async finalizeMint(params: {
+    spellTxid: string;
+    address: string;
+  }): Promise<ApiResponse<MintFinalizeResult>> {
+    return this.post<MintFinalizeResult>("/api/nft/mint/finalize", params);
   }
 
   /**

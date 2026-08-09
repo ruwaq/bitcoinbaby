@@ -222,4 +222,53 @@ describe("NFTMintingServiceSimple — witness plumbing (Task 2.1)", () => {
     expect(body.prev_txs.length).toBeGreaterThan(0);
     expect(body.prev_txs[0].bitcoin).toBeTruthy();
   });
+
+  it("emits a single NFT-only coin when no atomic payment is requested (legacy)", async () => {
+    const appId = "deadbeef".repeat(8);
+    const service = new NFTMintingServiceSimple({
+      appId,
+      network: "regtest",
+    });
+
+    const { getProverRequest } = stubFetchCapture();
+    await service.processMint(buildRequest());
+
+    const decoded = cbor.decode(
+      new Uint8Array(Buffer.from(getProverRequest()!.body.spell, "hex")),
+    );
+    // Legacy shape: only the NFT dust output, no treasury payment.
+    expect(decoded.tx.coins).toHaveLength(1);
+    expect(decoded.tx.coins[0].amount).toBe(330);
+  });
+
+  it("emits NFT coin + treasury payment when atomic payment is requested (D3)", async () => {
+    const appId = "deadbeef".repeat(8);
+    const service = new NFTMintingServiceSimple({
+      appId,
+      network: "regtest",
+    });
+
+    const { getProverRequest } = stubFetchCapture();
+    // D3 unified /mint: the mint and the payment are the same tx.
+    const treasury =
+      "tb1p7kk2fuf8kv5vjftczlezfded94v9ay9s0h7ggd87k5d5ws744lesw7smmu";
+    await service.processMint({
+      ...buildRequest(),
+      treasuryAddress: treasury,
+      priceSats: 5000,
+    });
+
+    const decoded = cbor.decode(
+      new Uint8Array(Buffer.from(getProverRequest()!.body.spell, "hex")),
+    );
+    // Atomic /mint shape: NFT dust output (vout 0) + treasury payment (vout 1).
+    expect(decoded.tx.coins).toHaveLength(2);
+    expect(decoded.tx.coins[0].amount).toBe(330); // NFT dust
+    expect(decoded.tx.coins[1].amount).toBe(5000); // price to treasury
+
+    // Only the NFT output carries Charms state (outs[0]); the treasury output
+    // is a plain P2TR coin with no state, so it must NOT appear in outs.
+    expect(decoded.tx.outs).toHaveLength(1);
+    expect(decoded.tx.outs[0].get(0)).toBeDefined();
+  });
 });

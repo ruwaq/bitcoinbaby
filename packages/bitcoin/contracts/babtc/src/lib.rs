@@ -10,9 +10,10 @@
 //! 4. Mint spell is created with merkle proof of mining TX inclusion
 //! 5. This contract validates the proof and authorizes token minting
 //!
-//! # Reward Formula (BRO-style)
-//! reward = BASE_REWARD × D² ÷ DIFFICULTY_FACTOR
-//! Where D = actual difficulty (leading zero bits)
+//! # Reward Formula (Canonical BRO, aligned with bro-reward.ts)
+//! reward = BRO_DENOMINATION · clz² / 2^halvings
+//! Where clz = actual difficulty (leading zero bits)
+//!   and halvings = floor((block_time - SPARK_START_TIME) / 14d), capped at 63.
 //!
 //! # Distribution
 //! - 90% to miner
@@ -30,11 +31,31 @@ use sha2::{Digest, Sha256};
 /// Minimum required leading zero bits for valid PoW
 const MIN_DIFFICULTY: u32 = 16;
 
-/// Base reward in base units (1 BABTC = 100_000_000 units)
-const BASE_REWARD: u64 = 100_000_000; // 1 BABTC
+/// BRO denomination: 8 decimals (1 whole token = 1e8 base units).
+/// Mirrors `BRO_DENOMINATION` in packages/bitcoin/src/charms/bro-reward.ts:32.
+const BRO_DENOMINATION: u64 = 100_000_000;
 
-/// Difficulty factor for reward calculation
-const DIFFICULTY_FACTOR: u64 = 100;
+/// SPARK genesis anchor (epoch seconds). Halving periods are measured FROM
+/// this timestamp, so SPARK's emission schedule starts fresh at launch instead
+/// of inheriting BRO's already-far-advanced halving clock. Mirrors
+/// `SPARK_START_TIME` in packages/bitcoin/src/charms/bro-reward.ts.
+///
+/// **TODO (deploy):** replace this placeholder with the REAL SPARK mainnet
+/// genesis timestamp (epoch seconds). The value MUST be identical in the
+/// contract and in `bro-reward.ts`, otherwise the signer and the on-chain
+/// reward diverge and every mining spell is rejected. A CI check
+/// (`contract-vk-check`) rebuilds this contract from source and compares the
+/// VK, which catches source drift but NOT a wrong-but-consistent constant —
+/// so set this deliberately right before the mainnet deploy.
+///   Placeholder: 1_758_102_000 = 2026-09-15T00:00:00Z
+///   Compute with: date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "YYYY-MM-DDTHH:MM:SSZ" +%s
+const SPARK_START_TIME: u64 = 1_758_102_000;
+
+/// BRO halves every 14 days (in seconds). Mirrors `BRO_HALVING_PERIOD_SECONDS`.
+const BRO_HALVING_PERIOD_SECONDS: u64 = 14 * 24 * 60 * 60;
+
+/// Maximum halving periods (cap to avoid 2^n overflow). Mirrors bro-reward.ts:50.
+const MAX_HALVING_PERIODS: u32 = 63;
 
 /// Reward distribution percentages (must sum to 100)
 const MINER_SHARE_PCT: u64 = 90;
@@ -57,6 +78,10 @@ pub struct MiningWitness {
     pub nonce: String,
     /// The actual difficulty achieved (leading zero bits)
     pub difficulty: u32,
+    /// Bitcoin block time (unix seconds) at which the work was mined.
+    /// Used for the halving schedule in calculate_reward. Mirrors the
+    /// `current_block` field in genesis-babies WorkWitness.
+    pub block_time: u64,
 }
 
 /// Reward calculation result
@@ -136,7 +161,7 @@ fn validate_token_mint(app: &App, tx: &Transaction, w: &Data) -> bool {
     }
 
     // Calculate expected reward based on difficulty
-    let expected_reward = calculate_reward(witness.difficulty);
+    let expected_reward = calculate_reward(witness.difficulty, witness.block_time);
 
     // Get input token amount (should be 0 for mining)
     let input_amount = match sum_token_amount(app, tx.ins.iter().map(|(_, v)| v)) {
@@ -173,18 +198,36 @@ fn validate_token_mint(app: &App, tx: &Transaction, w: &Data) -> bool {
 // HELPER FUNCTIONS
 // =============================================================================
 
-/// Calculate block reward based on difficulty (BRO-style formula)
+/// Calculate block reward — CANONICAL BRO formula (aligned with bro-reward.ts).
 ///
-/// Formula: reward = BASE_REWARD × D² ÷ DIFFICULTY_FACTOR
-/// Where D = actual difficulty (leading zero bits)
-fn calculate_reward(difficulty: u32) -> RewardCalc {
-    let d = difficulty as u64;
-    let total = BASE_REWARD * d * d / DIFFICULTY_FACTOR;
+/// Formula: reward = BRO_DENOMINATION · clz² / 2^halvings
+///   where halvings = clamp(0, floor((block_time - START_TIME) / PERIOD), MAX)
+///
+/// Mirrors `minedAmountBro` in packages/bitcoin/src/charms/bro-reward.ts:67.
+/// Any change here MUST be reflected there and vice versa.
+fn calculate_reward(difficulty: u32, block_time: u64) -> RewardCalc {
+    let clz = difficulty as u128;
+    let clz_squared = clz * clz;
 
-    // Calculate shares
+    // Halving: periods since genesis, clamped to [0, MAX].
+    let safe_time = if block_time < SPARK_START_TIME {
+        SPARK_START_TIME
+    } else {
+        block_time
+    };
+    let periods_passed = (safe_time - SPARK_START_TIME) / BRO_HALVING_PERIOD_SECONDS;
+    let safe_periods = if periods_passed > MAX_HALVING_PERIODS as u64 {
+        MAX_HALVING_PERIODS as u64
+    } else {
+        periods_passed
+    };
+    let halving_factor = 1u128 << safe_periods; // 2^safe_periods
+
+    let total = (BRO_DENOMINATION as u128 * clz_squared / halving_factor) as u64;
+
     let miner_share = total * MINER_SHARE_PCT / 100;
     let dev_share = total * DEV_SHARE_PCT / 100;
-    let staking_share = total - miner_share - dev_share; // Remainder to avoid rounding issues
+    let staking_share = total - miner_share - dev_share;
 
     RewardCalc {
         total,
@@ -246,21 +289,57 @@ mod tests {
     }
 
     #[test]
+    fn test_calculate_reward_canonical_formula_period_0() {
+        // Canonical: minedAmountBro = DENOMINATION · clz² / 2^halvings
+        // clz=16, period 0 (block_time == START_TIME) → 1e8 · 256 / 1 = 25_600_000_000
+        let reward = calculate_reward(16, SPARK_START_TIME);
+        assert_eq!(reward.total, 25_600_000_000, "clz=16 period 0 must match canonical");
+    }
+
+    #[test]
+    fn test_calculate_reward_halving_halves_reward() {
+        // One halving period later → reward halves.
+        let r0 = calculate_reward(16, SPARK_START_TIME);
+        let r1 = calculate_reward(16, SPARK_START_TIME + BRO_HALVING_PERIOD_SECONDS);
+        assert_eq!(r0.total, r1.total * 2, "one halving period must halve the reward");
+    }
+
+    #[test]
+    fn test_calculate_reward_clamps_before_start_time() {
+        // block_time before START_TIME clamps to START_TIME (no negative halvings).
+        let before = calculate_reward(16, SPARK_START_TIME - 1);
+        let at = calculate_reward(16, SPARK_START_TIME);
+        assert_eq!(before.total, at.total, "pre-genesis clamps to genesis");
+    }
+
+    #[test]
+    fn test_calculate_reward_scales_with_clz_squared() {
+        // clz=20 (vs 16): 20²/16² = 400/256 = 1.5625× the reward.
+        let r16 = calculate_reward(16, SPARK_START_TIME);
+        let r20 = calculate_reward(20, SPARK_START_TIME);
+        // 25_600_000_000 * 400 / 256 = 40_000_000_000
+        let _ = r16;
+        assert_eq!(r20.total, 40_000_000_000);
+    }
+
+    #[test]
     fn test_calculate_reward() {
-        // D=16: 1 * 16 * 16 / 100 = 2.56 BABTC
-        let reward = calculate_reward(16);
-        assert_eq!(reward.total, 256_000_000_u64);
+        // D=16 period 0: 1e8 · 16² / 1 = 25_600_000_000
+        let reward = calculate_reward(16, SPARK_START_TIME);
+        assert_eq!(reward.total, 25_600_000_000_u64);
 
-        // D=22: 1 * 22 * 22 / 100 = 4.84 BABTC
-        let reward = calculate_reward(22);
-        assert_eq!(reward.total, 484_000_000_u64);
+        // D=22 period 0: 1e8 · 22² / 1 = 48_400_000_000
+        let reward = calculate_reward(22, SPARK_START_TIME);
+        assert_eq!(reward.total, 48_400_000_000_u64);
 
-        // Verify distribution (90/5/5)
-        let reward = calculate_reward(20);
+        // D=20 period 0: 1e8 · 20² / 1 = 40_000_000_000 — verify distribution (90/5/5)
+        let reward = calculate_reward(20, SPARK_START_TIME);
         let total = reward.total;
+        assert_eq!(total, 40_000_000_000_u64);
         assert_eq!(reward.miner_share, total * 90 / 100);
         assert_eq!(reward.dev_share, total * 5 / 100);
         // staking_share gets remainder
+        assert_eq!(reward.staking_share, total - reward.miner_share - reward.dev_share);
     }
 
     #[test]

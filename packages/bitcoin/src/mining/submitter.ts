@@ -672,6 +672,10 @@ export class MiningSubmitter {
         challenge,
         nonce: String(proof.nonce),
         difficulty: proof.difficulty,
+        // proof.timestamp is the unix-seconds challenge time; used as the
+        // witness block_time so the contract's BRO formula matches the
+        // off-chain reward calculation below.
+        blockTime: proof.timestamp,
         inputUtxo,
         fundingUtxo: options.fundingUtxo,
         changeAddress: options.changeAddress || this.minerAddress,

@@ -15,7 +15,6 @@ import {
   pixelBorders,
 } from "@bitcoinbaby/ui";
 import {
-  NFTClaimFlow,
   NFTCollectionView,
   NFTExplorerView,
   NFTMarketplaceView,
@@ -30,8 +29,6 @@ export function NFTsSection() {
     mintState,
     evolvingIds,
     listingIds,
-    claimTxid,
-    setClaimTxid,
     selectedNFT,
     setSelectedNFT,
     listFeedback,
@@ -39,7 +36,6 @@ export function NFTsSection() {
     // Data
     collection,
     minting,
-    claiming,
     marketplace,
     explorer,
     balances,
@@ -54,7 +50,6 @@ export function NFTsSection() {
     handleCancelMint,
     handleMintAnother,
     handleViewCollection,
-    handleClaimNFT,
     handleSelectNFT,
     handleEvolve,
     handleListNFT,
@@ -191,34 +186,6 @@ export function NFTsSection() {
               onRefreshTransactions={refreshTransactions}
               onClearCompletedTransactions={clearCompletedTransactions}
             />
-
-            {/* Collapsible Manual Claim Accordion */}
-            <details className="group">
-              <summary
-                className={`font-pixel text-pixel-2xs bg-pixel-bg-medium ${pixelBorders.medium} p-4 text-pixel-text-muted hover:text-pixel-primary flex items-center justify-between cursor-pointer list-none [&::-webkit-details-marker]:hidden outline-none select-none`}
-              >
-                <span>MANUAL CLAIM WORKFLOW</span>
-                <span className="transform group-open:rotate-180 transition-transform duration-200">
-                  ▼
-                </span>
-              </summary>
-              <div className="mt-4">
-                <NFTClaimFlow
-                  isWalletConnected={minting.isWalletConnected}
-                  claimTxid={claimTxid}
-                  onClaimTxidChange={setClaimTxid}
-                  isClaiming={claiming.isLoading}
-                  claimError={claiming.error}
-                  lastClaimed={claiming.lastClaimed}
-                  onClaim={handleClaimNFT}
-                  onClaimAnother={() => {
-                    claiming.reset();
-                    setClaimTxid("");
-                  }}
-                  onViewCollection={handleViewCollection}
-                />
-              </div>
-            </details>
           </div>
         )}
 

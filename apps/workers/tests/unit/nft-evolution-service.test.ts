@@ -13,7 +13,7 @@
  * `{ operation: "level_up" }`.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   buildWorkProofSpellRequest,
   buildLevelUpSpellRequest,
@@ -21,6 +21,18 @@ import {
 import type { SparkNFTState } from "../../src/services/nft-minting-simple";
 import { NFT_CONTRACT_VK } from "../../src/lib/nft-contract-binary";
 import * as cbor from "cbor2";
+
+// `buildWorkSpellRequest` validates the PoW cryptographically via
+// `validateMiningProof` (it does real hash256). Mock it so the tests don't
+// need a genuine PoW solution. Hoisted before the SUT import below.
+vi.mock("../../src/lib/proof-validation", () => ({
+  validateMiningProof: vi
+    .fn()
+    .mockResolvedValue({ valid: true, calculatedReward: 100n }),
+}));
+
+import { buildWorkSpellRequest } from "../../src/services/nft-evolution-service";
+import { validateMiningProof } from "../../src/lib/proof-validation";
 
 const APP_ID = "deadbeef".repeat(8); // 64 hex chars
 const NFT_UTXO = { txid: "00".repeat(32), vout: 0 };
@@ -254,5 +266,151 @@ describe("buildLevelUpSpellRequest", () => {
     const outState = out0 instanceof Map ? out0.get(0) : (out0 as any)[0];
     expect(outState.level).toBe(6);
     expect(outState.xp).toBe(0);
+  });
+});
+
+describe("buildWorkSpellRequest", () => {
+  beforeEach(() => {
+    vi.mocked(validateMiningProof).mockClear();
+  });
+
+  const workParams = {
+    appId: APP_ID,
+    nftUtxo: NFT_UTXO,
+    currentState: baseState,
+    ownerAddress: OWNER_ADDRESS,
+    challenge: "1:100",
+    nonce: "1a2b",
+    difficulty: 16,
+    currentBlock: 800050,
+    proofHash: "0".repeat(64),
+    proofBlockData: "100:tb1ptest:1a2b",
+  };
+
+  it("validates the PoW BEFORE building the spell (calls validateMiningProof)", async () => {
+    await buildWorkSpellRequest(workParams);
+    expect(validateMiningProof).toHaveBeenCalledTimes(1);
+    const arg = vi.mocked(validateMiningProof).mock.calls[0][0];
+    // nonce in MiningProofInput is a NUMBER (parsed from hex).
+    expect(arg.nonce).toBe(0x1a2b);
+    expect(arg.difficulty).toBe(16);
+    expect(arg.hash).toBe(workParams.proofHash);
+    expect(arg.blockData).toBe(workParams.proofBlockData);
+  });
+
+  it("builds a work spell with witness operation 'work' (NOT 'work_proof')", async () => {
+    const { proverRequest } = await buildWorkSpellRequest(workParams);
+    const key = `n/${APP_ID}/${NFT_CONTRACT_VK}`;
+    const witnessHex = proverRequest.app_private_inputs[key];
+    expect(witnessHex, `witness must be keyed by "${key}"`).toBeDefined();
+
+    const decoded = cbor.decode(
+      new Uint8Array(Buffer.from(witnessHex, "hex")),
+    ) as Record<string, unknown>;
+    expect(decoded.operation).toBe("work");
+    // The witness must carry the raw PoW inputs so the contract can re-verify.
+    expect(decoded.challenge).toBe("1:100");
+    expect(decoded.nonce).toBe("1a2b");
+    expect(decoded.difficulty).toBe(16);
+    expect(decoded.current_block).toBe(800050);
+  });
+
+  it("witness does NOT carry xp_gain (C3 closure — xp is DERIVED on-chain)", async () => {
+    const { proverRequest } = await buildWorkSpellRequest(workParams);
+    const key = `n/${APP_ID}/${NFT_CONTRACT_VK}`;
+    const witnessHex = proverRequest.app_private_inputs[key];
+    const decoded = cbor.decode(
+      new Uint8Array(Buffer.from(witnessHex, "hex")),
+    ) as Record<string, unknown>;
+    expect(decoded.xp_gain).toBeUndefined();
+    expect(decoded.xpGain).toBeUndefined();
+  });
+
+  it("derives xp_gain from difficulty (never from witness input) and bumps xp + total_xp", async () => {
+    const { outState } = await buildWorkSpellRequest({
+      ...workParams,
+      difficulty: 16, // base difficulty → xp_from_difficulty(16) = 100
+    });
+    expect(outState.work_count).toBe(1);
+    expect(outState.last_work_block).toBe(800050);
+    expect(outState.xp).toBe(100);
+    expect(outState.total_xp).toBe(100);
+  });
+
+  it("derives 110 XP at difficulty 17 (+10% per bit over min) — matches contract xp_from_difficulty", async () => {
+    const { outState } = await buildWorkSpellRequest({
+      ...workParams,
+      difficulty: 17,
+    });
+    expect(outState.xp).toBe(110);
+    expect(outState.total_xp).toBe(110);
+  });
+
+  it("derives 200 XP at difficulty 26 (doubles the base)", async () => {
+    const { outState } = await buildWorkSpellRequest({
+      ...workParams,
+      difficulty: 26,
+    });
+    expect(outState.xp).toBe(200);
+    expect(outState.total_xp).toBe(200);
+  });
+
+  it("bumps xp on top of an existing non-zero xp balance (C1a invariant)", async () => {
+    const started: SparkNFTState = {
+      ...baseState,
+      xp: 200,
+      total_xp: 500,
+      work_count: 3,
+    };
+    const { outState } = await buildWorkSpellRequest({
+      ...workParams,
+      currentState: started,
+      difficulty: 16, // +100 XP
+    });
+    expect(outState.xp).toBe(300); // 200 + 100
+    expect(outState.total_xp).toBe(600); // 500 + 100
+    expect(outState.work_count).toBe(4);
+  });
+
+  it("throws when PoW is invalid (rejects forged difficulty)", async () => {
+    vi.mocked(validateMiningProof).mockResolvedValueOnce({
+      valid: false,
+      reason: "Hash does not meet difficulty",
+    });
+    await expect(
+      buildWorkSpellRequest({ ...workParams, difficulty: 99 }),
+    ).rejects.toThrow(/Invalid proof of work/);
+  });
+
+  it("throws when difficulty is below MIN_DIFFICULTY_FOR_XP (16) — no zero-XP work", async () => {
+    // validateMiningProof returns valid (default mock), but difficulty < 16 must
+    // still be rejected by the builder before building the spell.
+    await expect(
+      buildWorkSpellRequest({ ...workParams, difficulty: 10 }),
+    ).rejects.toThrow(/below minimum/i);
+  });
+
+  it("produces a version-15 spell whose outs carry the xp-bumped state", async () => {
+    const { proverRequest } = await buildWorkSpellRequest({
+      ...workParams,
+      difficulty: 16, // +100 XP
+    });
+    const decoded = cbor.decode(
+      new Uint8Array(Buffer.from(proverRequest.spell, "hex")),
+    ) as {
+      version: number;
+      tx: { ins: Uint8Array[]; outs: Map<number, SparkNFTState>[] };
+    };
+    expect(decoded.version).toBe(15);
+    expect(decoded.tx.ins).toHaveLength(1);
+    expect(decoded.tx.outs).toHaveLength(1);
+    const out0 = decoded.tx.outs[0];
+    const outState = out0 instanceof Map ? out0.get(0) : (out0 as any)[0];
+    // The spell's outs MUST reflect the derived xp (consistency with the
+    // contract's `validate_work`, which checks new.xp == old.xp + derived).
+    expect(outState.xp).toBe(100);
+    expect(outState.total_xp).toBe(100);
+    expect(outState.work_count).toBe(1);
+    expect(outState.last_work_block).toBe(800050);
   });
 });

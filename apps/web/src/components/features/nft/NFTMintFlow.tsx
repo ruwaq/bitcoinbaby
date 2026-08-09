@@ -36,20 +36,11 @@ const MINT_STEPS: Record<
     icon: "🔍",
     description: "Verifying prover is available...",
   },
-  reserving: {
-    label: "Reserving Token",
-    icon: "🔢",
-    description: "Reserving your unique token ID...",
-  },
-  generating_traits: {
-    label: "Generating Traits",
-    icon: "🧬",
-    description: "Creating your unique baby DNA...",
-  },
-  proving: {
-    label: "Generating ZK Proof",
+  preparing: {
+    label: "Preparing Mint",
     icon: "🔐",
-    description: "Generating zero-knowledge proof...",
+    description:
+      "Generating your ZK proof, tokenId, and traits on the server...",
   },
   signing_commit: {
     label: "Signing Commit",
@@ -71,10 +62,10 @@ const MINT_STEPS: Record<
     icon: "✨",
     description: "Sending spell to the network...",
   },
-  confirming: {
-    label: "Confirming",
+  finalizing: {
+    label: "Finalizing",
     icon: "✅",
-    description: "Confirming your mint...",
+    description: "Verifying your mint on-chain and saving it...",
   },
   success: { label: "Success!", icon: "🎉", description: "Mint complete!" },
   error: { label: "Error", icon: "⚠️", description: "Mint failed" },
@@ -167,7 +158,9 @@ export function NFTMintFlow({
               size="lg"
               disabled={!canMint || !isWalletConnected}
             >
-              {isWalletConnected ? "Mint Genesis Spark" : "Connect wallet first"}
+              {isWalletConnected
+                ? "Mint Genesis Spark"
+                : "Connect wallet first"}
             </Button>
           </motion.div>
           {!isWalletConnected && (
@@ -229,17 +222,15 @@ export function NFTMintFlow({
                 Progress
               </span>
             </div>
-            <div className="grid grid-cols-10 gap-1">
+            <div className="grid grid-cols-9 gap-1">
               {[
                 "checking_prover",
-                "reserving",
-                "generating_traits",
-                "proving",
+                "preparing",
                 "signing_commit",
                 "signing_spell",
                 "broadcasting_commit",
                 "broadcasting_spell",
-                "confirming",
+                "finalizing",
                 "success",
               ].map((step, i) => {
                 const stepIdx = Object.keys(MINT_STEPS).indexOf(currentStep);
