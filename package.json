@@ -31,6 +31,7 @@
     "signer:once": "pnpm --filter @bitcoinbaby/signer start:once",
     "signer:test": "pnpm --filter @bitcoinbaby/signer test:e2e",
     "signer:wallet": "pnpm --filter @bitcoinbaby/signer generate-wallet",
+    "verify:vks": "bash scripts/verify-vks.sh",
     "prepare": "husky"
   },
   "devDependencies": {
