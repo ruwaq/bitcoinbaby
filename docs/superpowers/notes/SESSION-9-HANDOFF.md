@@ -53,7 +53,7 @@ simultáneamente el pago (al treasury) y el mint (coin NFT al comprador).
 
 - **D4.1:** `buy.ts` ahora chequea el output NFT contra `NFT_DUST_SATS` (330) en vez del hardcode `546`. **Esto es lo que rompía toda reventa** (NFTs se mintean a 330, buy exigía 546).
 - **D4.2:** `/migrate-index` ahora requiere header `X-Admin-Key` (constantTimeEqual vs `ADMIN_KEY`). `/update-attempt` **NO** se gatedó — es un endpoint de tracking que el browser llama en cada paso del mint (ver fix `389aa23` abajo).
-- **D4.3:** `/unlist` requiere firma Schnorr (schema ya no acepta requests sin `signature`+`publicKey`; eliminada rama warn-only).
+- **D4.3 (revertido luego):** `/unlist` se endureció para requerir firma Schnorr, pero se revertió porque el `signMessage` del wallet es un placeholder ECDSA roto que no produce Schnorr BIP-340 → el endpoint quedaba inutilizable. Ahora la firma es opcional (se verifica si está, se loguea warning si no). Bug #11 reabierto hasta que el follow-up signMessage aterrice.
 
 ### Fase D5 — Docs (esta sesión)
 
@@ -78,7 +78,7 @@ simultáneamente el pago (al treasury) y el mint (coin NFT al comprador).
 | #8   | ALTO         | ✅         | tokenId server-side vía `incr`                                                                                                                                                          |
 | #9   | MEDIO        | ✅         | `/finalize` escribe `nft:all-tokens`                                                                                                                                                    |
 | #10  | MEDIO        | ✅ parcial | Auth ADMIN_KEY en `/migrate-index`. `/update-attempt` quedó público (es tracking del browser, no admin); hardening real requiere validar que el attemptId pertenezca al caller — futuro |
-| #11  | MEDIO        | ✅         | `/unlist` requiere firma Schnorr                                                                                                                                                        |
+| #11  | MEDIO        | ⚠️ revert  | D4.3 lo cerró exigiendo firma Schnorr, pero se revertió (el `signMessage` del wallet es ECDSA placeholder roto). Firma ahora opcional; bug reabierto hasta follow-up signMessage        |
 
 **Pendiente honesto:** bug #7 (`/list` legacy sin verificación on-chain de ownership del UTXO listado) NO se cerró. El plan D4.3 original solo apuntaba a `/unlist`. Es trabajo futuro de seguridad, no bloquea el flujo normal.
 
@@ -93,9 +93,10 @@ simultáneamente el pago (al treasury) y el mint (coin NFT al comprador).
 
 ---
 
-## Commits de la sesión (9, esta branch)
+## Commits de la sesión (10, esta branch)
 
 ```
+56ef6fd revert(nft): make /unlist signature optional again (D4.3 rollback)
 c94f64e feat(web): migrate NFT mint UI to unified /mint flow (D6)
 9b6b7bc refactor(core): prepareMint + finalizeMint replace 5 legacy NFT methods (D6.1-D6.3)
 389aa23 fix(nft): revert admin gate on /update-attempt (regression from D4.2)
@@ -107,15 +108,22 @@ d3cd6c4 docs(nft): ECONOMICS + /mint runbook + SESSION-9 handoff (D5)
 9a9d277 chore(workers): NFT mint shared prereqs for D3 (D0)
 ```
 
-Branch base: `feat/subproyecto-c-fases-0-2` (`8803964`). Total branch: 11 commits (D1+D2 SESSION-8 + D0+D3+D4+D5+D6+fix-D4.2 SESSION-9).
+Branch base: `feat/subproyecto-c-fases-0-2` (`8803964`). Total branch: 12 commits (D1+D2 SESSION-8 + D0+D3+D4+D5+D6+fix-D4.2+revert-D4.3 SESSION-9).
 
 ---
 
 ## ⚠️ FOLLOW-UPS (NO bloqueantes para PR, pero importantes)
 
-### 0. `/unlist` con firma Schnorr (NUEVO, dejado para sesión separada)
+### 0. Implementar `signMessage` Schnorr BIP-340 + re-endurecer `/unlist` (de una sesión entera)
 
-D4.3 endureció el endpoint `/unlist` para requerir firma Schnorr, pero el browser no tiene capacidad de firmar mensajes (`useWalletStore` solo expone `signPsbt`). El frontend `useMarketplace.unlistNFT` sigue enviando sin firma → **el marketplace unlist devuelve 400 hoy**. Para repararlo: añadir `signMessage` al wallet store + cablear `useMarketplace.unlistNFT` para firmar `unlist:{tokenId}:{timestamp}`. Trabajo de una sesión.
+El backend `/unlist` y la verificación Schnorr (`lib/crypto.ts:verifySchnorrSignature`) **ya funcionan** — lo que falta es el lado wallet. Hallazgo al investigar: `signMessage` YA existe en el `WalletProvider` (`useWalletProvider.ts:55`, `packages/bitcoin/src/providers/*/`), PERO:
+
+- **Internal wallet** (`packages/bitcoin/src/wallet.ts:249`): es un **placeholder ECDSA roto** (el código dice "For now, return a placeholder"), devuelve base64 sin `publicKey`. No sirve.
+- **Unisat**: usa BIP-322-simple.
+- **Xverse**: su propio formato.
+- **`SignedMessage` type** (`providers/types.ts:45`): tiene `signature` + `address` + `message` pero **NO** `publicKey`, que es lo que exige el schema `unlistBodySchema`.
+
+Trabajo real (no es cablear): (a) implementar Schnorr BIP-340 con taproot tweak en el internal wallet, (b) añadir `publicKey` al type `SignedMessage`, (c) decidir cómo manejar Unisat/Xverse (¿adaptar su salida a Schnorr, o marcarlos como no-soportados para unlist?), (d) cablear al `useWalletStore` + `useMarketplace.unlistNFT`, (e) re-endurecer el schema a `.required()`. Bug #11 (MEDIO, sin pérdida de fondos) queda abierto mientras tanto.
 
 ### 1. Regenerar binarios WASM embebidos (arrastrado de SESSION-7, MÁS urgente ahora)
 
@@ -150,10 +158,10 @@ El frontend (`apps/web`) probablemente llama aún a `/reserve`+`/prove`+`/confir
 
 Opciones ordenadas por prioridad lógica:
 
-1. **Follow-up #0 (`/unlist` con firma)** — el marketplace unlist está roto hoy (devuelve 400). Requiere añadir `signMessage` al wallet store. Es el único flujo roto post-D6.
-2. **Follow-up #1 (binarios WASM)** — rápido, desbloquea cualquier test E2E real. Último commit antes de PR.
-3. **PR a main** — una vez verificados #0 y #1. La branch tiene 11 commits atómicamente verdes; 1309 tests + typecheck limpio.
-4. **Bug #7** (`/list` legacy sin verificación on-chain) — hardening adicional, no bloqueante.
+1. **Follow-up #1 (binarios WASM)** — rápido, desbloquea cualquier test E2E real. Último commit antes de mergear el PR del sub-proyecto D.
+2. **Follow-up #0 (signMessage Schnorr + re-endurecer /unlist)** — una sesión entera. Bug #11 (MEDIO) queda abierto mientras tanto; el marketplace unlist funciona (sin firma) y no hay pérdida de fondos.
+3. **Bug #7** (`/list` legacy sin verificación on-chain) — hardening adicional, no bloqueante.
+4. **E2E reales en testnet4** — los e2e (`apps/web/e2e/nft-minting.spec.ts`) están reescritos contra `/mint` pero requieren worker deploy + fondos para correr de verdad.
 5. **E2E reales en testnet4** — los e2e (`apps/web/e2e/nft-minting.spec.ts`) están reescritos contra `/mint` pero requieren worker deploy + fondos para correr de verdad.
 
 **Contexto clave para cualquiera de estos:**
