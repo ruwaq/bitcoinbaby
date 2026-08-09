@@ -316,9 +316,10 @@ fn work_op_valid_pow_is_accepted() {
     old.work_count = 1;
     old.last_work_block = 199_999;
 
-    // Real mined PoW: "genesis-spark-test:745" hashes with 19 leading-zero bits.
-    let challenge = "genesis-spark-test";
-    let nonce = "745";
+    // Canonical challenge (D1.2): "{token_id}:{work_count}" = "1:1".
+    // Real mined PoW: "1:1:2751" double-sha256 has 19 leading-zero bits.
+    let challenge = format!("{}:{}", old.token_id, old.work_count);
+    let nonce = "2751";
     let difficulty = 19u32;
     let current_block = 200_000u64;
 
@@ -354,9 +355,9 @@ fn work_op_invalid_pow_is_rejected() {
     old.total_xp = 50;
     old.work_count = 1;
 
-    // Same challenge, but a nonce whose hash does NOT meet difficulty 19.
-    // "genesis-spark-test:bad" double-sha256 has 0 leading-zero bits.
-    let challenge = "genesis-spark-test";
+    // Canonical challenge (D1.2): "1:1", but a nonce whose hash does NOT meet
+    // difficulty 19. "1:1:bad" double-sha256 has 0 leading-zero bits.
+    let challenge = format!("{}:{}", old.token_id, old.work_count);
     let nonce = "bad";
     let difficulty = 19u32;
     let current_block = 200_000u64;
@@ -398,8 +399,9 @@ fn work_op_rejects_inflated_xp() {
     old.total_xp = 50;
     old.work_count = 1;
 
-    let challenge = "genesis-spark-test";
-    let nonce = "745"; // valid PoW at difficulty 19
+    // Canonical challenge (D1.2): "1:1", valid PoW at difficulty 19.
+    let challenge = format!("{}:{}", old.token_id, old.work_count);
+    let nonce = "2751"; // "1:1:2751" double-sha256 has 19 leading-zero bits
     let difficulty = 19u32;
     let current_block = 200_000u64;
 
@@ -423,6 +425,172 @@ fn work_op_rejects_inflated_xp() {
     assert!(
         !run(&app(), &tx, &Data::empty(), &w),
         "work with XP inflated beyond xp_from_difficulty(difficulty) must reject (C3 closed)"
+    );
+}
+
+// =============================================================================
+// WORK — D1 anti-replay (sub-proyecto D, Fase D1)
+//
+// These four tests pin the anti-replay guarantees added to `validate_work`:
+//   - D1.1: the witness block must STRICTLY advance over `old.last_work_block`,
+//   - D1.2: the challenge must equal the canonical "{token_id}:{work_count}",
+//   - D1.3: difficulty must be within [MIN_DIFFICULTY_FOR_XP, MAX_DIFFICULTY].
+// They are the regression net for the C3-reopening bugs (PoW replay across
+// NFTs and across successive work ops) documented in the sub-proyecto D audit.
+// =============================================================================
+
+#[test]
+fn work_op_rejects_non_advancing_block() {
+    // D1.1: a work op whose witness block is <= the last worked block must be
+    // rejected, even with a valid canonical challenge + valid PoW. This blocks
+    // the simplest replay (re-submit the same op at the same block height).
+    let mut old = fresh_mint();
+    old.xp = 50;
+    old.total_xp = 50;
+    old.work_count = 1;
+    old.last_work_block = 200_000; // the NFT already worked at this block
+
+    // Canonical challenge "1:1", valid PoW at difficulty 19.
+    let challenge = format!("{}:{}", old.token_id, old.work_count);
+    let nonce = "2751";
+    let difficulty = 19u32;
+    // Attacker reuses the SAME block (not strictly greater) — must reject.
+    let current_block = 200_000u64;
+
+    let xp_gain = genesis_babies::xp_from_difficulty(difficulty);
+    let mut new = old.clone();
+    new.work_count = old.work_count + 1;
+    new.total_xp = old.total_xp + xp_gain;
+    new.xp = old.xp + xp_gain;
+    new.last_work_block = current_block; // == old.last_work_block (no advance)
+
+    let tx = work_tx(&old, &new);
+    let w = Data::from(&genesis_babies::WorkWitness {
+        operation: "work".into(),
+        challenge,
+        nonce: nonce.into(),
+        difficulty,
+        current_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "work at a non-advancing block must reject (D1.1 anti-replay)"
+    );
+}
+
+#[test]
+fn work_op_rejects_reused_challenge_across_works() {
+    // D1.2: a PoW mined for work index N cannot be replayed at work index N+1.
+    // The canonical challenge is "{token_id}:{work_count}", so once work_count
+    // ticks the challenge string changes and the SAME (nonce, difficulty) pair
+    // no longer validates against the new expected challenge.
+    let mut old = fresh_mint();
+    old.xp = 50;
+    old.total_xp = 50;
+    old.work_count = 2; // this NFT already did 2 works
+    old.last_work_block = 199_999;
+
+    // Attacker reuses the PoW mined for "1:1" (the first work op) at work_count=2.
+    // The contract expects challenge "1:2", so "1:1" must be rejected outright.
+    let stale_challenge = format!("{}:{}", old.token_id, 1u64); // "1:1", not "1:2"
+    let nonce = "2751"; // valid PoW for "1:1", NOT for "1:2"
+    let difficulty = 19u32;
+    let current_block = 200_000u64;
+
+    let xp_gain = genesis_babies::xp_from_difficulty(difficulty);
+    let mut new = old.clone();
+    new.work_count = old.work_count + 1;
+    new.total_xp = old.total_xp + xp_gain;
+    new.xp = old.xp + xp_gain;
+    new.last_work_block = current_block;
+
+    let tx = work_tx(&old, &new);
+    let w = Data::from(&genesis_babies::WorkWitness {
+        operation: "work".into(),
+        challenge: stale_challenge,
+        nonce: nonce.into(),
+        difficulty,
+        current_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "a PoW mined for a previous work index must reject (D1.2 challenge binding)"
+    );
+}
+
+#[test]
+fn work_op_rejects_challenge_for_wrong_token() {
+    // D1.2 (cross-NFT dimension): a PoW mined for token A cannot be replayed on
+    // token B, because the canonical challenge embeds the token_id.
+    let mut old = fresh_mint();
+    old.token_id = 2; // this NFT is token #2
+    old.xp = 50;
+    old.total_xp = 50;
+    old.work_count = 1;
+    old.last_work_block = 199_999;
+
+    // Attacker mined "2:1:302506" (valid for token 2)... but tries to replay a
+    // PoW mined for token 1's challenge "1:1" instead. Must reject.
+    let wrong_challenge = format!("{}:{}", 1u32, old.work_count); // "1:1", not "2:1"
+    let nonce = "2751"; // valid PoW for "1:1", not for "2:1"
+    let difficulty = 19u32;
+    let current_block = 200_000u64;
+
+    let xp_gain = genesis_babies::xp_from_difficulty(difficulty);
+    let mut new = old.clone();
+    new.work_count = old.work_count + 1;
+    new.total_xp = old.total_xp + xp_gain;
+    new.xp = old.xp + xp_gain;
+    new.last_work_block = current_block;
+
+    let tx = work_tx(&old, &new);
+    let w = Data::from(&genesis_babies::WorkWitness {
+        operation: "work".into(),
+        challenge: wrong_challenge,
+        nonce: nonce.into(),
+        difficulty,
+        current_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "a PoW mined for another token_id must reject (D1.2 cross-NFT binding)"
+    );
+}
+
+#[test]
+fn work_op_rejects_excessive_difficulty() {
+    // D1.3: a difficulty above MAX_DIFFICULTY must be rejected before any PoW
+    // math runs. Without the cap, a witness could declare an absurd difficulty
+    // and (if a matching nonce existed) claim an outsized xp_from_difficulty.
+    let mut old = fresh_mint();
+    old.xp = 50;
+    old.total_xp = 50;
+    old.work_count = 1;
+    old.last_work_block = 199_999;
+
+    let challenge = format!("{}:{}", old.token_id, old.work_count);
+    let nonce = "0"; // irrelevant: the cap check rejects before verify_pow
+    let excessive_difficulty = genesis_babies::MAX_DIFFICULTY + 1; // 33
+    let current_block = 200_000u64;
+
+    let xp_gain = genesis_babies::xp_from_difficulty(excessive_difficulty);
+    let mut new = old.clone();
+    new.work_count = old.work_count + 1;
+    new.total_xp = old.total_xp + xp_gain;
+    new.xp = old.xp + xp_gain;
+    new.last_work_block = current_block;
+
+    let tx = work_tx(&old, &new);
+    let w = Data::from(&genesis_babies::WorkWitness {
+        operation: "work".into(),
+        challenge,
+        nonce: nonce.into(),
+        difficulty: excessive_difficulty,
+        current_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "a difficulty above MAX_DIFFICULTY must reject (D1.3 cap)"
     );
 }
 
