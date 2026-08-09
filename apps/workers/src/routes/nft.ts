@@ -4,17 +4,21 @@
  * NFT management, marketplace, and evolution endpoints.
  *
  * Routes:
+ * - POST /api/nft/mint/prepare         - Build atomic mint+payment spell (D3)
+ * - POST /api/nft/mint/finalize        - Verify spell on-chain + persist (D3)
  * - GET  /api/nft/counter              - Get current NFT counter
- * - POST /api/nft/reserve              - Reserve next NFT ID
- * - POST /api/nft/confirm/:tokenId     - Confirm NFT mint
+ * - GET  /api/nft/prover-health        - Check prover availability
+ * - GET  /api/nft/mint-attempts/:addr  - Get mint attempts for an address
  * - GET  /api/nft/owned/:address       - Get NFTs owned by address
- * - POST /api/nft/claim                - Claim NFT by txid
+ * - GET  /api/nft/all                  - Explorer: paginated NFT list
+ * - GET  /api/nft/stats                - Mint stats
  * - GET  /api/nft/:tokenId             - Get single NFT
  * - POST /api/nft/list                 - List NFT for sale
  * - DELETE /api/nft/unlist/:tokenId    - Remove listing
  * - GET  /api/nft/listings             - Get all active listings
  * - POST /api/nft/buy/:tokenId         - Buy listed NFT
- * - POST /api/nft/evolve               - Evolve NFT to next level
+ * - POST /api/nft/work/:tokenId        - Submit PoW to earn XP (C3)
+ * - POST /api/nft/evolve/:tokenId      - Evolve NFT to next level
  */
 
 import { Hono } from "hono";
@@ -24,7 +28,6 @@ import { confirmRouter } from "./nft/confirm";
 import { evolveRouter } from "./nft/evolve";
 import { listingRouter } from "./nft/listing";
 import { buyRouter } from "./nft/buy";
-import { claimRouter } from "./nft/claim";
 import { mintRouter } from "./nft/mint";
 
 export const nftRouter = new Hono<{ Bindings: Env }>();
@@ -37,5 +40,4 @@ nftRouter.route("/", reserveRouter);
 nftRouter.route("/", evolveRouter);
 nftRouter.route("/", listingRouter);
 nftRouter.route("/", buyRouter);
-nftRouter.route("/", claimRouter);
 nftRouter.route("/", confirmRouter); // Mount last to prevent /:tokenId from stealing routes

@@ -20,40 +20,6 @@ export const addressParamSchema = z.object({
   address: bitcoinAddressSchema,
 });
 
-export const reserveNftSchema = z.object({
-  address: bitcoinAddressSchema,
-});
-
-export const confirmNftSchema = z.object({
-  txid: z
-    .string()
-    .length(64)
-    .regex(/^[a-fA-F0-9]+$/),
-  address: bitcoinAddressSchema,
-  nft: z
-    .object({
-      dna: z.string(),
-      bloodline: z.string(),
-      baseType: z.string(),
-      rarityTier: z.string(),
-      level: z.number().int().min(1),
-      xp: z.number().int().min(0),
-      totalXp: z.number().int().min(0),
-      workCount: z.number().int().min(0),
-      evolutionCount: z.number().int().min(0),
-      heritage: z.number().int().min(0).max(4).optional(),
-    })
-    .optional(),
-});
-
-export const claimNftSchema = z.object({
-  txid: z
-    .string()
-    .length(64)
-    .regex(/^[a-fA-F0-9]+$/),
-  address: bitcoinAddressSchema,
-});
-
 export const listNftSchema = z.object({
   tokenId: z.number().int().positive(),
   price: z.number().int().min(1000, "Minimum price is 1000 satoshis"),
@@ -236,49 +202,6 @@ export const mintFinalizeSchema = z.object({
     .length(64)
     .regex(/^[a-fA-F0-9]+$/),
   address: bitcoinAddressSchema,
-});
-
-export const proveNftSchema = z.object({
-  /** Reserved token ID */
-  tokenId: z.number().int().positive(),
-  /** Owner's Bitcoin address */
-  address: bitcoinAddressSchema,
-  /** NFT initial state */
-  nftState: z.object({
-    dna: z
-      .string()
-      .length(64)
-      .regex(/^[a-fA-F0-9]+$/),
-    bloodline: z.enum(["royal", "warrior", "rogue", "mystic"]),
-    baseType: z.enum(["human", "animal", "robot", "mystic", "alien"]),
-    genesisBlock: z.number().int().min(0),
-    rarityTier: z.enum([
-      "common",
-      "uncommon",
-      "rare",
-      "epic",
-      "legendary",
-      "mythic",
-    ]),
-    tokenId: z.number().int().positive(),
-    level: z.number().int().min(1).max(10).default(1),
-    xp: z.number().int().min(0).default(0),
-    totalXp: z.number().int().min(0).default(0),
-    workCount: z.number().int().min(0).default(0),
-    lastWorkBlock: z.number().int().min(0).default(0),
-    evolutionCount: z.number().int().min(0).default(0),
-    tokensEarned: z.string().default("0"),
-    heritage: z.number().int().min(0).max(4).default(0),
-  }),
-  /** Funding UTXO */
-  fundingUtxo: z.object({
-    txid: z
-      .string()
-      .length(64)
-      .regex(/^[a-fA-F0-9]+$/),
-    vout: z.number().int().min(0),
-    value: z.number().int().positive(),
-  }),
 });
 
 export const unlistBodySchema = z.object({

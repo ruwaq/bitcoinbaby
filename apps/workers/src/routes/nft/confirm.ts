@@ -7,20 +7,13 @@
 import { Hono } from "hono";
 import type { Env } from "../../lib/types";
 import { getRedis } from "../../lib/redis";
-import {
-  errorResponse,
-  successResponse,
-} from "../../lib/helpers";
-import {
-  validateBody,
-  validateParams,
-} from "../../lib/middleware";
+import { errorResponse, successResponse } from "../../lib/helpers";
+import { validateParams } from "../../lib/middleware";
 import { nftLogger } from "../../lib/logger";
 import { getNetworkForEnvironment, EXPLORER_URLS } from "../../config/bitcoin";
 import {
   tokenIdParamSchema,
   addressParamSchema,
-  confirmNftSchema,
   explorerQuerySchema,
   MAX_SUPPLY,
 } from "./middleware";
@@ -31,84 +24,10 @@ export const confirmRouter = new Hono<{ Bindings: Env }>();
 // =============================================================================
 // NFT CORE
 // =============================================================================
-
-/**
- * POST /confirm/:tokenId - Confirm NFT was minted successfully
- *
- * Finalizes a reservation:
- * - Removes the temporary reservation
- * - Creates the permanent NFT record
- * - Increments the confirmed mint counter
- */
-confirmRouter.post(
-  "/confirm/:tokenId",
-  validateParams(tokenIdParamSchema),
-  validateBody(confirmNftSchema),
-  async (c) => {
-    const { tokenId } = c.get("validatedParams");
-    const body = c.get("validatedBody");
-
-    try {
-      const redis = getRedis(c.env);
-      const mintedAt = Date.now();
-
-      // Check if this token was reserved (optional - for safety)
-      const reservation = await redis.get(`nft:reserved:${tokenId}`);
-
-      // Clean up the reservation (whether it exists or not)
-      await redis.del(`nft:reserved:${tokenId}`);
-
-      // Check if already minted (idempotency)
-      const existingMint = await redis.exists(`nft:minted:${tokenId}`);
-      if (existingMint) {
-        nftLogger.warn("Token already minted", { tokenId });
-        return successResponse(c, { confirmed: true, alreadyMinted: true });
-      }
-
-      const nftRecord = {
-        tokenId,
-        txid: body.txid,
-        address: body.address,
-        mintedAt,
-        dna: body.nft?.dna || "",
-        bloodline: body.nft?.bloodline || "rogue",
-        baseType: body.nft?.baseType || "human",
-        rarityTier: body.nft?.rarityTier || "common",
-        level: body.nft?.level || 1,
-        xp: body.nft?.xp || 0,
-        totalXp: body.nft?.totalXp || 0,
-        workCount: body.nft?.workCount || 0,
-        evolutionCount: body.nft?.evolutionCount || 0,
-        genesisBlock: 0,
-        lastWorkBlock: 0,
-        tokensEarned: "0",
-        heritage: body.nft?.heritage ?? 0,
-      };
-
-      // Create NFT record FIRST, then add to indexes
-      // Order matters: data must exist before it's indexed
-      await redis.hset(`nft:minted:${tokenId}`, nftRecord);
-
-      // Then add to all indexes in parallel
-      await Promise.all([
-        redis.sadd(`nft:owned:${body.address}`, tokenId.toString()),
-        redis.sadd("nft:all-tokens", tokenId.toString()),
-        redis.incr("nft:minted:count"),
-      ]);
-
-      nftLogger.info("Confirmed token ID", {
-        tokenId,
-        owner: body.address,
-        hadReservation: !!reservation,
-      });
-
-      return successResponse(c, { confirmed: true });
-    } catch (error) {
-      nftLogger.error("[NFT] Confirm error:", error);
-      return errorResponse(c, "Failed to confirm mint", 500);
-    }
-  },
-);
+// NOTE (D3): the POST /confirm/:tokenId handler was removed. It trusted the
+// client txid blindly (bug #6) and had a TOCTOU race (bug #4). Minting is now
+// finalized exclusively via POST /mint/finalize in ./mint.ts, which verifies
+// the spell tx on-chain and persists atomically.
 
 /**
  * GET /owned/:address - Get all NFTs owned by an address
@@ -421,21 +340,24 @@ confirmRouter.post("/migrate-index", async (c) => {
 /**
  * GET /:tokenId - Get a single NFT by token ID
  */
-confirmRouter.get("/:tokenId", validateParams(tokenIdParamSchema), async (c) => {
-  const { tokenId } = c.get("validatedParams");
+confirmRouter.get(
+  "/:tokenId",
+  validateParams(tokenIdParamSchema),
+  async (c) => {
+    const { tokenId } = c.get("validatedParams");
 
-  try {
-    const redis = getRedis(c.env);
-    const nftData = await redis.hgetall(`nft:minted:${tokenId}`);
+    try {
+      const redis = getRedis(c.env);
+      const nftData = await redis.hgetall(`nft:minted:${tokenId}`);
 
-    if (!nftData || Object.keys(nftData).length === 0) {
-      return errorResponse(c, "NFT not found", 404);
+      if (!nftData || Object.keys(nftData).length === 0) {
+        return errorResponse(c, "NFT not found", 404);
+      }
+
+      return successResponse(c, parseNFTData(nftData, tokenId));
+    } catch (error) {
+      nftLogger.error("[NFT] Get single error:", error);
+      return errorResponse(c, "Failed to get NFT", 500);
     }
-
-    return successResponse(c, parseNFTData(nftData, tokenId));
-  } catch (error) {
-    nftLogger.error("[NFT] Get single error:", error);
-    return errorResponse(c, "Failed to get NFT", 500);
-  }
-});
-
+  },
+);
