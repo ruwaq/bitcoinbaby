@@ -12,20 +12,24 @@
  * Why halving: BRO halves rewards every 14 days from genesis (START_TIME) to
  * create a decaying emission schedule, mirroring Bitcoin's own halving logic.
  *
- * Status of alignment (2026-08-08, sub-proyecto B Fase 3):
+ * Status of alignment (2026-08-09, sub-proyecto C Fase 2):
  *   - DONE This module (canonical reference).
- *   - DONE token.ts calculateMiningReward — kept as-is for v1 contract lockstep
- *        (see BRO_ALIGNMENT.md); canonical variant exposed via
- *        calculateMiningRewardBro in token.ts.
+ *   - DONE token.ts calculateMiningReward — kept as the LEGACY v1 formula,
+ *        now formally @deprecated (sub-proyecto C Fase 2.4); canonical
+ *        variant exposed via calculateMiningRewardBro in token.ts.
  *   - DONE merkle.ts calculateMiningReward — delegates here (Step 2).
- *   - PENDING babtc/src/lib.rs (v1 on-chain contract) — NOT yet aligned.
- *        Changing the contract formula recompiles the WASM -> new appVk ->
- *        orphans already-minted testnet4 tokens. Realignment deferred to
- *        sub-proyecto C (mainnet) where a contract redeployment + state
- *        migration is acceptable.
- *   - PENDING scripts/signer/mint-babtc.ts — NOT yet aligned (locked to v1
- *        contract's calculate_reward; must change in lockstep with the
- *        contract).
+ *   - DONE babtc/src/lib.rs (v1 on-chain contract) — calculate_reward now uses
+ *        `BRO_DENOMINATION · clz² / 2^halvings` with halving + START_TIME
+ *        (sub-proyecto C Fase 2.1). VK rotated; testnet4 tokens orphaned by
+ *        design (Big-Bang Reset). The contract's MiningWitness now carries
+ *        `block_time` for the halving schedule.
+ *   - DONE scripts/signer/mint-babtc.ts — calculateReward delegates to
+ *        minedAmountBro and emits `block_time` in the witness (sub-proyecto C
+ *        Fase 2.2).
+ *   - FOLLOW-UP: submitter.ts display-only calls to the legacy
+ *        calculateMiningReward (lines ~581, ~688) remain for UI display of the
+ *        v1 flow; they do NOT feed the witness or on-chain spell. Migrate them
+ *        to calculateMiningRewardBro when the v1 display path is retired.
  */
 
 /** 8 decimals (1 whole token = 1e8 base units), matches BRO denomination. */

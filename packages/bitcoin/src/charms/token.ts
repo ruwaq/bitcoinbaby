@@ -215,20 +215,23 @@ export interface MiningReward {
 /**
  * Calculate mining reward based on difficulty (LEGACY v1-contract formula).
  *
- * @deprecated This is the LEGACY reward computation, kept ONLY because the v1
- *   on-chain babtc contract (`packages/bitcoin/contracts/babtc/src/lib.rs`)
- *   uses the matching `BASE_REWARD * D² / DIFFICULTY_FACTOR` formula and
- *   rejects mint spells whose reward does not match. Changing this number
- *   without redeploying the contract would orphan already-minted testnet4
- *   tokens (new appVk). All callers below build real mint spells that the v1
- *   contract validates, so they MUST stay on this legacy value until the
- *   contract is redeployed.
+ * @deprecated DEFINITIVE — sub-proyecto C Fase 2.4. The v1 on-chain babtc
+ *   contract was realigned to the canonical BRO formula in Fase 2.1
+ *   (`calculate_reward` now uses `BRO_DENOMINATION · clz² / 2^halvings` with
+ *   halving + START_TIME), and the signer was aligned in Fase 2.2 (delegates
+ *   to `minedAmountBro`). This legacy function is retained ONLY for:
+ *     (a) backwards-compatible display of the pre-Fase-2 reward values in
+ *         `submitter.ts` (lines ~581, ~688 — UI display only, does NOT feed
+ *         the witness or on-chain spell), and
+ *     (b) historical reference of the pre-alignment formula.
+ *   All NEW code MUST use {@link calculateMiningRewardBro} (or `minedAmountBro`
+ *   directly from bro-reward.ts). Removal scheduled for sub-proyecto D
+ *   (post-mainnet stabilization), once the v1 display path in submitter.ts is
+ *   retired.
  *
- *   The CANONICAL BRO formula lives in `./bro-reward.ts` (`minedAmountBro`)
- *   and is exposed here as {@link calculateMiningRewardBro}. New off-chain
- *   code (estimation, analytics, UI projections) should use the canonical one.
- *   Realignment of this function + the v1 contract + the signer is tracked as
- *   sub-proyecto C (mainnet). See `docs/superpowers/notes/BRO_ALIGNMENT.md`.
+ *   The CANONICAL BRO formula lives in `./bro-reward.ts` (`minedAmountBro`).
+ *   See `docs/superpowers/notes/BRO_ALIGNMENT.md` and
+ *   `docs/audits/VK_RECONCILIATION.md` for the full reconciliation history.
  *
  * Legacy formula: BASE_REWARD * D² / DIFFICULTY_FACTOR
  * Where: BASE_REWARD = 1 SPARK, FACTOR = 100
