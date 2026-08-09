@@ -1,14 +1,16 @@
 /**
- * SPARK Deployment Configuration
+ * SPARK Deployment Configuration (multi-network)
  *
- * This file contains deployment-specific configuration.
- * Update these values after deploying the contract to testnet4.
+ * The actual SPARK_TESTNET4 deployment data lives in `./testnet4.ts`, which is
+ * the SINGLE SOURCE OF TRUTH (it also supports overriding appId/appVk via
+ * environment variables). This file layers on the multi-network view
+ * (testnet4 / regtest / mainnet) plus the helpers consumers expect
+ * (`getDeploymentConfig`, `isDeploymentReady`, `validateDeployment`).
  *
- * Deployment Steps:
- * 1. Build contract: cd contracts/babtc && charms app build
- * 2. Get VK: charms app vk ./target/wasm32-wasip1/release/babtc-contract.wasm
- * 3. Create genesis UTXO on testnet4
- * 4. Deploy and update this file with the output values
+ * Placeholder detection is delegated to the shared string-prefix-based
+ * `isSPARKConfigured` from `./testnet4.ts` so there is exactly one mechanism
+ * for "is this config real?". There is no hand-maintained `isPlaceholder`
+ * boolean that can drift from the actual values.
  *
  * Reward Formula (BRO-style):
  * reward = BASE_REWARD × D² ÷ DIFFICULTY_FACTOR
@@ -18,6 +20,10 @@
  */
 
 import type { SupportedNetwork } from "../types";
+import {
+  SPARK_TESTNET4 as TESTNET4_CONFIG,
+  isSPARKConfigured,
+} from "./testnet4";
 
 export interface DeploymentConfig {
   /** Network identifier */
@@ -30,45 +36,45 @@ export interface DeploymentConfig {
   deploymentBlock?: number;
   /** Genesis UTXO that created this app */
   genesisUtxo?: string;
-  /** Is this a placeholder config? */
-  isPlaceholder: boolean;
+  /**
+   * Whether this config is a placeholder (not yet deployed).
+   * @deprecated Derived from the appId/appVk via string-prefix detection in
+   * {@link isSPARKConfigured}. Do not set manually — rely on the helper.
+   */
+  readonly isPlaceholder: boolean;
 }
 
 /**
- * Testnet4 Deployment Configuration
- *
- * STATUS: DEPLOYED - Ready for mining (v2 with BRO-style rewards)
- *
- * Genesis UTXO: b3deba0743aeffd0e455ce442b1693107090341381e3d8bcc5f586667c3e8a81:0
- * Deployed: 2026-02-18
- * Updated: 2026-03-05 (BRO-style rewards, Charms SDK 11.0.1)
- *
- * Contract: packages/bitcoin/contracts/babtc
- * VK generated with: charms app vk ./target/wasm32-wasip1/release/babtc-contract.wasm
+ * Re-export of the canonical testnet4 deployment data so existing importers of
+ * `SPARK_TESTNET4` from this file keep working. The data is defined once, in
+ * `./testnet4.ts`.
  */
 export const SPARK_TESTNET4: DeploymentConfig = {
   network: "testnet4",
-  appId: "87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681b",
-  appVk: "acf2ec0b7245eb9c3371ef4e67eb1ca3f85d712b1aeca438a6a6d1898392179d",
-  deploymentBlock: 75000, // Approximate block height
-  genesisUtxo:
-    "b3deba0743aeffd0e455ce442b1693107090341381e3d8bcc5f586667c3e8a81:0",
-  isPlaceholder: false,
+  appId: TESTNET4_CONFIG.appId,
+  appVk: TESTNET4_CONFIG.appVk,
+  deploymentBlock: TESTNET4_CONFIG.deploymentBlock,
+  genesisUtxo: TESTNET4_CONFIG.genesisUtxo,
+  get isPlaceholder(): boolean {
+    return !isSPARKConfigured(this);
+  },
 };
 
 /**
  * Regtest Deployment Configuration
  *
- * STATUS: DEPLOYED locally for development.
+ * STATUS: DEPLOYED locally for development. Mirrors the testnet4 deployment so
+ * the same contract can be exercised against a local node.
  */
 export const SPARK_REGTEST: DeploymentConfig = {
   network: "regtest",
-  appId: "87b5ecfbfa392550b0a221e20f28a9453ed212a343551a2a43387d0cd183681b",
-  appVk: "acf2ec0b7245eb9c3371ef4e67eb1ca3f85d712b1aeca438a6a6d1898392179d",
+  appId: TESTNET4_CONFIG.appId,
+  appVk: TESTNET4_CONFIG.appVk,
   deploymentBlock: 1,
-  genesisUtxo:
-    "b3deba0743aeffd0e455ce442b1693107090341381e3d8bcc5f586667c3e8a81:0",
-  isPlaceholder: false,
+  genesisUtxo: TESTNET4_CONFIG.genesisUtxo,
+  get isPlaceholder(): boolean {
+    return !isSPARKConfigured(this);
+  },
 };
 
 /**
@@ -81,7 +87,9 @@ export const SPARK_MAINNET: DeploymentConfig = {
   network: "mainnet",
   appId: "not_deployed",
   appVk: "not_deployed",
-  isPlaceholder: true,
+  get isPlaceholder(): boolean {
+    return !isSPARKConfigured(this);
+  },
 };
 
 /**
@@ -102,7 +110,7 @@ export function isDeploymentReady(
   network: SupportedNetwork = "testnet4",
 ): boolean {
   const config = getDeploymentConfig(network);
-  return !config.isPlaceholder;
+  return isSPARKConfigured(config);
 }
 
 /**
@@ -112,7 +120,7 @@ export function validateDeployment(
   network: SupportedNetwork = "testnet4",
 ): void {
   const config = getDeploymentConfig(network);
-  if (config.isPlaceholder) {
+  if (!isSPARKConfigured(config)) {
     throw new Error(
       `SPARK contract not deployed to ${network}. ` +
         `See packages/bitcoin/contracts/babtc/BUILD.md for deployment instructions.`,

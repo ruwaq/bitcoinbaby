@@ -44,6 +44,26 @@ export const TESTNET4_ENDPOINTS = {
 // =============================================================================
 // SPARK DEPLOYMENT CONFIG
 // =============================================================================
+//
+// This file is the SINGLE SOURCE OF TRUTH for the SPARK_TESTNET4 deployment
+// data (appId, appVk, genesisUtxo). The companion file `deployment.ts` adds
+// multi-network helpers (getDeploymentConfig / isDeploymentReady / ...) but it
+// re-uses the SPARK_TESTNET4 constant defined here instead of redefining it.
+//
+// Placeholder detection is string-prefix based (see `isSPARKConfigured`) so it
+// cannot drift the way a hand-maintained `isPlaceholder` boolean would.
+
+/** Placeholder markers that mark an appId/appVk as "not yet deployed". */
+const PLACEHOLDER_MARKERS = ["PLACEHOLDER", "not_deployed", ""];
+
+/**
+ * A minimal shape that {@link isSPARKConfigured} can inspect. Any config object
+ * with `appId` / `appVk` strings (real or placeholder) satisfies this.
+ */
+export interface SparkConfigLike {
+  appId: string;
+  appVk: string;
+}
 
 /**
  * SPARK App Configuration
@@ -89,13 +109,37 @@ export const SPARK_TESTNET4 = {
 } as const;
 
 /**
- * Check if SPARK is properly configured for deployment
+ * Check whether a SPARK config is properly deployed (not a placeholder).
+ *
+ * Uses string-prefix detection against known placeholder markers so it stays
+ * correct without maintaining a manual `isPlaceholder` boolean. With no
+ * argument it inspects {@link SPARK_TESTNET4} (preserving the existing
+ * call-site contract).
  */
-export function isSPARKConfigured(): boolean {
+export function isSPARKConfigured(
+  config: SparkConfigLike = SPARK_TESTNET4,
+): boolean {
   return (
-    !SPARK_TESTNET4.appId.startsWith("PLACEHOLDER") &&
-    !SPARK_TESTNET4.appVk.startsWith("PLACEHOLDER")
+    !isPlaceholderValue(config.appId) &&
+    !isPlaceholderValue(config.appVk) &&
+    config.appId.length === 64 &&
+    config.appVk.length === 64
   );
+}
+
+/**
+ * True if a value is a known placeholder marker (empty, "PLACEHOLDER...",
+ * "not_deployed") or all-zero hex (a sentinel for "unset").
+ */
+function isPlaceholderValue(value: string): boolean {
+  const trimmed = value.trim();
+  if (PLACEHOLDER_MARKERS.includes(trimmed)) return true;
+  if (value.startsWith("PLACEHOLDER") || value.startsWith("not_deployed")) {
+    return true;
+  }
+  // All-zero hex (64 chars of '0') is treated as an unset sentinel.
+  if (/^0+$/.test(trimmed)) return true;
+  return false;
 }
 
 /**
@@ -199,16 +243,15 @@ export const GENESIS_SPARKS_REGTEST = {
   symbol: "GBABY",
   maxSupply: 10_000,
   priceSats: 50_000n,
-  treasuryAddress: "tb1p7kk2fuf8kv5vjftczlezfded94v9ay9s0h7ggd87k5d5ws744lesw7smmu",
+  treasuryAddress:
+    "tb1p7kk2fuf8kv5vjftczlezfded94v9ay9s0h7ggd87k5d5ws744lesw7smmu",
   isPlaceholder: false,
 } as const;
 
 /**
  * Get Genesis Sparks config for a network
  */
-export function getGenesisBabiesConfig(
-  network: SupportedNetwork = "testnet4",
-) {
+export function getGenesisBabiesConfig(network: SupportedNetwork = "testnet4") {
   if (network === "mainnet") return GENESIS_SPARKS_MAINNET;
   if (network === "regtest") return GENESIS_SPARKS_REGTEST;
   return GENESIS_SPARKS_TESTNET4;

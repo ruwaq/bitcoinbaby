@@ -185,6 +185,30 @@ describe("MiningOrchestrator", () => {
 
       expect(true).toBe(true); // No errors thrown
     });
+
+    it("should expose an optional BlockObserver hook (no AI-loop change)", async () => {
+      const { MiningOrchestrator } = await import("../src/mining/orchestrator");
+      const { BlockObserver } = await import("../src/mining/block-observer");
+
+      const orchestrator = new MiningOrchestrator();
+
+      // Initially none attached.
+      expect(orchestrator.getBlockObserver()).toBeNull();
+
+      // Attaching/stripping must not throw and must not start mining.
+      const obs = new BlockObserver({}, {}, async () => ({
+        height: 1,
+        hash: "0".repeat(64),
+        time: 0,
+      }));
+      expect(() => orchestrator.setBlockObserver(obs)).not.toThrow();
+      expect(orchestrator.getBlockObserver()).toBe(obs);
+      expect(orchestrator.getIsRunning()).toBe(false);
+
+      // terminate() clears the hook and stops the observer without throwing.
+      expect(() => orchestrator.terminate()).not.toThrow();
+      expect(orchestrator.getBlockObserver()).toBeNull();
+    });
   });
 
   describe("Lifecycle", () => {
@@ -246,7 +270,7 @@ describe("MiningOrchestrator", () => {
 describe("CPUMiner", () => {
   describe("Constructor", () => {
     it("should create with default options", async () => {
-      const { CPUMiner } = await import("../src/mining/cpu-miner");
+      const { CPUMiner } = await import("../src/mining/legacy/cpu-miner");
 
       const miner = new CPUMiner();
 
@@ -256,7 +280,7 @@ describe("CPUMiner", () => {
     });
 
     it("should accept custom options", async () => {
-      const { CPUMiner } = await import("../src/mining/cpu-miner");
+      const { CPUMiner } = await import("../src/mining/legacy/cpu-miner");
 
       const onHashrate = vi.fn();
       const onWorkFound = vi.fn();
@@ -276,7 +300,7 @@ describe("CPUMiner", () => {
 
   describe("Throttle", () => {
     it("should clamp throttle to 0-100 range", async () => {
-      const { CPUMiner } = await import("../src/mining/cpu-miner");
+      const { CPUMiner } = await import("../src/mining/legacy/cpu-miner");
 
       const miner = new CPUMiner();
 
@@ -289,7 +313,7 @@ describe("CPUMiner", () => {
 
   describe("Lifecycle", () => {
     it("should handle stop when not started", async () => {
-      const { CPUMiner } = await import("../src/mining/cpu-miner");
+      const { CPUMiner } = await import("../src/mining/legacy/cpu-miner");
 
       const miner = new CPUMiner();
 
@@ -298,7 +322,7 @@ describe("CPUMiner", () => {
     });
 
     it("should handle terminate cleanly", async () => {
-      const { CPUMiner } = await import("../src/mining/cpu-miner");
+      const { CPUMiner } = await import("../src/mining/legacy/cpu-miner");
 
       const miner = new CPUMiner();
 
@@ -308,7 +332,7 @@ describe("CPUMiner", () => {
     });
 
     it("should handle pause/resume when not started", async () => {
-      const { CPUMiner } = await import("../src/mining/cpu-miner");
+      const { CPUMiner } = await import("../src/mining/legacy/cpu-miner");
 
       const miner = new CPUMiner();
 
@@ -320,7 +344,7 @@ describe("CPUMiner", () => {
 
   describe("isRunning semantics", () => {
     it("should return false when not started", async () => {
-      const { CPUMiner } = await import("../src/mining/cpu-miner");
+      const { CPUMiner } = await import("../src/mining/legacy/cpu-miner");
 
       const miner = new CPUMiner();
 

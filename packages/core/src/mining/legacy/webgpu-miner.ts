@@ -5,8 +5,8 @@
  * Architecture follows the BRO token pattern.
  */
 
-import type { Miner, MiningResult } from "./types";
-import { getNavigator } from "./capabilities";
+import type { Miner, MiningResult } from "../types";
+import { getNavigator } from "../capabilities";
 import { createLogger } from "@bitcoinbaby/shared";
 
 const log = createLogger("WebGPUMiner");

@@ -14,6 +14,11 @@ import { createLogger } from "@bitcoinbaby/shared";
 
 const log = createLogger("Orchestrator");
 import { AIWorkIntegration } from "./ai-integration";
+// TYPE-ONLY import: keeps the BlockObserver available as an optional hook
+// without adding a runtime dependency that could affect import ordering in
+// tests. The AI loop remains the active mining driver; the observer is wired
+// in opportunistically (see setBlockObserver). See spec Sección 4 / Fase 4.
+import type { BlockObserver } from "./block-observer";
 
 const defaultConfig: OrchestratorConfig = {
   preferWebGPU: true,
@@ -26,7 +31,13 @@ const defaultConfig: OrchestratorConfig = {
 };
 
 /**
- * MiningOrchestrator - Coordina miners CPU y WebGPU
+ * MiningOrchestrator - Coordinates the AI Proof-of-Useful-Work loop.
+ *
+ * NOTE: This orchestrator does NOT instantiate any miner. BitcoinBaby's
+ * production model is "Block-Tick" (the player observes real Bitcoin blocks and
+ * reacts to them; the player does not mine). `getMinerType()` therefore always
+ * returns `null`. The reference CPU/WebGPU miners live under `./legacy/` but are
+ * not wired in here.
  *
  * Basado en el patron del BRO token:
  * https://github.com/CharmsDev/bro/tree/main/webapp/src/mining
@@ -44,6 +55,13 @@ export class MiningOrchestrator {
   private aiTotalTokens = 0;
   private isPaused = false;
   private abortController: AbortController | null = null;
+  /**
+   * Optional Block-Tick observer (trustless randomness beacon, spec Sección 4).
+   * When set, the orchestrator MAY consume observed ticks opportunistically.
+   * The AI Proof-of-Useful-Work loop remains the active driver until a future
+   * Fase replaces it; this field only makes the observer AVAILABLE here.
+   */
+  private blockObserver: BlockObserver | null = null;
 
   constructor(config: Partial<OrchestratorConfig> = {}) {
     this.config = { ...defaultConfig, ...config };
@@ -211,6 +229,10 @@ export class MiningOrchestrator {
     this.startCancelled = true;
     this.isStarting = false;
     this.stop();
+    // Stop the Block-Tick observer if one was attached so it doesn't leak a
+    // polling interval. The caller owned it; we only guarantee cleanup.
+    this.blockObserver?.stop();
+    this.blockObserver = null;
     this.cleanupFunctions.forEach((cleanup) => cleanup());
     this.cleanupFunctions = [];
     this.aiIntegration?.terminate();
@@ -230,7 +252,10 @@ export class MiningOrchestrator {
   }
 
   getMinerType(): "cpu" | "webgpu" | null {
-    return this.isRunning ? "cpu" : null;
+    // The orchestrator never instantiates a real miner; it only runs the AI
+    // Proof-of-Useful-Work loop. Report `null` honestly so status surfaces
+    // (e.g. via mining-singleton) don't claim a CPU/WebGPU miner is active.
+    return null;
   }
 
   getCapabilities(): DeviceCapabilities | null {
@@ -239,6 +264,25 @@ export class MiningOrchestrator {
 
   getIsRunning(): boolean {
     return this.isRunning;
+  }
+
+  // ==========================================================================
+  // Block-Tick observer (optional, opportunistic — AI loop stays active)
+  // ==========================================================================
+
+  /**
+   * Attach a {@link BlockObserver} so the orchestrator can consume observed
+   * Bitcoin ticks. Does NOT replace the AI loop. The caller owns the observer's
+   * lifecycle (start/stop); the orchestrator only stops it on terminate().
+   */
+  setBlockObserver(observer: BlockObserver | null): void {
+    this.blockObserver = observer;
+    log.info("BlockObserver attached", { attached: observer !== null });
+  }
+
+  /** Returns the attached BlockObserver, if any. */
+  getBlockObserver(): BlockObserver | null {
+    return this.blockObserver;
   }
 
   // ==========================================================================

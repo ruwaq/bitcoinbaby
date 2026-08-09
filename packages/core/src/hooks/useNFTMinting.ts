@@ -273,6 +273,8 @@ export function useNFTMinting(
           tokensEarned: 0n,
           narrativeRoot: "",
           worldStateRoot: "",
+          lastSettleBlock: 0,
+          settleCount: 0,
         };
 
         return {

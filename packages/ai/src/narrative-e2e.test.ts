@@ -37,6 +37,8 @@ const TEST_NFTS: SparkNFTState[] = [
     tokensEarned: 500n,
     narrativeRoot: "",
     worldStateRoot: "",
+    lastSettleBlock: 0,
+    settleCount: 0,
   },
   {
     dna: "beefdeadcafe1234feed5678badc0ffee99aabbccddeeff0011223344556677",
@@ -55,6 +57,8 @@ const TEST_NFTS: SparkNFTState[] = [
     tokensEarned: 5000n,
     narrativeRoot: "",
     worldStateRoot: "",
+    lastSettleBlock: 0,
+    settleCount: 0,
   },
   {
     dna: "1010101010101010101010101010101020202020202020202020202020202020",
@@ -73,6 +77,8 @@ const TEST_NFTS: SparkNFTState[] = [
     tokensEarned: 25000n,
     narrativeRoot: "",
     worldStateRoot: "",
+    lastSettleBlock: 0,
+    settleCount: 0,
   },
   {
     dna: "ffffffff00000000deadbeefcafe1234abcdef9876543210feedfacec0ffeeee",
@@ -91,6 +97,8 @@ const TEST_NFTS: SparkNFTState[] = [
     tokensEarned: 50n,
     narrativeRoot: "",
     worldStateRoot: "",
+    lastSettleBlock: 0,
+    settleCount: 0,
   },
   {
     dna: "cafebabecafebabecafebabecafebabe12345678123456781234567812345678",
@@ -109,6 +117,8 @@ const TEST_NFTS: SparkNFTState[] = [
     tokensEarned: 300n,
     narrativeRoot: "",
     worldStateRoot: "",
+    lastSettleBlock: 0,
+    settleCount: 0,
   },
 ];
 

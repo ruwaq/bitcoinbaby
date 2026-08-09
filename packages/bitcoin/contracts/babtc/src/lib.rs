@@ -237,7 +237,9 @@ mod tests {
 
     #[test]
     fn test_count_leading_zeros() {
-        assert_eq!(count_leading_zeros(&[0x00, 0x00, 0x01, 0xff]), 16);
+        // 2 zero bytes (16 bits) + 7 leading zeros of 0x01 = 23.
+        assert_eq!(count_leading_zeros(&[0x00, 0x00, 0x01, 0xff]), 23);
+        // 1 zero byte (8 bits) + 4 leading zeros of 0x0f = 12.
         assert_eq!(count_leading_zeros(&[0x00, 0x0f, 0xff, 0xff]), 12);
         assert_eq!(count_leading_zeros(&[0x00, 0x00, 0x00, 0xff]), 24);
         assert_eq!(count_leading_zeros(&[0xff, 0xff, 0xff, 0xff]), 0);

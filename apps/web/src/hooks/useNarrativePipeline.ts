@@ -42,6 +42,8 @@ function createWorldNftState(): import("@bitcoinbaby/ai").SparkNFTState {
     tokensEarned: 0n,
     narrativeRoot: "",
     worldStateRoot: "",
+    lastSettleBlock: 0,
+    settleCount: 0,
   };
 }
 

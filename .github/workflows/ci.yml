@@ -1,0 +1,111 @@
+# BitcoinBaby CI
+#
+# Runs on every PR and push to main. Gates merge on:
+#   - lint (turbo lint)
+#   - typecheck (turbo typecheck)
+#   - unit/integration tests (turbo test)
+#   - Rust contract tests (cargo test for genesis-babies + babtc)
+#   - secret scan (scripts/scan-secrets.sh over the full tree)
+#   - build smoke (turbo build)
+#
+# The pre-commit hook (husky) already runs secret-scan + prettier; this workflow
+# adds the ESLint/typecheck/test/build barandilla that the hook assumes exists.
+# See docs/superpowers/specs/2026-08-08-hardening-block-tick-mining-design.md Sección 7.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-flight runs for the same ref when a new commit lands.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Node/TS pipeline (lint, typecheck, test, build)
+  # ---------------------------------------------------------------------------
+  ts:
+    name: Lint · Typecheck · Test · Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build (smoke)
+        run: pnpm build
+
+  # ---------------------------------------------------------------------------
+  # Rust contract tests (genesis-babies + babtc — the on-chain logic)
+  # ---------------------------------------------------------------------------
+  contracts:
+    name: Cargo tests (contracts)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        contract: [genesis-babies, babtc]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            packages/bitcoin/contracts/${{ matrix.contract }}
+
+      - name: cargo test (${{ matrix.contract }})
+        working-directory: packages/bitcoin/contracts/${{ matrix.contract }}
+        run: cargo test --locked
+
+  # ---------------------------------------------------------------------------
+  # Secret scan over the whole tree (defence-in-depth beyond pre-commit)
+  # ---------------------------------------------------------------------------
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The scanner diffs staged files locally; in CI we scan all tracked
+          # files, so fetch full history is unnecessary but harmless.
+          fetch-depth: 1
+
+      - name: Scan for secrets
+        # scan-secrets.sh expects staged files (git diff --cached). In CI there
+        # is no staging, so we stage everything first to reuse the script verbatim.
+        run: |
+          git add -A
+          ./scripts/scan-secrets.sh

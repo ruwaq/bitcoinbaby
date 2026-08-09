@@ -94,6 +94,13 @@ export interface SparkNFTState {
   // Narrative state (merkle roots for off-chain verification)
   narrativeRoot: string; // 32-byte merkle root of narrative event history
   worldStateRoot: string; // 32-byte merkle root of personality + inventory
+
+  // Settlement state (Fase 2 — Block-Tick batch settlement).
+  // These advance ONLY via the `settle` operation (createNFTSettleSpell);
+  // every other spell preserves them unchanged. Mirrors the on-chain Rust
+  // fields `last_settle_block` and `settle_count`.
+  lastSettleBlock: number; // bitcoin block height of last settle (0 = never)
+  settleCount: number; // anti-replay settlement counter
 }
 
 /**
@@ -327,6 +334,10 @@ export function createNFTGenesisSpell(params: NFTGenesisParams): SpellV2 {
     tokensEarned: 0n,
     narrativeRoot: "",
     worldStateRoot: "",
+    // Fase 2: fresh mints start unsettled (the on-chain contract enforces this
+    // via is_valid_initial_state — last_settle_block==0, settle_count==0).
+    lastSettleBlock: 0,
+    settleCount: 0,
   };
 
   return {
@@ -449,6 +460,87 @@ export function createNFTLevelUpSpell(params: NFTLevelUpParams): SpellV2 {
     version: 2,
     apps: {
       $00: nftAppRef,
+    },
+    ins: [
+      {
+        utxo_id: `${params.nftUtxo.txid}:${params.nftUtxo.vout}`,
+        charms: {
+          $00: params.currentState,
+        },
+      },
+    ],
+    outs: [
+      {
+        address: params.ownerAddress,
+        charms: {
+          $00: newState,
+        },
+        sats: 546,
+      },
+    ],
+  };
+}
+
+// =============================================================================
+// SETTLEMENT (Fase 2 — Block-Tick batch settlement)
+// =============================================================================
+
+/**
+ * Settle spell parameters. Commits an accumulated narrative Merkle root on-chain
+ * and advances the settlement counter. Gameplay counters (level, xp, tokens) are
+ * preserved unchanged — settle anchors narrative only.
+ *
+ * See spec Sección 2 / AI_WORLD_ENGINE F7.
+ */
+export interface NFTSettleParams {
+  appId: string;
+  appVk: string;
+  nftUtxo: { txid: string; vout: number };
+  currentState: SparkNFTState;
+  ownerAddress: string;
+  narrativeRoot: string; // 64-hex-char new Merkle root
+  settleBlock: number; // bitcoin block height at settlement
+}
+
+/**
+ * Generate a settle spell — commits the narrative root + advances the settle
+ * counter. The on-chain contract (`validate_settle` in genesis-babies) checks:
+ *   - the root is a well-formed 64-hex-char string,
+ *   - `settleCount` ticks by exactly 1,
+ *   - `lastSettleBlock` moves strictly forward,
+ *   - all gameplay counters (level, xp, totalXp, workCount, evolutionCount,
+ *     tokensEarned, lastWorkBlock) are UNCHANGED.
+ *
+ * This function mirrors those checks client-side (failing fast with a clear
+ * error) so misbuilt spells are rejected before they reach the prover.
+ */
+export function createNFTSettleSpell(params: NFTSettleParams): SpellV2 {
+  if (
+    params.narrativeRoot.length !== 64 ||
+    !/^[0-9a-fA-F]{64}$/.test(params.narrativeRoot)
+  ) {
+    throw new Error(
+      `Invalid narrative root: must be 64 hex chars, got length ${params.narrativeRoot.length}`,
+    );
+  }
+  if (params.settleBlock <= params.currentState.lastSettleBlock) {
+    throw new Error(
+      `Settle block must advance: ${params.settleBlock} <= ${params.currentState.lastSettleBlock}`,
+    );
+  }
+
+  const appRef = `n/${params.appId}/${params.appVk}`;
+  const newState: SparkNFTState = {
+    ...params.currentState,
+    narrativeRoot: params.narrativeRoot,
+    lastSettleBlock: params.settleBlock,
+    settleCount: (params.currentState.settleCount ?? 0) + 1,
+  };
+
+  return {
+    version: 2,
+    apps: {
+      $00: appRef,
     },
     ins: [
       {

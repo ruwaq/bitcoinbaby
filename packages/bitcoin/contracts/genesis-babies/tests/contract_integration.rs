@@ -96,6 +96,9 @@ fn fresh_mint() -> SparkNFTState {
         evolution_count: 0,
         tokens_earned: "0".into(),
         heritage: 0,
+        narrative_root: String::new(),
+        last_settle_block: 0,
+        settle_count: 0,
     }
 }
 
@@ -365,6 +368,352 @@ fn work_proof_mutating_immutable_dna_is_rejected() {
     assert!(
         !run(&app(), &tx, &Data::empty(), &w),
         "work_proof mutating dna must reject"
+    );
+}
+
+// =============================================================================
+// WORK (C3 fix — PoW-verified) — accepted / rejected
+//
+// These exercise the new `work` operation end-to-end through `app_contract`.
+// Unlike the deprecated `work_proof` path, XP is NOT a witness input here:
+// `validate_work` re-hashes `challenge:nonce` on-chain and DERIVES the gain via
+// `xp_from_difficulty`. The PoW vector is the same one pinned in the contract's
+// unit tests: challenge "genesis-spark-test" + nonce "745" (integer 1861, hex
+// without 0x prefix) yields a double-SHA256 with exactly 19 leading-zero bits,
+// so `xp_from_difficulty(19) == 130`.
+// =============================================================================
+
+/// Build a one-in / one-out `Transaction` carrying `old` → `new` Spark state.
+/// Same shape every other test constructs inline; factored out to keep the
+/// `work` tests focused on the witness + state-transition under test.
+fn work_tx(old: &SparkNFTState, new: &SparkNFTState) -> Transaction {
+    Transaction {
+        ins: vec![(utxo(), charms_with(old))],
+        refs: vec![],
+        outs: vec![charms_with(new)],
+        coin_ins: None,
+        coin_outs: None,
+        prev_txs: Default::default(),
+        app_public_inputs: Default::default(),
+    }
+}
+
+#[test]
+fn work_op_valid_pow_is_accepted() {
+    let mut old = fresh_mint();
+    old.xp = 50;
+    old.total_xp = 50;
+    old.work_count = 1;
+    old.last_work_block = 199_999;
+
+    // Real mined PoW: "genesis-spark-test:745" hashes with 19 leading-zero bits.
+    let challenge = "genesis-spark-test";
+    let nonce = "745";
+    let difficulty = 19u32;
+    let current_block = 200_000u64;
+
+    // The contract DERIVES the gain from the verified difficulty — it must equal
+    // `xp_from_difficulty(difficulty)`, which is 130 here.
+    let xp_gain = genesis_babies::xp_from_difficulty(difficulty);
+    assert_eq!(xp_gain, 130, "test vector sanity: xp_from_difficulty(19)");
+
+    let mut new = old.clone();
+    new.work_count = old.work_count + 1;
+    new.total_xp = old.total_xp + xp_gain;
+    new.xp = old.xp + xp_gain; // C1a: spendable xp ticks by the same derived gain
+    new.last_work_block = current_block;
+
+    let tx = work_tx(&old, &new);
+    let w = Data::from(&genesis_babies::WorkWitness {
+        operation: "work".into(),
+        challenge: challenge.into(),
+        nonce: nonce.into(),
+        difficulty,
+        current_block,
+    });
+    assert!(
+        run(&app(), &tx, &Data::empty(), &w),
+        "valid work (verified PoW) must be accepted"
+    );
+}
+
+#[test]
+fn work_op_invalid_pow_is_rejected() {
+    let mut old = fresh_mint();
+    old.xp = 50;
+    old.total_xp = 50;
+    old.work_count = 1;
+
+    // Same challenge, but a nonce whose hash does NOT meet difficulty 19.
+    // "genesis-spark-test:bad" double-sha256 has 0 leading-zero bits.
+    let challenge = "genesis-spark-test";
+    let nonce = "bad";
+    let difficulty = 19u32;
+    let current_block = 200_000u64;
+
+    // The attacker still tries to bump the counters as if the PoW were valid.
+    // The contract MUST reject before the counters are even examined, because
+    // `verify_pow` fails on-chain.
+    let xp_gain = genesis_babies::xp_from_difficulty(difficulty);
+    let mut new = old.clone();
+    new.work_count = old.work_count + 1;
+    new.total_xp = old.total_xp + xp_gain;
+    new.xp = old.xp + xp_gain;
+    new.last_work_block = current_block;
+
+    let tx = work_tx(&old, &new);
+    let w = Data::from(&genesis_babies::WorkWitness {
+        operation: "work".into(),
+        challenge: challenge.into(),
+        nonce: nonce.into(),
+        difficulty,
+        current_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "work with a nonce that fails verify_pow must reject (C3)"
+    );
+}
+
+#[test]
+fn work_op_rejects_inflated_xp() {
+    // Direct test that C3 is closed at the integration level: even with a VALID
+    // proof of work, an attacker cannot inject more XP than the on-chain
+    // derivation allows. Here `new.total_xp` is bumped by the derived gain PLUS
+    // an extra 999_999 (and `xp` likewise), simulating the old `xp_gain`-as-free-
+    // input exploit. The contract must reject because the counters no longer
+    // match `old + xp_from_difficulty(difficulty)`.
+    let mut old = fresh_mint();
+    old.xp = 50;
+    old.total_xp = 50;
+    old.work_count = 1;
+
+    let challenge = "genesis-spark-test";
+    let nonce = "745"; // valid PoW at difficulty 19
+    let difficulty = 19u32;
+    let current_block = 200_000u64;
+
+    let derived = genesis_babies::xp_from_difficulty(difficulty); // 130
+    let inflated = derived + 999_999; // the attacker's injected surplus
+
+    let mut new = old.clone();
+    new.work_count = old.work_count + 1;
+    new.total_xp = old.total_xp + inflated; // NOT old.total_xp + derived
+    new.xp = old.xp + inflated; // spendable xp inflated to match (would bypass level-up thresholds)
+    new.last_work_block = current_block;
+
+    let tx = work_tx(&old, &new);
+    let w = Data::from(&genesis_babies::WorkWitness {
+        operation: "work".into(),
+        challenge: challenge.into(),
+        nonce: nonce.into(),
+        difficulty,
+        current_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "work with XP inflated beyond xp_from_difficulty(difficulty) must reject (C3 closed)"
+    );
+}
+
+// =============================================================================
+// SETTLE (Fase 2 — batch narrative settlement) — accepted / rejected
+//
+// These exercise the new `settle` operation end-to-end through `app_contract`.
+// `validate_settle` validates the STATE TRANSITION only (not the full Merkle
+// inclusion proof — that is the EZKL layer's job, spec Sección 5). It enforces:
+//   (1) narrative_root is well-formed (64 hex chars) and matches the witness,
+//   (2) settle_count ticks by exactly 1 (anti-replay on the counter dimension),
+//   (3) settle_block moves STRICTLY forward (anti-replay on the block dimension),
+//   (4) gameplay counters (level, xp, total_xp, work_count, evolution_count,
+//       tokens_earned, last_work_block) are UNCHANGED — settle cannot forge XP.
+// =============================================================================
+
+/// Build a one-in / one-out `Transaction` carrying `old` → `new` Spark state.
+/// Same shape as `work_tx`; factored out separately so the settle tests read
+/// at a glance.
+fn settle_tx(old: &SparkNFTState, new: &SparkNFTState) -> Transaction {
+    Transaction {
+        ins: vec![(utxo(), charms_with(old))],
+        refs: vec![],
+        outs: vec![charms_with(new)],
+        coin_ins: None,
+        coin_outs: None,
+        prev_txs: Default::default(),
+        app_public_inputs: Default::default(),
+    }
+}
+
+/// A fixed, well-formed 64-hex-char narrative root for tests. Built from a
+/// repeat pattern (not a literal 64-hex string) so no secret scanner confuses
+/// it for a key — it is test data, not a secret.
+fn valid_narrative_root() -> String {
+    "deadbeef".repeat(8) // 8 * 8 = 64 hex chars
+}
+
+#[test]
+fn settle_op_valid_transition_is_accepted() {
+    // First-ever settle: counter 0 → 1, block 0 → 100, narrative "" → root.
+    let old = fresh_mint(); // settle_count=0, narrative_root="", last_settle_block=0
+
+    let settle_block = 100u64;
+    let root = valid_narrative_root();
+    let mut new = old.clone();
+    new.settle_count = old.settle_count + 1; // 1
+    new.last_settle_block = settle_block;
+    new.narrative_root = root.clone();
+
+    let tx = settle_tx(&old, &new);
+    let w = Data::from(&genesis_babies::SettleWitness {
+        operation: "settle".into(),
+        narrative_root: root,
+        settle_block,
+    });
+    assert!(
+        run(&app(), &tx, &Data::empty(), &w),
+        "valid settle transition must be accepted"
+    );
+}
+
+#[test]
+fn settle_op_rejects_double_settle_same_block() {
+    // Anti-replay on the block dimension: a second settle whose settle_block is
+    // NOT strictly greater than old.last_settle_block must be rejected. This
+    // prevents anchoring two roots at the same height.
+    let mut old = fresh_mint();
+    old.settle_count = 1;
+    old.last_settle_block = 100;
+
+    // BUG under test: settle_block == old.last_settle_block (not strictly greater).
+    let settle_block = 100u64;
+    let root = valid_narrative_root();
+    let mut new = old.clone();
+    new.settle_count = old.settle_count + 1;
+    new.last_settle_block = settle_block;
+    new.narrative_root = root.clone();
+
+    let tx = settle_tx(&old, &new);
+    let w = Data::from(&genesis_babies::SettleWitness {
+        operation: "settle".into(),
+        narrative_root: root,
+        settle_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "settle at a non-advancing block must reject (anti-replay)"
+    );
+}
+
+#[test]
+fn settle_op_rejects_xp_mutation() {
+    // Settle must NOT be a path to forge XP / tokens. Here the attacker performs
+    // a valid-looking settle AND simultaneously bumps xp + total_xp. The
+    // contract must reject because gameplay counters must be unchanged on settle.
+    let mut old = fresh_mint();
+    old.xp = 50;
+    old.total_xp = 50;
+    old.work_count = 1;
+
+    let settle_block = 100u64;
+    let root = valid_narrative_root();
+    let mut new = old.clone();
+    new.settle_count = old.settle_count + 1;
+    new.last_settle_block = settle_block;
+    new.narrative_root = root.clone();
+    // BUG under test: attacker also bumps xp and total_xp through the settle op.
+    new.xp = old.xp + 999_999;
+    new.total_xp = old.total_xp + 999_999;
+
+    let tx = settle_tx(&old, &new);
+    let w = Data::from(&genesis_babies::SettleWitness {
+        operation: "settle".into(),
+        narrative_root: root,
+        settle_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "settle that also bumps xp/total_xp must reject (no XP forgery via settle)"
+    );
+}
+
+#[test]
+fn settle_op_rejects_bad_narrative_root() {
+    // The committed root must be a well-formed 64-hex-char string. Here it is
+    // 63 chars (one short).
+    let old = fresh_mint();
+
+    let settle_block = 100u64;
+    let bad_root = "a".repeat(63); // 63 chars, not 64
+    let mut new = old.clone();
+    new.settle_count = old.settle_count + 1;
+    new.last_settle_block = settle_block;
+    new.narrative_root = bad_root.clone();
+
+    let tx = settle_tx(&old, &new);
+    let w = Data::from(&genesis_babies::SettleWitness {
+        operation: "settle".into(),
+        narrative_root: bad_root,
+        settle_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "settle with a 63-char (non-32-byte) narrative root must reject"
+    );
+}
+
+#[test]
+fn settle_op_rejects_counter_skip() {
+    // Anti-replay on the counter dimension: settle_count must tick by EXACTLY 1.
+    // Skipping (0 → 2) must be rejected so an attacker cannot reserve counter
+    // space or desync the settlement log.
+    let old = fresh_mint();
+
+    let settle_block = 100u64;
+    let root = valid_narrative_root();
+    let mut new = old.clone();
+    new.settle_count = old.settle_count + 2; // BUG: skips 1
+    new.last_settle_block = settle_block;
+    new.narrative_root = root.clone();
+
+    let tx = settle_tx(&old, &new);
+    let w = Data::from(&genesis_babies::SettleWitness {
+        operation: "settle".into(),
+        narrative_root: root,
+        settle_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "settle that skips the counter (0→2) must reject"
+    );
+}
+
+#[test]
+fn settle_op_rejects_root_mismatch_between_witness_and_state() {
+    // The witness attests root A but the published output carries root B. The
+    // contract must reject — the published state must be bound to the witness.
+    let old = fresh_mint();
+
+    let settle_block = 100u64;
+    let witness_root = valid_narrative_root();
+    let mut state_root = witness_root.clone();
+    // Flip the last char so the published root differs from the attested one.
+    let last = state_root.pop().unwrap();
+    state_root.push(if last == 'a' { 'b' } else { 'a' });
+
+    let mut new = old.clone();
+    new.settle_count = old.settle_count + 1;
+    new.last_settle_block = settle_block;
+    new.narrative_root = state_root; // differs from the witness's narrative_root
+
+    let tx = settle_tx(&old, &new);
+    let w = Data::from(&genesis_babies::SettleWitness {
+        operation: "settle".into(),
+        narrative_root: witness_root,
+        settle_block,
+    });
+    assert!(
+        !run(&app(), &tx, &Data::empty(), &w),
+        "settle where the published root != witness root must reject"
     );
 }
 
