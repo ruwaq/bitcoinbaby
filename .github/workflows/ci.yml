@@ -5,6 +5,7 @@
 #   - typecheck (turbo typecheck)
 #   - unit/integration tests (turbo test)
 #   - Rust contract tests (cargo test for genesis-babies + babtc)
+#   - contract VK reproducibility (wasm32-wasip1 build vs embedded binary)
 #   - secret scan (scripts/scan-secrets.sh over the full tree)
 #   - build smoke (turbo build)
 #
@@ -88,6 +89,110 @@ jobs:
       - name: cargo test (${{ matrix.contract }})
         working-directory: packages/bitcoin/contracts/${{ matrix.contract }}
         run: cargo test --locked
+
+  # ---------------------------------------------------------------------------
+  # Contract VK reproducibility check (supply-chain defense)
+  # ---------------------------------------------------------------------------
+  # Builds each Charms contract from source (wasm32-wasip1 target) and verifies
+  # the resulting VK (SHA256 of the wasm) matches the VK embedded in the
+  # worker's contract-binary.ts. Catches supply-chain tampering: if someone
+  # swaps the embedded binary for a different one, this job fails.
+  #
+  # The embedded binaries were produced with `cargo build --release --target
+  # wasm32-wasip1` (NOT `charms app build`, which wraps the wasm and changes the
+  # hash — see docs/audits/VK_RECONCILIATION.md). This job mirrors that pipeline.
+  contract-vk-check:
+    name: Contract VK reproducibility (${{ matrix.contract }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # Map contract dir name -> embedded binary TS file.
+        # The declared VK variable names are documented here for reference, but
+        # extraction uses a generic grep for the first 64-hex string in the file
+        # (robust to renames). Verified actual names on 2026-08-09:
+        #   babtc-contract-binary.ts       -> BABTC_CONTRACT_VK
+        #   babtc-v2-contract-binary.ts    -> BABTC_V2_CONTRACT_VK
+        #   nft-contract-binary.ts         -> NFT_CONTRACT_VK
+        include:
+          - contract: babtc
+            binary_file: apps/workers/src/lib/babtc-contract-binary.ts
+          - contract: babtc-v2
+            binary_file: apps/workers/src/lib/babtc-v2-contract-binary.ts
+          - contract: genesis-babies
+            binary_file: apps/workers/src/lib/nft-contract-binary.ts
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain + wasm32-wasip1 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            packages/bitcoin/contracts/${{ matrix.contract }}
+
+      - name: Build contract from source (wasm32-wasip1)
+        working-directory: packages/bitcoin/contracts/${{ matrix.contract }}
+        run: cargo build --release --target wasm32-wasip1 --locked
+
+      # NOTE on wasm selection: a single contract may emit more than one wasm in
+      # target/wasm32-wasip1/release/ (e.g. babtc produces both the cargo lib
+      # output `babtc_contract.wasm` AND the charms-wrapped `babtc-contract.wasm`
+      # if `charms app build` was run). We hash EVERY top-level release/*.wasm
+      # (excluding deps/) and pass if the declared VK matches ANY of them. The
+      # spec's original `find | head -1` was non-deterministic and could grab the
+      # charms-wrapped wasm, which has a different hash.
+      - name: Compute built VKs (sha256 of each wasm) and compare to declared
+        env:
+          BINARY_FILE: ${{ matrix.binary_file }}
+        working-directory: packages/bitcoin/contracts/${{ matrix.contract }}
+        run: |
+          set -euo pipefail
+          # Declared VK: first 64-hex string in the embedded binary TS file.
+          DECLARED=$(grep -oE '"[a-f0-9]{64}"' "$GITHUB_WORKSPACE/$BINARY_FILE" | head -1 | tr -d '"')
+          echo "Declared VK (from $BINARY_FILE):"
+          echo "  $DECLARED"
+          echo ""
+
+          echo "Built wasm files (target/wasm32-wasip1/release/*.wasm, excluding deps/):"
+          MATCH=0
+          MATCHED_WASM=""
+          while IFS= read -r wasm; do
+            VK=$(sha256sum "$wasm" | awk '{print $1}')
+            SIZE=$(wc -c < "$wasm")
+            MARKER="  "
+            if [ "$VK" = "$DECLARED" ]; then
+              MARKER=">>"
+              MATCH=1
+              MATCHED_WASM="$wasm"
+            fi
+            printf "  %s %-40s (%7d bytes) %s\n" "$MARKER" "$(basename "$wasm")" "$SIZE" "$VK"
+          done < <(find target/wasm32-wasip1/release -maxdepth 1 -name "*.wasm")
+          echo ""
+          echo "Legend: '>>' = matches declared VK"
+
+          echo ""
+          if [ -z "$DECLARED" ]; then
+            echo "FAIL: could not extract a declared VK from $BINARY_FILE."
+            exit 1
+          fi
+
+          if [ "$MATCH" = "1" ]; then
+            echo "PASS: declared VK matches built wasm '$MATCHED_WASM'."
+            echo "      Embedded binary is reproducible from source via cargo build."
+          else
+            echo "FAIL: VK MISMATCH -- the embedded binary does NOT match any wasm"
+            echo "      produced from source. This is a supply-chain risk. Either:"
+            echo "        (a) the source changed and the embedded binary wasn't regenerated, or"
+            echo "        (b) the embedded binary was tampered with."
+            echo "      See docs/audits/VK_RECONCILIATION.md."
+            exit 1
+          fi
 
   # ---------------------------------------------------------------------------
   # Secret scan over the whole tree (defence-in-depth beyond pre-commit)
